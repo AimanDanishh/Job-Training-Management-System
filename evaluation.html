@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <?!= include('style') ?>
+  <title>TrainHub — Evaluation</title>
+  <style>
+    .likert-btn { width:32px;height:32px;border-radius:7px;border:2px solid #E2E8F0;
+                  background:#fff;font-size:12px;font-weight:700;cursor:pointer;transition:all 0.12s; }
+    .likert-btn.sel-1,.likert-btn.sel-2 { border-color:#EF4444;background:#FEF2F2;color:#EF4444; }
+    .likert-btn.sel-3 { border-color:#F59E0B;background:#FFFBEB;color:#D97706; }
+    .likert-btn.sel-4,.likert-btn.sel-5 { border-color:#22C55E;background:#F0FDF4;color:#16A34A; }
+    .radio-pill { display:flex;align-items:center;gap:6px;cursor:pointer;padding:7px 14px;
+                  border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;font-size:13px;
+                  font-weight:400;color:#374151;transition:all 0.12s; }
+    .radio-pill.active { border-color:#2563EB;background:#EFF6FF;color:#2563EB;font-weight:600; }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-logo"><div style="display:flex;align-items:center;gap:10px"><div class="logo-icon"><span class="icon filled md" style="color:white">corporate_fare</span></div><div><div class="logo-name">TrainHub</div><div class="logo-sub">Management System</div></div></div></div>
+    <nav class="sidebar-nav">
+      <a class="nav-item" data-page="dashboard"  href="?page=dashboard"><span class="icon">dashboard</span>Dashboard</a>
+      <a class="nav-item" data-page="training"   href="?page=training"><span class="icon">school</span>Training Programmes</a>
+      <a class="nav-item" data-page="employee"   href="?page=employee"><span class="icon">group</span>Employees</a>
+      <a class="nav-item" data-page="attendance" href="?page=attendance"><span class="icon">fact_check</span>Attendance</a>
+      <a class="nav-item" data-page="evaluation" href="?page=evaluation"><span class="icon">rate_review</span>Evaluation</a>
+      <a class="nav-item" data-page="report"     href="?page=report"><span class="icon">bar_chart</span>Reports</a>
+      <div class="nav-divider"></div>
+      <a class="nav-item nav-logout" href="?page=index"><span class="icon">logout</span>Logout</a>
+    </nav>
+    <div class="sidebar-user"><div style="display:flex;align-items:center;gap:10px"><div class="avatar" style="background:#2563EB;width:32px;height:32px;font-size:12px">SA</div><div><div style="font-size:12.5px;font-weight:600;color:#1E293B">Sarah Mitchell</div><div style="font-size:11px;color:#94A3B8">HR Administrator</div></div></div></div>
+  </aside>
+
+  <div class="main-area">
+    <header class="topbar">
+      <div style="flex:1"><h1 class="topbar-title">Evaluation</h1><p class="topbar-sub">Training & Post-Training Evaluations</p></div>
+      <button class="btn-th btn-primary" onclick="openModal('modal-eval')"><span class="icon sm">rate_review</span>Submit Evaluation</button>
+    </header>
+
+    <main class="page-content">
+      <!-- Selector -->
+      <div class="card-th mb-4">
+        <div class="row g-3 align-items-end">
+          <div class="col-md-6">
+            <label class="label-th">Select Training Programme</label>
+            <select id="sel-eval-t" class="input-th">
+              <option value="">— Select a training —</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <button class="btn-th btn-primary" style="width:100%" onclick="loadEvaluations()"><span class="icon sm">search</span>Load</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sub-tabs -->
+      <div class="subtab-row" id="eval-subtabs" style="display:none">
+        <button class="subtab active" data-tab="training-eval" onclick="switchTab(this)"><span class="icon sm">rate_review</span>Training Evaluation</button>
+        <button class="subtab" data-tab="post-eval" onclick="switchTab(this)"><span class="icon sm">timeline</span>6-Month Post Evaluation</button>
+      </div>
+
+      <!-- Training Eval Tab -->
+      <div id="tab-training-eval">
+        <div class="row g-3 mb-3" id="eval-summary" style="display:none">
+          <div class="col-md-4"><div class="card-th" style="background:#F0FDF4;border-color:#BBF7D0"><div class="stat-value" style="color:#22C55E" id="e-completed">—</div><div class="stat-label">Completed</div></div></div>
+          <div class="col-md-4"><div class="card-th" style="background:#F5F3FF;border-color:#DDD6FE"><div class="stat-value" style="color:#8B5CF6" id="e-avg">—</div><div class="stat-label">Average Score</div></div></div>
+        </div>
+        <div class="card-th card-th-p0">
+          <div style="overflow-x:auto">
+            <table class="table-th">
+              <thead><tr><th>Employee</th><th>Department</th><th>Avg Score</th><th>Submitted At</th></tr></thead>
+              <tbody id="eval-tbody"><tr><td colspan="4" style="text-align:center;color:#94A3B8;padding:40px">Select a training to view evaluations</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Post Eval Tab -->
+      <div id="tab-post-eval" style="display:none">
+        <div class="card-th card-th-p0">
+          <div style="overflow-x:auto">
+            <table class="table-th">
+              <thead><tr><th>Employee</th><th>Evaluator</th><th>Competency Before</th><th>Competency After</th><th>Improvement</th><th>Submitted At</th></tr></thead>
+              <tbody id="post-tbody"><tr><td colspan="6" style="text-align:center;color:#94A3B8;padding:40px">Select a training to view post-evaluations</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div style="margin-top:16px;text-align:right">
+          <button class="btn-th btn-primary" onclick="openModal('modal-post-eval')"><span class="icon sm">add</span>Submit Post-Training Evaluation</button>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Training Eval Modal -->
+<div id="modal-eval" class="modal-overlay" style="display:none">
+  <div class="modal-box" style="max-width:620px">
+    <div class="modal-header">
+      <div><h3 class="modal-title">Training Evaluation Form</h3><p class="modal-sub">Borang Penilaian Latihan</p></div>
+      <button class="modal-close" onclick="closeModal('modal-eval')">✕</button>
+    </div>
+    <input type="hidden" id="eval-tid">
+    <div class="row g-2 mb-3">
+      <div class="col-md-6"><label class="label-th">Employee ID</label><input id="eval-empid" class="input-th" placeholder="EMP-XXXX"></div>
+      <div class="col-md-6"><label class="label-th">Employee Name</label><input id="eval-empname" class="input-th" placeholder="Full name"></div>
+    </div>
+
+    <!-- Section A -->
+    <div style="background:#EFF6FF;border-radius:10px;padding:14px 16px;margin-bottom:20px">
+      <h4 style="font-size:13px;font-weight:700;color:#1E293B;margin:0 0 4px">Section A — Programme Assessment</h4>
+      <p style="font-size:11.5px;color:#1D4ED8;margin:0">Rate each statement: 1 = Strongly Disagree, 5 = Strongly Agree</p>
+    </div>
+
+    <div id="likert-questions"></div>
+
+    <!-- Section B -->
+    <div style="margin:20px 0 14px">
+      <h4 style="font-size:13px;font-weight:700;color:#1E293B;margin:0 0 14px">Section B — Open Feedback</h4>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div>
+          <label class="label-th">1. What was the most valuable part of the training?<br><small style="font-weight:400;color:#94A3B8">Apakah bahagian latihan yang paling bernilai kepada anda?</small></label>
+          <textarea id="eval-b1" class="input-th" rows="2" placeholder="Your response..."></textarea>
+        </div>
+        <div>
+          <label class="label-th">2. What could be improved?<br><small style="font-weight:400;color:#94A3B8">Apa yang boleh diperbaiki?</small></label>
+          <textarea id="eval-b2" class="input-th" rows="2" placeholder="Your response..."></textarea>
+        </div>
+        <div>
+          <label class="label-th">3. Future training suggestions<br><small style="font-weight:400;color:#94A3B8">Cadangan topik latihan akan datang</small></label>
+          <textarea id="eval-b3" class="input-th" rows="2" placeholder="Your response..."></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:16px;border-top:1px solid #F1F5F9">
+      <button class="btn-th btn-secondary" onclick="closeModal('modal-eval')">Cancel</button>
+      <button id="btn-submit-eval" class="btn-th btn-primary" onclick="submitEval()"><span class="icon sm">send</span>Submit Evaluation</button>
+    </div>
+  </div>
+</div>
+
+<!-- Post-Eval Modal -->
+<div id="modal-post-eval" class="modal-overlay" style="display:none">
+  <div class="modal-box" style="max-width:600px">
+    <div class="modal-header">
+      <div><h3 class="modal-title">Post Training Evaluation (6 Months)</h3><p class="modal-sub">Supervisor assessment form</p></div>
+      <button class="modal-close" onclick="closeModal('modal-post-eval')">✕</button>
+    </div>
+    <input type="hidden" id="post-tid">
+    <div class="row g-2 mb-3">
+      <div class="col-md-6"><label class="label-th">Employee ID</label><input id="post-empid" class="input-th" placeholder="EMP-XXXX"></div>
+      <div class="col-md-6"><label class="label-th">Evaluator Name</label><input id="post-evname" class="input-th" placeholder="Supervisor name"></div>
+      <div class="col-md-6"><label class="label-th">Evaluator Employee ID</label><input id="post-evid" class="input-th" placeholder="EMP-XXXX"></div>
+    </div>
+
+    <!-- Competency Before -->
+    <div style="margin-bottom:18px">
+      <h4 style="font-size:13px;font-weight:700;color:#1E293B;margin:0 0 10px">Competency Level Before Training</h4>
+      <div id="comp-before" style="display:flex;flex-direction:column;gap:6px"></div>
+    </div>
+
+    <!-- Improvement questions -->
+    <div style="margin-bottom:18px;display:flex;flex-direction:column;gap:12px" id="improvement-questions"></div>
+
+    <!-- Competency After -->
+    <div style="margin-bottom:18px">
+      <h4 style="font-size:13px;font-weight:700;color:#1E293B;margin:0 0 10px">Competency Level After Training</h4>
+      <div id="comp-after" style="display:flex;flex-direction:column;gap:6px"></div>
+    </div>
+
+    <div style="margin-bottom:18px">
+      <label class="label-th">Additional Comments</label>
+      <textarea id="post-comments" class="input-th" rows="3" placeholder="Optional..."></textarea>
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:16px;border-top:1px solid #F1F5F9">
+      <button class="btn-th btn-secondary" onclick="closeModal('modal-post-eval')">Cancel</button>
+      <button id="btn-submit-post" class="btn-th btn-primary" onclick="submitPostEval()"><span class="icon sm">send</span>Submit</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<?!= include('script') ?>
+<script>
+  // ─── Likert questions ──────────────────────────────────────────────────────
+  const LIKERT_QS = [
+    { en: 'The training objectives were clearly defined.', ms: 'Objektif latihan dinyatakan dengan jelas.' },
+    { en: 'The content was relevant to my job.',           ms: 'Kandungan latihan berkaitan dengan tugas saya.' },
+    { en: 'The training materials were useful.',           ms: 'Bahan latihan berguna dan disediakan dengan baik.' },
+    { en: 'The trainer was knowledgeable and effective.',  ms: 'Penceramah mempunyai pengetahuan dan berkesan.' },
+    { en: 'The training was engaging and interactive.',    ms: 'Latihan ini menarik dan interaktif.' },
+    { en: 'The duration of the training was appropriate.', ms: 'Tempoh latihan adalah sesuai.' },
+    { en: 'I will be able to apply what I learned.',       ms: 'Saya dapat mempraktikkan apa yang saya pelajari.' },
+  ];
+  const COMPETENCY = [
+    { v:1, l:'Basic / Novice',   d:'Limited understanding; requires constant supervision' },
+    { v:2, l:'Intermediate',     d:'Developing skill; requires occasional guidance' },
+    { v:3, l:'Competent',        d:'Fully proficient; can work independently' },
+    { v:4, l:'Advanced',         d:'High proficiency; can guide others' },
+    { v:5, l:'Expert',           d:'Mastery level; recognized authority' },
+  ];
+  const IMPROVE_QS = [
+    { id:'improvement', label:'Has the employee shown improvement after training?' },
+    { id:'canApply',    label:'Can the employee apply what was learned?' },
+    { id:'further',     label:'Does the employee require further training?' },
+  ];
+
+  let likertScores = Array(7).fill(0);
+
+  // Build likert form
+  function buildLikert() {
+    const el = document.getElementById('likert-questions');
+    el.innerHTML = LIKERT_QS.map((q, qi) => `
+      <div style="display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid #F8FAFC">
+        <div style="flex:1;min-width:0">
+          <p style="font-size:13px;color:#1E293B;margin:0 0 2px;line-height:1.4">${qi+1}. ${q.en}</p>
+          <p style="font-size:11px;color:#94A3B8;margin:0;font-style:italic">${q.ms}</p>
+        </div>
+        <div style="display:flex;gap:4px;flex-shrink:0" id="likert-row-${qi}">
+          ${[1,2,3,4,5].map(n => `<button class="likert-btn" data-q="${qi}" data-v="${n}" onclick="selectLikert(${qi},${n})">${n}</button>`).join('')}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function selectLikert(qi, v) {
+    likertScores[qi] = v;
+    document.querySelectorAll(`#likert-row-${qi} .likert-btn`).forEach(b => {
+      b.className = 'likert-btn' + (Number(b.dataset.v) === v ? ' sel-'+v : '');
+    });
+  }
+
+  // Build competency selectors
+  function buildCompetency(containerId, name) {
+    document.getElementById(containerId).innerHTML = COMPETENCY.map(c => `
+      <label class="radio-pill" id="${name}-${c.v}" onclick="selectComp('${name}',${c.v})">
+        <input type="radio" name="${name}" value="${c.v}" style="display:none">
+        <span style="font-size:13px;font-weight:600">${c.v}. ${c.l}</span>
+        <span style="font-size:11.5px;color:#94A3B8;margin-left:4px">— ${c.d}</span>
+      </label>
+    `).join('');
+  }
+
+  function selectComp(name, v) {
+    document.querySelectorAll(`[id^="${name}-"]`).forEach(el => el.classList.remove('active'));
+    const target = document.getElementById(`${name}-${v}`);
+    if (target) target.classList.add('active');
+  }
+
+  // Build improvement questions
+  function buildImprovementQs() {
+    const el = document.getElementById('improvement-questions');
+    const opts = { improvement: ['Yes','Partially','No'], canApply: ['Yes','Partially','No'], further: ['Yes','No'] };
+    el.innerHTML = IMPROVE_QS.map(q => `
+      <div>
+        <p style="font-size:13px;font-weight:600;color:#374151;margin:0 0 8px">${q.label}</p>
+        <div style="display:flex;gap:8px" id="opts-${q.id}">
+          ${(opts[q.id] || ['Yes','No']).map(o => `
+            <label class="radio-pill" id="opt-${q.id}-${o}" onclick="selectOpt('${q.id}','${o}')">
+              <input type="radio" name="${q.id}" value="${o}" style="display:none">${o}
+            </label>`).join('')}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function selectOpt(name, v) {
+    document.querySelectorAll(`[id^="opt-${name}-"]`).forEach(el => el.classList.remove('active'));
+    document.getElementById(`opt-${name}-${v}`).classList.add('active');
+  }
+
+  // ─── Page init ───────────────────────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', async () => {
+    buildLikert();
+    buildCompetency('comp-before', 'cb');
+    buildCompetency('comp-after',  'ca');
+    buildImprovementQs();
+
+    try {
+      const trainings = await callServer('getTrainings');
+      const sel = document.getElementById('sel-eval-t');
+      trainings.forEach(t => {
+        const o = document.createElement('option');
+        o.value = t.ID; o.textContent = `[${t.Code}] ${t.Name}`;
+        sel.appendChild(o);
+      });
+      const params = new URLSearchParams(window.location.search);
+      const pid = params.get('id');
+      if (pid) { sel.value = pid; loadEvaluations(); }
+    } catch(e) { showToast(e.message, 'error'); }
+  });
+
+  function switchTab(btn) {
+    document.querySelectorAll('.subtab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    ['training-eval','post-eval'].forEach(id =>
+      document.getElementById('tab-'+id).style.display = btn.dataset.tab === id ? '' : 'none'
+    );
+  }
+
+  async function loadEvaluations() {
+    const id = document.getElementById('sel-eval-t').value;
+    if (!id) { showToast('Select a training.', 'error'); return; }
+
+    document.getElementById('eval-subtabs').style.display = '';
+    document.getElementById('eval-tid').value  = id;
+    document.getElementById('post-tid').value  = id;
+
+    try {
+      const sum   = await callServer('getEvaluationSummary', id);
+      document.getElementById('eval-summary').style.display = '';
+      document.getElementById('e-completed').textContent = sum.evalCompleted || 0;
+      document.getElementById('e-avg').textContent = sum.avgScore ? sum.avgScore + ' / 5' : 'N/A';
+
+      const evals = await callServer('getTrainingEvaluations', id);
+      document.getElementById('eval-tbody').innerHTML = evals.length
+        ? evals.map((r, i) => `<tr>
+            <td><div style="display:flex;align-items:center;gap:8px">${avatar(r.EmployeeName,27,i)}<div><div style="font-size:13px;font-weight:500">${r.EmployeeName}</div><div style="font-size:11px;color:#94A3B8">${r.EmployeeID}</div></div></div></td>
+            <td style="font-size:12px;color:#64748B">—</td>
+            <td><span style="font-size:14px;font-weight:800;color:${r.AvgScore>=4?'#22C55E':r.AvgScore>=3?'#F59E0B':'#EF4444'}">${Number(r.AvgScore).toFixed(1)}</span><span style="font-size:11px;color:#94A3B8">/5</span></td>
+            <td style="font-size:12px;color:#64748B">${r.SubmittedAt}</td>
+          </tr>`).join('')
+        : '<tr><td colspan="4" style="text-align:center;color:#94A3B8;padding:32px">No evaluations submitted yet.</td></tr>';
+
+      const posts = await callServer('getPostEvaluations', id);
+      document.getElementById('post-tbody').innerHTML = posts.length
+        ? posts.map((r, i) => `<tr>
+            <td><div style="display:flex;align-items:center;gap:8px">${avatar(r.EmployeeID, 27, i)}<span style="font-size:13px;font-weight:500">${r.EmployeeID}</span></div></td>
+            <td style="font-size:12px;color:#64748B">${r.EvaluatorName}</td>
+            <td>${COMPETENCY.find(c=>c.v==r.CompetencyBefore)?.l||r.CompetencyBefore}</td>
+            <td>${COMPETENCY.find(c=>c.v==r.CompetencyAfter)?.l||r.CompetencyAfter}</td>
+            <td>${statusBadge(r.Improvement)}</td>
+            <td style="font-size:12px;color:#64748B">${r.SubmittedAt}</td>
+          </tr>`).join('')
+        : '<tr><td colspan="6" style="text-align:center;color:#94A3B8;padding:32px">No post-evaluations yet.</td></tr>';
+    } catch(e) { showToast(e.message, 'error'); }
+  }
+
+  async function submitEval() {
+    const tid = document.getElementById('eval-tid').value || document.getElementById('sel-eval-t').value;
+    const empId = document.getElementById('eval-empid').value.trim();
+    const empName = document.getElementById('eval-empname').value.trim();
+    if (!tid) { showToast('Select a training first.', 'error'); return; }
+    if (!empId) { showToast('Employee ID is required.', 'error'); return; }
+
+    const data = {
+      TrainingID: tid, EmployeeID: empId, EmployeeName: empName,
+      Q1: likertScores[0], Q2: likertScores[1], Q3: likertScores[2],
+      Q4: likertScores[3], Q5: likertScores[4], Q6: likertScores[5], Q7: likertScores[6],
+      SectionB1: document.getElementById('eval-b1').value,
+      SectionB2: document.getElementById('eval-b2').value,
+      SectionB3: document.getElementById('eval-b3').value,
+    };
+    const btn = document.getElementById('btn-submit-eval');
+    setBtnLoading(btn, true, 'Submitting...');
+    try {
+      await callServer('saveTrainingEvaluation', data);
+      showToast('Evaluation submitted!', 'success');
+      closeModal('modal-eval');
+      likertScores = Array(7).fill(0);
+      buildLikert();
+      loadEvaluations();
+    } catch(e) { showToast(e.message, 'error'); }
+    finally { setBtnLoading(btn, false, '<span class="icon sm">send</span> Submit Evaluation'); }
+  }
+
+  async function submitPostEval() {
+    const tid = document.getElementById('post-tid').value || document.getElementById('sel-eval-t').value;
+    const empId   = document.getElementById('post-empid').value.trim();
+    const evName  = document.getElementById('post-evname').value.trim();
+    const evId    = document.getElementById('post-evid').value.trim();
+    if (!tid || !empId || !evName) { showToast('Training, Employee ID and Evaluator Name are required.', 'error'); return; }
+
+    const getComp = name => {
+      const el = document.querySelector(`input[name="${name}"]:checked`);
+      return el ? el.value : 0;
+    };
+    const getOpt = name => {
+      const el = document.querySelector(`input[name="${name}"]:checked`);
+      return el ? el.value : '';
+    };
+
+    const data = {
+      TrainingID: tid, EmployeeID: empId, EvaluatorName: evName, EvaluatorID: evId,
+      CompetencyBefore: getComp('cb'), CompetencyAfter: getComp('ca'),
+      Improvement:      getOpt('improvement'), CanApply: getOpt('canApply'),
+      FurtherTraining:  getOpt('further'),
+      Comments: document.getElementById('post-comments').value,
+    };
+    const btn = document.getElementById('btn-submit-post');
+    setBtnLoading(btn, true, 'Submitting...');
+    try {
+      await callServer('savePostEvaluation', data);
+      showToast('Post-training evaluation submitted!', 'success');
+      closeModal('modal-post-eval');
+      loadEvaluations();
+    } catch(e) { showToast(e.message, 'error'); }
+    finally { setBtnLoading(btn, false, '<span class="icon sm">send</span> Submit'); }
+  }
+</script>
+</body>
+</html>

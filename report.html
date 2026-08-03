@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <?!= include('style') ?>
+  <title>TrainHub — Reports</title>
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-logo"><div style="display:flex;align-items:center;gap:10px"><div class="logo-icon"><span class="icon filled md" style="color:white">corporate_fare</span></div><div><div class="logo-name">TrainHub</div><div class="logo-sub">Management System</div></div></div></div>
+    <nav class="sidebar-nav">
+      <a class="nav-item" data-page="dashboard"  href="?page=dashboard"><span class="icon">dashboard</span>Dashboard</a>
+      <a class="nav-item" data-page="training"   href="?page=training"><span class="icon">school</span>Training Programmes</a>
+      <a class="nav-item" data-page="employee"   href="?page=employee"><span class="icon">group</span>Employees</a>
+      <a class="nav-item" data-page="attendance" href="?page=attendance"><span class="icon">fact_check</span>Attendance</a>
+      <a class="nav-item" data-page="evaluation" href="?page=evaluation"><span class="icon">rate_review</span>Evaluation</a>
+      <a class="nav-item" data-page="report"     href="?page=report"><span class="icon">bar_chart</span>Reports</a>
+      <div class="nav-divider"></div>
+      <a class="nav-item nav-logout" href="?page=index"><span class="icon">logout</span>Logout</a>
+    </nav>
+    <div class="sidebar-user"><div style="display:flex;align-items:center;gap:10px"><div class="avatar" style="background:#2563EB;width:32px;height:32px;font-size:12px">SA</div><div><div style="font-size:12.5px;font-weight:600;color:#1E293B">Sarah Mitchell</div><div style="font-size:11px;color:#94A3B8">HR Administrator</div></div></div></div>
+  </aside>
+
+  <div class="main-area">
+    <header class="topbar">
+      <div style="flex:1"><h1 class="topbar-title">Reports</h1><p class="topbar-sub">Generate and export training analytics</p></div>
+    </header>
+
+    <main class="page-content">
+      <!-- Training selector -->
+      <div class="card-th mb-4">
+        <div class="row g-3 align-items-end">
+          <div class="col-md-6">
+            <label class="label-th">Select Training Programme</label>
+            <select id="sel-rep-t" class="input-th">
+              <option value="">— Select a training —</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <button class="btn-th btn-primary" style="width:100%" onclick="loadReport()"><span class="icon sm">bar_chart</span>Generate Report</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Report sections (shown after load) -->
+      <div id="report-content" style="display:none">
+        <!-- Programme header -->
+        <div class="card-th mb-4" id="rep-header"></div>
+
+        <!-- KPI stats -->
+        <div class="row g-3 mb-4" id="rep-stats"></div>
+
+        <!-- Attendance summary by day -->
+        <div class="card-th card-th-p0 mb-4">
+          <div class="card-header-row">
+            <span style="font-size:14px;font-weight:700">Attendance by Day</span>
+            <button class="btn-th btn-secondary btn-sm" onclick="exportSheet()"><span class="icon sm">download</span>Export to Sheet</button>
+          </div>
+          <div style="overflow-x:auto">
+            <table class="table-th" id="rep-att-table">
+              <thead><tr><th>Day</th><th>Date</th><th>Total</th><th>Present</th><th>Absent</th><th>Late</th><th>Attendance %</th></tr></thead>
+              <tbody id="rep-att-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Evaluation summary -->
+        <div class="card-th mb-4" id="rep-eval-summary"></div>
+
+        <!-- Export actions -->
+        <div class="card-th">
+          <div class="section-label">Export Options</div>
+          <div class="row g-3" id="export-cards"></div>
+        </div>
+      </div>
+
+      <div id="report-loading" style="display:none;text-align:center;padding:48px;color:#94A3B8">
+        <div class="spinner" style="margin:0 auto 12px;width:32px;height:32px;border-color:rgba(37,99,235,0.2);border-top-color:#2563EB"></div>
+        Generating report...
+      </div>
+    </main>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<?!= include('script') ?>
+<script>
+  let currentReportId = null;
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    try {
+      const trainings = await callServer('getTrainings');
+      const sel = document.getElementById('sel-rep-t');
+      trainings.forEach(t => {
+        const o = document.createElement('option');
+        o.value = t.ID; o.textContent = `[${t.Code}] ${t.Name}`;
+        sel.appendChild(o);
+      });
+      const params = new URLSearchParams(window.location.search);
+      const pid = params.get('id');
+      if (pid) { sel.value = pid; loadReport(); }
+    } catch(e) { showToast(e.message, 'error'); }
+  });
+
+  async function loadReport() {
+    const id = document.getElementById('sel-rep-t').value;
+    if (!id) { showToast('Please select a training.', 'error'); return; }
+    currentReportId = id;
+
+    document.getElementById('report-content').style.display = 'none';
+    document.getElementById('report-loading').style.display = '';
+
+    try {
+      const report = await callServer('generateReport', id);
+      renderReport(report);
+    } catch(e) {
+      showToast('Failed to generate report: ' + e.message, 'error');
+    } finally {
+      document.getElementById('report-loading').style.display = 'none';
+    }
+  }
+
+  function renderReport(report) {
+    const t   = report.training;
+    const att = report.attendance;
+    const ev  = report.evaluation;
+
+    // Header
+    document.getElementById('rep-header').innerHTML = `
+      <div style="display:flex;gap:16px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap">
+        <div>
+          <span style="font-size:10.5px;font-family:monospace;color:#94A3B8;background:#F8FAFC;padding:2px 7px;border-radius:4px;border:1px solid #E2E8F0">${t.Code}</span>
+          <h2 style="font-size:20px;font-weight:800;color:#1E293B;margin:8px 0 6px;letter-spacing:-0.02em">${t.Name}</h2>
+          <div style="display:flex;gap:14px;flex-wrap:wrap">
+            ${[['person',t.Trainer],['location_on',t.Venue||'—'],['calendar_today',t.StartDate+' — '+(t.EndDate||'?')],['schedule',t.Duration+' days · '+t.TotalHours+' hours']].map(([ic,tx])=>
+              `<span style="display:flex;align-items:center;gap:4px;font-size:12px;color:#64748B"><span class="icon sm" style="color:#94A3B8">${ic}</span>${tx}</span>`
+            ).join('')}
+          </div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:11px;color:#94A3B8">Generated</div>
+          <div style="font-size:12px;color:#64748B">${report.generatedAt}</div>
+          ${statusBadge(t.Status)}
+        </div>
+      </div>
+      <div style="background:#F8FAFC;border-radius:10px;padding:12px 16px;margin-top:16px">
+        <div class="section-label" style="margin-bottom:8px">Lifecycle Stage</div>
+        ${renderLifecycle(t.Stage||'Created')}
+      </div>
+    `;
+
+    // KPI stats
+    const attSum = att.summary || {};
+    const evalSum = ev.summary || {};
+    document.getElementById('rep-stats').innerHTML = [
+      { label:'Attendance Rate',    value:(attSum.pct||0)+'%',        color:'#22C55E', icon:'fact_check' },
+      { label:'Present Records',    value:attSum.present||0,          color:'#2563EB', icon:'how_to_reg' },
+      { label:'Absent Records',     value:attSum.absent||0,           color:'#EF4444', icon:'person_off' },
+      { label:'Evaluations Received',value:evalSum.evalCompleted||0,  color:'#8B5CF6', icon:'rate_review' },
+      { label:'Average Eval Score', value:evalSum.avgScore?evalSum.avgScore+'/5':'N/A', color:'#F59E0B', icon:'star' },
+    ].map(s => `
+      <div class="col-6 col-md-4 col-lg">
+        <div class="stat-card">
+          <span class="icon filled md" style="color:${s.color};margin-bottom:6px;display:block">${s.icon}</span>
+          <div class="stat-value" style="color:${s.color}">${s.value}</div>
+          <div class="stat-label">${s.label}</div>
+        </div>
+      </div>
+    `).join('');
+
+    // Attendance by day table
+    const days = att.days || [];
+    document.getElementById('rep-att-tbody').innerHTML = days.length
+      ? days.map(d => {
+          const records = d.records || [];
+          const present = records.filter(r => r.Status === 'Present').length;
+          const absent  = records.filter(r => r.Status === 'Absent').length;
+          const late    = records.filter(r => r.Status === 'Late').length;
+          const pct     = records.length ? Math.round(present / records.length * 100) : 0;
+          return `<tr>
+            <td style="font-weight:700">Day ${d.day}</td>
+            <td style="font-size:12px;color:#64748B">${d.date}</td>
+            <td style="font-size:13px;font-weight:500">${records.length}</td>
+            <td style="color:#22C55E;font-weight:600">${present}</td>
+            <td style="color:#EF4444;font-weight:600">${absent}</td>
+            <td style="color:#F59E0B;font-weight:600">${late}</td>
+            <td>
+              <div style="display:flex;align-items:center;gap:8px;min-width:120px">
+                ${progressBar(pct, pct>=90?'#22C55E':pct>=70?'#F59E0B':'#EF4444', 6)}
+                <span style="font-size:12px;font-weight:700;color:#1E293B;min-width:34px">${pct}%</span>
+              </div>
+            </td>
+          </tr>`;
+        }).join('')
+      : '<tr><td colspan="7" style="text-align:center;color:#94A3B8;padding:24px">No attendance data</td></tr>';
+
+    // Eval summary
+    document.getElementById('rep-eval-summary').innerHTML = `
+      <h4 style="font-size:14px;font-weight:700;color:#1E293B;margin:0 0 16px">Evaluation Summary</h4>
+      <div class="row g-3">
+        <div class="col-md-4">
+          <div style="background:#F0FDF4;border-radius:10px;padding:14px;text-align:center">
+            <div style="font-size:28px;font-weight:800;color:#22C55E">${evalSum.evalCompleted||0}</div>
+            <div style="font-size:12px;color:#64748B">Evaluations Completed</div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div style="background:#F5F3FF;border-radius:10px;padding:14px;text-align:center">
+            <div style="font-size:28px;font-weight:800;color:#8B5CF6">${evalSum.avgScore||'—'}</div>
+            <div style="font-size:12px;color:#64748B">Average Score (out of 5)</div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div style="background:#ECFEFF;border-radius:10px;padding:14px;text-align:center">
+            <div style="font-size:28px;font-weight:800;color:#0891B2">${evalSum.postCompleted||0}</div>
+            <div style="font-size:12px;color:#64748B">Post-Eval Completed</div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Export cards
+    document.getElementById('export-cards').innerHTML = [
+      { title:'Attendance Excel Export',           desc:'Export attendance data to a new Google Sheet',  icon:'table_chart',    color:'#22C55E', action:'exportSheet()' },
+      { title:'Participant List',                  desc:'Download full participant roster',              icon:'group',          color:'#2563EB', action:'showToast("Use File > Download in the spreadsheet","info")' },
+      { title:'Training Evaluation Summary',       desc:'View aggregated evaluation responses',          icon:'rate_review',    color:'#8B5CF6', action:'navTo("evaluation",{id:"'+id+'"})' },
+      { title:'Post Training Evaluation Summary',  desc:'View 6-month supervisor evaluation results',   icon:'timeline',       color:'#F59E0B', action:'navTo("evaluation",{id:"'+id+'"})' },
+    ].map(r => `
+      <div class="col-md-6">
+        <div style="display:flex;gap:12px;align-items:flex-start;padding:14px;background:#F8FAFC;border-radius:10px;border:1px solid #F1F5F9;cursor:pointer;transition:background 0.12s"
+             onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='#F8FAFC'"
+             onclick="${r.action}">
+          <div style="width:36px;height:36px;border-radius:9px;background:${r.color}15;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <span class="icon" style="color:${r.color}">${r.icon}</span>
+          </div>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600;color:#1E293B;margin-bottom:2px">${r.title}</div>
+            <div style="font-size:11.5px;color:#94A3B8">${r.desc}</div>
+          </div>
+          <span class="icon sm" style="color:#94A3B8;flex-shrink:0">arrow_forward</span>
+        </div>
+      </div>
+    `).join('');
+
+    document.getElementById('report-content').style.display = '';
+  }
+
+  async function exportSheet() {
+    if (!currentReportId) return;
+    try {
+      const res = await callServer('exportAttendanceSheet', currentReportId);
+      showToast('Exported: ' + res.sheetName + '. Open your spreadsheet to view it.', 'success');
+    } catch(e) { showToast(e.message, 'error'); }
+  }
+</script>
+</body>
+</html>

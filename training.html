@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <?!= include('style') ?>
+  <title>TrainHub — Training Programmes</title>
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-logo"><div style="display:flex;align-items:center;gap:10px"><div class="logo-icon"><span class="icon filled md" style="color:white">corporate_fare</span></div><div><div class="logo-name">TrainHub</div><div class="logo-sub">Management System</div></div></div></div>
+    <nav class="sidebar-nav">
+      <a class="nav-item" data-page="dashboard" href="?page=dashboard"><span class="icon">dashboard</span>Dashboard</a>
+      <a class="nav-item" data-page="training"  href="?page=training"><span class="icon">school</span>Training Programmes</a>
+      <a class="nav-item" data-page="employee"  href="?page=employee"><span class="icon">group</span>Employees</a>
+      <a class="nav-item" data-page="attendance"href="?page=attendance"><span class="icon">fact_check</span>Attendance</a>
+      <a class="nav-item" data-page="evaluation"href="?page=evaluation"><span class="icon">rate_review</span>Evaluation</a>
+      <a class="nav-item" data-page="report"    href="?page=report"><span class="icon">bar_chart</span>Reports</a>
+      <div class="nav-divider"></div>
+      <a class="nav-item nav-logout" href="?page=index"><span class="icon">logout</span>Logout</a>
+    </nav>
+    <div class="sidebar-user"><div style="display:flex;align-items:center;gap:10px"><div class="avatar" style="background:#2563EB;width:32px;height:32px;font-size:12px">SA</div><div><div style="font-size:12.5px;font-weight:600;color:#1E293B">Sarah Mitchell</div><div style="font-size:11px;color:#94A3B8">HR Administrator</div></div></div></div>
+  </aside>
+
+  <div class="main-area">
+    <header class="topbar">
+      <div style="flex:1"><h1 class="topbar-title">Training Programmes</h1><p class="topbar-sub">Manage the full lifecycle of all training programmes</p></div>
+      <button class="btn-th btn-primary" onclick="openModal('modal-training')"><span class="icon sm">add</span>New Programme</button>
+    </header>
+
+    <main class="page-content">
+      <!-- Toolbar -->
+      <div class="d-flex gap-2 flex-wrap justify-content-between align-items-center mb-3">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <div style="position:relative">
+            <span class="icon" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94A3B8;font-size:14px">search</span>
+            <input id="search-t" class="input-th" style="padding-left:28px;width:220px" placeholder="Search programmes...">
+          </div>
+          <select id="status-t" class="input-th" style="width:auto">
+            <option value="">All Status</option>
+            <option>Draft</option><option>Upcoming</option><option>In Progress</option><option>Completed</option><option>Archived</option>
+          </select>
+          <select id="cat-t" class="input-th" style="width:auto">
+            <option value="">All Categories</option>
+            <option>Leadership & Management</option><option>Compliance & Regulatory</option>
+            <option>Technology & Innovation</option><option>Project Management</option>
+            <option>Data & Analytics</option><option>Customer Experience</option>
+          </select>
+        </div>
+        <button class="btn-th btn-secondary btn-sm" onclick="loadTrainings()"><span class="icon sm">refresh</span>Refresh</button>
+      </div>
+
+      <div id="t-count" style="font-size:12px;color:#94A3B8;margin-bottom:12px"></div>
+
+      <!-- Cards grid -->
+      <div id="training-grid" class="row g-3"></div>
+    </main>
+  </div>
+</div>
+
+<!-- Training Modal -->
+<div id="modal-training" class="modal-overlay" style="display:none">
+  <div class="modal-box" style="max-width:640px">
+    <div class="modal-header">
+      <div><h3 class="modal-title" id="t-modal-title">New Training Programme</h3><p class="modal-sub">Fill in programme details</p></div>
+      <button class="modal-close" onclick="closeModal('modal-training')">✕</button>
+    </div>
+    <input type="hidden" id="t-id">
+    <div class="row g-3">
+      <div class="col-12">
+        <label class="label-th">Programme Name <span class="required">*</span></label>
+        <input id="t-name" class="input-th" placeholder="e.g. Leadership Excellence Programme">
+      </div>
+      <div class="col-md-6">
+        <label class="label-th">Category</label>
+        <select id="t-cat" class="input-th">
+          <option>Leadership & Management</option><option>Compliance & Regulatory</option>
+          <option>Technology & Innovation</option><option>Project Management</option>
+          <option>Data & Analytics</option><option>Customer Experience</option>
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label class="label-th">Trainer / Facilitator <span class="required">*</span></label>
+        <input id="t-trainer" class="input-th" placeholder="Trainer name">
+      </div>
+      <div class="col-md-6">
+        <label class="label-th">Venue</label>
+        <input id="t-venue" class="input-th" placeholder="Training venue">
+      </div>
+      <div class="col-md-6">
+        <label class="label-th">Course Fee (RM)</label>
+        <input id="t-fee" class="input-th" type="number" min="0" step="0.01" placeholder="0.00">
+      </div>
+      <div class="col-md-6">
+        <label class="label-th">Department</label>
+        <select id="t-dept" class="input-th">
+          <option value="">All Departments</option>
+          <option>Engineering</option><option>HR</option><option>Finance</option>
+          <option>Operations</option><option>IT</option><option>Sales</option>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="label-th">Start Date <span class="required">*</span></label>
+        <input id="t-start" class="input-th" type="date">
+      </div>
+      <div class="col-md-4">
+        <label class="label-th">End Date</label>
+        <input id="t-end" class="input-th" type="date">
+      </div>
+      <div class="col-md-2">
+        <label class="label-th">Days</label>
+        <input id="t-duration" class="input-th" type="number" min="1" value="1">
+      </div>
+      <div class="col-md-2">
+        <label class="label-th">Hours/Day</label>
+        <input id="t-hours" class="input-th" type="number" min="1" value="8">
+      </div>
+      <div class="col-md-6">
+        <label class="label-th">Status</label>
+        <select id="t-status" class="input-th">
+          <option>Draft</option><option>Upcoming</option><option>In Progress</option><option>Completed</option>
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label class="label-th">Lifecycle Stage</label>
+        <select id="t-stage" class="input-th">
+          <option>Created</option><option>Participants Imported</option>
+          <option>Attendance In Progress</option><option>Training Completed</option>
+          <option>Evaluation Completed</option><option>Waiting for 6-Month Review</option>
+          <option>Programme Closed</option>
+        </select>
+      </div>
+      <div class="col-12">
+        <label class="label-th">Programme Objectives</label>
+        <textarea id="t-obj" class="input-th" rows="3" placeholder="Describe the training objectives..."></textarea>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid #F1F5F9">
+      <button class="btn-th btn-secondary" onclick="closeModal('modal-training')">Cancel</button>
+      <button id="btn-save-t" class="btn-th btn-primary" onclick="saveTraining()"><span class="icon sm">save</span>Save Programme</button>
+    </div>
+  </div>
+</div>
+
+<!-- Detail Panel (overlay) -->
+<div id="detail-panel" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.3);z-index:150;backdrop-filter:blur(2px)">
+  <div style="position:absolute;top:0;right:0;bottom:0;width:min(720px,100vw);background:#F8FAFC;overflow-y:auto;box-shadow:-8px 0 32px rgba(0,0,0,0.12)">
+    <div id="detail-content" style="padding:24px"></div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<?!= include('script') ?>
+<script>
+  let allTrainings = [];
+
+  document.addEventListener('DOMContentLoaded', loadTrainings);
+  document.getElementById('search-t').addEventListener('input', filterTrainings);
+  document.getElementById('status-t').addEventListener('change', filterTrainings);
+  document.getElementById('cat-t').addEventListener('change', filterTrainings);
+
+  async function loadTrainings() {
+    document.getElementById('training-grid').innerHTML = '<div class="col-12 text-center py-5" style="color:#94A3B8">Loading...</div>';
+    try {
+      allTrainings = await callServer('getTrainings');
+      renderGrid(allTrainings);
+    } catch(e) { showToast(e.message, 'error'); }
+  }
+
+  function filterTrainings() {
+    const q   = document.getElementById('search-t').value.toLowerCase();
+    const st  = document.getElementById('status-t').value;
+    const cat = document.getElementById('cat-t').value;
+    const f   = allTrainings.filter(t =>
+      (!q || t.Name.toLowerCase().includes(q) || t.Code.toLowerCase().includes(q) || t.Trainer.toLowerCase().includes(q)) &&
+      (!st  || t.Status   === st) &&
+      (!cat || t.Category === cat)
+    );
+    renderGrid(f);
+  }
+
+  const CAT_COLORS = {
+    'Leadership & Management': '#2563EB', 'Compliance & Regulatory': '#EF4444',
+    'Technology & Innovation': '#8B5CF6', 'Project Management': '#0891B2',
+    'Data & Analytics': '#F59E0B', 'Customer Experience': '#22C55E'
+  };
+
+  function renderGrid(list) {
+    document.getElementById('t-count').textContent = `Showing ${list.length} of ${allTrainings.length} programmes`;
+    const grid = document.getElementById('training-grid');
+    if (!list.length) {
+      grid.innerHTML = '<div class="col-12"><div class="empty-state"><span class="icon">school</span><p style="color:#94A3B8">No training programmes found</p></div></div>';
+      return;
+    }
+    grid.innerHTML = list.map(t => {
+      const cc = CAT_COLORS[t.Category] || '#2563EB';
+      return `
+      <div class="col-md-6 col-xl-4">
+        <div style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden;
+                    transition:box-shadow 0.15s,transform 0.1s;cursor:pointer"
+             onmouseover="this.style.boxShadow='0 6px 20px rgba(0,0,0,0.09)';this.style.transform='translateY(-1px)'"
+             onmouseout="this.style.boxShadow='';this.style.transform=''">
+          <div style="height:4px;background:${cc}"></div>
+          <div style="padding:16px">
+            <!-- Header -->
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+              <div style="flex:1;min-width:0">
+                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+                  <span style="font-size:10.5px;font-family:monospace;color:#94A3B8;background:#F8FAFC;padding:2px 6px;border-radius:4px;border:1px solid #E2E8F0">${t.Code || '—'}</span>
+                  <span style="font-size:10.5px;color:${cc};background:${cc}15;padding:2px 7px;border-radius:999px;font-weight:500">${t.Category}</span>
+                </div>
+                <h3 style="font-size:13.5px;font-weight:700;color:#1E293B;margin:0;line-height:1.3">${t.Name}</h3>
+              </div>
+              ${statusBadge(t.Status)}
+            </div>
+            <!-- Meta -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;margin-bottom:10px">
+              ${[['person',t.Trainer],['location_on',t.Venue||'—'],['calendar_today',t.StartDate+' → '+(t.EndDate||'?')],['schedule',t.Duration+'d · '+(t.TotalHours||'?')+'h'],['group',t.Participants+' Participants'],['corporate_fare',t.Department||'All Depts']].map(([ic,tx])=>
+                `<div style="display:flex;align-items:center;gap:4px"><span class="icon sm" style="color:#94A3B8">${ic}</span><span style="font-size:11.5px;color:#64748B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${tx}</span></div>`
+              ).join('')}
+            </div>
+            <!-- Stage chip -->
+            <div style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:#F8FAFC;border-radius:7px;margin-bottom:10px;border:1px solid #F1F5F9">
+              <span class="icon sm" style="color:#2563EB">linear_scale</span>
+              <span style="font-size:11.5px;font-weight:600;color:#1E293B;flex:1">Stage: ${t.Stage||'Created'}</span>
+            </div>
+            <!-- Actions -->
+            <div style="display:flex;gap:6px;border-top:1px solid #F1F5F9;padding-top:12px">
+              <button class="btn-th btn-primary btn-sm" style="flex:1;justify-content:center" onclick="openDetail('${t.ID}')"><span class="icon sm">open_in_new</span>Open</button>
+              ${t.FolderID ? `<a class="btn-th btn-secondary btn-sm" href="https://drive.google.com/drive/folders/${t.FolderID}" target="_blank" title="Open Google Drive Workspace" style="text-decoration:none"><span class="icon sm">folder</span></a>` : ''}
+              <button class="btn-th btn-secondary btn-sm" onclick="editTraining(${JSON.stringify(t).replace(/"/g,"'").replace(/\n/g,' ')})"><span class="icon sm">edit</span></button>
+              <button class="btn-th btn-danger btn-sm" onclick="confirmDeleteT('${t.ID}')"><span class="icon sm">archive</span></button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function editTraining(t) {
+    document.getElementById('t-modal-title').textContent = 'Edit Training Programme';
+    document.getElementById('t-id').value       = t.ID;
+    document.getElementById('t-name').value     = t.Name;
+    document.getElementById('t-cat').value      = t.Category;
+    document.getElementById('t-trainer').value  = t.Trainer;
+    document.getElementById('t-venue').value    = t.Venue || '';
+    document.getElementById('t-fee').value      = t.CourseFee || '';
+    document.getElementById('t-dept').value     = t.Department || '';
+    document.getElementById('t-start').value    = t.StartDate || '';
+    document.getElementById('t-end').value      = t.EndDate   || '';
+    document.getElementById('t-duration').value = t.Duration  || 1;
+    document.getElementById('t-hours').value    = t.TotalHours|| 8;
+    document.getElementById('t-status').value   = t.Status    || 'Draft';
+    document.getElementById('t-stage').value    = t.Stage     || 'Created';
+    document.getElementById('t-obj').value      = t.Objectives|| '';
+    openModal('modal-training');
+  }
+
+  async function saveTraining() {
+    const id   = document.getElementById('t-id').value;
+    const name = document.getElementById('t-name').value.trim();
+    if (!name) { showToast('Programme name is required.', 'error'); return; }
+
+    const data = {
+      ID: id, Name: name,
+      Category:   document.getElementById('t-cat').value,
+      Trainer:    document.getElementById('t-trainer').value,
+      Venue:      document.getElementById('t-venue').value,
+      CourseFee:  document.getElementById('t-fee').value,
+      Department: document.getElementById('t-dept').value,
+      StartDate:  document.getElementById('t-start').value,
+      EndDate:    document.getElementById('t-end').value,
+      Duration:   document.getElementById('t-duration').value,
+      TotalHours: document.getElementById('t-hours').value,
+      Status:     document.getElementById('t-status').value,
+      Stage:      document.getElementById('t-stage').value,
+      Objectives: document.getElementById('t-obj').value,
+      Participants: 0
+    };
+    const btn = document.getElementById('btn-save-t');
+    setBtnLoading(btn, true, 'Saving...');
+    try {
+      const res = await callServer(id ? 'updateTraining' : 'addTraining', data);
+      if (res && res.folderUrl) {
+        const formLink = res.requisitionFormUrl
+          ? ` · <a href="${res.requisitionFormUrl}" target="_blank" style="color:white;text-decoration:underline;font-weight:600">Open Requisition Form</a>`
+          : '';
+        showToast(`Programme & Drive Workspace created! <a href="${res.folderUrl}" target="_blank" style="color:white;text-decoration:underline;font-weight:600">Open Folder</a>${formLink}`, 'success');
+      } else {
+        showToast(id ? 'Programme updated.' : 'Programme created.', 'success');
+      }
+      closeModal('modal-training');
+      clearTrainingForm();
+      loadTrainings();
+    } catch(e) { showToast(e.message, 'error'); }
+    finally { setBtnLoading(btn, false, '<span class="icon sm">save</span> Save Programme'); }
+  }
+
+  async function confirmDeleteT(id) {
+    if (!confirm('Archive this programme?')) return;
+    try { await callServer('deleteTraining', id); showToast('Programme archived.', 'success'); loadTrainings(); }
+    catch(e) { showToast(e.message, 'error'); }
+  }
+
+  async function openDetail(id) {
+    const panel   = document.getElementById('detail-panel');
+    const content = document.getElementById('detail-content');
+    content.innerHTML = '<div class="text-center py-5" style="color:#94A3B8">Loading...</div>';
+    panel.style.display = 'block';
+
+    try {
+      const t = await callServer('getTrainingById', id);
+      content.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+          <div>
+            <span style="font-size:10.5px;font-family:monospace;color:#94A3B8;background:#F8FAFC;padding:2px 7px;border-radius:4px;border:1px solid #E2E8F0">${t.Code}</span>
+            <h2 style="font-size:18px;font-weight:800;color:#1E293B;margin:8px 0 0;letter-spacing:-0.02em">${t.Name}</h2>
+          </div>
+          <button class="btn-th btn-secondary btn-sm" onclick="document.getElementById('detail-panel').style.display='none'"><span class="icon sm">close</span>Close</button>
+        </div>
+        <div style="background:#F8FAFC;border-radius:10px;padding:14px 16px;margin-bottom:20px">
+          <div class="section-label" style="margin-bottom:8px">Programme Lifecycle</div>
+          ${renderLifecycle(t.Stage || 'Created')}
+        </div>
+        <div class="row g-3 mb-3">
+          ${[['Trainer',t.Trainer],['Venue',t.Venue||'—'],['Start Date',t.StartDate],['End Date',t.EndDate||'—'],
+             ['Duration',t.Duration+' days'],['Total Hours',t.TotalHours+' hours'],
+             ['Participants',t.Participants],['Department',t.Department||'All']].map(([l,v])=>
+            `<div class="col-6"><div style="font-size:11.5px;color:#94A3B8">${l}</div><div style="font-size:13px;font-weight:500;color:#1E293B">${v}</div></div>`
+          ).join('')}
+        </div>
+        ${t.Objectives ? `<div><div style="font-size:11.5px;color:#94A3B8;margin-bottom:5px">Objectives</div><p style="font-size:13px;color:#374151;line-height:1.6;margin:0">${t.Objectives}</p></div>` : ''}
+        <hr class="divider">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn-th btn-primary btn-sm" onclick="navTo('attendance', {id:'${t.ID}'})"><span class="icon sm">fact_check</span>View Attendance</button>
+          <button class="btn-th btn-secondary btn-sm" onclick="navTo('evaluation', {id:'${t.ID}'})"><span class="icon sm">rate_review</span>View Evaluations</button>
+          <button class="btn-th btn-secondary btn-sm" onclick="navTo('report', {id:'${t.ID}'})"><span class="icon sm">bar_chart</span>Generate Report</button>
+          ${t.FolderID ? `<a class="btn-th btn-secondary btn-sm" href="https://drive.google.com/drive/folders/${t.FolderID}" target="_blank" style="text-decoration:none;display:inline-flex;align-items:center;gap:4px"><span class="icon sm">folder</span>Drive Workspace</a>` : ''}
+        </div>
+      `;
+    } catch(e) { showToast(e.message, 'error'); }
+  }
+
+  // Close detail panel on overlay click
+  document.getElementById('detail-panel').addEventListener('click', function(e) {
+    if (e.target === this) this.style.display = 'none';
+  });
+
+  function clearTrainingForm() {
+    ['t-id','t-name','t-trainer','t-venue','t-fee','t-start','t-end','t-obj'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('t-duration').value = 1;
+    document.getElementById('t-hours').value    = 8;
+    document.getElementById('t-status').value   = 'Draft';
+    document.getElementById('t-stage').value    = 'Created';
+    document.getElementById('t-modal-title').textContent = 'New Training Programme';
+  }
+</script>
+</body>
+</html>

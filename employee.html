@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <?!= include('style') ?>
+  <title>TrainHub — Employees</title>
+</head>
+<body>
+<div class="app-shell">
+  <!-- Sidebar (same on every page) -->
+  <aside class="sidebar">
+    <div class="sidebar-logo"><div style="display:flex;align-items:center;gap:10px"><div class="logo-icon"><span class="icon filled md" style="color:white">corporate_fare</span></div><div><div class="logo-name">TrainHub</div><div class="logo-sub">Management System</div></div></div></div>
+    <nav class="sidebar-nav">
+      <a class="nav-item" data-page="dashboard" href="?page=dashboard"><span class="icon">dashboard</span>Dashboard</a>
+      <a class="nav-item" data-page="training"  href="?page=training"><span class="icon">school</span>Training Programmes</a>
+      <a class="nav-item" data-page="employee"  href="?page=employee"><span class="icon">group</span>Employees</a>
+      <a class="nav-item" data-page="attendance"href="?page=attendance"><span class="icon">fact_check</span>Attendance</a>
+      <a class="nav-item" data-page="evaluation"href="?page=evaluation"><span class="icon">rate_review</span>Evaluation</a>
+      <a class="nav-item" data-page="report"    href="?page=report"><span class="icon">bar_chart</span>Reports</a>
+      <div class="nav-divider"></div>
+      <a class="nav-item nav-logout" href="?page=index"><span class="icon">logout</span>Logout</a>
+    </nav>
+    <div class="sidebar-user"><div style="display:flex;align-items:center;gap:10px"><div class="avatar" style="background:#2563EB;width:32px;height:32px;font-size:12px">SA</div><div><div style="font-size:12.5px;font-weight:600;color:#1E293B">Sarah Mitchell</div><div style="font-size:11px;color:#94A3B8">HR Administrator</div></div></div></div>
+  </aside>
+
+  <div class="main-area">
+    <header class="topbar">
+      <div style="flex:1"><h1 class="topbar-title">Employees</h1><p class="topbar-sub">Manage employee records</p></div>
+      <button class="btn-th btn-primary" onclick="openModal('modal-add')"><span class="icon sm">person_add</span>Add Employee</button>
+    </header>
+
+    <main class="page-content">
+      <!-- Toolbar -->
+      <div class="d-flex gap-2 flex-wrap justify-content-between align-items-center mb-3">
+        <div style="display:flex;gap:8px">
+          <div style="position:relative">
+            <span class="icon" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94A3B8;font-size:14px">search</span>
+            <input id="search-input" class="input-th" style="padding-left:28px;width:220px" placeholder="Search employees...">
+          </div>
+          <select id="dept-filter" class="input-th" style="width:auto">
+            <option value="">All Departments</option>
+            <option>Engineering</option><option>HR</option><option>Finance</option>
+            <option>Operations</option><option>IT</option><option>Sales</option>
+          </select>
+          <select id="status-filter" class="input-th" style="width:auto">
+            <option value="">All Status</option>
+            <option>Active</option><option>Inactive</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn-th btn-secondary btn-sm" onclick="loadEmployees()"><span class="icon sm">refresh</span>Refresh</button>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="card-th card-th-p0">
+        <div style="overflow-x:auto">
+          <table class="table-th">
+            <thead><tr>
+              <th>Employee ID</th><th>Name</th><th>Department</th><th>Position</th>
+              <th>Email</th><th>Status</th><th>Actions</th>
+            </tr></thead>
+            <tbody id="emp-tbody">
+              <tr><td colspan="7" style="text-align:center;color:#94A3B8;padding:40px">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="emp-footer" class="p-3" style="font-size:12px;color:#94A3B8;border-top:1px solid #F1F5F9"></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div id="modal-add" class="modal-overlay" style="display:none">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div><h3 class="modal-title" id="modal-title">Add Employee</h3><p class="modal-sub">Fill in the details below</p></div>
+      <button class="modal-close" onclick="closeModal('modal-add')">✕</button>
+    </div>
+    <input type="hidden" id="emp-id">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="label-th">Full Name <span class="required">*</span></label>
+        <input id="emp-name" class="input-th" placeholder="Full name">
+      </div>
+      <div class="col-md-6">
+        <label class="label-th">Department <span class="required">*</span></label>
+        <select id="emp-dept" class="input-th">
+          <option value="">Select department</option>
+          <option>Engineering</option><option>HR</option><option>Finance</option>
+          <option>Operations</option><option>IT</option><option>Sales</option>
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label class="label-th">Position</label>
+        <input id="emp-position" class="input-th" placeholder="Job title">
+      </div>
+      <div class="col-md-6">
+        <label class="label-th">Status</label>
+        <select id="emp-status" class="input-th">
+          <option>Active</option><option>Inactive</option>
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label class="label-th">Email</label>
+        <input id="emp-email" class="input-th" type="email" placeholder="email@company.com">
+      </div>
+      <div class="col-md-6">
+        <label class="label-th">Phone</label>
+        <input id="emp-phone" class="input-th" placeholder="+60 1X-XXXXXXXX">
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid #F1F5F9">
+      <button class="btn-th btn-secondary" onclick="closeModal('modal-add')">Cancel</button>
+      <button id="btn-save-emp" class="btn-th btn-primary" onclick="saveEmployee()"><span class="icon sm">save</span>Save Employee</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<?!= include('script') ?>
+<script>
+  let allEmployees = [];
+
+  document.addEventListener('DOMContentLoaded', loadEmployees);
+  document.getElementById('search-input').addEventListener('input', filterTable);
+  document.getElementById('dept-filter').addEventListener('change', filterTable);
+  document.getElementById('status-filter').addEventListener('change', filterTable);
+
+  async function loadEmployees() {
+    try {
+      allEmployees = await callServer('getEmployees');
+      renderTable(allEmployees);
+    } catch(e) {
+      showToast('Failed to load employees: ' + e.message, 'error');
+    }
+  }
+
+  function filterTable() {
+    const q    = document.getElementById('search-input').value.toLowerCase();
+    const dept = document.getElementById('dept-filter').value;
+    const stat = document.getElementById('status-filter').value;
+    const f = allEmployees.filter(e =>
+      (!q || e.Name.toLowerCase().includes(q) || e.ID.toLowerCase().includes(q) || (e.Position||'').toLowerCase().includes(q)) &&
+      (!dept || e.Department === dept) &&
+      (!stat || e.Status === stat)
+    );
+    renderTable(f);
+  }
+
+  function renderTable(list) {
+    const tbody = document.getElementById('emp-tbody');
+    document.getElementById('emp-footer').textContent = `Showing ${list.length} of ${allEmployees.length} employees`;
+
+    if (!list.length) {
+      tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><span class="icon">group</span><p style="color:#94A3B8">No employees found</p></div></td></tr>';
+      return;
+    }
+    tbody.innerHTML = list.map((e, i) => `
+      <tr>
+        <td style="font-family:monospace;font-size:11px;color:#94A3B8">${e.ID}</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            ${avatar(e.Name, 28, i)}
+            <div>
+              <div style="font-size:13px;font-weight:500">${e.Name}</div>
+              <div style="font-size:11px;color:#94A3B8">${e.Position || ''}</div>
+            </div>
+          </div>
+        </td>
+        <td style="font-size:12px;color:#64748B">${e.Department}</td>
+        <td style="font-size:12px;color:#64748B">${e.Position || '—'}</td>
+        <td style="font-size:12px;color:#64748B">${e.Email || '—'}</td>
+        <td>${statusBadge(e.Status || 'Active')}</td>
+        <td>
+          <div style="display:flex;gap:4px">
+            <button class="btn-th btn-secondary btn-xs" onclick="editEmployee(${JSON.stringify(e).replace(/"/g,"'")})" title="Edit"><span class="icon sm">edit</span></button>
+            <button class="btn-th btn-danger btn-xs" onclick="confirmDelete('${e.ID}')" title="Delete"><span class="icon sm">delete</span></button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function editEmployee(e) {
+    document.getElementById('modal-title').textContent = 'Edit Employee';
+    document.getElementById('emp-id').value       = e.ID;
+    document.getElementById('emp-name').value     = e.Name;
+    document.getElementById('emp-dept').value     = e.Department;
+    document.getElementById('emp-position').value = e.Position;
+    document.getElementById('emp-status').value   = e.Status;
+    document.getElementById('emp-email').value    = e.Email;
+    document.getElementById('emp-phone').value    = e.Phone;
+    openModal('modal-add');
+  }
+
+  async function saveEmployee() {
+    const id   = document.getElementById('emp-id').value;
+    const name = document.getElementById('emp-name').value.trim();
+    const dept = document.getElementById('emp-dept').value;
+    if (!name) { showToast('Name is required.', 'error'); return; }
+    if (!dept) { showToast('Department is required.', 'error'); return; }
+
+    const data = {
+      ID: id, Name: name, Department: dept,
+      Position: document.getElementById('emp-position').value,
+      Status:   document.getElementById('emp-status').value,
+      Email:    document.getElementById('emp-email').value,
+      Phone:    document.getElementById('emp-phone').value
+    };
+
+    const btn = document.getElementById('btn-save-emp');
+    setBtnLoading(btn, true, 'Saving...');
+    try {
+      await callServer(id ? 'updateEmployee' : 'addEmployee', data);
+      showToast(id ? 'Employee updated.' : 'Employee added.', 'success');
+      closeModal('modal-add');
+      clearForm();
+      loadEmployees();
+    } catch(e) {
+      showToast(e.message, 'error');
+    } finally {
+      setBtnLoading(btn, false, '<span class="icon sm">save</span> Save Employee');
+    }
+  }
+
+  async function confirmDelete(id) {
+    if (!confirm('Delete this employee? This action cannot be undone.')) return;
+    try {
+      await callServer('deleteEmployee', id);
+      showToast('Employee deleted.', 'success');
+      loadEmployees();
+    } catch(e) { showToast(e.message, 'error'); }
+  }
+
+  function clearForm() {
+    ['emp-id','emp-name','emp-position','emp-email','emp-phone'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('emp-dept').value   = '';
+    document.getElementById('emp-status').value = 'Active';
+    document.getElementById('modal-title').textContent = 'Add Employee';
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <?!= include('style') ?>
+  <title>TrainHub — Attendance</title>
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-logo"><div style="display:flex;align-items:center;gap:10px"><div class="logo-icon"><span class="icon filled md" style="color:white">corporate_fare</span></div><div><div class="logo-name">TrainHub</div><div class="logo-sub">Management System</div></div></div></div>
+    <nav class="sidebar-nav">
+      <a class="nav-item" data-page="dashboard"  href="?page=dashboard"><span class="icon">dashboard</span>Dashboard</a>
+      <a class="nav-item" data-page="training"   href="?page=training"><span class="icon">school</span>Training Programmes</a>
+      <a class="nav-item" data-page="employee"   href="?page=employee"><span class="icon">group</span>Employees</a>
+      <a class="nav-item" data-page="attendance" href="?page=attendance"><span class="icon">fact_check</span>Attendance</a>
+      <a class="nav-item" data-page="evaluation" href="?page=evaluation"><span class="icon">rate_review</span>Evaluation</a>
+      <a class="nav-item" data-page="report"     href="?page=report"><span class="icon">bar_chart</span>Reports</a>
+      <div class="nav-divider"></div>
+      <a class="nav-item nav-logout" href="?page=index"><span class="icon">logout</span>Logout</a>
+    </nav>
+    <div class="sidebar-user"><div style="display:flex;align-items:center;gap:10px"><div class="avatar" style="background:#2563EB;width:32px;height:32px;font-size:12px">SA</div><div><div style="font-size:12.5px;font-weight:600;color:#1E293B">Sarah Mitchell</div><div style="font-size:11px;color:#94A3B8">HR Administrator</div></div></div></div>
+  </aside>
+
+  <div class="main-area">
+    <header class="topbar">
+      <div style="flex:1"><h1 class="topbar-title">Attendance</h1><p class="topbar-sub" id="topbar-sub">Select a training to view attendance</p></div>
+      <button class="btn-th btn-secondary btn-sm" onclick="exportAtt()"><span class="icon sm">download</span>Export to Sheet</button>
+    </header>
+
+    <main class="page-content">
+      <!-- Training selector -->
+      <div class="card-th mb-4">
+        <div class="row g-3 align-items-end">
+          <div class="col-md-6">
+            <label class="label-th">Select Training Programme</label>
+            <select id="sel-training" class="input-th" onchange="onTrainingSelect()">
+              <option value="">— Select a training —</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <button class="btn-th btn-primary" style="width:100%" onclick="loadAttendance()"><span class="icon sm">search</span>Load Attendance</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Summary row -->
+      <div class="row g-3 mb-4" id="att-summary" style="display:none">
+        <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-value" style="color:#22C55E" id="s-present">—</div><div class="stat-label">Present Records</div></div></div>
+        <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-value" style="color:#EF4444" id="s-absent">—</div><div class="stat-label">Absent</div></div></div>
+        <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-value" style="color:#F59E0B" id="s-late">—</div><div class="stat-label">Late</div></div></div>
+        <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-value" style="color:#2563EB" id="s-pct">—</div><div class="stat-label">Attendance Rate</div></div></div>
+      </div>
+
+      <!-- Day accordion -->
+      <div id="days-container"></div>
+
+      <!-- Add Day Form -->
+      <div id="add-day-section" style="display:none" class="mt-4">
+        <div class="card-th">
+          <h4 style="font-size:14px;font-weight:700;color:#1E293B;margin:0 0 16px">Add Attendance Records</h4>
+          <div class="row g-3 mb-3">
+            <div class="col-md-3">
+              <label class="label-th">Day Number</label>
+              <input id="add-day" class="input-th" type="number" min="1" placeholder="1">
+            </div>
+            <div class="col-md-3">
+              <label class="label-th">Date</label>
+              <input id="add-date" class="input-th" type="date">
+            </div>
+          </div>
+          <div id="records-editor">
+            <div class="section-label">Attendance Records</div>
+            <div id="records-list"></div>
+            <button class="btn-th btn-secondary btn-sm mt-2" onclick="addRecordRow()"><span class="icon sm">add</span>Add Row</button>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid #F1F5F9">
+            <button class="btn-th btn-primary" onclick="saveDayAttendance()"><span class="icon sm">save</span>Save Attendance</button>
+            <button class="btn-th btn-secondary" onclick="document.getElementById('add-day-section').style.display='none'">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<?!= include('script') ?>
+<script>
+  let currentTraining = null;
+  const STATUS_OPTIONS = ['Present','Late','Partial Attendance','Left Early','Absent'];
+  const REMARK_OPTIONS = ['No remarks','Left after lunch','Medical leave','Emergency','Personal reason','Attended morning session only'];
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    try {
+      const trainings = await callServer('getTrainings');
+      const sel = document.getElementById('sel-training');
+      trainings.forEach(t => {
+        const o = document.createElement('option');
+        o.value = t.ID; o.textContent = `[${t.Code}] ${t.Name}`;
+        sel.appendChild(o);
+      });
+      // Check URL param
+      const params = new URLSearchParams(window.location.search);
+      const preId = params.get('id');
+      if (preId) { sel.value = preId; onTrainingSelect(); loadAttendance(); }
+    } catch(e) { showToast(e.message, 'error'); }
+  });
+
+  function onTrainingSelect() {
+    const sel = document.getElementById('sel-training');
+    if (sel.value) document.getElementById('add-day-section').style.display = 'none';
+  }
+
+  async function loadAttendance() {
+    const id = document.getElementById('sel-training').value;
+    if (!id) { showToast('Please select a training first.', 'error'); return; }
+
+    const t = await callServer('getTrainingById', id);
+    currentTraining = t;
+    document.getElementById('topbar-sub').textContent = t.Name;
+
+    // Summary
+    const sum = await callServer('getAttendanceSummary', id);
+    document.getElementById('att-summary').style.display = '';
+    document.getElementById('s-present').textContent = sum.present || 0;
+    document.getElementById('s-absent').textContent  = sum.absent  || 0;
+    document.getElementById('s-late').textContent    = sum.late    || 0;
+    document.getElementById('s-pct').textContent     = (sum.pct || 0) + '%';
+
+    // Days
+    const days = await callServer('getAttendance', id);
+    renderDays(days);
+    document.getElementById('add-day-section').style.display = '';
+  }
+
+  function renderDays(days) {
+    const container = document.getElementById('days-container');
+    if (!days.length) {
+      container.innerHTML = '<div class="empty-state"><span class="icon">fact_check</span><p style="color:#94A3B8">No attendance records yet. Add records below.</p></div>';
+      return;
+    }
+    container.innerHTML = days.map(d => {
+      const pct = d.records ? Math.round(d.records.filter(r => r.Status === 'Present').length / d.records.length * 100) : 0;
+      return `
+      <div style="border:1px solid #E2E8F0;border-radius:10px;overflow:hidden;background:#fff;margin-bottom:12px">
+        <div style="padding:12px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;background:#F8FAFC;border-bottom:1px solid #E2E8F0"
+             onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none'">
+          <div style="width:38px;height:38px;border-radius:9px;background:#EFF6FF;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0">
+            <span style="font-size:8.5px;font-weight:700;color:#2563EB;text-transform:uppercase">Day</span>
+            <span style="font-size:15px;font-weight:800;color:#2563EB;line-height:1">${d.day}</span>
+          </div>
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:5px;flex-wrap:wrap">
+              <span style="font-size:13px;font-weight:600;color:#1E293B">${d.date}</span>
+              <span style="font-size:12px;font-weight:700;color:${pct>=90?'#22C55E':pct>=70?'#F59E0B':'#EF4444'}">
+                ${d.records ? d.records.filter(r=>r.Status==='Present').length : 0}/${d.records ? d.records.length : 0} Present
+              </span>
+            </div>
+            ${progressBar(pct, pct>=90?'#22C55E':pct>=70?'#F59E0B':'#EF4444', 5)}
+          </div>
+          <span class="icon" style="color:#94A3B8">expand_more</span>
+        </div>
+        <div style="display:none;overflow-x:auto">
+          <table class="table-th">
+            <thead><tr><th>Emp ID</th><th>Name</th><th>Dept</th><th>Check In</th><th>Check Out</th><th>Hours</th><th>Status</th><th>Remarks</th></tr></thead>
+            <tbody>
+              ${(d.records || []).map((r, i) => `
+              <tr style="${r.EditedBy?'background:#FFFBEB':''}">
+                <td style="font-family:monospace;font-size:11px;color:#94A3B8">${r.EmployeeID}</td>
+                <td><div style="display:flex;align-items:center;gap:7px">${avatar(r.EmployeeName,25,i)}<span style="font-size:13px;font-weight:500">${r.EmployeeName}</span></div></td>
+                <td style="font-size:12px;color:#64748B">${r.Department}</td>
+                <td style="font-family:monospace;font-size:12px">${r.CheckIn||'—'}</td>
+                <td style="font-family:monospace;font-size:12px">${r.CheckOut||'—'}</td>
+                <td style="font-size:12px;font-weight:500">${r.Hours>0?r.Hours+'h':'—'}</td>
+                <td>${statusBadge(r.Status)}</td>
+                <td style="font-size:12px;color:#64748B">${r.Remarks||'—'}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  let recordRowCount = 0;
+  function addRecordRow() {
+    const i = recordRowCount++;
+    const row = document.createElement('div');
+    row.className = 'row g-2 mb-2';
+    row.id = 'rrow-' + i;
+    row.innerHTML = `
+      <div class="col-md-2"><input class="input-th" placeholder="EMP ID" id="r-empid-${i}"></div>
+      <div class="col-md-3"><input class="input-th" placeholder="Name" id="r-name-${i}"></div>
+      <div class="col-md-2"><input class="input-th" placeholder="Dept" id="r-dept-${i}"></div>
+      <div class="col-md-1"><input class="input-th" type="time" id="r-in-${i}"></div>
+      <div class="col-md-1"><input class="input-th" type="time" id="r-out-${i}"></div>
+      <div class="col-md-1"><input class="input-th" type="number" step="0.5" placeholder="h" id="r-hrs-${i}"></div>
+      <div class="col-md-1"><select class="input-th" id="r-stat-${i}">${STATUS_OPTIONS.map(s=>`<option>${s}</option>`).join('')}</select></div>
+      <div class="col-md-1"><button class="btn-th btn-danger btn-xs" onclick="document.getElementById('rrow-${i}').remove()"><span class="icon sm">delete</span></button></div>
+    `;
+    document.getElementById('records-list').appendChild(row);
+  }
+
+  async function saveDayAttendance() {
+    if (!currentTraining) { showToast('Select a training first.', 'error'); return; }
+    const day  = document.getElementById('add-day').value;
+    const date = document.getElementById('add-date').value;
+    if (!day || !date) { showToast('Day number and date are required.', 'error'); return; }
+
+    const records = [];
+    document.querySelectorAll('[id^="rrow-"]').forEach(row => {
+      const i = row.id.replace('rrow-','');
+      records.push({
+        EmployeeID:   document.getElementById('r-empid-'+i).value,
+        EmployeeName: document.getElementById('r-name-' +i).value,
+        Department:   document.getElementById('r-dept-' +i).value,
+        CheckIn:      document.getElementById('r-in-'   +i).value,
+        CheckOut:     document.getElementById('r-out-'  +i).value,
+        Hours:        document.getElementById('r-hrs-'  +i).value || 0,
+        Status:       document.getElementById('r-stat-' +i).value,
+      });
+    });
+
+    try {
+      await callServer('saveAttendance', currentTraining.ID, currentTraining.Code, day, date, records);
+      showToast('Attendance saved for Day ' + day, 'success');
+      loadAttendance();
+    } catch(e) { showToast(e.message, 'error'); }
+  }
+
+  async function exportAtt() {
+    const id = document.getElementById('sel-training').value;
+    if (!id) { showToast('Select a training first.', 'error'); return; }
+    try {
+      const res = await callServer('exportAttendanceSheet', id);
+      showToast('Exported to sheet: ' + res.sheetName, 'success');
+    } catch(e) { showToast(e.message, 'error'); }
+  }
+</script>
+</body>
+</html>

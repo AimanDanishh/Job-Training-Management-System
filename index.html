@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <?!= include('style') ?>
+  <title>TrainHub — Google Sign In</title>
+  <style>
+    body { min-height: 100vh; background: linear-gradient(135deg, #EFF6FF 0%, #F8FAFC 55%, #EEF2FF 100%);
+           display: flex; align-items: center; justify-content: center; padding: 24px; }
+    .login-card { background: #fff; border-radius: 16px; padding: 32px; border: 1px solid #E2E8F0;
+                  box-shadow: 0 4px 24px rgba(0,0,0,0.06); width: 100%; max-width: 420px; }
+    .user-profile-badge { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px;
+                         padding: 14px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; }
+  </style>
+</head>
+<body>
+  <div style="width:100%;max-width:420px">
+    <!-- Logo -->
+    <div style="text-align:center;margin-bottom:24px">
+      <div style="width:54px;height:54px;background:linear-gradient(135deg,#2563EB,#1D4ED8);border-radius:14px;
+                  display:flex;align-items:center;justify-content:center;margin:0 auto 12px;
+                  box-shadow:0 8px 20px rgba(37,99,235,0.25)">
+        <span class="icon filled lg" style="color:white">corporate_fare</span>
+      </div>
+      <h1 style="font-size:22px;font-weight:800;color:#1E293B;margin:0 0 4px;letter-spacing:-0.02em">TrainHub</h1>
+      <p style="font-size:13px;color:#64748B;margin:0">Training Management System</p>
+    </div>
+
+    <div class="login-card">
+      <div style="text-align:center;margin-bottom:18px">
+        <span style="background:#EFF6FF;color:#2563EB;padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:6px">
+          <span class="icon sm" style="font-size:16px">verified_user</span> Google Workspace Auth
+        </span>
+      </div>
+
+      <h2 style="font-size:18px;font-weight:700;color:#1E293B;margin:0 0 4px;text-align:center">Administrator Sign In</h2>
+      <p style="font-size:13px;color:#64748B;margin:0 0 22px;text-align:center">Sign in using your authorized company Google account.</p>
+
+      <!-- Error Alert -->
+      <div id="login-error" class="alert-th alert-error" style="display:none;margin-bottom:18px;align-items:flex-start">
+        <span class="icon sm filled" style="margin-top:2px">error</span>
+        <span id="login-error-msg" style="font-size:12.5px;line-height:1.4">Access denied.</span>
+      </div>
+
+      <!-- Detected Account Card -->
+      <div id="user-profile-card" class="user-profile-badge">
+        <div id="user-avatar" style="width:40px;height:40px;border-radius:50%;background:#2563EB;color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px">
+          <span class="spinner" style="border-top-color:white"></span>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div id="user-email-text" style="font-size:13.5px;font-weight:600;color:#1E293B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            Checking Google Account...
+          </div>
+          <div id="user-status-text" style="font-size:11.5px;color:#64748B">
+            Verifying organization authorization
+          </div>
+        </div>
+      </div>
+
+      <!-- Sign In Button -->
+      <button id="btn-google-signin" class="btn-th btn-primary" style="width:100%;justify-content:center;padding:12px;font-size:14px;font-weight:600;gap:10px" disabled>
+        <svg width="18" height="18" viewBox="0 0 24 24">
+          <path fill="#ffffff" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+          <path fill="#ffffff" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#ffffff" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+          <path fill="#ffffff" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+        </svg>
+        Sign In with Google
+      </button>
+
+      <!-- Optional Manual Email Input (for local testing/manual entry) -->
+      <div style="margin-top:20px;padding-top:16px;border-top:1px dashed #E2E8F0;text-align:center">
+        <a href="javascript:void(0)" id="toggle-manual-input" style="font-size:12px;color:#2563EB;text-decoration:none;font-weight:500">
+          Switch account or sign in manually
+        </a>
+        <div id="manual-input-box" style="display:none;margin-top:12px;text-align:left">
+          <label class="label-th">Company Google Email</label>
+          <div style="display:flex;gap:8px">
+            <input id="manual-email-inp" class="input-th" placeholder="admin@company.com" type="email">
+            <button id="btn-manual-verify" class="btn-th btn-secondary" style="white-space:nowrap">Verify</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p style="text-align:center;font-size:11.5px;color:#94A3B8;margin-top:18px">
+      © 2026 TrainHub · Google Workspace SSO Protected
+    </p>
+  </div>
+
+  <?!= include('script') ?>
+  <div id="toast-container"></div>
+  <script>
+    let activeGoogleUser = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      checkCurrentUser();
+    });
+
+    document.getElementById('btn-google-signin').addEventListener('click', () => {
+      if (activeGoogleUser && activeGoogleUser.success) {
+        navTo('dashboard');
+      } else {
+        checkCurrentUser(true);
+      }
+    });
+
+    document.getElementById('toggle-manual-input').addEventListener('click', () => {
+      const box = document.getElementById('manual-input-box');
+      box.style.display = box.style.display === 'none' ? 'block' : 'none';
+    });
+
+    document.getElementById('btn-manual-verify').addEventListener('click', () => {
+      const manualEmail = document.getElementById('manual-email-inp').value.trim();
+      if (!manualEmail) return;
+      verifyEmail(manualEmail);
+    });
+
+    function checkCurrentUser(autoRedirect = false) {
+      google.script.run
+        .withSuccessHandler(res => handleAuthResponse(res, autoRedirect))
+        .withFailureHandler(err => {
+          showAuthError('Failed to connect to Google Auth: ' + err.message);
+        })
+        .getCurrentUser();
+    }
+
+    function verifyEmail(email) {
+      google.script.run
+        .withSuccessHandler(res => handleAuthResponse(res, true))
+        .withFailureHandler(err => {
+          showAuthError('Verification error: ' + err.message);
+        })
+        .verifyGoogleUser(email);
+    }
+
+    function handleAuthResponse(res, autoRedirect) {
+      const errBox = document.getElementById('login-error');
+      const errMsg = document.getElementById('login-error-msg');
+      const emailText = document.getElementById('user-email-text');
+      const statusText = document.getElementById('user-status-text');
+      const avatar = document.getElementById('user-avatar');
+      const btn = document.getElementById('btn-google-signin');
+
+      activeGoogleUser = res;
+
+      if (res && res.success && res.authenticated) {
+        errBox.style.display = 'none';
+        emailText.textContent = res.email;
+        statusText.textContent = 'Authorized Company Administrator (' + res.name + ')';
+        statusText.style.color = '#16A34A';
+        avatar.innerHTML = res.name ? res.name.charAt(0).toUpperCase() : 'G';
+        avatar.style.background = '#2563EB';
+
+        btn.disabled = false;
+        btn.innerHTML = `<span class="icon filled sm">login</span> Continue to Dashboard (${res.name})`;
+
+        if (autoRedirect) {
+          navTo('dashboard');
+        }
+      } else {
+        const errorText = (res && res.message) || 'Access denied. Please ensure you log in with your company Google Account.';
+        showAuthError(errorText, res ? res.email : null);
+      }
+    }
+
+    function showAuthError(msg, detectedEmail) {
+      const errBox = document.getElementById('login-error');
+      const errMsg = document.getElementById('login-error-msg');
+      const emailText = document.getElementById('user-email-text');
+      const statusText = document.getElementById('user-status-text');
+      const avatar = document.getElementById('user-avatar');
+      const btn = document.getElementById('btn-google-signin');
+
+      errBox.style.display = 'flex';
+      errMsg.textContent = msg;
+
+      emailText.textContent = detectedEmail || 'Unauthorized Account';
+      statusText.textContent = 'Access Restricted';
+      statusText.style.color = '#DC2626';
+      avatar.innerHTML = '!';
+      avatar.style.background = '#DC2626';
+
+      btn.disabled = true;
+      btn.innerHTML = `<span class="icon filled sm">lock</span> Access Denied`;
+    }
+  </script>
+</body>
+</html>
