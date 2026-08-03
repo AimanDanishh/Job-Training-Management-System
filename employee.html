@@ -8,26 +8,12 @@
 </head>
 <body>
 <div class="app-shell">
-  <!-- Sidebar (same on every page) -->
-  <aside class="sidebar">
-    <div class="sidebar-logo"><div style="display:flex;align-items:center;gap:10px"><div class="logo-icon"><span class="icon filled md" style="color:white">corporate_fare</span></div><div><div class="logo-name">TrainHub</div><div class="logo-sub">Management System</div></div></div></div>
-    <nav class="sidebar-nav">
-      <a class="nav-item" data-page="dashboard" href="?page=dashboard"><span class="icon">dashboard</span>Dashboard</a>
-      <a class="nav-item" data-page="training"  href="?page=training"><span class="icon">school</span>Training Programmes</a>
-      <a class="nav-item" data-page="employee"  href="?page=employee"><span class="icon">group</span>Employees</a>
-      <a class="nav-item" data-page="attendance"href="?page=attendance"><span class="icon">fact_check</span>Attendance</a>
-      <a class="nav-item" data-page="evaluation"href="?page=evaluation"><span class="icon">rate_review</span>Evaluation</a>
-      <a class="nav-item" data-page="report"    href="?page=report"><span class="icon">bar_chart</span>Reports</a>
-      <div class="nav-divider"></div>
-      <a class="nav-item nav-logout" href="?page=index"><span class="icon">logout</span>Logout</a>
-    </nav>
-    <div class="sidebar-user"><div style="display:flex;align-items:center;gap:10px"><div class="avatar" style="background:#2563EB;width:32px;height:32px;font-size:12px">SA</div><div><div style="font-size:12.5px;font-weight:600;color:#1E293B">Sarah Mitchell</div><div style="font-size:11px;color:#94A3B8">HR Administrator</div></div></div></div>
-  </aside>
+  <!-- Sidebar -->
+  <?!= include('sidebar') ?>
 
   <div class="main-area">
     <header class="topbar">
-      <div style="flex:1"><h1 class="topbar-title">Employees</h1><p class="topbar-sub">Manage employee records</p></div>
-      <button class="btn-th btn-primary" onclick="openModal('modal-add')"><span class="icon sm">person_add</span>Add Employee</button>
+      <div style="flex:1"><h1 class="topbar-title">Employees</h1><p class="topbar-sub">Employee directory and records (Read-Only)</p></div>
     </header>
 
     <main class="page-content">
@@ -120,6 +106,7 @@
 </div>
 
 <div id="toast-container"></div>
+<script>window.__TRAINHUB_PAGE__ = '<?!= currentPage ?>';</script>
 <?!= include('script') ?>
 <script>
   let allEmployees = [];
@@ -176,7 +163,7 @@
         <td>${statusBadge(e.Status || 'Active')}</td>
         <td>
           <div style="display:flex;gap:4px">
-            <button class="btn-th btn-secondary btn-xs" onclick="editEmployee(${JSON.stringify(e).replace(/"/g,"'")})" title="Edit"><span class="icon sm">edit</span></button>
+            <button class="btn-th btn-secondary btn-xs" onclick="editEmployee('${e.ID}')" title="Edit"><span class="icon sm">edit</span></button>
             <button class="btn-th btn-danger btn-xs" onclick="confirmDelete('${e.ID}')" title="Delete"><span class="icon sm">delete</span></button>
           </div>
         </td>
@@ -184,7 +171,9 @@
     `).join('');
   }
 
-  function editEmployee(e) {
+  function editEmployee(idOrObj) {
+    const e = typeof idOrObj === 'object' ? idOrObj : allEmployees.find(x => x.ID === idOrObj);
+    if (!e) return;
     document.getElementById('modal-title').textContent = 'Edit Employee';
     document.getElementById('emp-id').value       = e.ID;
     document.getElementById('emp-name').value     = e.Name;

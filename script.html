@@ -1,7 +1,7 @@
-<!-- script.html — Shared JavaScript utilities. Include with: <?!= include('script') ?> -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-
 <script>
+// Bootstrap's CSS is used for layout utilities; its JavaScript bundle is not
+// required by this app. Keeping it out avoids Apps Script's document.write
+// parser corrupting the external script URL during page rendering.
 // ═══════════════════════════════════════════════════════════════════════════════
 // Shared Utilities
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -47,13 +47,60 @@ function setBtnLoading(btn, loading, text) {
   }
 }
 
+// ─── Cross-Origin Safe Query Param Reader ──────────────────────────────────
+function getQueryParam(name) {
+  try {
+    if (window.location && window.location.search) {
+      const v = new URLSearchParams(window.location.search).get(name);
+      if (v) return v;
+    }
+  } catch(e) {}
+
+  try {
+    if (window.top && window.top !== window && window.top.location) {
+      const v = new URLSearchParams(window.top.location.search).get(name);
+      if (v) return v;
+    }
+  } catch(e) {}
+
+  try {
+    if (window.parent && window.parent !== window && window.parent.location) {
+      const v = new URLSearchParams(window.parent.location.search).get(name);
+      if (v) return v;
+    }
+  } catch(e) {}
+
+  return null;
+}
+
 // ─── Navigate to page ────────────────────────────────────────────────────────
+let _cachedBaseUrl = null;
 function navTo(page, params) {
-  let url;
-  google.script.run.withSuccessHandler(base => {
-    url = base + '?page=' + page;
+  const navigate = (base) => {
+    if (!base) return;
+    const cleanBase = base.split('?')[0];
+    let url = cleanBase + '?page=' + page;
     if (params) Object.entries(params).forEach(([k,v]) => url += '&' + k + '=' + encodeURIComponent(v));
-    window.top.location.href = url;
+    try {
+      if (window.top) window.top.location.href = url;
+      else window.location.href = url;
+    } catch(e) {
+      window.location.href = url;
+    }
+  };
+  if (_cachedBaseUrl) {
+    navigate(_cachedBaseUrl);
+    return;
+  }
+  const currentUrl = window.location.href.split('?')[0];
+  if (currentUrl && currentUrl.includes('/exec')) {
+    _cachedBaseUrl = currentUrl;
+    navigate(currentUrl);
+    return;
+  }
+  google.script.run.withSuccessHandler(base => {
+    _cachedBaseUrl = base;
+    navigate(base);
   }).getAppUrl();
 }
 
@@ -131,11 +178,20 @@ function avatar(name, size = 30, index = 0) {
   return `<div class="avatar" style="width:${size}px;height:${size}px;background:${bg};font-size:${size*0.38}px">${initials}</div>`;
 }
 
-// ─── Sidebar active state ─────────────────────────────────────────────────────
+// ─── Sidebar active state & navigation ───────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  const page = new URLSearchParams(window.location.search).get('page') || 'dashboard';
+  const urlPage = getQueryParam('page');
+  const page = window.__TRAINHUB_PAGE__ || urlPage || 'dashboard';
   document.querySelectorAll('.nav-item[data-page]').forEach(el => {
     if (el.dataset.page === page) el.classList.add('active');
+    else el.classList.remove('active');
+    el.addEventListener('click', (e) => {
+      e.preventDefault();
+      document.querySelectorAll('.nav-item[data-page]').forEach(n => n.classList.remove('active'));
+      el.classList.add('active');
+      const p = el.dataset.page;
+      if (p) navTo(p);
+    });
   });
 
   // Mobile sidebar toggle

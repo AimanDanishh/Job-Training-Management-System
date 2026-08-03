@@ -8,20 +8,8 @@
 </head>
 <body>
 <div class="app-shell">
-  <aside class="sidebar">
-    <div class="sidebar-logo"><div style="display:flex;align-items:center;gap:10px"><div class="logo-icon"><span class="icon filled md" style="color:white">corporate_fare</span></div><div><div class="logo-name">TrainHub</div><div class="logo-sub">Management System</div></div></div></div>
-    <nav class="sidebar-nav">
-      <a class="nav-item" data-page="dashboard"  href="?page=dashboard"><span class="icon">dashboard</span>Dashboard</a>
-      <a class="nav-item" data-page="training"   href="?page=training"><span class="icon">school</span>Training Programmes</a>
-      <a class="nav-item" data-page="employee"   href="?page=employee"><span class="icon">group</span>Employees</a>
-      <a class="nav-item" data-page="attendance" href="?page=attendance"><span class="icon">fact_check</span>Attendance</a>
-      <a class="nav-item" data-page="evaluation" href="?page=evaluation"><span class="icon">rate_review</span>Evaluation</a>
-      <a class="nav-item" data-page="report"     href="?page=report"><span class="icon">bar_chart</span>Reports</a>
-      <div class="nav-divider"></div>
-      <a class="nav-item nav-logout" href="?page=index"><span class="icon">logout</span>Logout</a>
-    </nav>
-    <div class="sidebar-user"><div style="display:flex;align-items:center;gap:10px"><div class="avatar" style="background:#2563EB;width:32px;height:32px;font-size:12px">SA</div><div><div style="font-size:12.5px;font-weight:600;color:#1E293B">Sarah Mitchell</div><div style="font-size:11px;color:#94A3B8">HR Administrator</div></div></div></div>
-  </aside>
+  <!-- Sidebar -->
+  <?!= include('sidebar') ?>
 
   <div class="main-area">
     <header class="topbar">
@@ -85,6 +73,7 @@
 </div>
 
 <div id="toast-container"></div>
+<script>window.__TRAINHUB_PAGE__ = '<?!= currentPage ?>';</script>
 <?!= include('script') ?>
 <script>
   let currentReportId = null;
@@ -98,8 +87,7 @@
         o.value = t.ID; o.textContent = `[${t.Code}] ${t.Name}`;
         sel.appendChild(o);
       });
-      const params = new URLSearchParams(window.location.search);
-      const pid = params.get('id');
+      const pid = getQueryParam('id');
       if (pid) { sel.value = pid; loadReport(); }
     } catch(e) { showToast(e.message, 'error'); }
   });
@@ -223,10 +211,10 @@
 
     // Export cards
     document.getElementById('export-cards').innerHTML = [
-      { title:'Attendance Excel Export',           desc:'Export attendance data to a new Google Sheet',  icon:'table_chart',    color:'#22C55E', action:'exportSheet()' },
-      { title:'Participant List',                  desc:'Download full participant roster',              icon:'group',          color:'#2563EB', action:'showToast("Use File > Download in the spreadsheet","info")' },
-      { title:'Training Evaluation Summary',       desc:'View aggregated evaluation responses',          icon:'rate_review',    color:'#8B5CF6', action:'navTo("evaluation",{id:"'+id+'"})' },
-      { title:'Post Training Evaluation Summary',  desc:'View 6-month supervisor evaluation results',   icon:'timeline',       color:'#F59E0B', action:'navTo("evaluation",{id:"'+id+'"})' },
+      { title:'Export as PDF (.pdf)',              desc:'Generate and download complete formatted PDF summary report', icon:'picture_as_pdf', color:'#EF4444', action:'exportPdfFormat()' },
+      { title:'Export as Excel (.xlsx)',            desc:'Export full programme, attendance & evaluation data to Excel',  icon:'table_chart',    color:'#22C55E', action:'exportExcelFormat()' },
+      { title:'Training Evaluation Summary',       desc:'View aggregated evaluation responses',                         icon:'rate_review',    color:'#8B5CF6', action:'navTo("evaluation",{id:"'+id+'"})' },
+      { title:'Post Training Evaluation Summary',  desc:'View 6-month supervisor evaluation results',                  icon:'timeline',       color:'#F59E0B', action:'navTo("evaluation",{id:"'+id+'"})' },
     ].map(r => `
       <div class="col-md-6">
         <div style="display:flex;gap:12px;align-items:flex-start;padding:14px;background:#F8FAFC;border-radius:10px;border:1px solid #F1F5F9;cursor:pointer;transition:background 0.12s"
@@ -247,11 +235,35 @@
     document.getElementById('report-content').style.display = '';
   }
 
-  async function exportSheet() {
-    if (!currentReportId) return;
+  async function exportPdfFormat() {
+    if (!currentReportId) { showToast('Select a training first.', 'error'); return; }
+    showToast('Generating PDF report...', 'info');
     try {
-      const res = await callServer('exportAttendanceSheet', currentReportId);
-      showToast('Exported: ' + res.sheetName + '. Open your spreadsheet to view it.', 'success');
+      const res = await callServer('exportReportPdf', currentReportId);
+      if (res && res.dataUri) {
+        const link = document.createElement('a');
+        link.href = res.dataUri;
+        link.download = res.fileName || 'Training_Report.pdf';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showToast('PDF Report downloaded successfully!', 'success');
+      } else if (res && res.pdfUrl) {
+        window.open(res.pdfUrl, '_blank');
+        showToast('PDF Report created in Google Drive!', 'success');
+      }
+    } catch(e) { showToast(e.message, 'error'); }
+  }
+
+  async function exportExcelFormat() {
+    if (!currentReportId) { showToast('Select a training first.', 'error'); return; }
+    showToast('Generating Excel report...', 'info');
+    try {
+      const res = await callServer('exportReportExcel', currentReportId);
+      if (res && (res.sheetUrl || res.downloadUrl)) {
+        window.open(res.sheetUrl || res.downloadUrl, '_blank');
+        showToast('Excel report generated! <a href="' + (res.downloadUrl || res.sheetUrl) + '" target="_blank" style="color:white;text-decoration:underline">Open / Download XLSX</a>', 'success');
+      }
     } catch(e) { showToast(e.message, 'error'); }
   }
 </script>

@@ -7,37 +7,10 @@
   <title>TrainHub — Dashboard</title>
 </head>
 <body>
-<?!= include('sidebar') ?>
-
 <div class="app-shell">
   <!-- Sidebar -->
-  <aside class="sidebar">
-    <div class="sidebar-logo">
-      <div style="display:flex;align-items:center;gap:10px">
-        <div class="logo-icon"><span class="icon filled md" style="color:white">corporate_fare</span></div>
-        <div><div class="logo-name">TrainHub</div><div class="logo-sub">Management System</div></div>
-      </div>
-    </div>
-    <nav class="sidebar-nav">
-      <a class="nav-item" data-page="dashboard" href="?page=dashboard"><span class="icon">dashboard</span>Dashboard</a>
-      <a class="nav-item" data-page="training"  href="?page=training" ><span class="icon">school</span>Training Programmes</a>
-      <a class="nav-item" data-page="employee"  href="?page=employee" ><span class="icon">group</span>Employees</a>
-      <a class="nav-item" data-page="attendance"href="?page=attendance"><span class="icon">fact_check</span>Attendance</a>
-      <a class="nav-item" data-page="evaluation"href="?page=evaluation"><span class="icon">rate_review</span>Evaluation</a>
-      <a class="nav-item" data-page="report"    href="?page=report"   ><span class="icon">bar_chart</span>Reports</a>
-      <div class="nav-divider"></div>
-      <a class="nav-item nav-logout" href="?page=index"><span class="icon">logout</span>Logout</a>
-    </nav>
-    <div class="sidebar-user">
-      <div style="display:flex;align-items:center;gap:10px">
-        <div class="avatar" style="background:#2563EB;width:32px;height:32px;font-size:12px">SA</div>
-        <div style="flex:1;min-width:0">
-          <div style="font-size:12.5px;font-weight:600;color:#1E293B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Sarah Mitchell</div>
-          <div style="font-size:11px;color:#94A3B8">HR Administrator</div>
-        </div>
-      </div>
-    </div>
-  </aside>
+  <?!= include('sidebar') ?>
+
 
   <!-- Main -->
   <div class="main-area">
@@ -67,7 +40,9 @@
         <div class="section-label">Quick Actions</div>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
           <button class="btn-th" style="background:#EFF6FF;color:#2563EB;border:1px solid #BFDBFE" onclick="navTo('training')"><span class="icon sm">add_circle</span>New Programme</button>
-          <button class="btn-th" style="background:#F5F3FF;color:#7C3AED;border:1px solid #DDD6FE" onclick="navTo('employee')"><span class="icon sm">person_add</span>Add Employee</button>
+          <button class="btn-th" style="background:#EEF2FF;color:#4F46E5;border:1px solid #C7D2FE" onclick="navTo('session')"><span class="icon sm">qr_code</span>Session QR Codes</button>
+          <button class="btn-th" style="background:#F5F3FF;color:#7C3AED;border:1px solid #DDD6FE" onclick="navTo('attendance')"><span class="icon sm">fact_check</span>Attendance</button>
+          <button class="btn-th" style="background:#FFFBEB;color:#D97706;border:1px solid #FDE68A" onclick="navTo('evaluation')"><span class="icon sm">rate_review</span>Evaluation</button>
           <button class="btn-th" style="background:#F0FDF4;color:#16A34A;border:1px solid #BBF7D0" onclick="navTo('report')"><span class="icon sm">bar_chart</span>Reports</button>
           <button class="btn-th" style="background:#ECFEFF;color:#0891B2;border:1px solid #A5F3FC" onclick="navTo('training')"><span class="icon sm">school</span>View All Programmes</button>
         </div>
@@ -104,6 +79,7 @@
 </div>
 
 <div id="toast-container"></div>
+<script>window.__TRAINHUB_PAGE__ = '<?!= currentPage ?>';</script>
 <?!= include('script') ?>
 <script>
   // Load dashboard data on page load
@@ -111,7 +87,10 @@
 
   async function loadDashboard() {
     try {
-      const data = await callServer('getDashboardReport');
+      const [data, trainings] = await Promise.all([
+        callServer('getDashboardReport'),
+        callServer('getTrainings')
+      ]);
       const s = data.summary || {};
 
       document.getElementById('kpi-upcoming').textContent  = s.upcoming   || 0;
@@ -121,7 +100,6 @@
       document.getElementById('kpi-post').textContent      = s.pendingPost|| 0;
 
       // Active/upcoming programmes list
-      const trainings = await callServer('getTrainings');
       const active = (trainings || []).filter(t => t.Status === 'In Progress' || t.Status === 'Upcoming').slice(0, 5);
       renderActiveProgrammes(active);
 

@@ -32,6 +32,7 @@ function setConfigProperty(key, value) {
 function initDefaultScriptProperties() {
   const defaults = {
     'SPREADSHEET_ID':          '',
+    'EMPLOYEE_SPREADSHEET_ID': '',
     'ALLOWED_DOMAIN':          'company.com',
     'ADMIN_EMAILS':            'admin@company.com',
     'ADMIN_USER':              'admin',
@@ -49,7 +50,9 @@ function initDefaultScriptProperties() {
     'CERTIFICATE_TEMPLATE_ID': '',
     'REPORT_TEMPLATE_ID':      '',
     // Google Sheets master copy of AP-HRD-F01-00. Every new programme gets a populated copy.
-    'TRAINING_REQUISITION_TEMPLATE_ID': ''
+    'TRAINING_REQUISITION_TEMPLATE_ID': '',
+    // Company logo Drive link or public image URL to embed in center of session QR codes
+    'COMPANY_LOGO_URL':        ''
   };
   PropertiesService.getScriptProperties().setProperties(defaults, false);
   Logger.log('Default Script Properties successfully initialized in Project Settings.');
@@ -60,64 +63,243 @@ function getSpreadsheetId() {
   return getConfigProperty('SPREADSHEET_ID', '');
 }
 
+function setSpreadsheetId(id) {
+  setConfigProperty('SPREADSHEET_ID', id);
+  Logger.log('SPREADSHEET_ID updated in Project Settings: ' + id);
+  return 'SPREADSHEET_ID set to: ' + id;
+}
+
+function getEmployeeSpreadsheetId() {
+  return getConfigProperty('EMPLOYEE_SPREADSHEET_ID', getSpreadsheetId());
+}
+
+function setEmployeeSpreadsheetId(id) {
+  setConfigProperty('EMPLOYEE_SPREADSHEET_ID', id);
+  Logger.log('EMPLOYEE_SPREADSHEET_ID updated in Project Settings: ' + id);
+  return 'EMPLOYEE_SPREADSHEET_ID set to: ' + id;
+}
+
+function getCompanyLogoUrl() {
+  return getConfigProperty('COMPANY_LOGO_URL', '');
+}
+
+function setCompanyLogoUrl(url) {
+  setConfigProperty('COMPANY_LOGO_URL', url);
+  Logger.log('COMPANY_LOGO_URL updated in Project Settings: ' + url);
+  return 'COMPANY_LOGO_URL set to: ' + url;
+}
+
+/**
+ * Convert any Google Drive share link, preview link, or File ID into a direct public image CDN URL
+ * suitable for external rendering engines like QuickChart.
+ * 
+ * @param {string} input - Google Drive link (e.g. https://drive.google.com/file/d/FILE_ID/view) or File ID or image URL
+ * @returns {string} Direct public image URL (e.g. https://lh3.googleusercontent.com/d/FILE_ID)
+ */
+function convertDriveLinkToDirectImageUrl(input) {
+  if (!input) return '';
+  const str = String(input).trim();
+
+  // If already a direct image host URL (not drive.google.com), return directly
+  if (!str.includes('drive.google.com') && str.startsWith('http')) {
+    return str;
+  }
+
+  let fileId = '';
+  // Extract File ID from drive.google.com links
+  const fileIdMatch = str.match(/\/d\/([a-zA-Z0-9_-]{25,})/);
+  if (fileIdMatch && fileIdMatch[1]) {
+    fileId = fileIdMatch[1];
+  } else {
+    const idParamMatch = str.match(/id=([a-zA-Z0-9_-]{25,})/);
+    if (idParamMatch && idParamMatch[1]) {
+      fileId = idParamMatch[1];
+    } else if (/^[a-zA-Z0-9_-]{25,}$/.test(str)) {
+      fileId = str;
+    }
+  }
+
+  if (fileId) {
+    // High performance Google Drive image CDN URL format
+    return `https://lh3.googleusercontent.com/d/${fileId}`;
+  }
+
+  return str;
+}
+
 const SHEET_NAMES = {
-  get employees()    { return getConfigProperty('SHEET_EMPLOYEES', 'Employees'); },
-  get trainings()    { return getConfigProperty('SHEET_TRAININGS', 'Trainings'); },
-  get attendance()   { return getConfigProperty('SHEET_ATTENDANCE', 'Attendance'); },
-  get trainingEval() { return getConfigProperty('SHEET_TRAINING_EVAL', 'TrainingEval'); },
-  get postEval()     { return getConfigProperty('SHEET_POST_EVAL', 'PostEval'); }
+  get employees()            { return getConfigProperty('SHEET_EMPLOYEES', 'Employees'); },
+  get trainings()            { return getConfigProperty('SHEET_TRAININGS', 'Trainings'); },
+  get trainingSessions()     { return getConfigProperty('SHEET_TRAINING_SESSIONS', 'TrainingSessions'); },
+  get attendance()           { return getConfigProperty('SHEET_ATTENDANCE', 'Attendance'); },
+  get trainingEval()         { return getConfigProperty('SHEET_TRAINING_EVAL', 'TrainingEval'); },
+  get postEval()             { return getConfigProperty('SHEET_POST_EVAL', 'PostEval'); },
+  get trainingParticipants() { return getConfigProperty('SHEET_TRAINING_PARTICIPANTS', 'TrainingParticipants'); }
 };
 
 // ─── Spreadsheet Access ────────────────────────────────────────────────────────
+let _cachedSpreadsheet = null;
 function getSpreadsheet() {
+  if (_cachedSpreadsheet) return _cachedSpreadsheet;
   const spreadsheetId = getSpreadsheetId();
   if (spreadsheetId) {
-    return SpreadsheetApp.openById(spreadsheetId);
+    _cachedSpreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    return _cachedSpreadsheet;
   }
-  return SpreadsheetApp.getActiveSpreadsheet();
+  _cachedSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  return _cachedSpreadsheet;
+}
+
+let _cachedEmployeeSpreadsheet = null;
+function getEmployeeSpreadsheet() {
+  if (_cachedEmployeeSpreadsheet) return _cachedEmployeeSpreadsheet;
+  const empSpreadsheetId = getEmployeeSpreadsheetId();
+  if (empSpreadsheetId) {
+    try {
+      _cachedEmployeeSpreadsheet = SpreadsheetApp.openById(empSpreadsheetId);
+      return _cachedEmployeeSpreadsheet;
+    } catch(e) {
+      Logger.log('Failed to open separate EMPLOYEE_SPREADSHEET_ID: ' + e.message);
+    }
+  }
+  return getSpreadsheet();
 }
 
 function getSheet(name) {
-  const ss = getSpreadsheet();
+  const ss = (name === SHEET_NAMES.employees) ? getEmployeeSpreadsheet() : getSpreadsheet();
+  if (!ss) return null;
   let sheet = ss.getSheetByName(name);
   if (!sheet) {
-    sheet = ss.insertSheet(name);
-    initSheetHeaders(sheet, name);
+    const allSheets = ss.getSheets();
+    const targetClean = String(name).toLowerCase().replace(/[^a-z0-9]/g, '');
+    sheet = allSheets.find(s => {
+      const sClean = s.getName().toLowerCase().replace(/[^a-z0-9]/g, '');
+      return sClean === targetClean ||
+             sClean === targetClean + 's' ||
+             sClean + 's' === targetClean;
+    });
+
+    if (!sheet) {
+      if (name === SHEET_NAMES.employees && ss !== getSpreadsheet() && allSheets.length > 0) {
+        sheet = allSheets[0];
+      } else {
+        sheet = ss.insertSheet(name);
+        initSheetHeaders(sheet, name);
+      }
+    }
   }
+
+  // Auto-seed initial sample records if sheet is newly created or empty
+  if (sheet && sheet.getLastRow() <= 1) {
+    seedInitialSheetData(sheet, name);
+  }
+
+  // Ensure required columns exist for Trainings and TrainingSessions sheets
+  if (sheet) {
+    const cleanName = String(name).toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (cleanName === 'trainings') {
+      ensureTrainingSheetColumns(sheet);
+    } else if (cleanName === 'trainingsessions' || cleanName === 'sessions') {
+      ensureTrainingSessionsSheetColumns(sheet);
+    }
+  }
+
   return sheet;
 }
 
-// ─── Sheet Headers ─────────────────────────────────────────────────────────────
+// ─── Sheet Headers & Sample Data ─────────────────────────────────────────────
 function initSheetHeaders(sheet, name) {
   const headers = {
-    Employees:    ['ID', 'Name', 'Department', 'Position', 'Email', 'Phone', 'Status'],
-    Trainings:    ['ID', 'Code', 'Name', 'Category', 'Trainer', 'Venue', 'StartDate',
-                   'EndDate', 'Duration', 'TotalHours', 'Department', 'Objectives',
-                   'Status', 'Stage', 'Participants',
-                   'FolderID', 'AttendanceFolderID', 'EvaluationFolderID', 'CertificateFolderID',
-                   'MaterialsFolderID', 'PhotosFolderID', 'ReportsFolderID', 'TrainerNotesFolderID',
-                   'CreatedDate', 'UpdatedDate', 'CourseFee', 'RequisitionFormFileID'],
-    Attendance:   ['ID', 'TrainingID', 'TrainingCode', 'EmployeeID', 'EmployeeName',
-                   'Department', 'Day', 'Date', 'CheckIn', 'CheckOut', 'Hours',
-                   'Status', 'Remarks', 'EditedBy', 'EditedAt'],
-    TrainingEval: ['ID', 'TrainingID', 'EmployeeID', 'EmployeeName',
-                   'Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6', 'Q7',
-                   'SectionB1', 'SectionB2', 'SectionB3', 'AvgScore', 'SubmittedAt'],
-    PostEval:     ['ID', 'TrainingID', 'EmployeeID', 'EvaluatorName', 'EvaluatorID',
-                   'CompetencyBefore', 'CompetencyAfter', 'Improvement', 'CanApply',
-                   'FurtherTraining', 'Comments', 'SubmittedAt']
+    Employees:        ['ID', 'Name', 'Department', 'Position', 'Email', 'Phone', 'Status'],
+    Trainings:        ['ID', 'Code', 'Name', 'Category', 'Trainer', 'Venue', 'StartDate',
+                       'EndDate', 'Duration', 'TotalHours', 'Department', 'Objectives',
+                       'Status', 'Stage', 'Participants',
+                       'FolderID', 'AttendanceFolderID', 'EvaluationFolderID', 'CertificateFolderID',
+                       'MaterialsFolderID', 'PhotosFolderID', 'ReportsFolderID', 'TrainerNotesFolderID',
+                       'CreatedDate', 'UpdatedDate', 'CourseFee', 'RequisitionFormFileID'],
+    TrainingSessions: ['SessionID', 'TrainingID', 'SessionName', 'SessionDate', 'StartTime', 'EndTime', 'AttendanceURL', 'QRCodeURL', 'QRStatus', 'CreatedDate'],
+    Attendance:       ['AttendanceID', 'SessionID', 'TrainingID', 'EmployeeNo', 'EmployeeName',
+                       'Department', 'ScanTime', 'Status', 'TrainingCode', 'Day', 'Date', 'Hours',
+                       'Remarks', 'EditedBy', 'EditedAt'],
+    TrainingEval:     ['ID', 'TrainingID', 'EmployeeID', 'EmployeeName',
+                       'Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6', 'Q7',
+                       'SectionB1', 'SectionB2', 'SectionB3', 'AvgScore', 'SubmittedAt'],
+    PostEval:         ['ID', 'TrainingID', 'EmployeeID', 'EvaluatorName', 'EvaluatorID',
+                       'CompetencyBefore', 'CompetencyAfter', 'Improvement', 'CanApply',
+                       'FurtherTraining', 'Comments', 'SubmittedAt'],
+    TrainingParticipants: ['ID', 'TrainingID', 'EmployeeID', 'EmployeeName', 'Department', 'Position', 'AddedAt']
   };
 
   const headerKey = Object.keys(headers).find(k => k === name || getConfigProperty('SHEET_' + k.toUpperCase(), k) === name);
   const matchedHeaders = headers[headerKey] || headers[name];
 
-  if (matchedHeaders) {
+  if (matchedHeaders && sheet.getLastRow() === 0) {
     sheet.appendRow(matchedHeaders);
     sheet.getRange(1, 1, 1, matchedHeaders.length)
       .setFontWeight('bold')
       .setBackground('#2563EB')
       .setFontColor('#FFFFFF');
     sheet.setFrozenRows(1);
+  }
+}
+
+function seedInitialSheetData(sheet, name) {
+  if (sheet.getLastRow() === 0) {
+    initSheetHeaders(sheet, name);
+  }
+  if (sheet.getLastRow() > 1) return;
+
+  const key = Object.keys(SHEET_NAMES).find(k => SHEET_NAMES[k] === name || k === name || name.toLowerCase().includes(k.toLowerCase())) || name;
+  const timeNow = now();
+
+  if (key === 'employees' || name === 'Employees' || name === 'Employees') {
+    const sampleEmployees = [
+      ['EMP-1001', 'Ahmad Razak', 'Engineering / Cost Centre 101', 'Senior Engineer', 'ahmad.razak@company.com', '+60 12-3456789', 'Active'],
+      ['EMP-1002', 'Siti Nurhaliza', 'HR / Cost Centre 102', 'HR Executive', 'siti.nurhaliza@company.com', '+60 13-9876543', 'Active'],
+      ['EMP-1003', 'Tan Wei Liang', 'Finance / Cost Centre 103', 'Financial Analyst', 'wei.liang@company.com', '+60 16-4567890', 'Active'],
+      ['EMP-1004', 'Muthu Kumar', 'Operations / Cost Centre 104', 'Operations Supervisor', 'muthu.k@company.com', '+60 17-2345678', 'Active'],
+      ['EMP-1005', 'Lee Jia Hui', 'IT / Cost Centre 105', 'System Admin', 'jiahui.lee@company.com', '+60 19-8765432', 'Active'],
+      ['EMP-1006', 'Faridah Hashim', 'Sales / Cost Centre 106', 'Sales Manager', 'faridah.h@company.com', '+60 11-1234567', 'Active'],
+      ['EMP-1007', 'Chong Jin Hoe', 'Engineering / Cost Centre 101', 'Software Engineer', 'jinhoe.c@company.com', '+60 14-5678901', 'Active'],
+      ['EMP-1008', 'Nadia Azman', 'HR / Cost Centre 102', 'Talent Acquisition Specialist', 'nadia.a@company.com', '+60 18-9012345', 'Active']
+    ];
+    sampleEmployees.forEach(r => sheet.appendRow(r));
+  } else if (key === 'trainings' || name === 'Trainings') {
+    const sampleTrainings = [
+      [
+        'TRN-1001', 'LM-2026-0001', 'Leadership Excellence & Strategic Management',
+        'Leadership & Management', 'Dr. Aris Thorne', 'Grand Ballroom / Online',
+        '2026-08-10', '2026-08-12', 3, 24, 'HR / Cost Centre 102',
+        'Enhance strategic leadership capabilities and team management skills.',
+        'Upcoming', 'Created', 4, '', '', '', '', '', '', '', '', timeNow, timeNow, '1500.00', ''
+      ],
+      [
+        'TRN-1002', 'CR-2026-0002', 'ISO 27001 Cybersecurity & Data Compliance',
+        'Compliance & Regulatory', 'Sarah Jenkins', 'Training Room A',
+        '2026-08-01', '2026-08-02', 2, 16, 'IT / Cost Centre 105',
+        'Comprehensive security protocols and compliance training.',
+        'In Progress', 'Attendance In Progress', 2, '', '', '', '', '', '', '', '', timeNow, timeNow, '1200.00', ''
+      ]
+    ];
+    sampleTrainings.forEach(r => sheet.appendRow(r));
+  } else if (key === 'trainingParticipants' || name === 'TrainingParticipants') {
+    const sampleParticipants = [
+      ['TP-1001', 'TRN-1001', 'EMP-1001', 'Ahmad Razak', 'Engineering / Cost Centre 101', 'Senior Engineer', timeNow],
+      ['TP-1002', 'TRN-1001', 'EMP-1002', 'Siti Nurhaliza', 'HR / Cost Centre 102', 'HR Executive', timeNow],
+      ['TP-1003', 'TRN-1001', 'EMP-1003', 'Tan Wei Liang', 'Finance / Cost Centre 103', 'Financial Analyst', timeNow],
+      ['TP-1004', 'TRN-1001', 'EMP-1004', 'Muthu Kumar', 'Operations / Cost Centre 104', 'Operations Supervisor', timeNow],
+      ['TP-1005', 'TRN-1002', 'EMP-1005', 'Lee Jia Hui', 'IT / Cost Centre 105', 'System Admin', timeNow],
+      ['TP-1006', 'TRN-1002', 'EMP-1007', 'Chong Jin Hoe', 'Engineering / Cost Centre 101', 'Software Engineer', timeNow]
+    ];
+    sampleParticipants.forEach(r => sheet.appendRow(r));
+  } else if (key === 'trainingSessions' || name === 'TrainingSessions') {
+    const sampleSessions = [
+      ['SES0001', 'TRN-1001', 'Day 1 - Morning', '2026-08-10', '09:00', '12:00', '', '', 'Active', timeNow],
+      ['SES0002', 'TRN-1001', 'Day 1 - Afternoon', '2026-08-10', '13:30', '17:00', '', '', 'Active', timeNow],
+      ['SES0003', 'TRN-1002', 'Day 1', '2026-08-01', '09:00', '17:00', '', '', 'Active', timeNow],
+      ['SES0004', 'TRN-1002', 'Day 2', '2026-08-02', '09:00', '17:00', '', '', 'Active', timeNow]
+    ];
+    sampleSessions.forEach(r => sheet.appendRow(r));
   }
 }
 
@@ -135,12 +317,58 @@ function ensureTrainingSheetColumns(sheet) {
   return headers;
 }
 
+/** Adds/repairs fields in TrainingSessions sheet if missing. */
+function ensureTrainingSessionsSheetColumns(sheet) {
+  if (!sheet) return [];
+  const requiredHeaders = ['SessionID', 'TrainingID', 'SessionName', 'SessionDate', 'StartTime', 'EndTime', 'AttendanceURL', 'QRCodeURL', 'QRStatus', 'CreatedDate'];
+  
+  if (sheet.getLastRow() === 0) {
+    initSheetHeaders(sheet, 'TrainingSessions');
+    return requiredHeaders;
+  }
+
+  const lastCol = Math.max(sheet.getLastColumn(), 1);
+  let headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  const cleanHeaderStrings = headers.map(h => String(h || '').trim().toLowerCase().replace(/[^a-z0-9]/g, ''));
+
+  let headersModified = false;
+
+  requiredHeaders.forEach(reqHeader => {
+    const cleanReq = reqHeader.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (!cleanHeaderStrings.includes(cleanReq)) {
+      const nextCol = sheet.getLastColumn() + 1;
+      sheet.getRange(1, nextCol).setValue(reqHeader)
+        .setFontWeight('bold').setBackground('#2563EB').setFontColor('#FFFFFF');
+      headers.push(reqHeader);
+      cleanHeaderStrings.push(cleanReq);
+      headersModified = true;
+    }
+  });
+
+  if (headersModified) {
+    sheet.setFrozenRows(1);
+  }
+
+  return headers;
+}
+
 // ─── ID Generation ─────────────────────────────────────────────────────────────
 function generateId(prefix) {
   return prefix + '-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
 }
 
-// ─── Sheet to JSON ─────────────────────────────────────────────────────────────
+function normalizeEmployeeHeader(header) {
+  const h = String(header).trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (['id', 'empid', 'employeeid', 'employeeno', 'staffid', 'badgenumber', 'no', 'nokp', 'ic'].includes(h)) return 'ID';
+  if (['name', 'fullname', 'employeename', 'staffname', 'nama'].includes(h)) return 'Name';
+  if (['department', 'dept', 'costcentre', 'company', 'division', 'section', 'jabatan'].includes(h)) return 'Department';
+  if (['position', 'positiontitle', 'jobtitle', 'title', 'designation', 'role', 'jawatan', 'jobcategory'].includes(h)) return 'Position';
+  if (['email', 'emailaddress', 'emel'].includes(h)) return 'Email';
+  if (['phone', 'mobile', 'contact', 'contactnumber', 'telefon'].includes(h)) return 'Phone';
+  if (['status', 'employmentstatus', 'employmenttype', 'stat'].includes(h)) return 'Status';
+  return header;
+}
+
 /**
  * Convert a sheet's data rows into an array of objects keyed by header row.
  */
@@ -152,11 +380,22 @@ function sheetToJson(sheet) {
   const rows = [];
 
   for (let i = 1; i < data.length; i++) {
-    if (!data[i][0]) continue; // skip empty rows
+    const isRowEmpty = data[i].every(val => val === '' || val === null || val === undefined);
+    if (isRowEmpty) continue;
+
     const obj = {};
     headers.forEach((h, j) => {
-      obj[h] = data[i][j] !== undefined ? String(data[i][j]) : '';
+      const cleanH = String(h).trim();
+      const normKey = normalizeEmployeeHeader(cleanH);
+      const val = data[i][j] !== undefined ? String(data[i][j]) : '';
+      obj[cleanH] = val;
+      if (normKey && !obj[normKey]) {
+        obj[normKey] = val;
+      }
     });
+    if (!obj.ID && data[i][0] !== undefined) obj.ID = String(data[i][0]);
+    if (!obj.Name && data[i][1] !== undefined) obj.Name = String(data[i][1]);
+
     obj._row = i + 1; // 1-indexed sheet row number
     rows.push(obj);
   }

@@ -6,15 +6,18 @@
 // ─── Web App Entry Point ───────────────────────────────────────────────────────
 function doGet(e) {
   const page = (e && e.parameter && e.parameter.page) ? e.parameter.page : 'index';
-  const allowedPages = ['index', 'dashboard', 'employee', 'training', 'attendance', 'evaluation', 'report'];
+  const allowedPages = ['index', 'dashboard', 'training', 'attendance', 'evaluation', 'report', 'session'];
 
   const safePage = allowedPages.includes(page) ? page : 'index';
   const appTitle = getConfigProperty('APP_TITLE', 'TrainHub — Training Management System');
 
   try {
     const template = HtmlService.createTemplateFromFile(safePage);
-    // Pass page parameter into the template
+    // Pass page parameter and session parameters into the template
     template.currentPage = safePage;
+    template.sessionParam = (e && e.parameter && e.parameter.session) ? e.parameter.session : '';
+    template.queryParams = (e && e.parameter) ? JSON.stringify(e.parameter) : '{}';
+
     return template.evaluate()
       .setTitle(appTitle)
       .addMetaTag('viewport', 'width=device-width, initial-scale=1')

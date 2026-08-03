@@ -14,6 +14,8 @@
   - [2. Clone or Sync Code via Clasp](#2-clone-or-sync-code-via-clasp)
   - [3. Configure Script Properties](#3-configure-script-properties)
   - [4. Initialize Database Sheets](#4-initialize-database-sheets)
+- [Session-Based QR Attendance Guide & Setup](#-session-based-qr-attendance-guide--setup)
+- [Separate Employee Spreadsheet & Header Mapping](#-separate-employee-spreadsheet--header-mapping-700-employees)
 - [Google Drive Workspace & Requisition Form Automation](#-google-drive-workspace--requisition-form-automation)
 - [Deployment Guide](#-deployment-guide)
   - [Deploying as Web App](#deploying-as-web-app)
@@ -40,6 +42,8 @@
 | Feature | Description |
 | :--- | :--- |
 | **Employee Management** | Full CRUD for staff records with department filtering and active/inactive status tracking. |
+| **Separate Employee Database** | Read employee records from a standalone external Google Spreadsheet (`EMPLOYEE_SPREADSHEET_ID`) with smart header mapping. |
+| **Scalable Participant Picker** | Read-only batch participant selection modal & search-as-you-type autocomplete overlays (optimized for 700+ employees). |
 | **Training Lifecycle Control** | End-to-end tracking of training programmes from requisition through 6-month evaluation. |
 | **Automated Drive Workspaces** | Automatically generates organized Drive folders and subfolders (`Attendance`, `Evaluation`, `Certificates`, `Materials`, `Photos`, `Reports`, `Trainer Notes`) for every new training. |
 | **Form Population Engine** | Auto-fills requisition form headers and updates participant lists directly inside Google Sheets. |
@@ -158,6 +162,7 @@ System IDs, credentials, sheet names, and application parameters are configured 
 | `ADMIN_PASS` | Fallback administrative password | `admin123` |
 | `APP_TITLE` | Application title displayed in browser tab | `TrainHub — Training Management System` |
 | `SPREADSHEET_ID` | ID of your Google Spreadsheet database | `1Y-pvLmTOllx84Vw...` *(or blank if bound)* |
+| `EMPLOYEE_SPREADSHEET_ID` | Optional ID of a separate Google Spreadsheet containing your external employee database | `1EmpSheetId...` *(or blank if using main database)* |
 | `ROOT_FOLDER_ID` | Root Google Drive parent folder ID for training workspaces | `1abc...` *(defaults to `Job Training System/Training`)* |
 | `TEMPLATE_FOLDER_ID` | Master Template folder ID | `1xyz...` |
 | `ATTENDANCE_TEMPLATE_ID` | Template file ID for Attendance Records | `1att...` |
@@ -170,6 +175,30 @@ System IDs, credentials, sheet names, and application parameters are configured 
 | `SHEET_ATTENDANCE` | Custom tab name for Attendance | `Attendance` |
 | `SHEET_TRAINING_EVAL` | Custom tab name for Training Evaluations | `TrainingEval` |
 | `SHEET_POST_EVAL` | Custom tab name for Post-Training Evaluations | `PostEval` |
+
+---
+
+### 👥 Separate Employee Spreadsheet & Header Mapping (700+ Employees)
+
+TrainHub can connect directly to an external, standalone Employee Spreadsheet:
+
+1. **Configuring Separate Spreadsheet**:
+   - Set `EMPLOYEE_SPREADSHEET_ID` in Script Properties (or run `setEmployeeSpreadsheetId('YOUR_ID')`).
+   - TrainHub reads employee profiles directly from the external file without writing or editing any data (strictly read-only).
+   - If the sheet tab in the external file is not named `Employees`, TrainHub automatically falls back to the **first sheet tab**.
+
+2. **Automatic Header Normalization**:
+   External spreadsheet headers are normalized automatically into standard system fields:
+   - `Employee No` / `Staff ID` / `No` / `IC` ➔ `ID`
+   - `Name` / `Full Name` / `Staff Name` ➔ `Name`
+   - `Position Title` / `Job Title` / `Designation` ➔ `Position`
+   - `Cost Centre` / `Company` / `Department` ➔ `Department`
+   - `Employment Type` / `Status` ➔ `Status`
+   - All original columns (`Gender`, `Nationality`, `Age Group`, `Grade Category`, `Job Category`, `Supervisor`, `Department Manager`, `HOD`, `Csuite`, etc.) remain fully preserved.
+
+3. **Read-Only Participant Selection & Autocomplete**:
+   - **Batch Picker Modal**: In Attendance screen, click **Select from Employee List** to search by Name, ID, or Department filter, and select multiple employees at once.
+   - **Search-as-you-Type Autocomplete**: Typing 1-2 letters into any `Employee ID` or `Name` input (in Attendance or Evaluation forms) opens an overlay popover showing top 8 matches for instant auto-filling.
 
 ---
 
@@ -199,13 +228,102 @@ Job Training System/
 ---
 
 ### 4. Initialize Database Sheets
-To automatically create all required sheet tabs with pre-styled headers (`Employees`, `Trainings`, `Attendance`, `TrainingEval`, `PostEval`):
+To automatically create all required sheet tabs with pre-styled headers (`Employees`, `Trainings`, `TrainingSessions`, `Attendance`, `TrainingEval`, `PostEval`):
 
 1. In the Apps Script Editor, open `Helper.gs`.
 2. Select `setupSheets` from the function dropdown menu at the top.
 3. Click **Run**.
 4. Grant the required permissions when prompted by Google OAuth.
-5. Check your Google Sheet — all required tabs will be generated automatically!
+5. Check your Google Sheet — all required tabs (`TrainingSessions` included) will be generated automatically!
+
+---
+
+## 📱 Session-Based QR Attendance Guide & Setup
+
+TrainHub tracks attendance **per training session** rather than strictly per day or per employee. This accommodates any schedule configuration:
+- **1-Day Training**: 1 Session (`Full Day`)
+- **2-Day Training**: 2 Sessions (`Day 1`, `Day 2`)
+- **1-Day with Morning & Afternoon**: 2 Sessions (`Morning`, `Afternoon`)
+- **3-Day with Morning & Afternoon**: 6 Sessions
+
+---
+
+### 🛠️ Step-by-Step Setup & Administrator Flow
+
+#### Step 1: Create a Training Programme
+1. Go to **Training Programmes** ➔ **New Programme**.
+2. Fill in training details (Name, Trainer, Start/End Dates, Duration).
+3. Saving the programme automatically generates default session(s) based on duration:
+   - Duration = `1`: Creates 1 session named **Full Day**.
+   - Duration > `1`: Creates 1 session per day (e.g., **Day 1**, **Day 2**, **Day 3**).
+
+#### Step 2: Customize Sessions (Optional)
+1. Navigate to **QR Sessions** from the sidebar (or open a programme's details view).
+2. Click **New Session** to add custom sessions (e.g. `Day 1 - Morning`, `Day 1 - Afternoon`).
+3. Set session dates, start/end times, and set status (`Active`, `Expired`, `Inactive`).
+
+#### Step 3: Generate & Access QR Codes
+1. TrainHub automatically generates an **Attendance URL** and **QuickChart QR Code** for every session:
+   - **Attendance URL**: `https://YOUR_WEBAPP_URL?page=attendance&session=SES0001`
+   - **QR Code URL**: `https://quickchart.io/qr?size=400&text=ENCODED_URL`
+2. If any sessions miss QR codes, click **Generate Missing QRs** in the **QR Sessions** toolbar.
+
+#### Step 4: Project, Print, or Share QR Codes
+- **Project**: Open **Training Programmes** ➔ Click programme ➔ View session card.
+- **Print**: Click **Download QR** or **Print** on any session card.
+- **Share**: Click **Copy Link** to share the direct check-in link with remote participants.
+
+---
+
+### 🖼️ Adding Company Logo (Google Drive Link) to QR Codes
+
+TrainHub supports adding your company logo directly into the center of QuickChart QR codes:
+
+1. **Upload Logo to Google Drive**:
+   - Upload your logo image (`.png`, `.jpeg`, or `.svg`) to Google Drive.
+   - Right-click the file ➔ **Share** ➔ Change general access to **"Anyone with the link can view"**.
+   - Copy the link (e.g. `https://drive.google.com/file/d/1ABC123XYZ.../view?usp=sharing`).
+
+2. **Configure Logo in TrainHub**:
+   - Navigate to **QR Sessions** from the sidebar.
+   - Click **Company Logo QR** in the topbar.
+   - Paste your Google Drive logo share link (or direct image URL).
+   - Click **Save & Apply to QR Codes**.
+
+3. **How It Works Under the Hood**:
+   - Apps Script (`convertDriveLinkToDirectImageUrl()`) extracts the File ID (`1ABC123XYZ...`) and converts it into a high-speed public CDN image URL (`https://lh3.googleusercontent.com/d/1ABC123XYZ...`).
+   - `QRService.gs` attaches `centerImageUrl` and `centerImageSizeRatio=0.22` to the QuickChart API.
+   - High Error Correction (`ecLevel=H` - 30% error tolerance) is automatically enabled so the QR code remains 100% scannable even with the logo embedded in the center!
+
+### 📲 Participant Check-In Flow
+
+1. **Scan QR Code**: Participant scans the session QR code using their smartphone camera (or clicks shared link).
+2. **Session Identification**: The Web App opens with `?page=attendance&session=SES0001`.
+3. **Session Details Displayed**: TrainHub displays:
+   - Programme Title (e.g. *Fire Safety Training*)
+   - Session Name (e.g. *Day 1 - Morning*)
+   - Date & Time Range (e.g. *2026-08-10 | 09:00 - 12:00*)
+4. **Participant Check-In**:
+   - Participant enters their **Employee Number / ID** (e.g. `EMP-1001`).
+   - Autocomplete popover resolves name and department from the Employee Registry.
+   - Participant clicks **Record Attendance**.
+5. **System Validation**:
+   - Rejects if **Session does not exist**.
+   - Rejects if **Session has expired** or is `Inactive`/`Scheduled`.
+   - Rejects if **Employee already checked in** for this session (1 check-in per employee per session).
+6. **Success Feedback**: Saves record into `Attendance` sheet and displays a green success card with the exact check-in timestamp (`ScanTime`).
+
+---
+
+### 🧩 Architecture & Modular Services
+
+| Module File | Purpose & Functions |
+| :--- | :--- |
+| **`TrainingService.gs`** | `createTraining()` — Creates programme and auto-generates sessions. |
+| **`SessionService.gs`** | `createSession()`, `getSessions()`, `getSession()`, `updateSession()`, `updateSessionQRStatus()`, `deleteSession()`. |
+| **`QRService.gs`** | `generateAttendanceURL()`, `generateQRCode()`, `generateMissingQRCodes()`. |
+| **`AttendanceService.gs`** | `submitAttendance()`, `getAttendanceBySession()`, `getAttendanceByTraining()`. |
+| **`ValidationService.gs`** | `validateAttendance()` — Handles non-existent, expired, inactive, or duplicate checks. |
 
 ---
 
@@ -246,17 +364,24 @@ Whenever you push code changes via `clasp push` or modify code in the Apps Scrip
 ├── Helper.gs           # Database connector, sheet initialization, date/JSON formatters
 ├── Employee.gs         # Employee CRUD logic & sheet handlers
 ├── Training.gs         # Training programme CRUD & lifecycle stage tracking
+├── TrainingService.gs  # Training programme lifecycle service & session auto-creation
+├── SessionService.gs   # Training sessions management (createSession, getSession, updateSession)
+├── QRService.gs        # QuickChart QR generation & attendance URL constructor
 ├── Attendance.gs       # Attendance record handling, hour calculations & day grouping
+├── AttendanceService.gs# Session-based attendance submission & query service
+├── ValidationService.gs# Attendance validation engine (session check, status check, duplicate check)
 ├── Evaluation.gs       # Training & 6-month post-training evaluation handling
 ├── Report.gs           # Report generation, analytics data & spreadsheet/PDF exports
 ├── Auth.gs             # Authentication and authorization helpers
 ├── index.html          # Main application layout, sidebar & view router
 ├── dashboard.html      # Overview dashboard UI with metrics & charts
 ├── employee.html       # Employee directory UI
-├── training.html       # Training course creation & lifecycle management UI
-├── attendance.html     # Attendance tracking & QR check-in UI
+├── training.html       # Training course creation & session management UI
+├── session.html        # Session management hub & QR code preview UI
+├── attendance.html     # Participant QR check-in & admin attendance management UI
 ├── evaluation.html     # Participant feedback & post-training evaluation UI
 ├── report.html         # Analytics reports & export preview UI
+├── sidebar.html        # Navigation sidebar with session QR link
 ├── style.html          # Modular CSS styles (Glassmorphism, animations, UI tokens, aphakind font)
 ├── script.html         # Client-side JavaScript controllers & API integrations
 ├── Job Training Form.md # Reference notes on form formatting & features

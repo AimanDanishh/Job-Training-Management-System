@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <?!= include('style') ?>
+  <title>TrainHub — Training Sessions & QR Codes</title>
+  <style>
+    .session-card {
+      background: #ffffff;
+      border: 1px solid #E2E8F0;
+      border-radius: 12px;
+      padding: 20px;
+      transition: all 0.2s ease;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+    .session-card:hover {
+      border-color: #2563EB;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);
+    }
+    .qr-container {
+      background: #F8FAFC;
+      border: 1px solid #CBD5E1;
+      border-radius: 10px;
+      padding: 12px;
+      text-align: center;
+      margin: 14px 0;
+    }
+    .qr-img {
+      width: 170px;
+      height: 170px;
+      object-fit: contain;
+      border-radius: 6px;
+      background: #ffffff;
+      padding: 6px;
+      border: 1px solid #E2E8F0;
+    }
+    .url-box {
+      font-size: 11px;
+      color: #64748B;
+      background: #F1F5F9;
+      padding: 6px 10px;
+      border-radius: 6px;
+      word-break: break-all;
+      font-family: monospace;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <!-- Sidebar -->
+  <?!= include('sidebar') ?>
+
+  <div class="main-area">
+    <header class="topbar">
+      <button id="sidebar-toggle" class="btn-th btn-secondary btn-sm" style="display:none"><span class="icon sm">menu</span></button>
+      <div style="flex:1">
+        <h1 class="topbar-title">Training Sessions & QR Codes</h1>
+        <p class="topbar-sub">Manage session-based QR attendance and track check-ins</p>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn-th btn-secondary btn-sm" onclick="openCompanyLogoModal()">
+          <span class="icon sm">image</span>Company Logo QR
+        </button>
+        <button class="btn-th btn-secondary btn-sm" onclick="runGenerateMissingQRCodes()">
+          <span class="icon sm">qr_code_scanner</span>Generate Missing QRs
+        </button>
+        <button class="btn-th btn-primary btn-sm" onclick="openCreateSessionModal()">
+          <span class="icon sm">add</span>New Session
+        </button>
+      </div>
+    </header>
+
+    <main class="page-content">
+      <!-- Toolbar -->
+      <div class="card-th mb-4">
+        <div class="row g-3 align-items-end">
+          <div class="col-md-5">
+            <label class="label-th">Filter by Training Programme</label>
+            <select id="filter-training" class="input-th" onchange="loadSessions()">
+              <option value="">All Training Programmes</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="label-th">Filter by QR Status</label>
+            <select id="filter-status" class="input-th" onchange="loadSessions()">
+              <option value="">All Statuses</option>
+              <option value="Active">Active</option>
+              <option value="Expired">Expired</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+          </div>
+          <div class="col-md-4 text-end">
+            <button class="btn-th btn-secondary" onclick="loadSessions()">
+              <span class="icon sm">refresh</span>Refresh Sessions
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Session Count -->
+      <div id="session-count" style="font-size:12px;color:#94A3B8;margin-bottom:12px"></div>
+
+      <!-- Sessions Grid -->
+      <div id="sessions-grid" class="row g-3">
+        <div class="text-center p-5" style="color:#94A3B8">Loading sessions...</div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Create / Edit Session Modal -->
+<div id="modal-session" class="modal-overlay" style="display:none">
+  <div class="modal-box" style="max-width:540px">
+    <div class="modal-header">
+      <div>
+        <h3 class="modal-title" id="session-modal-title">New Training Session</h3>
+        <p class="modal-sub">Create a session with auto-generated QR code</p>
+      </div>
+      <button class="modal-close" onclick="closeModal('modal-session')">✕</button>
+    </div>
+    <div class="row g-3 mt-1">
+      <div class="col-12">
+        <label class="label-th">Training Programme <span class="required">*</span></label>
+        <select id="s-training-id" class="input-th"></select>
+      </div>
+      <div class="col-12">
+        <label class="label-th">Session Name <span class="required">*</span></label>
+        <input id="s-name" class="input-th" placeholder="e.g. Day 1, Morning, Day 2 Afternoon">
+      </div>
+      <div class="col-md-6">
+        <label class="label-th">Session Date <span class="required">*</span></label>
+        <input id="s-date" class="input-th" type="date">
+      </div>
+      <div class="col-md-3">
+        <label class="label-th">Start Time</label>
+        <input id="s-start-time" class="input-th" type="time" value="09:00">
+      </div>
+      <div class="col-md-3">
+        <label class="label-th">End Time</label>
+        <input id="s-end-time" class="input-th" type="time" value="17:00">
+      </div>
+      <div class="col-12">
+        <label class="label-th">QR Status</label>
+        <select id="s-status" class="input-th">
+          <option value="Active">Active (Ready for check-in)</option>
+          <option value="Expired">Expired (Check-in closed)</option>
+          <option value="Inactive">Inactive</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid #F1F5F9">
+      <button class="btn-th btn-secondary" onclick="closeModal('modal-session')">Cancel</button>
+      <button class="btn-th btn-primary" id="btn-save-session" onclick="saveSession()">
+        <span class="icon sm">save</span>Save Session
+      </button>
+    </div>
+  </div>
+<!-- Company Logo QR Modal -->
+<div id="modal-logo" class="modal-overlay" style="display:none">
+  <div class="modal-box" style="max-width:540px">
+    <div class="modal-header">
+      <div>
+        <h3 class="modal-title">Center Company Logo for QR Codes</h3>
+        <p class="modal-sub">Add a Google Drive logo image link to embed inside QR codes</p>
+      </div>
+      <button class="modal-close" onclick="closeModal('modal-logo')">✕</button>
+    </div>
+    <div class="mt-2 mb-3">
+      <label class="label-th">Google Drive Logo Share Link or Image URL</label>
+      <input id="logo-url-input" class="input-th" placeholder="https://drive.google.com/file/d/FILE_ID/view?usp=sharing">
+      <div style="font-size:11.5px;color:#64748B;margin-top:6px;line-height:1.5;background:#F8FAFC;padding:10px;border-radius:6px;border:1px solid #E2E8F0">
+        💡 <strong>Tip:</strong> Paste your Google Drive logo share link. Make sure the file sharing setting in Google Drive is set to <em>"Anyone with the link can view"</em> so QuickChart can fetch the image.
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid #F1F5F9">
+      <button class="btn-th btn-secondary" onclick="closeModal('modal-logo')">Cancel</button>
+      <button class="btn-th btn-primary" id="btn-save-logo" onclick="saveCompanyLogo()">
+        <span class="icon sm">image</span>Save & Apply to QR Codes
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<script>window.__TRAINHUB_PAGE__ = '<?!= currentPage ?>';</script>
+<?!= include('script') ?>
+<script>
+  let allTrainings = [];
+  let allSessionsList = [];
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    try {
+      allTrainings = await callServer('getTrainings') || [];
+      populateTrainingSelectors();
+
+      const preTrainingId = getQueryParam('id') || getQueryParam('trainingId');
+      if (preTrainingId) {
+        document.getElementById('filter-training').value = preTrainingId;
+      }
+
+      await loadSessions();
+    } catch(e) {
+      showToast('Failed to initialize sessions page: ' + e.message, 'error');
+    }
+  });
+
+  function populateTrainingSelectors() {
+    const selFilter = document.getElementById('filter-training');
+    const selModal  = document.getElementById('s-training-id');
+
+    const opts = allTrainings.map(t => `<option value="${t.ID}">[${t.Code || t.ID}] ${t.Name}</option>`).join('');
+    selFilter.innerHTML = '<option value="">All Training Programmes</option>' + opts;
+    selModal.innerHTML  = '<option value="">— Select Training —</option>' + opts;
+  }
+
+  async function loadSessions() {
+    const grid = document.getElementById('sessions-grid');
+    grid.innerHTML = '<div class="text-center p-5" style="color:#94A3B8">Loading sessions...</div>';
+
+    try {
+      const selectedTrainingId = document.getElementById('filter-training').value;
+      const selectedStatus     = document.getElementById('filter-status').value;
+
+      allSessionsList = await callServer('getSessions', selectedTrainingId || '') || [];
+
+      let filtered = allSessionsList;
+      if (selectedStatus) {
+        filtered = filtered.filter(s => String(s.QRStatus || 'Active').toLowerCase() === selectedStatus.toLowerCase());
+      }
+
+      document.getElementById('session-count').textContent = `Showing ${filtered.length} session(s)`;
+
+      if (!filtered.length) {
+        grid.innerHTML = `
+          <div class="col-12">
+            <div class="empty-state card-th text-center p-5">
+              <span class="icon" style="font-size:48px;color:#94A3B8">qr_code</span>
+              <p style="color:#64748B;font-weight:600;margin-top:12px">No sessions found</p>
+              <p style="color:#94A3B8;font-size:12px">Create a new session or generate missing QR codes above.</p>
+              <button class="btn-th btn-primary btn-sm mt-3" onclick="openCreateSessionModal()">
+                <span class="icon sm">add</span>Create New Session
+              </button>
+            </div>
+          </div>`;
+        return;
+      }
+
+      grid.innerHTML = filtered.map(s => renderSessionCard(s)).join('');
+    } catch(e) {
+      grid.innerHTML = `<div class="col-12 text-center text-danger p-4">Error loading sessions: ${e.message}</div>`;
+    }
+  }
+
+  function renderSessionCard(s) {
+    const parentT = allTrainings.find(t => String(t.ID) === String(s.TrainingID)) || {};
+    const trainingTitle = s.TrainingTitle || parentT.Name || 'Training Programme';
+
+    const attUrl = s.AttendanceURL || generateClientAttendanceURL(s.SessionID);
+    const qrUrl  = s.QRCodeURL || `https://quickchart.io/qr?size=400&text=${encodeURIComponent(attUrl)}`;
+    const status = s.QRStatus || 'Active';
+
+    return `
+      <div class="col-md-6 col-lg-4">
+        <div class="session-card">
+          <div style="display:flex;justify-space-between;align-items:flex-start;gap:8px">
+            <div style="flex:1">
+              <span style="font-size:11px;font-weight:700;color:#2563EB;text-transform:uppercase">${s.SessionID}</span>
+              <h3 style="font-size:16px;font-weight:700;color:#1E293B;margin:2px 0 4px">${s.SessionName}</h3>
+              <p style="font-size:12px;color:#64748B;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${trainingTitle}">
+                ${trainingTitle}
+              </p>
+            </div>
+            <div>${statusBadge(status)}</div>
+          </div>
+
+          <div style="display:flex;gap:12px;font-size:12px;color:#475569;margin-top:10px;padding:8px 10px;background:#F8FAFC;border-radius:6px">
+            <div><span class="icon sm" style="color:#64748B">calendar_today</span> ${s.SessionDate || '—'}</div>
+            <div><span class="icon sm" style="color:#64748B">schedule</span> ${s.StartTime || '09:00'} - ${s.EndTime || '17:00'}</div>
+          </div>
+
+          <div class="qr-container">
+            <img class="qr-img" src="${qrUrl}" alt="Session QR Code" onerror="this.src='https://via.placeholder.com/170?text=QR+Error'">
+            <div class="url-box">${attUrl}</div>
+          </div>
+
+          <div style="margin-top:auto;display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;gap:6px">
+              <button class="btn-th btn-secondary btn-sm" style="flex:1" onclick="copyAttendanceLink('${attUrl}')">
+                <span class="icon sm">content_copy</span>Copy Link
+              </button>
+              <a class="btn-th btn-primary btn-sm" style="flex:1;text-decoration:none;text-align:center" href="${qrUrl}" download="${s.SessionID}_QR.png" target="_blank">
+                <span class="icon sm">download</span>Download QR
+              </a>
+            </div>
+            <div style="display:flex;gap:6px">
+              <button class="btn-th btn-secondary btn-sm" style="flex:1" onclick="navTo('attendance', {session:'${s.SessionID}'})">
+                <span class="icon sm">visibility</span>View Attendance
+              </button>
+              <button class="btn-th btn-secondary btn-sm" style="width:auto" onclick="toggleSessionStatus('${s.SessionID}', '${status}')" title="Toggle Active / Expired">
+                <span class="icon sm">${status==='Active'?'block':'check_circle'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function generateClientAttendanceURL(sessionId) {
+    const currentUrl = window.location.href.split('?')[0];
+    return `${currentUrl}?page=attendance&session=${encodeURIComponent(sessionId)}`;
+  }
+
+  function copyAttendanceLink(url) {
+    navigator.clipboard.writeText(url).then(() => {
+      showToast('Attendance link copied to clipboard!', 'success');
+    }).catch(() => {
+      showToast('Failed to copy link automatically.', 'error');
+    });
+  }
+
+  async function toggleSessionStatus(sessionId, currentStatus) {
+    const newStatus = currentStatus === 'Active' ? 'Expired' : 'Active';
+    try {
+      await callServer('updateSessionQRStatus', sessionId, newStatus);
+      showToast(`Session ${sessionId} marked as ${newStatus}`, 'info');
+      await loadSessions();
+    } catch(e) {
+      showToast('Failed to update status: ' + e.message, 'error');
+    }
+  }
+
+  async function runGenerateMissingQRCodes() {
+    try {
+      const res = await callServer('generateMissingQRCodes');
+      showToast(res.message || 'QR codes generated successfully.', 'success');
+      await loadSessions();
+    } catch(e) {
+      showToast('Failed to generate QRs: ' + e.message, 'error');
+    }
+  }
+
+  function openCreateSessionModal() {
+    const preTrainingId = document.getElementById('filter-training').value;
+    if (preTrainingId) {
+      document.getElementById('s-training-id').value = preTrainingId;
+    }
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('s-date').value = today;
+    document.getElementById('s-name').value = '';
+    openModal('modal-session');
+  }
+
+  async function saveSession() {
+    const btn = document.getElementById('btn-save-session');
+    const data = {
+      TrainingID:  document.getElementById('s-training-id').value,
+      SessionName: document.getElementById('s-name').value,
+      SessionDate: document.getElementById('s-date').value,
+      StartTime:   document.getElementById('s-start-time').value,
+      EndTime:     document.getElementById('s-end-time').value,
+      QRStatus:    document.getElementById('s-status').value
+    };
+
+    if (!data.TrainingID) { showToast('Please select a Training Programme.', 'error'); return; }
+    if (!data.SessionName) { showToast('Please enter a Session Name.', 'error'); return; }
+
+    setBtnLoading(btn, true, 'Saving...');
+    try {
+      await callServer('createSession', data);
+      showToast('Session created successfully!', 'success');
+      closeModal('modal-session');
+      await loadSessions();
+    } catch(e) {
+      showToast(e.message, 'error');
+    } finally {
+      setBtnLoading(btn, false);
+    }
+  }
+
+  async function openCompanyLogoModal() {
+    try {
+      const currentLogo = await callServer('getCompanyLogoUrl').catch(() => '');
+      document.getElementById('logo-url-input').value = currentLogo || '';
+    } catch(e) {}
+    openModal('modal-logo');
+  }
+
+  async function saveCompanyLogo() {
+    const logoUrl = document.getElementById('logo-url-input').value.trim();
+    const btn = document.getElementById('btn-save-logo');
+    setBtnLoading(btn, true, 'Updating QRs...');
+    try {
+      const res = await callServer('updateCompanyLogoAndRegenerateQRs', logoUrl);
+      showToast('Company logo updated and applied to QR codes!', 'success');
+      closeModal('modal-logo');
+      await loadSessions();
+    } catch(e) {
+      showToast('Failed to update logo: ' + e.message, 'error');
+    } finally {
+      setBtnLoading(btn, false, '<span class="icon sm">image</span>Save & Apply to QR Codes');
+    }
+  }
+</script>
+</body>
+</html>

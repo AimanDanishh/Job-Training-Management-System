@@ -1,0 +1,30 @@
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="logo-icon"><span class="icon filled md" style="color:white">corporate_fare</span></div>
+      <div>
+        <div class="logo-name">TrainHub</div>
+        <div class="logo-sub">Management System</div>
+      </div>
+    </div>
+  </div>
+  <nav class="sidebar-nav">
+    <a class="nav-item" data-page="dashboard"  href="?page=dashboard"  onclick="navTo('dashboard'); return false;"><span class="icon">dashboard</span>Dashboard</a>
+    <a class="nav-item" data-page="training"   href="?page=training"   onclick="navTo('training'); return false;"><span class="icon">school</span>Training Programmes</a>
+    <a class="nav-item" data-page="session"    href="?page=session"    onclick="navTo('session'); return false;"><span class="icon">qr_code</span>QR Sessions</a>
+    <a class="nav-item" data-page="attendance" href="?page=attendance" onclick="navTo('attendance'); return false;"><span class="icon">fact_check</span>Attendance</a>
+    <a class="nav-item" data-page="evaluation" href="?page=evaluation" onclick="navTo('evaluation'); return false;"><span class="icon">rate_review</span>Evaluation</a>
+    <a class="nav-item" data-page="report"     href="?page=report"     onclick="navTo('report'); return false;"><span class="icon">bar_chart</span>Reports</a>
+    <div class="nav-divider"></div>
+    <a class="nav-item nav-logout" href="?page=index" onclick="navTo('index'); return false;"><span class="icon">logout</span>Logout</a>
+  </nav>
+  <div class="sidebar-user">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="avatar" style="background:#2563EB;width:32px;height:32px;font-size:12px">SA</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12.5px;font-weight:600;color:#1E293B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Sarah Mitchell</div>
+        <div style="font-size:11px;color:#94A3B8">HR Administrator</div>
+      </div>
+    </div>
+  </div>
+</aside>

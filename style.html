@@ -63,8 +63,8 @@
                   color: #64748B; text-decoration: none; transition: all 0.12s;
                   margin-bottom: 2px; }
   .nav-item:hover     { background: #F8FAFC; color: #1E293B; text-decoration: none; }
-  .nav-item.active    { background: #EFF6FF; color: #2563EB; text-decoration: none; }
-  .nav-item.active .icon { color: #2563EB; }
+  .nav-item.active    { background: #EFF6FF; color: #2563EB; font-weight: 700; text-decoration: none; border-left: 3.5px solid #2563EB; box-shadow: inset 0 0 0 1px rgba(37,99,235,0.15); }
+  .nav-item.active .icon { color: #2563EB; font-variation-settings: 'FILL' 1; }
   .nav-divider  { border-top: 1px solid #F1F5F9; margin: 12px 0; }
   .nav-logout   { color: #64748B; }
   .nav-logout:hover { background: #FEF2F2; color: #EF4444; }
@@ -228,4 +228,22 @@
     .main-area { margin-left: 0; }
     .page-content { padding: 12px 14px; }
   }
+
+  /* ── Autocomplete Suggestions Dropdown ──────────────────────────── */
+  .autocomplete-wrapper { position: relative; width: 100%; }
+  .autocomplete-dropdown {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+    max-height: 240px; overflow-y: auto; background: #ffffff;
+    border: 1px solid #CBD5E1; border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(15,23,42,0.15); z-index: 1000;
+    padding: 4px 0; margin: 0; list-style: none;
+  }
+  .autocomplete-item {
+    padding: 8px 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between;
+    font-size: 12.5px; border-bottom: 1px solid #F1F5F9; transition: background 0.1s;
+  }
+  .autocomplete-item:last-child { border-bottom: none; }
+  .autocomplete-item:hover, .autocomplete-item.active { background: #EFF6FF; }
+  .autocomplete-item .emp-code { font-family: monospace; font-size: 11px; font-weight: 600; color: #2563EB; background: #EFF6FF; padding: 2px 6px; border-radius: 4px; border: 1px solid #BFDBFE; }
+  .autocomplete-item .emp-dept { font-size: 11px; color: #64748B; background: #F8FAFC; padding: 2px 6px; border-radius: 4px; }
 </style>

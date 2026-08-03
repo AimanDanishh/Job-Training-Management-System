@@ -213,3 +213,98 @@ function generateTrainingCode(category) {
   }[category] || 'TR';
   return prefix + '-' + new Date().getFullYear() + '-' + String(Date.now()).slice(-4);
 }
+
+// ─── Training Participants Management ──────────────────────────────────────────
+function getTrainingParticipants(trainingId) {
+  try {
+    const sheet = getSheet(SHEET_NAMES.trainingParticipants);
+    const rows = sheetToJson(sheet);
+    const filtered = rows.filter(r => String(r.TrainingID) === String(trainingId));
+    return ok(filtered);
+  } catch (e) {
+    return err('Failed to get training participants: ' + e.message);
+  }
+}
+
+function addTrainingParticipants(trainingId, participants) {
+  try {
+    if (!trainingId) return err('Training ID is required.');
+    if (!participants || !Array.isArray(participants) || participants.length === 0) {
+      return err('No participants provided.');
+    }
+
+    const sheet = getSheet(SHEET_NAMES.trainingParticipants);
+    const existingRows = sheetToJson(sheet).filter(r => String(r.TrainingID) === String(trainingId));
+    const existingEmpIds = new Set(existingRows.map(r => r.EmployeeID));
+
+    let addedCount = 0;
+    const addedAt = now();
+
+    participants.forEach(p => {
+      const empId = p.ID || p.EmployeeID;
+      if (empId && !existingEmpIds.has(empId)) {
+        sheet.appendRow([
+          generateId('TP'),
+          trainingId,
+          empId,
+          p.Name || p.EmployeeName || '',
+          p.Department || '',
+          p.Position || '',
+          addedAt
+        ]);
+        existingEmpIds.add(empId);
+        addedCount++;
+      }
+    });
+
+    const totalCount = existingEmpIds.size;
+    updateTrainingParticipantCount(trainingId, totalCount);
+
+    return ok({ message: `Added ${addedCount} participants successfully.`, count: totalCount });
+  } catch (e) {
+    return err('Failed to add participants: ' + e.message);
+  }
+}
+
+function removeTrainingParticipant(trainingId, employeeId) {
+  try {
+    const sheet = getSheet(SHEET_NAMES.trainingParticipants);
+    const data = sheet.getDataRange().getValues();
+    let foundRow = -1;
+
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][1]) === String(trainingId) && String(data[i][2]) === String(employeeId)) {
+        sheet.deleteRow(i + 1);
+        foundRow = i;
+        break;
+      }
+    }
+
+    if (foundRow === -1) return err('Participant record not found.');
+
+    const remainingRows = sheetToJson(sheet).filter(r => String(r.TrainingID) === String(trainingId));
+    const totalCount = remainingRows.length;
+    updateTrainingParticipantCount(trainingId, totalCount);
+
+    return ok({ message: 'Participant removed successfully.', count: totalCount });
+  } catch (e) {
+    return err('Failed to remove participant: ' + e.message);
+  }
+}
+
+function updateTrainingParticipantCount(trainingId, count) {
+  try {
+    const tSheet = getSheet(SHEET_NAMES.trainings);
+    const row = findRowById(tSheet, trainingId);
+    if (row !== -1) {
+      tSheet.getRange(row, 15).setValue(count);
+      const currentStage = tSheet.getRange(row, 14).getValue();
+      if (currentStage === 'Created' && count > 0) {
+        tSheet.getRange(row, 14).setValue('Participants Imported');
+      }
+      tSheet.getRange(row, 25).setValue(now());
+    }
+  } catch (e) {
+    Logger.log('updateTrainingParticipantCount error: ' + e.message);
+  }
+}

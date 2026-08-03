@@ -19,20 +19,8 @@
 </head>
 <body>
 <div class="app-shell">
-  <aside class="sidebar">
-    <div class="sidebar-logo"><div style="display:flex;align-items:center;gap:10px"><div class="logo-icon"><span class="icon filled md" style="color:white">corporate_fare</span></div><div><div class="logo-name">TrainHub</div><div class="logo-sub">Management System</div></div></div></div>
-    <nav class="sidebar-nav">
-      <a class="nav-item" data-page="dashboard"  href="?page=dashboard"><span class="icon">dashboard</span>Dashboard</a>
-      <a class="nav-item" data-page="training"   href="?page=training"><span class="icon">school</span>Training Programmes</a>
-      <a class="nav-item" data-page="employee"   href="?page=employee"><span class="icon">group</span>Employees</a>
-      <a class="nav-item" data-page="attendance" href="?page=attendance"><span class="icon">fact_check</span>Attendance</a>
-      <a class="nav-item" data-page="evaluation" href="?page=evaluation"><span class="icon">rate_review</span>Evaluation</a>
-      <a class="nav-item" data-page="report"     href="?page=report"><span class="icon">bar_chart</span>Reports</a>
-      <div class="nav-divider"></div>
-      <a class="nav-item nav-logout" href="?page=index"><span class="icon">logout</span>Logout</a>
-    </nav>
-    <div class="sidebar-user"><div style="display:flex;align-items:center;gap:10px"><div class="avatar" style="background:#2563EB;width:32px;height:32px;font-size:12px">SA</div><div><div style="font-size:12.5px;font-weight:600;color:#1E293B">Sarah Mitchell</div><div style="font-size:11px;color:#94A3B8">HR Administrator</div></div></div></div>
-  </aside>
+  <!-- Sidebar -->
+  <?!= include('sidebar') ?>
 
   <div class="main-area">
     <header class="topbar">
@@ -105,8 +93,16 @@
     </div>
     <input type="hidden" id="eval-tid">
     <div class="row g-2 mb-3">
-      <div class="col-md-6"><label class="label-th">Employee ID</label><input id="eval-empid" class="input-th" placeholder="EMP-XXXX"></div>
-      <div class="col-md-6"><label class="label-th">Employee Name</label><input id="eval-empname" class="input-th" placeholder="Full name"></div>
+      <div class="col-md-6 autocomplete-wrapper">
+        <label class="label-th">Employee ID</label>
+        <input id="eval-empid" class="input-th" placeholder="EMP-XXXX" autocomplete="off">
+        <div id="eval-empid-drop" class="autocomplete-dropdown" style="display:none"></div>
+      </div>
+      <div class="col-md-6 autocomplete-wrapper">
+        <label class="label-th">Employee Name</label>
+        <input id="eval-empname" class="input-th" placeholder="Full name" autocomplete="off">
+        <div id="eval-empname-drop" class="autocomplete-dropdown" style="display:none"></div>
+      </div>
     </div>
 
     <!-- Section A -->
@@ -152,9 +148,20 @@
     </div>
     <input type="hidden" id="post-tid">
     <div class="row g-2 mb-3">
-      <div class="col-md-6"><label class="label-th">Employee ID</label><input id="post-empid" class="input-th" placeholder="EMP-XXXX"></div>
-      <div class="col-md-6"><label class="label-th">Evaluator Name</label><input id="post-evname" class="input-th" placeholder="Supervisor name"></div>
-      <div class="col-md-6"><label class="label-th">Evaluator Employee ID</label><input id="post-evid" class="input-th" placeholder="EMP-XXXX"></div>
+      <div class="col-md-6 autocomplete-wrapper">
+        <label class="label-th">Employee ID</label>
+        <input id="post-empid" class="input-th" placeholder="EMP-XXXX" autocomplete="off">
+        <div id="post-empid-drop" class="autocomplete-dropdown" style="display:none"></div>
+      </div>
+      <div class="col-md-6">
+        <label class="label-th">Evaluator Name</label>
+        <input id="post-evname" class="input-th" placeholder="Supervisor name">
+      </div>
+      <div class="col-md-6 autocomplete-wrapper">
+        <label class="label-th">Evaluator Employee ID</label>
+        <input id="post-evid" class="input-th" placeholder="EMP-XXXX" autocomplete="off">
+        <div id="post-evid-drop" class="autocomplete-dropdown" style="display:none"></div>
+      </div>
     </div>
 
     <!-- Competency Before -->
@@ -185,6 +192,7 @@
 </div>
 
 <div id="toast-container"></div>
+<script>window.__TRAINHUB_PAGE__ = '<?!= currentPage ?>';</script>
 <?!= include('script') ?>
 <script>
   // ─── Likert questions ──────────────────────────────────────────────────────
@@ -274,6 +282,8 @@
     document.getElementById(`opt-${name}-${v}`).classList.add('active');
   }
 
+  let allEmployees = [];
+
   // ─── Page init ───────────────────────────────────────────────────────────────
   document.addEventListener('DOMContentLoaded', async () => {
     buildLikert();
@@ -282,18 +292,82 @@
     buildImprovementQs();
 
     try {
-      const trainings = await callServer('getTrainings');
+      const [trainings, employees] = await Promise.all([
+        callServer('getTrainings'),
+        callServer('getEmployees').catch(() => [])
+      ]);
+      allEmployees = employees || [];
+      initEvalAutocompletes();
+
       const sel = document.getElementById('sel-eval-t');
       trainings.forEach(t => {
         const o = document.createElement('option');
         o.value = t.ID; o.textContent = `[${t.Code}] ${t.Name}`;
         sel.appendChild(o);
       });
-      const params = new URLSearchParams(window.location.search);
-      const pid = params.get('id');
+      const pid = getQueryParam('id');
       if (pid) { sel.value = pid; loadEvaluations(); }
     } catch(e) { showToast(e.message, 'error'); }
   });
+
+  function initEvalAutocompletes() {
+    setupFieldAutocomplete('eval-empid', 'eval-empid-drop', (emp) => {
+      document.getElementById('eval-empid').value = emp.ID || '';
+      document.getElementById('eval-empname').value = emp.Name || '';
+    });
+    setupFieldAutocomplete('eval-empname', 'eval-empname-drop', (emp) => {
+      document.getElementById('eval-empid').value = emp.ID || '';
+      document.getElementById('eval-empname').value = emp.Name || '';
+    });
+    setupFieldAutocomplete('post-empid', 'post-empid-drop', (emp) => {
+      document.getElementById('post-empid').value = emp.ID || '';
+    });
+    setupFieldAutocomplete('post-evid', 'post-evid-drop', (emp) => {
+      document.getElementById('post-evid').value = emp.ID || '';
+      document.getElementById('post-evname').value = emp.Name || '';
+    });
+  }
+
+  function setupFieldAutocomplete(inputId, dropId, onSelect) {
+    const inputEl = document.getElementById(inputId);
+    const dropEl  = document.getElementById(dropId);
+    if (!inputEl || !dropEl) return;
+
+    inputEl.addEventListener('input', () => {
+      const q = inputEl.value.trim().toLowerCase();
+      if (q.length < 1) { dropEl.style.display = 'none'; return; }
+      const matches = allEmployees.filter(e =>
+        (e.ID || '').toLowerCase().includes(q) ||
+        (e.Name || '').toLowerCase().includes(q)
+      ).slice(0, 8);
+
+      if (!matches.length) { dropEl.style.display = 'none'; return; }
+
+      dropEl.innerHTML = matches.map(m => `
+        <div class="autocomplete-item" data-id="${m.ID}">
+          <div>
+            <span class="emp-code">${m.ID}</span>
+            <strong style="margin-left:6px">${m.Name}</strong>
+          </div>
+          <span class="emp-dept">${m.Department}</span>
+        </div>
+      `).join('');
+      dropEl.style.display = 'block';
+
+      dropEl.querySelectorAll('.autocomplete-item').forEach(item => {
+        item.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          const emp = allEmployees.find(x => x.ID === item.dataset.id);
+          if (emp) onSelect(emp);
+          dropEl.style.display = 'none';
+        });
+      });
+    });
+
+    inputEl.addEventListener('blur', () => {
+      setTimeout(() => { dropEl.style.display = 'none'; }, 200);
+    });
+  }
 
   function switchTab(btn) {
     document.querySelectorAll('.subtab').forEach(b => b.classList.remove('active'));
@@ -312,12 +386,16 @@
     document.getElementById('post-tid').value  = id;
 
     try {
-      const sum   = await callServer('getEvaluationSummary', id);
+      const [sum, evals, posts] = await Promise.all([
+        callServer('getEvaluationSummary', id),
+        callServer('getTrainingEvaluations', id),
+        callServer('getPostEvaluations', id)
+      ]);
+
       document.getElementById('eval-summary').style.display = '';
       document.getElementById('e-completed').textContent = sum.evalCompleted || 0;
       document.getElementById('e-avg').textContent = sum.avgScore ? sum.avgScore + ' / 5' : 'N/A';
 
-      const evals = await callServer('getTrainingEvaluations', id);
       document.getElementById('eval-tbody').innerHTML = evals.length
         ? evals.map((r, i) => `<tr>
             <td><div style="display:flex;align-items:center;gap:8px">${avatar(r.EmployeeName,27,i)}<div><div style="font-size:13px;font-weight:500">${r.EmployeeName}</div><div style="font-size:11px;color:#94A3B8">${r.EmployeeID}</div></div></div></td>
@@ -327,7 +405,6 @@
           </tr>`).join('')
         : '<tr><td colspan="4" style="text-align:center;color:#94A3B8;padding:32px">No evaluations submitted yet.</td></tr>';
 
-      const posts = await callServer('getPostEvaluations', id);
       document.getElementById('post-tbody').innerHTML = posts.length
         ? posts.map((r, i) => `<tr>
             <td><div style="display:flex;align-items:center;gap:8px">${avatar(r.EmployeeID, 27, i)}<span style="font-size:13px;font-weight:500">${r.EmployeeID}</span></div></td>

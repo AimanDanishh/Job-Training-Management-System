@@ -5,27 +5,151 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <?!= include('style') ?>
   <title>TrainHub — Attendance</title>
+  <style>
+    .qr-checkin-card {
+      max-width: 540px;
+      margin: 40px auto;
+      background: #ffffff;
+      border: 1px solid #E2E8F0;
+      border-radius: 16px;
+      padding: 32px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+    }
+    .checkin-header {
+      text-align: center;
+      margin-bottom: 24px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid #F1F5F9;
+    }
+    .session-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      background: #EFF6FF;
+      color: #2563EB;
+      border-radius: 99px;
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .success-card {
+      text-align: center;
+      padding: 24px;
+      background: #F0FDF4;
+      border: 1px solid #BBF7D0;
+      border-radius: 12px;
+      margin-top: 20px;
+    }
+    .success-icon {
+      width: 60px;
+      height: 60px;
+      border-radius: 99px;
+      background: #22C55E;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+      font-size: 32px;
+    }
+    .error-card {
+      text-align: center;
+      padding: 24px;
+      background: #FEF2F2;
+      border: 1px solid #FCA5A5;
+      border-radius: 12px;
+      margin-top: 20px;
+    }
+    .error-icon {
+      width: 60px;
+      height: 60px;
+      border-radius: 99px;
+      background: #EF4444;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+      font-size: 32px;
+    }
+  </style>
 </head>
 <body>
-<div class="app-shell">
-  <aside class="sidebar">
-    <div class="sidebar-logo"><div style="display:flex;align-items:center;gap:10px"><div class="logo-icon"><span class="icon filled md" style="color:white">corporate_fare</span></div><div><div class="logo-name">TrainHub</div><div class="logo-sub">Management System</div></div></div></div>
-    <nav class="sidebar-nav">
-      <a class="nav-item" data-page="dashboard"  href="?page=dashboard"><span class="icon">dashboard</span>Dashboard</a>
-      <a class="nav-item" data-page="training"   href="?page=training"><span class="icon">school</span>Training Programmes</a>
-      <a class="nav-item" data-page="employee"   href="?page=employee"><span class="icon">group</span>Employees</a>
-      <a class="nav-item" data-page="attendance" href="?page=attendance"><span class="icon">fact_check</span>Attendance</a>
-      <a class="nav-item" data-page="evaluation" href="?page=evaluation"><span class="icon">rate_review</span>Evaluation</a>
-      <a class="nav-item" data-page="report"     href="?page=report"><span class="icon">bar_chart</span>Reports</a>
-      <div class="nav-divider"></div>
-      <a class="nav-item nav-logout" href="?page=index"><span class="icon">logout</span>Logout</a>
-    </nav>
-    <div class="sidebar-user"><div style="display:flex;align-items:center;gap:10px"><div class="avatar" style="background:#2563EB;width:32px;height:32px;font-size:12px">SA</div><div><div style="font-size:12.5px;font-weight:600;color:#1E293B">Sarah Mitchell</div><div style="font-size:11px;color:#94A3B8">HR Administrator</div></div></div></div>
-  </aside>
+
+<!-- Participant Check-In Container (Shown when QR code scanned with session param) -->
+<div id="participant-checkin-view" style="display:none; min-height: 100vh; background: #F8FAFC; padding: 20px;">
+  <div class="qr-checkin-card">
+    <div class="checkin-header">
+      <span class="session-badge" id="p-session-badge">Session Attendance</span>
+      <h2 id="p-training-title" style="font-size:20px; font-weight:800; color:#1E293B; margin:4px 0 6px">Loading Training...</h2>
+      <h4 id="p-session-name" style="font-size:15px; font-weight:600; color:#2563EB; margin:0 0 10px">—</h4>
+      <div style="display:flex; justify-content:center; gap:16px; font-size:12.5px; color:#64748B; background:#F1F5F9; padding:8px 14px; border-radius:8px">
+        <div><span class="icon sm" style="color:#94A3B8">calendar_today</span> <span id="p-session-date">—</span></div>
+        <div><span class="icon sm" style="color:#94A3B8">schedule</span> <span id="p-session-time">—</span></div>
+      </div>
+    </div>
+
+    <!-- Loading State -->
+    <div id="p-loading" class="text-center p-4">
+      <div class="spinner mb-2"></div>
+      <p style="color:#64748B; font-size:13px">Verifying session details...</p>
+    </div>
+
+    <!-- Submission Form -->
+    <div id="p-form-container" style="display:none">
+      <div class="mb-3">
+        <label class="label-th">Employee Number / ID <span class="required">*</span></label>
+        <div style="position:relative">
+          <input id="p-emp-no" class="input-th" placeholder="e.g. EMP-1001" oninput="onEmployeeNoInput()">
+          <div id="p-emp-dropdown" class="autocomplete-dropdown" style="display:none"></div>
+        </div>
+        <div style="font-size:11px; color:#94A3B8; margin-top:4px">Enter your assigned Employee ID number</div>
+      </div>
+
+      <div class="mb-3">
+        <label class="label-th">Full Name</label>
+        <input id="p-emp-name" class="input-th" placeholder="Employee Name">
+      </div>
+
+      <div class="mb-4">
+        <label class="label-th">Department</label>
+        <input id="p-emp-dept" class="input-th" placeholder="Department / Cost Centre">
+      </div>
+
+      <button id="btn-submit-checkin" class="btn-th btn-primary" style="width:100%; padding:12px; font-size:15px" onclick="submitCheckinForm()">
+        <span class="icon sm">check_circle</span> Record Attendance
+      </button>
+    </div>
+
+    <!-- Success Feedback View -->
+    <div id="p-success-container" style="display:none" class="success-card">
+      <div class="success-icon">✓</div>
+      <h3 style="font-size:18px; font-weight:700; color:#166534; margin:0 0 6px">Attendance Submitted!</h3>
+      <p style="font-size:13px; color:#15803D; margin:0 0 16px" id="p-success-msg">Your check-in has been successfully recorded.</p>
+      <div style="font-size:12px; color:#64748B; background:#ffffff; padding:10px; border-radius:8px; border:1px solid #DCFCE7">
+        Check-In Time: <strong id="p-success-time">—</strong>
+      </div>
+    </div>
+
+    <!-- Error / Validation Reject View -->
+    <div id="p-error-container" style="display:none" class="error-card">
+      <div class="error-icon">✕</div>
+      <h3 style="font-size:18px; font-weight:700; color:#991B1B; margin:0 0 6px">Check-In Rejected</h3>
+      <p style="font-size:13.5px; color:#B91C1C; margin:0" id="p-error-msg">Attendance submission failed.</p>
+      <button class="btn-th btn-secondary btn-sm mt-3" onclick="resetCheckinForm()">Try Again</button>
+    </div>
+  </div>
+</div>
+
+<!-- Admin Attendance Management View -->
+<div id="admin-attendance-view" class="app-shell">
+  <!-- Sidebar -->
+  <?!= include('sidebar') ?>
 
   <div class="main-area">
     <header class="topbar">
-      <div style="flex:1"><h1 class="topbar-title">Attendance</h1><p class="topbar-sub" id="topbar-sub">Select a training to view attendance</p></div>
+      <div style="flex:1"><h1 class="topbar-title">Attendance Management</h1><p class="topbar-sub" id="topbar-sub">Select a training to view attendance</p></div>
       <button class="btn-th btn-secondary btn-sm" onclick="exportAtt()"><span class="icon sm">download</span>Export to Sheet</button>
     </header>
 
@@ -53,17 +177,17 @@
         <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-value" style="color:#2563EB" id="s-pct">—</div><div class="stat-label">Attendance Rate</div></div></div>
       </div>
 
-      <!-- Day accordion -->
+      <!-- Days / Session Accordion -->
       <div id="days-container"></div>
 
-      <!-- Add Day Form -->
+      <!-- Manual Attendance Addition -->
       <div id="add-day-section" style="display:none" class="mt-4">
         <div class="card-th">
-          <h4 style="font-size:14px;font-weight:700;color:#1E293B;margin:0 0 16px">Add Attendance Records</h4>
+          <h4 style="font-size:14px;font-weight:700;color:#1E293B;margin:0 0 16px">Add Manual Attendance Records</h4>
           <div class="row g-3 mb-3">
             <div class="col-md-3">
-              <label class="label-th">Day Number</label>
-              <input id="add-day" class="input-th" type="number" min="1" placeholder="1">
+              <label class="label-th">Day Number / Session</label>
+              <input id="add-day" class="input-th" type="text" placeholder="Day 1 or SES0001">
             </div>
             <div class="col-md-3">
               <label class="label-th">Date</label>
@@ -73,7 +197,11 @@
           <div id="records-editor">
             <div class="section-label">Attendance Records</div>
             <div id="records-list"></div>
-            <button class="btn-th btn-secondary btn-sm mt-2" onclick="addRecordRow()"><span class="icon sm">add</span>Add Row</button>
+            <div style="display:flex;gap:8px;flex-wrap:wrap" class="mt-2">
+              <button class="btn-th btn-primary btn-sm" onclick="loadTrainingParticipantsIntoEditor()"><span class="icon sm">group</span>Load Enrolled Participants</button>
+              <button class="btn-th btn-secondary btn-sm" onclick="addRecordRow()"><span class="icon sm">add</span>Add Row</button>
+              <button class="btn-th btn-secondary btn-sm" onclick="openParticipantModal()"><span class="icon sm">group_add</span>Select from Master Registry</button>
+            </div>
           </div>
           <div style="display:flex;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid #F1F5F9">
             <button class="btn-th btn-primary" onclick="saveDayAttendance()"><span class="icon sm">save</span>Save Attendance</button>
@@ -85,28 +213,202 @@
   </div>
 </div>
 
+<!-- Select Participants Modal -->
+<div id="modal-select-participants" class="modal-overlay" style="display:none">
+  <div class="modal-box" style="max-width:680px">
+    <div class="modal-header">
+      <div>
+        <h3 class="modal-title">Select Participants from Employee List</h3>
+        <p class="modal-sub">Search by Name or Employee ID</p>
+      </div>
+      <button class="modal-close" onclick="closeModal('modal-select-participants')">✕</button>
+    </div>
+    <div class="row g-2 mb-3">
+      <div class="col-md-7">
+        <div style="position:relative">
+          <span class="icon" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94A3B8;font-size:14px">search</span>
+          <input id="p-search" class="input-th" style="padding-left:28px" placeholder="Search by name, ID, position...">
+        </div>
+      </div>
+      <div class="col-md-5">
+        <select id="p-dept" class="input-th">
+          <option value="">All Departments</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px 8px 0 0;font-size:12px;font-weight:600;color:#64748B">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0">
+        <input type="checkbox" id="p-select-all" onchange="toggleSelectAllParticipants(this.checked)">
+        <span>Select All Filtered (<span id="p-filtered-count">0</span>)</span>
+      </label>
+      <span id="p-selected-count" style="color:#2563EB">0 selected</span>
+    </div>
+    <div id="p-list-container" style="max-height:300px;overflow-y:auto;border:1px solid #E2E8F0;border-top:none;border-radius:0 0 8px 8px;background:#fff">
+      <div class="p-3 text-center" style="color:#94A3B8">Loading employees...</div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:16px;border-top:1px solid #F1F5F9">
+      <button class="btn-th btn-secondary" onclick="closeModal('modal-select-participants')">Cancel</button>
+      <button class="btn-th btn-primary" onclick="confirmAddSelectedParticipants()"><span class="icon sm">add_circle</span>Add Selected Participants</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast-container"></div>
+<script>window.__TRAINHUB_PAGE__ = '<?!= currentPage ?>';</script>
 <?!= include('script') ?>
 <script>
   let currentTraining = null;
+  let currentSessionObj = null;
+  let allEmployeesList = [];
+  let selectedParticipantIds = new Set();
+  let currentFilteredEmployees = [];
   const STATUS_OPTIONS = ['Present','Late','Partial Attendance','Left Early','Absent'];
   const REMARK_OPTIONS = ['No remarks','Left after lunch','Medical leave','Emergency','Personal reason','Attended morning session only'];
 
   document.addEventListener('DOMContentLoaded', async () => {
     try {
-      const trainings = await callServer('getTrainings');
-      const sel = document.getElementById('sel-training');
-      trainings.forEach(t => {
-        const o = document.createElement('option');
-        o.value = t.ID; o.textContent = `[${t.Code}] ${t.Name}`;
-        sel.appendChild(o);
-      });
-      // Check URL param
-      const params = new URLSearchParams(window.location.search);
-      const preId = params.get('id');
-      if (preId) { sel.value = preId; onTrainingSelect(); loadAttendance(); }
-    } catch(e) { showToast(e.message, 'error'); }
+      allEmployeesList = await callServer('getEmployees').catch(() => []);
+      initDeptFilter();
+
+      // Check if opened via QR Code scan with session parameter
+      const sessionIdParam = getQueryParam('session') || "<?!= typeof sessionParam !== 'undefined' ? sessionParam : '' ?>";
+      if (sessionIdParam) {
+        // Participant QR Check-In Flow
+        document.getElementById('admin-attendance-view').style.display = 'none';
+        document.getElementById('participant-checkin-view').style.display = 'block';
+        await initializeParticipantCheckin(sessionIdParam);
+      } else {
+        // Admin Management Flow
+        document.getElementById('participant-checkin-view').style.display = 'none';
+        document.getElementById('admin-attendance-view').style.display = 'block';
+
+        const trainings = await callServer('getTrainings');
+        const sel = document.getElementById('sel-training');
+        trainings.forEach(t => {
+          const o = document.createElement('option');
+          o.value = t.ID; o.textContent = `[${t.Code}] ${t.Name}`;
+          sel.appendChild(o);
+        });
+
+        const preId = getQueryParam('id');
+        if (preId) { sel.value = preId; onTrainingSelect(); loadAttendance(); }
+      }
+    } catch(e) {
+      showToast(e.message, 'error');
+    }
   });
+
+  // ─── Participant Check-In Logic ─────────────────────────────────────────────
+  async function initializeParticipantCheckin(sessionId) {
+    document.getElementById('p-loading').style.display = 'block';
+    document.getElementById('p-form-container').style.display = 'none';
+    document.getElementById('p-error-container').style.display = 'none';
+    document.getElementById('p-success-container').style.display = 'none';
+
+    try {
+      const res = await callServer('getSession', sessionId);
+      currentSessionObj = res;
+
+      document.getElementById('p-session-badge').textContent = res.SessionID || 'Session';
+      document.getElementById('p-training-title').textContent = res.TrainingTitle || 'Training Programme';
+      document.getElementById('p-session-name').textContent = res.SessionName || 'Session Check-In';
+      document.getElementById('p-session-date').textContent = res.SessionDate || '—';
+      document.getElementById('p-session-time').textContent = `${res.StartTime || '09:00'} - ${res.EndTime || '17:00'}`;
+
+      document.getElementById('p-loading').style.display = 'none';
+
+      // Check status
+      if (res.QRStatus === 'Expired' || res.QRStatus === 'Inactive') {
+        showCheckinError(`Session is ${res.QRStatus}. Check-in is closed for this session.`);
+        return;
+      }
+
+      document.getElementById('p-form-container').style.display = 'block';
+    } catch(e) {
+      document.getElementById('p-loading').style.display = 'none';
+      showCheckinError(e.message || 'Session not found or invalid URL.');
+    }
+  }
+
+  function onEmployeeNoInput() {
+    const val = document.getElementById('p-emp-no').value.trim().toLowerCase();
+    const drop = document.getElementById('p-emp-dropdown');
+    if (!val) { drop.style.display = 'none'; return; }
+
+    const matches = allEmployeesList.filter(e =>
+      (e.ID || '').toLowerCase().includes(val) || (e.Name || '').toLowerCase().includes(val)
+    ).slice(0, 5);
+
+    if (!matches.length) { drop.style.display = 'none'; return; }
+
+    drop.innerHTML = matches.map(m => `
+      <div class="autocomplete-item" onclick="selectParticipantEmp('${m.ID}')">
+        <div><span class="emp-code">${m.ID}</span> <strong>${m.Name}</strong></div>
+        <span class="emp-dept">${m.Department}</span>
+      </div>
+    `).join('');
+    drop.style.display = 'block';
+  }
+
+  function selectParticipantEmp(empId) {
+    const emp = allEmployeesList.find(e => e.ID === empId);
+    if (emp) {
+      document.getElementById('p-emp-no').value   = emp.ID;
+      document.getElementById('p-emp-name').value = emp.Name;
+      document.getElementById('p-emp-dept').value = emp.Department;
+    }
+    document.getElementById('p-emp-dropdown').style.display = 'none';
+  }
+
+  async function submitCheckinForm() {
+    if (!currentSessionObj) { showCheckinError('Invalid session context.'); return; }
+    const empNo = document.getElementById('p-emp-no').value.trim();
+    const empName = document.getElementById('p-emp-name').value.trim();
+    const empDept = document.getElementById('p-emp-dept').value.trim();
+
+    if (!empNo) { showToast('Please enter your Employee Number / ID.', 'error'); return; }
+
+    const btn = document.getElementById('btn-submit-checkin');
+    setBtnLoading(btn, true, 'Submitting...');
+
+    try {
+      const res = await callServer('submitAttendance', {
+        sessionId: currentSessionObj.SessionID,
+        employeeNo: empNo,
+        employeeName: empName,
+        department: empDept
+      });
+
+      document.getElementById('p-form-container').style.display = 'none';
+      document.getElementById('p-success-container').style.display = 'block';
+      document.getElementById('p-success-msg').textContent = res.message || 'Attendance recorded!';
+      document.getElementById('p-success-time').textContent = res.scanTime || new Date().toLocaleString();
+    } catch(e) {
+      showCheckinError(e.message);
+    } finally {
+      setBtnLoading(btn, false, '<span class="icon sm">check_circle</span> Record Attendance');
+    }
+  }
+
+  function showCheckinError(msg) {
+    document.getElementById('p-form-container').style.display = 'none';
+    document.getElementById('p-error-container').style.display = 'block';
+    document.getElementById('p-error-msg').textContent = msg;
+  }
+
+  function resetCheckinForm() {
+    document.getElementById('p-error-container').style.display = 'none';
+    document.getElementById('p-form-container').style.display = 'block';
+  }
+
+  // ─── Admin Attendance Logic ────────────────────────────────────────────────
+  function initDeptFilter() {
+    const depts = Array.from(new Set(allEmployeesList.map(e => e.Department).filter(Boolean))).sort();
+    const sel = document.getElementById('p-dept');
+    if (sel) {
+      sel.innerHTML = '<option value="">All Departments</option>' + depts.map(d => `<option value="${d}">${d}</option>`).join('');
+    }
+  }
 
   function onTrainingSelect() {
     const sel = document.getElementById('sel-training');
@@ -117,46 +419,50 @@
     const id = document.getElementById('sel-training').value;
     if (!id) { showToast('Please select a training first.', 'error'); return; }
 
-    const t = await callServer('getTrainingById', id);
+    const [t, sum, grouped] = await Promise.all([
+      callServer('getTrainingById', id),
+      callServer('getAttendanceSummary', id),
+      callServer('getAttendanceByTraining', id).catch(() => [])
+    ]);
     currentTraining = t;
     document.getElementById('topbar-sub').textContent = t.Name;
 
     // Summary
-    const sum = await callServer('getAttendanceSummary', id);
     document.getElementById('att-summary').style.display = '';
     document.getElementById('s-present').textContent = sum.present || 0;
     document.getElementById('s-absent').textContent  = sum.absent  || 0;
     document.getElementById('s-late').textContent    = sum.late    || 0;
     document.getElementById('s-pct').textContent     = (sum.pct || 0) + '%';
 
-    // Days
-    const days = await callServer('getAttendance', id);
-    renderDays(days);
+    renderSessionsAccordion(grouped);
     document.getElementById('add-day-section').style.display = '';
   }
 
-  function renderDays(days) {
+  function renderSessionsAccordion(grouped) {
     const container = document.getElementById('days-container');
-    if (!days.length) {
-      container.innerHTML = '<div class="empty-state"><span class="icon">fact_check</span><p style="color:#94A3B8">No attendance records yet. Add records below.</p></div>';
+    if (!grouped.length) {
+      container.innerHTML = '<div class="empty-state"><span class="icon">fact_check</span><p style="color:#94A3B8">No session attendance records yet.</p></div>';
       return;
     }
-    container.innerHTML = days.map(d => {
-      const pct = d.records ? Math.round(d.records.filter(r => r.Status === 'Present').length / d.records.length * 100) : 0;
+    container.innerHTML = grouped.map(g => {
+      const s = g.session || {};
+      const records = g.records || [];
+      const pct = g.totalRecords > 0 ? Math.round((g.presentCount / g.totalRecords) * 100) : 0;
       return `
       <div style="border:1px solid #E2E8F0;border-radius:10px;overflow:hidden;background:#fff;margin-bottom:12px">
         <div style="padding:12px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;background:#F8FAFC;border-bottom:1px solid #E2E8F0"
              onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none'">
-          <div style="width:38px;height:38px;border-radius:9px;background:#EFF6FF;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0">
-            <span style="font-size:8.5px;font-weight:700;color:#2563EB;text-transform:uppercase">Day</span>
-            <span style="font-size:15px;font-weight:800;color:#2563EB;line-height:1">${d.day}</span>
+          <div style="width:38px;height:38px;border-radius:99px;background:#EFF6FF;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0">
+            <span style="font-size:8px;font-weight:700;color:#2563EB;text-transform:uppercase">SES</span>
+            <span style="font-size:11px;font-weight:800;color:#2563EB;line-height:1">${s.SessionID || '—'}</span>
           </div>
           <div style="flex:1">
             <div style="display:flex;align-items:center;gap:12px;margin-bottom:5px;flex-wrap:wrap">
-              <span style="font-size:13px;font-weight:600;color:#1E293B">${d.date}</span>
+              <span style="font-size:14px;font-weight:700;color:#1E293B">${s.SessionName} (${s.SessionDate || '—'})</span>
               <span style="font-size:12px;font-weight:700;color:${pct>=90?'#22C55E':pct>=70?'#F59E0B':'#EF4444'}">
-                ${d.records ? d.records.filter(r=>r.Status==='Present').length : 0}/${d.records ? d.records.length : 0} Present
+                ${g.presentCount}/${g.totalRecords} Present
               </span>
+              ${statusBadge(s.QRStatus || 'Active')}
             </div>
             ${progressBar(pct, pct>=90?'#22C55E':pct>=70?'#F59E0B':'#EF4444', 5)}
           </div>
@@ -164,19 +470,19 @@
         </div>
         <div style="display:none;overflow-x:auto">
           <table class="table-th">
-            <thead><tr><th>Emp ID</th><th>Name</th><th>Dept</th><th>Check In</th><th>Check Out</th><th>Hours</th><th>Status</th><th>Remarks</th></tr></thead>
+            <thead><tr><th>Emp ID</th><th>Name</th><th>Dept</th><th>Scan / Check-In Time</th><th>Status</th><th>Remarks</th></tr></thead>
             <tbody>
-              ${(d.records || []).map((r, i) => `
-              <tr style="${r.EditedBy?'background:#FFFBEB':''}">
-                <td style="font-family:monospace;font-size:11px;color:#94A3B8">${r.EmployeeID}</td>
+              ${records.length ? records.map((r, i) => `
+              <tr>
+                <td style="font-family:monospace;font-size:11px;color:#2563EB;font-weight:700">${r.EmployeeNo || r.EmployeeID}</td>
                 <td><div style="display:flex;align-items:center;gap:7px">${avatar(r.EmployeeName,25,i)}<span style="font-size:13px;font-weight:500">${r.EmployeeName}</span></div></td>
                 <td style="font-size:12px;color:#64748B">${r.Department}</td>
-                <td style="font-family:monospace;font-size:12px">${r.CheckIn||'—'}</td>
-                <td style="font-family:monospace;font-size:12px">${r.CheckOut||'—'}</td>
-                <td style="font-size:12px;font-weight:500">${r.Hours>0?r.Hours+'h':'—'}</td>
+                <td style="font-family:monospace;font-size:12px">${r.ScanTime || r.CheckIn || '—'}</td>
                 <td>${statusBadge(r.Status)}</td>
                 <td style="font-size:12px;color:#64748B">${r.Remarks||'—'}</td>
-              </tr>`).join('')}
+              </tr>`).join('') : `
+              <tr><td colspan="6" class="text-center p-3 text-muted">No attendance scanned for this session yet.</td></tr>
+              `}
             </tbody>
           </table>
         </div>
@@ -185,47 +491,176 @@
   }
 
   let recordRowCount = 0;
-  function addRecordRow() {
+  function addRecordRow(prefill = {}) {
     const i = recordRowCount++;
     const row = document.createElement('div');
-    row.className = 'row g-2 mb-2';
+    row.className = 'row g-2 mb-2 align-items-center';
     row.id = 'rrow-' + i;
+    const empIdVal = prefill.ID || prefill.EmployeeID || '';
+    const nameVal  = prefill.Name || prefill.EmployeeName || '';
+    const deptVal  = prefill.Department || '';
+    const statVal  = prefill.Status || 'Present';
+
     row.innerHTML = `
-      <div class="col-md-2"><input class="input-th" placeholder="EMP ID" id="r-empid-${i}"></div>
-      <div class="col-md-3"><input class="input-th" placeholder="Name" id="r-name-${i}"></div>
-      <div class="col-md-2"><input class="input-th" placeholder="Dept" id="r-dept-${i}"></div>
-      <div class="col-md-1"><input class="input-th" type="time" id="r-in-${i}"></div>
-      <div class="col-md-1"><input class="input-th" type="time" id="r-out-${i}"></div>
-      <div class="col-md-1"><input class="input-th" type="number" step="0.5" placeholder="h" id="r-hrs-${i}"></div>
-      <div class="col-md-1"><select class="input-th" id="r-stat-${i}">${STATUS_OPTIONS.map(s=>`<option>${s}</option>`).join('')}</select></div>
+      <div class="col-md-3 autocomplete-wrapper">
+        <input class="input-th" placeholder="EMP ID" id="r-empid-${i}" value="${empIdVal}" autocomplete="off">
+        <div id="r-empid-drop-${i}" class="autocomplete-dropdown" style="display:none"></div>
+      </div>
+      <div class="col-md-3 autocomplete-wrapper">
+        <input class="input-th" placeholder="Name" id="r-name-${i}" value="${nameVal}" autocomplete="off">
+        <div id="r-name-drop-${i}" class="autocomplete-dropdown" style="display:none"></div>
+      </div>
+      <div class="col-md-3"><input class="input-th" placeholder="Dept" id="r-dept-${i}" value="${deptVal}"></div>
+      <div class="col-md-2"><select class="input-th" id="r-stat-${i}">${STATUS_OPTIONS.map(s=>`<option ${s===statVal?'selected':''}>${s}</option>`).join('')}</select></div>
       <div class="col-md-1"><button class="btn-th btn-danger btn-xs" onclick="document.getElementById('rrow-${i}').remove()"><span class="icon sm">delete</span></button></div>
     `;
     document.getElementById('records-list').appendChild(row);
+    attachRowAutocomplete(i);
+  }
+
+  async function loadTrainingParticipantsIntoEditor() {
+    if (!currentTraining) { showToast('Select a training first.', 'error'); return; }
+    try {
+      const list = await callServer('getTrainingParticipants', currentTraining.ID);
+      if (!list || !list.length) {
+        showToast('No enrolled participants found for this training.', 'info');
+        return;
+      }
+      list.forEach(p => addRecordRow(p));
+      showToast(`Loaded ${list.length} enrolled participants.`, 'success');
+    } catch(e) { showToast(e.message, 'error'); }
+  }
+
+  function attachRowAutocomplete(i) {
+    const empInput = document.getElementById(`r-empid-${i}`);
+    const nameInput = document.getElementById(`r-name-${i}`);
+    const empDrop  = document.getElementById(`r-empid-drop-${i}`);
+    const nameDrop = document.getElementById(`r-name-drop-${i}`);
+
+    function setupField(inputEl, dropEl) {
+      inputEl.addEventListener('input', () => {
+        const q = inputEl.value.trim().toLowerCase();
+        if (q.length < 1) { dropEl.style.display = 'none'; return; }
+        const matches = allEmployeesList.filter(e =>
+          (e.ID || '').toLowerCase().includes(q) || (e.Name || '').toLowerCase().includes(q)
+        ).slice(0, 8);
+
+        if (!matches.length) { dropEl.style.display = 'none'; return; }
+
+        dropEl.innerHTML = matches.map(m => `
+          <div class="autocomplete-item" onclick="selectRowEmployee(${i}, '${m.ID}')">
+            <div><span class="emp-code">${m.ID}</span> <strong>${m.Name}</strong></div>
+            <span class="emp-dept">${m.Department}</span>
+          </div>
+        `).join('');
+        dropEl.style.display = 'block';
+      });
+
+      inputEl.addEventListener('blur', () => {
+        setTimeout(() => { dropEl.style.display = 'none'; }, 200);
+      });
+    }
+
+    setupField(empInput, empDrop);
+    setupField(nameInput, nameDrop);
+  }
+
+  function selectRowEmployee(rowIndex, empId) {
+    const emp = allEmployeesList.find(e => e.ID === empId);
+    if (!emp) return;
+    document.getElementById(`r-empid-${rowIndex}`).value = emp.ID || '';
+    document.getElementById(`r-name-${rowIndex}`).value  = emp.Name || '';
+    document.getElementById(`r-dept-${rowIndex}`).value  = emp.Department || '';
+  }
+
+  async function openParticipantModal() {
+    selectedParticipantIds.clear();
+    openModal('modal-select-participants');
+    filterParticipantsModal();
+  }
+
+  function filterParticipantsModal() {
+    const q    = document.getElementById('p-search').value.trim().toLowerCase();
+    const dept = document.getElementById('p-dept').value;
+
+    currentFilteredEmployees = allEmployeesList.filter(e =>
+      (!q || (e.Name||'').toLowerCase().includes(q) || (e.ID||'').toLowerCase().includes(q)) &&
+      (!dept || e.Department === dept)
+    );
+
+    document.getElementById('p-filtered-count').textContent = currentFilteredEmployees.length;
+    renderParticipantModalList(currentFilteredEmployees);
+  }
+
+  function renderParticipantModalList(list) {
+    const container = document.getElementById('p-list-container');
+    if (!list.length) {
+      container.innerHTML = '<div class="p-4 text-center" style="color:#94A3B8">No employees found.</div>';
+      return;
+    }
+    container.innerHTML = list.slice(0, 25).map((e, idx) => {
+      const isChecked = selectedParticipantIds.has(e.ID);
+      return `
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid #F1F5F9;background:${isChecked?'#EFF6FF':idx%2===0?'#fff':'#FAFAFA'}">
+          <input type="checkbox" style="width:16px;height:16px;cursor:pointer" ${isChecked?'checked':''} onchange="toggleParticipantSelection('${e.ID}', this.checked)">
+          <div style="flex:1">
+            <span style="font-family:monospace;font-size:11px;font-weight:700;color:#2563EB">${e.ID}</span>
+            <strong style="font-size:13px;color:#1E293B;margin-left:6px">${e.Name}</strong>
+          </div>
+          <span class="badge-th badge-blue">${e.Department}</span>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function toggleParticipantSelection(id, checked) {
+    if (checked) selectedParticipantIds.add(id);
+    else selectedParticipantIds.delete(id);
+  }
+
+  function toggleSelectAllParticipants(checked) {
+    currentFilteredEmployees.forEach(e => {
+      if (checked) selectedParticipantIds.add(e.ID);
+      else selectedParticipantIds.delete(e.ID);
+    });
+    renderParticipantModalList(currentFilteredEmployees);
+  }
+
+  function confirmAddSelectedParticipants() {
+    selectedParticipantIds.forEach(id => {
+      const emp = allEmployeesList.find(e => e.ID === id);
+      if (emp) addRecordRow(emp);
+    });
+    closeModal('modal-select-participants');
   }
 
   async function saveDayAttendance() {
     if (!currentTraining) { showToast('Select a training first.', 'error'); return; }
-    const day  = document.getElementById('add-day').value;
-    const date = document.getElementById('add-date').value;
-    if (!day || !date) { showToast('Day number and date are required.', 'error'); return; }
+    const sessionName = document.getElementById('add-day').value || 'Day 1';
 
     const records = [];
     document.querySelectorAll('[id^="rrow-"]').forEach(row => {
       const i = row.id.replace('rrow-','');
       records.push({
-        EmployeeID:   document.getElementById('r-empid-'+i).value,
+        EmployeeNo:   document.getElementById('r-empid-'+i).value,
         EmployeeName: document.getElementById('r-name-' +i).value,
         Department:   document.getElementById('r-dept-' +i).value,
-        CheckIn:      document.getElementById('r-in-'   +i).value,
-        CheckOut:     document.getElementById('r-out-'  +i).value,
-        Hours:        document.getElementById('r-hrs-'  +i).value || 0,
-        Status:       document.getElementById('r-stat-' +i).value,
+        Status:       document.getElementById('r-stat-' +i).value
       });
     });
 
     try {
-      await callServer('saveAttendance', currentTraining.ID, currentTraining.Code, day, date, records);
-      showToast('Attendance saved for Day ' + day, 'success');
+      for (const r of records) {
+        if (r.EmployeeNo) {
+          await callServer('submitAttendance', {
+            sessionId: sessionName,
+            employeeNo: r.EmployeeNo,
+            employeeName: r.EmployeeName,
+            department: r.Department
+          });
+        }
+      }
+      showToast('Attendance records saved!', 'success');
       loadAttendance();
     } catch(e) { showToast(e.message, 'error'); }
   }
@@ -235,7 +670,7 @@
     if (!id) { showToast('Select a training first.', 'error'); return; }
     try {
       const res = await callServer('exportAttendanceSheet', id);
-      showToast('Exported to sheet: ' + res.sheetName, 'success');
+      showToast('Exported to sheet: ' + (res.sheetName || 'Attendance'), 'success');
     } catch(e) { showToast(e.message, 'error'); }
   }
 </script>
