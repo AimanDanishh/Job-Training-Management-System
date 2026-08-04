@@ -260,6 +260,8 @@ function addTrainingParticipants(trainingId, participants) {
     const totalCount = existingEmpIds.size;
     updateTrainingParticipantCount(trainingId, totalCount);
 
+    try { syncTrainingRequisitionParticipants(trainingId); } catch(e) {}
+
     return ok({ message: `Added ${addedCount} participants successfully.`, count: totalCount });
   } catch (e) {
     return err('Failed to add participants: ' + e.message);
@@ -285,6 +287,8 @@ function removeTrainingParticipant(trainingId, employeeId) {
     const remainingRows = sheetToJson(sheet).filter(r => String(r.TrainingID) === String(trainingId));
     const totalCount = remainingRows.length;
     updateTrainingParticipantCount(trainingId, totalCount);
+
+    try { syncTrainingRequisitionParticipants(trainingId); } catch(e) {}
 
     return ok({ message: 'Participant removed successfully.', count: totalCount });
   } catch (e) {

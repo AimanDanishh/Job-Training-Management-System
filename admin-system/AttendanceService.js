@@ -158,3 +158,33 @@ function getAttendanceByTraining(trainingId) {
     return err('Failed to load training attendance: ' + e.message);
   }
 }
+
+/**
+ * Update single attendance record's Status and Remarks.
+ */
+function updateAttendanceRecord(id, status, remarks) {
+  try {
+    if (!id) return err('Record ID is required.');
+    const sheet = getSheet(SHEET_NAMES.attendance);
+    if (!sheet) return err('Attendance sheet not found.');
+
+    const row = findRowById(sheet, id);
+    if (row === -1) return err('Attendance record not found.');
+
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const statusCol   = headers.indexOf('Status') + 1;
+    const remarksCol  = headers.indexOf('Remarks') + 1;
+    const editedByCol = headers.indexOf('EditedBy') + 1;
+    const editedAtCol = headers.indexOf('EditedAt') + 1;
+
+    if (statusCol)  sheet.getRange(row, statusCol).setValue(status || 'Present');
+    if (remarksCol) sheet.getRange(row, remarksCol).setValue(remarks || '');
+    if (editedByCol) sheet.getRange(row, editedByCol).setValue('Admin');
+    if (editedAtCol) sheet.getRange(row, editedAtCol).setValue(now());
+
+    return ok({ message: 'Attendance record updated successfully.' });
+  } catch (e) {
+    Logger.log('updateAttendanceRecord error: ' + e.message);
+    return err('Failed to update record: ' + e.message);
+  }
+}

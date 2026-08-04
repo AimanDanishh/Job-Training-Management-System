@@ -26,19 +26,20 @@ function saveTrainingEvaluation(data) {
     );
     if (exists) return err('You have already submitted an evaluation for this training.');
 
-    const scores = [data.Q1, data.Q2, data.Q3, data.Q4, data.Q5, data.Q6, data.Q7]
-      .map(Number).filter(n => !isNaN(n) && n > 0);
-    const avg = scores.length > 0
-      ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2)
-      : 0;
+    const scores = [data.Q1, data.Q2, data.Q3, data.Q4, data.Q5, data.Q6, data.Q7].map(Number);
+    if (scores.some(s => isNaN(s) || s < 1 || s > 5)) {
+      return err('All 7 evaluation questions (scale 1-5) are required.');
+    }
+
+    const avg = (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2);
 
     sheet.appendRow([
       generateId('EVL'),
       data.TrainingID,
       data.EmployeeID,
       data.EmployeeName  || '',
-      data.Q1 || 0, data.Q2 || 0, data.Q3 || 0,
-      data.Q4 || 0, data.Q5 || 0, data.Q6 || 0, data.Q7 || 0,
+      data.Q1, data.Q2, data.Q3,
+      data.Q4, data.Q5, data.Q6, data.Q7,
       data.SectionB1     || '',
       data.SectionB2     || '',
       data.SectionB3     || '',
@@ -67,6 +68,12 @@ function savePostEvaluation(data) {
     if (!data.TrainingID || !data.EmployeeID || !data.EvaluatorName)
       return err('TrainingID, EmployeeID, and Evaluator Name are required.');
 
+    const cb = Number(data.CompetencyBefore);
+    const ca = Number(data.CompetencyAfter);
+    if (isNaN(cb) || cb < 1 || cb > 5 || isNaN(ca) || ca < 1 || ca > 5) {
+      return err('Competency levels before and after training (scale 1-5) are required.');
+    }
+
     const sheet = getSheet(SHEET_NAMES.postEval);
     const rows  = sheetToJson(sheet);
     const exists = rows.find(r =>
@@ -80,8 +87,8 @@ function savePostEvaluation(data) {
       data.EmployeeID,
       data.EvaluatorName      || '',
       data.EvaluatorID        || '',
-      data.CompetencyBefore   || 0,
-      data.CompetencyAfter    || 0,
+      cb,
+      ca,
       data.Improvement        || '',
       data.CanApply           || '',
       data.FurtherTraining    || '',
@@ -140,3 +147,27 @@ function tryAdvanceToEvaluationCompleted(trainingId) {
     Logger.log('Stage auto-advance error: ' + e.message);
   }
 }
+
+/**
+ * Bulk email 6-month post-training evaluation form link to supervisor
+ */
+function sendSupervisorPostEvalEmails(trainingId, supervisorEmail, selectedEmpIds) {
+  try {
+    if (!trainingId || !supervisorEmail) {
+      return err('Training ID and Supervisor Email are required.');
+    }
+    const cleanEmail = String(supervisorEmail).trim();
+    const cleanBase = getPublicPortalUrl().split('?')[0];
+    const postUrl = `${cleanBase}?page=post&id=${encodeURIComponent(trainingId)}`;
+
+    const count = (Array.isArray(selectedEmpIds) && selectedEmpIds.length > 0) ? selectedEmpIds.length : 1;
+
+    const subject = `[Action Required] 6-Month Post-Training Evaluation — TrainHub`;
+    const body = `Dear Supervisor,\n\nYou have been requested to complete the 6-Month Post-Training Evaluation for your team member(s).\n\nPlease click the link below to open the evaluation form on the TrainHub Participant Portal:\n${postUrl}\n\nThank you,\nTrainHub Management System`;
+
+    MailApp.sendEmail(cleanEmail, subject, body);
+    return ok({ message: `Sent 6-month evaluation link to ${cleanEmail} for ${count} participant(s).` });
+  } catch (e) {
+    return err('Failed to send supervisor email: ' + e.message);
+  }
+}

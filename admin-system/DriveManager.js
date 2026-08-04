@@ -159,7 +159,7 @@ function createTrainingRequisitionForm(code, training, targetFolderId) {
   }
 }
 
-/** Keeps the participant grid on the requisition form in sync with saved attendance. */
+/** Keeps the participant grid on the requisition form in sync with enrolled training participants and attendance. */
 function syncTrainingRequisitionParticipants(trainingId) {
   try {
     const trainingSheet = getSheet(SHEET_NAMES.trainings);
@@ -170,31 +170,61 @@ function syncTrainingRequisitionParticipants(trainingId) {
     const formId = formColumn ? trainingSheet.getRange(trainingRow, formColumn).getValue() : '';
     if (!formId) return;
 
-    const attendanceRows = sheetToJson(getSheet(SHEET_NAMES.attendance))
-      .filter(row => String(row.TrainingID) === String(trainingId));
+    // Combine participants from TrainingParticipants sheet & Attendance sheet
+    const tpSheet = getSheet(SHEET_NAMES.trainingParticipants);
+    const tpRows  = tpSheet ? sheetToJson(tpSheet).filter(row => String(row.TrainingID) === String(trainingId)) : [];
+
+    const attSheet = getSheet(SHEET_NAMES.attendance);
+    const attRows  = attSheet ? sheetToJson(attSheet).filter(row => String(row.TrainingID) === String(trainingId)) : [];
+
     const uniqueParticipants = [];
     const seen = {};
-    attendanceRows.forEach(row => {
-      const key = row.EmployeeID || row.EmployeeName;
-      if (key && !seen[key]) { seen[key] = true; uniqueParticipants.push(row); }
+
+    tpRows.forEach(row => {
+      const empId = row.EmployeeID || row.EmployeeNo || row.ID;
+      if (empId && !seen[empId]) {
+        seen[empId] = true;
+        uniqueParticipants.push({
+          EmployeeID: empId,
+          EmployeeName: row.EmployeeName || row.Name || '',
+          Department: row.Department || '',
+          Position: row.Position || row.JobTitle || ''
+        });
+      }
+    });
+
+    attRows.forEach(row => {
+      const empId = row.EmployeeNo || row.EmployeeID;
+      if (empId && !seen[empId]) {
+        seen[empId] = true;
+        uniqueParticipants.push({
+          EmployeeID: empId,
+          EmployeeName: row.EmployeeName || '',
+          Department: row.Department || '',
+          Position: row.Position || ''
+        });
+      }
     });
 
     const employeeRows = sheetToJson(getSheet(SHEET_NAMES.employees));
     const employees = {};
     employeeRows.forEach(row => { employees[row.ID] = row; });
+
     const formSpreadsheet = SpreadsheetApp.openById(formId);
     const sheet = formSpreadsheet.getSheetByName('Training Form') || formSpreadsheet.getSheets()[0];
     const rowCount = 25; // Rows 15-39 in the supplied AP-HRD-F01-00 template.
     sheet.getRangeList(['A15:A39', 'C15:C39', 'D15:D39', 'E15:E39', 'G15:G39']).clearContent();
+
     uniqueParticipants.slice(0, rowCount).forEach((participant, index) => {
       const employee = employees[participant.EmployeeID] || {};
       const row = 15 + index;
       sheet.getRange(`A${row}`).setValue(participant.EmployeeID || '');
-      sheet.getRange(`C${row}`).setValue(participant.EmployeeName || '');
-      sheet.getRange(`D${row}`).setValue(participant.Department || '');
+      sheet.getRange(`C${row}`).setValue(participant.EmployeeName || employee.Name || '');
+      sheet.getRange(`D${row}`).setValue(participant.Department || employee.Department || '');
       sheet.getRange(`E${row}`).setValue(employee.NRIC || '');
-      sheet.getRange(`G${row}`).setValue(employee.Position || '');
+      sheet.getRange(`G${row}`).setValue(participant.Position || employee.Position || employee.JobTitle || '');
     });
+
     trainingSheet.getRange(trainingRow, 15).setValue(uniqueParticipants.length);
     SpreadsheetApp.flush();
   } catch (e) {

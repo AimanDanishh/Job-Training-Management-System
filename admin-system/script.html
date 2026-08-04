@@ -1,4 +1,5 @@
 <script>
+window.__PUBLIC_PORTAL_URL__ = "<?!= (typeof publicPortalUrl !== 'undefined') ? publicPortalUrl : '' ?>";
 // Bootstrap's CSS is used for layout utilities; its JavaScript bundle is not
 // required by this app. Keeping it out avoids Apps Script's document.write
 // parser corrupting the external script URL during page rendering.

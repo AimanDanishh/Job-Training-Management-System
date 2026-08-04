@@ -13,10 +13,11 @@ function doGet(e) {
 
   try {
     const template = HtmlService.createTemplateFromFile(safePage);
-    // Pass page parameter and session parameters into the template
+    // Pass page parameter, session parameters, and public portal URL into the template
     template.currentPage = safePage;
     template.sessionParam = (e && e.parameter && e.parameter.session) ? e.parameter.session : '';
     template.queryParams = (e && e.parameter) ? JSON.stringify(e.parameter) : '{}';
+    template.publicPortalUrl = getPublicPortalUrl();
 
     return template.evaluate()
       .setTitle(appTitle)

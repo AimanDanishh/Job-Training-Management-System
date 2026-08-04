@@ -115,6 +115,8 @@
     const att = report.attendance;
     const ev  = report.evaluation;
 
+    const reqUrl = report.requisitionFormUrl || (t.RequisitionFormFileID ? `https://docs.google.com/spreadsheets/d/${t.RequisitionFormFileID}/edit` : '');
+
     // Header
     document.getElementById('rep-header').innerHTML = `
       <div style="display:flex;gap:16px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap">
@@ -129,10 +131,25 @@
         </div>
         <div style="text-align:right;flex-shrink:0">
           <div style="font-size:11px;color:#94A3B8">Generated</div>
-          <div style="font-size:12px;color:#64748B">${report.generatedAt}</div>
+          <div style="font-size:12px;color:#64748B;margin-bottom:6px">${report.generatedAt}</div>
           ${statusBadge(t.Status)}
         </div>
       </div>
+
+      ${reqUrl ? `
+        <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:12px 16px;margin-top:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+          <div>
+            <div style="font-size:13px;font-weight:700;color:#1D4ED8;display:flex;align-items:center;gap:6px">
+              <span class="icon sm">description</span> Training Requisition Form (Google Sheets)
+            </div>
+            <div style="font-size:11.5px;color:#3B82F6">Official programme requisition form auto-synced with participant data</div>
+          </div>
+          <a class="btn-th btn-primary btn-sm" style="text-decoration:none" href="${reqUrl}" target="_blank">
+            <span class="icon sm">open_in_new</span> Open Requisition Form
+          </a>
+        </div>
+      ` : ''}
+
       <div style="background:#F8FAFC;border-radius:10px;padding:12px 16px;margin-top:16px">
         <div class="section-label" style="margin-bottom:8px">Lifecycle Stage</div>
         ${renderLifecycle(t.Stage||'Created')}

@@ -11,65 +11,123 @@
   <!-- Sidebar -->
   <?!= include('sidebar') ?>
 
-
   <!-- Main -->
   <div class="main-area">
     <header class="topbar">
       <button id="sidebar-toggle" class="btn-th btn-secondary btn-sm" style="display:none"><span class="icon sm">menu</span></button>
       <div style="flex:1">
         <h1 class="topbar-title">Dashboard</h1>
-        <p class="topbar-sub">Welcome back. Here's your training overview.</p>
+        <p class="topbar-sub">Welcome back. System overview & real-time training analytics.</p>
       </div>
-      <button class="btn-th btn-primary btn-sm" onclick="navTo('training')">
-        <span class="icon sm">add</span>New Programme
-      </button>
+      <div style="display:flex;gap:8px">
+        <button class="btn-th btn-primary btn-sm" onclick="navTo('training')">
+          <span class="icon sm">add</span>New Programme
+        </button>
+      </div>
     </header>
 
     <main class="page-content">
-      <!-- KPI row -->
+      <!-- KPI Row -->
       <div class="row g-3 mb-4" id="kpi-row">
-        <div class="col-6 col-md-4 col-xl"><div class="stat-card"><div class="d-flex align-items-center gap-2 mb-2"><span class="icon filled md" style="color:#F59E0B">event</span></div><div class="stat-value" style="color:#F59E0B" id="kpi-upcoming">—</div><div class="stat-label">Upcoming</div></div></div>
-        <div class="col-6 col-md-4 col-xl"><div class="stat-card"><div class="d-flex align-items-center gap-2 mb-2"><span class="icon filled md" style="color:#2563EB">sync</span></div><div class="stat-value" style="color:#2563EB" id="kpi-ongoing">—</div><div class="stat-label">In Progress</div></div></div>
-        <div class="col-6 col-md-4 col-xl"><div class="stat-card"><div class="d-flex align-items-center gap-2 mb-2"><span class="icon filled md" style="color:#22C55E">task_alt</span></div><div class="stat-value" style="color:#22C55E" id="kpi-completed">—</div><div class="stat-label">Completed</div></div></div>
-        <div class="col-6 col-md-4 col-xl"><div class="stat-card"><div class="d-flex align-items-center gap-2 mb-2"><span class="icon filled md" style="color:#EF4444">rate_review</span></div><div class="stat-value" style="color:#EF4444" id="kpi-eval">—</div><div class="stat-label">Pending Evaluations</div></div></div>
-        <div class="col-6 col-md-4 col-xl"><div class="stat-card"><div class="d-flex align-items-center gap-2 mb-2"><span class="icon filled md" style="color:#8B5CF6">timeline</span></div><div class="stat-value" style="color:#8B5CF6" id="kpi-post">—</div><div class="stat-label">Pending 6-Month Eval</div></div></div>
+        <div class="col-6 col-md-4 col-xl">
+          <div class="stat-card">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <span class="icon filled md" style="color:#2563EB">school</span>
+            </div>
+            <div class="stat-value" style="color:#2563EB" id="kpi-total">—</div>
+            <div class="stat-label">Total Programmes</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl">
+          <div class="stat-card">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <span class="icon filled md" style="color:#F59E0B">event</span>
+            </div>
+            <div class="stat-value" style="color:#F59E0B" id="kpi-upcoming">—</div>
+            <div class="stat-label">Upcoming</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl">
+          <div class="stat-card">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <span class="icon filled md" style="color:#0284C7">sync</span>
+            </div>
+            <div class="stat-value" style="color:#0284C7" id="kpi-ongoing">—</div>
+            <div class="stat-label">In Progress</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl">
+          <div class="stat-card">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <span class="icon filled md" style="color:#22C55E">task_alt</span>
+            </div>
+            <div class="stat-value" style="color:#22C55E" id="kpi-completed">—</div>
+            <div class="stat-label">Completed</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl">
+          <div class="stat-card">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <span class="icon filled md" style="color:#EF4444">rate_review</span>
+            </div>
+            <div class="stat-value" style="color:#EF4444" id="kpi-eval">—</div>
+            <div class="stat-label">Pending Eval</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl">
+          <div class="stat-card">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <span class="icon filled md" style="color:#8B5CF6">timeline</span>
+            </div>
+            <div class="stat-value" style="color:#8B5CF6" id="kpi-post">—</div>
+            <div class="stat-label">Pending 6-Mo Review</div>
+          </div>
+        </div>
       </div>
 
-      <!-- Quick Actions -->
+      <!-- Quick Actions Bar -->
       <div class="card-th mb-4">
-        <div class="section-label">Quick Actions</div>
+        <div class="section-label" style="margin-bottom:12px">Quick Actions & Shortcuts</div>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <button class="btn-th" style="background:#EFF6FF;color:#2563EB;border:1px solid #BFDBFE" onclick="navTo('training')"><span class="icon sm">add_circle</span>New Programme</button>
-          <button class="btn-th" style="background:#EEF2FF;color:#4F46E5;border:1px solid #C7D2FE" onclick="navTo('session')"><span class="icon sm">qr_code</span>Session QR Codes</button>
-          <button class="btn-th" style="background:#F5F3FF;color:#7C3AED;border:1px solid #DDD6FE" onclick="navTo('attendance')"><span class="icon sm">fact_check</span>Attendance</button>
-          <button class="btn-th" style="background:#FFFBEB;color:#D97706;border:1px solid #FDE68A" onclick="navTo('evaluation')"><span class="icon sm">rate_review</span>Evaluation</button>
-          <button class="btn-th" style="background:#F0FDF4;color:#16A34A;border:1px solid #BBF7D0" onclick="navTo('report')"><span class="icon sm">bar_chart</span>Reports</button>
-          <button class="btn-th" style="background:#ECFEFF;color:#0891B2;border:1px solid #A5F3FC" onclick="navTo('training')"><span class="icon sm">school</span>View All Programmes</button>
+          <button class="btn-th" style="background:#EFF6FF;color:#2563EB;border:1px solid #BFDBFE" onclick="navTo('training')">
+            <span class="icon sm">add_circle</span> New Programme
+          </button>
+          <button class="btn-th" style="background:#F0FDF4;color:#16A34A;border:1px solid #BBF7D0" onclick="navTo('attendance')">
+            <span class="icon sm">fact_check</span> Attendance Logs
+          </button>
+          <button class="btn-th" style="background:#FFFBEB;color:#D97706;border:1px solid #FDE68A" onclick="navTo('evaluation')">
+            <span class="icon sm">rate_review</span> Evaluation Forms
+          </button>
+          <button class="btn-th" style="background:#F5F3FF;color:#7C3AED;border:1px solid #DDD6FE" onclick="navTo('report')">
+            <span class="icon sm">bar_chart</span> Requisition & Reports
+          </button>
         </div>
       </div>
 
       <!-- Tables row -->
       <div class="row g-3">
+        <!-- Active & Upcoming Programmes -->
         <div class="col-md-7">
-          <div class="card-th card-th-p0">
+          <div class="card-th card-th-p0" style="height:100%">
             <div class="card-header-row">
-              <span style="font-size:14px;font-weight:700">Active & Upcoming Programmes</span>
+              <span style="font-size:14px;font-weight:700;color:#1E293B">Active & Upcoming Programmes</span>
               <button class="btn-th btn-secondary btn-sm" onclick="navTo('training')">View All</button>
             </div>
-            <div id="active-programmes"><div class="empty-state"><span class="icon">school</span><p style="color:#94A3B8">Loading...</p></div></div>
+            <div id="active-programmes">
+              <div class="empty-state"><span class="icon">school</span><p style="color:#94A3B8">Loading programmes...</p></div>
+            </div>
           </div>
         </div>
+
+        <!-- Live Activity Feed -->
         <div class="col-md-5">
           <div class="card-th card-th-p0" style="height:100%">
             <div class="card-header-row">
-              <span style="font-size:14px;font-weight:700">Recent Activities</span>
+              <span style="font-size:14px;font-weight:700;color:#1E293B">Recent System Activities</span>
+              <span style="font-size:11px;color:#22C55E;font-weight:600">● Live Updates</span>
             </div>
-            <div id="activity-feed" style="padding:8px 0">
-              <!-- Static for now; extend with a RecentActivity sheet if needed -->
-              <div style="padding:10px 16px;display:flex;gap:10px;align-items:flex-start;border-bottom:1px solid #F8FAFC">
-                <div style="width:28px;height:28px;border-radius:7px;background:#EFF6FF;display:flex;align-items:center;justify-content:center;flex-shrink:0"><span class="icon sm" style="color:#2563EB">group_add</span></div>
-                <div><div style="font-size:12px;color:#374151">System initialised</div><div style="font-size:10.5px;color:#94A3B8">Just now</div></div>
-              </div>
+            <div id="activity-feed" style="padding:4px 0">
+              <div class="p-4 text-center" style="color:#94A3B8"><div class="spinner mb-2"></div><br>Loading recent activities...</div>
             </div>
           </div>
         </div>
@@ -82,7 +140,6 @@
 <script>window.__TRAINHUB_PAGE__ = '<?!= currentPage ?>';</script>
 <?!= include('script') ?>
 <script>
-  // Load dashboard data on page load
   document.addEventListener('DOMContentLoaded', loadDashboard);
 
   async function loadDashboard() {
@@ -92,7 +149,9 @@
         callServer('getTrainings')
       ]);
       const s = data.summary || {};
+      const tList = Array.isArray(trainings) ? trainings : [];
 
+      document.getElementById('kpi-total').textContent     = s.total      || tList.length || 0;
       document.getElementById('kpi-upcoming').textContent  = s.upcoming   || 0;
       document.getElementById('kpi-ongoing').textContent   = s.ongoing    || 0;
       document.getElementById('kpi-completed').textContent = s.completed  || 0;
@@ -100,8 +159,11 @@
       document.getElementById('kpi-post').textContent      = s.pendingPost|| 0;
 
       // Active/upcoming programmes list
-      const active = (trainings || []).filter(t => t.Status === 'In Progress' || t.Status === 'Upcoming').slice(0, 5);
+      const active = tList.filter(t => t.Status === 'In Progress' || t.Status === 'Upcoming' || t.Status === 'Draft').slice(0, 6);
       renderActiveProgrammes(active);
+
+      // Render recent activities
+      renderActivityFeed(tList);
 
     } catch(e) {
       showToast('Failed to load dashboard: ' + e.message, 'error');
@@ -111,24 +173,53 @@
   function renderActiveProgrammes(list) {
     const el = document.getElementById('active-programmes');
     if (!list.length) {
-      el.innerHTML = '<div class="empty-state"><span class="icon">school</span><p style="color:#94A3B8">No active programmes</p></div>';
+      el.innerHTML = '<div class="empty-state"><span class="icon">school</span><p style="color:#94A3B8">No active or upcoming programmes</p></div>';
       return;
     }
     el.innerHTML = list.map((p, i) => `
-      <div style="display:flex;gap:12px;align-items:center;padding:11px 20px;border-bottom:${i<list.length-1?'1px solid #F8FAFC':'none'};cursor:pointer"
-           onclick="navTo('training')" onmouseover="this.style.background='#F8FAFC'" onmouseout="this.style.background='transparent'">
-        <div style="width:34px;height:34px;border-radius:9px;background:${p.Status==='In Progress'?'#EFF6FF':'#FFFBEB'};
+      <div style="display:flex;gap:12px;align-items:center;padding:12px 20px;border-bottom:${i < list.length - 1 ? '1px solid #F1F5F9' : 'none'};cursor:pointer;transition:background 0.12s"
+           onclick="navTo('training', {id:'${p.ID}'})" onmouseover="this.style.background='#F8FAFC'" onmouseout="this.style.background='transparent'">
+        <div style="width:36px;height:36px;border-radius:10px;background:${p.Status==='In Progress'?'#EFF6FF':p.Status==='Upcoming'?'#FFFBEB':'#F8FAFC'};
                     display:flex;align-items:center;justify-content:center;flex-shrink:0">
-          <span class="icon" style="color:${p.Status==='In Progress'?'#2563EB':'#D97706'}">school</span>
+          <span class="icon" style="color:${p.Status==='In Progress'?'#2563EB':p.Status==='Upcoming'?'#D97706':'#64748B'}">school</span>
         </div>
         <div style="flex:1;min-width:0">
-          <div style="font-size:13px;font-weight:600;color:#1E293B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.Name}</div>
-          <div style="font-size:11px;color:#94A3B8;margin-top:1px">${p.StartDate} — ${p.EndDate} · ${p.Trainer}</div>
+          <div style="font-size:13px;font-weight:700;color:#1E293B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.Name}</div>
+          <div style="font-size:11.5px;color:#64748B;margin-top:2px">${p.Code} · ${p.StartDate} — ${p.EndDate||'TBD'}</div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
-          <span style="font-size:11.5px;color:#64748B">${p.Participants} pax</span>
+          <span style="font-size:11.5px;font-weight:600;color:#64748B">${p.Participants || 0} pax</span>
           ${statusBadge(p.Status)}
         </div>
+      </div>
+    `).join('');
+  }
+
+  function renderActivityFeed(trainings) {
+    const feed = document.getElementById('activity-feed');
+    if (!trainings || !trainings.length) {
+      feed.innerHTML = '<div class="p-4 text-center" style="color:#94A3B8">No recent activity logs.</div>';
+      return;
+    }
+
+    const items = trainings.slice(0, 5).map(t => ({
+      title: `Programme Created: ${t.Name}`,
+      sub: `${t.Code} · Stage: ${t.Stage || 'Created'}`,
+      icon: 'school',
+      color: '#2563EB',
+      time: t.CreatedDate || 'Recently'
+    }));
+
+    feed.innerHTML = items.map((item, idx) => `
+      <div style="padding:12px 16px;display:flex;gap:12px;align-items:flex-start;border-bottom:${idx<items.length-1?'1px solid #F8FAFC':'none'}">
+        <div style="width:30px;height:30px;border-radius:8px;background:${item.color}15;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px">
+          <span class="icon sm" style="color:${item.color}">${item.icon}</span>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12.5px;font-weight:600;color:#1E293B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.title}</div>
+          <div style="font-size:11px;color:#64748B;margin-top:1px">${item.sub}</div>
+        </div>
+        <span style="font-size:10.5px;color:#94A3B8;flex-shrink:0">${item.time}</span>
       </div>
     `).join('');
   }

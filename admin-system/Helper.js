@@ -52,7 +52,9 @@ function initDefaultScriptProperties() {
     // Google Sheets master copy of AP-HRD-F01-00. Every new programme gets a populated copy.
     'TRAINING_REQUISITION_TEMPLATE_ID': '',
     // Company logo Drive link or public image URL to embed in center of session QR codes
-    'COMPANY_LOGO_URL':        ''
+    'COMPANY_LOGO_URL':        '',
+    // Public Participant Portal Apps Script Web App Deployment URL
+    'PUBLIC_PORTAL_URL':       ''
   };
   PropertiesService.getScriptProperties().setProperties(defaults, false);
   Logger.log('Default Script Properties successfully initialized in Project Settings.');
@@ -87,6 +89,18 @@ function setCompanyLogoUrl(url) {
   setConfigProperty('COMPANY_LOGO_URL', url);
   Logger.log('COMPANY_LOGO_URL updated in Project Settings: ' + url);
   return 'COMPANY_LOGO_URL set to: ' + url;
+}
+
+function getPublicPortalUrl() {
+  const portalUrl = getConfigProperty('PUBLIC_PORTAL_URL', '');
+  if (portalUrl && portalUrl.trim() !== '') return portalUrl.trim();
+  return getAppUrl();
+}
+
+function setPublicPortalUrl(url) {
+  setConfigProperty('PUBLIC_PORTAL_URL', url || '');
+  Logger.log('PUBLIC_PORTAL_URL updated in Project Settings: ' + url);
+  return 'PUBLIC_PORTAL_URL set to: ' + url;
 }
 
 /**

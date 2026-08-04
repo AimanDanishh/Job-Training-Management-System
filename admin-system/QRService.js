@@ -11,7 +11,7 @@
  */
 function generateAttendanceURL(sessionId) {
   if (!sessionId) return '';
-  let baseUrl = getAppUrl();
+  let baseUrl = getPublicPortalUrl();
   if (!baseUrl) {
     baseUrl = 'https://script.google.com/macros/s/CURRENT_DEPLOYMENT_ID/exec';
   }
@@ -137,7 +137,7 @@ function generateMissingQRCodes(forceRegenerate = false) {
 function getEvaluationQRCodes(trainingId) {
   try {
     if (!trainingId) return err('Training ID is required.');
-    let baseUrl = getAppUrl();
+    let baseUrl = getPublicPortalUrl();
     if (!baseUrl) {
       baseUrl = 'https://script.google.com/macros/s/CURRENT_DEPLOYMENT_ID/exec';
     }

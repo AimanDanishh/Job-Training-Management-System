@@ -23,12 +23,18 @@ function generateReport(trainingId) {
     const evalData  = JSON.parse(getTrainingEvaluations(trainingId)).data || [];
     const postData  = JSON.parse(getPostEvaluations(trainingId)).data    || [];
 
+    let requisitionFormUrl = '';
+    if (training.RequisitionFormFileID) {
+      requisitionFormUrl = `https://docs.google.com/spreadsheets/d/${encodeURIComponent(training.RequisitionFormFileID)}/edit`;
+    }
+
     return ok({
-      training:      training,
-      attendance:    { summary: attSummary, days: attData },
-      evaluation:    { summary: evalSummary, responses: evalData },
-      postEvaluation: postData,
-      generatedAt:   now()
+      training:           training,
+      requisitionFormUrl: requisitionFormUrl,
+      attendance:         { summary: attSummary, days: attData },
+      evaluation:         { summary: evalSummary, responses: evalData },
+      postEvaluation:     postData,
+      generatedAt:        now()
     });
   } catch (e) {
     return err('Failed to generate report: ' + e.message);

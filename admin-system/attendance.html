@@ -199,7 +199,7 @@
 
           <!-- Quick Participant Search Bar -->
           <div class="mb-3" style="background:#F8FAFC;padding:12px;border-radius:8px;border:1px solid #E2E8F0">
-            <label class="label-th" style="margin-bottom:6px">Search Participant by Name or Employee ID</label>
+            <label class="label-th" style="margin-bottom:6px">Search Participant by Name or Employee ID to Record Attendance</label>
             <div class="autocomplete-wrapper">
               <div style="position:relative">
                 <span class="icon" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94A3B8;font-size:15px">search</span>
@@ -208,19 +208,8 @@
               <div id="manual-att-search-drop" class="autocomplete-dropdown" style="display:none"></div>
             </div>
           </div>
-
-          <div id="records-editor">
-            <div class="section-label">Attendance Records Table</div>
-            <div id="records-list"></div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap" class="mt-2">
-              <button class="btn-th btn-primary btn-sm" onclick="loadTrainingParticipantsIntoEditor()"><span class="icon sm">group</span>Load All Enrolled Participants</button>
-              <button class="btn-th btn-secondary btn-sm" onclick="addRecordRow()"><span class="icon sm">add</span>Add Blank Row</button>
-              <button class="btn-th btn-secondary btn-sm" onclick="openParticipantModal()"><span class="icon sm">group_add</span>Select from Master Registry</button>
-            </div>
-          </div>
-          <div style="display:flex;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid #F1F5F9">
-            <button class="btn-th btn-primary" onclick="saveDayAttendance()"><span class="icon sm">save</span>Save Attendance</button>
-            <button class="btn-th btn-secondary" onclick="document.getElementById('add-day-section').style.display='none'">Cancel</button>
+          <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">
+            <button class="btn-th btn-secondary" onclick="document.getElementById('add-day-section').style.display='none'">Close</button>
           </div>
         </div>
       </div>
@@ -484,15 +473,26 @@
     });
   }
 
-  function addParticipantFromSearch(empId) {
+  async function addParticipantFromSearch(empId) {
+    const selSessionId = document.getElementById('add-session-select').value;
+    if (!selSessionId) {
+      showToast('Please select a Training Session first.', 'error');
+      return;
+    }
     const item = [...currentTrainingParticipants, ...allEmployeesList].find(e => (e.EmployeeID || e.ID) === empId);
-    if (item) {
-      addRecordRow({
-        ID: item.EmployeeID || item.ID,
-        Name: item.EmployeeName || item.Name,
-        Department: item.Department || ''
+    if (!item) return;
+
+    try {
+      const res = await callServer('submitAttendance', {
+        sessionId: selSessionId,
+        employeeNo: item.EmployeeID || item.ID,
+        employeeName: item.EmployeeName || item.Name,
+        department: item.Department || ''
       });
-      showToast(`Added ${item.EmployeeName || item.Name} to attendance table.`, 'success');
+      showToast(`Manual attendance recorded for ${item.EmployeeName || item.Name}!`, 'success');
+      loadAttendance();
+    } catch(e) {
+      showToast(e.message, 'error');
     }
     document.getElementById('manual-att-search').value = '';
     document.getElementById('manual-att-search-drop').style.display = 'none';
@@ -566,24 +566,79 @@
         </div>
         <div style="display:none;overflow-x:auto">
           <table class="table-th">
-            <thead><tr><th>Emp ID</th><th>Name</th><th>Dept</th><th>Scan / Check-In Time</th><th>Status</th><th>Remarks</th></tr></thead>
+            <thead><tr><th>Emp ID</th><th>Name</th><th>Dept</th><th>Scan / Check-In Time</th><th>Status</th><th>Remarks</th><th>Actions</th></tr></thead>
             <tbody>
-              ${records.length ? records.map((r, i) => `
-              <tr>
-                <td style="font-family:monospace;font-size:11px;color:#2563EB;font-weight:700">${r.EmployeeNo || r.EmployeeID}</td>
-                <td><div style="display:flex;align-items:center;gap:7px">${avatar(r.EmployeeName,25,i)}<span style="font-size:13px;font-weight:500">${r.EmployeeName}</span></div></td>
-                <td style="font-size:12px;color:#64748B">${r.Department}</td>
-                <td style="font-family:monospace;font-size:12px">${r.ScanTime || r.CheckIn || '—'}</td>
-                <td>${statusBadge(r.Status)}</td>
-                <td style="font-size:12px;color:#64748B">${r.Remarks||'—'}</td>
-              </tr>`).join('') : `
-              <tr><td colspan="6" class="text-center p-3 text-muted">No attendance scanned for this session yet.</td></tr>
+              ${records.length ? records.map((r, i) => {
+                const recId = r.AttendanceID || r.ID || r.id;
+                const safeRemarks = (r.Remarks || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                return `
+                <tr id="att-row-${recId}">
+                  <td style="font-family:monospace;font-size:11px;color:#2563EB;font-weight:700">${r.EmployeeNo || r.EmployeeID}</td>
+                  <td><div style="display:flex;align-items:center;gap:7px">${avatar(r.EmployeeName,25,i)}<span style="font-size:13px;font-weight:500">${r.EmployeeName}</span></div></td>
+                  <td style="font-size:12px;color:#64748B">${r.Department}</td>
+                  <td style="font-family:monospace;font-size:12px">${r.ScanTime || r.CheckIn || '—'}</td>
+                  <td id="att-stat-cell-${recId}">${statusBadge(r.Status)}</td>
+                  <td id="att-rem-cell-${recId}" style="font-size:12px;color:#64748B">${r.Remarks||'—'}</td>
+                  <td id="att-act-cell-${recId}">
+                    <button class="btn-th btn-secondary btn-xs" onclick="editParticipantRow('${recId}', '${r.Status||'Present'}', '${safeRemarks}')">
+                      <span class="icon sm">edit</span> Edit
+                    </button>
+                  </td>
+                </tr>`;
+              }).join('') : `
+              <tr><td colspan="7" class="text-center p-3 text-muted">No attendance scanned for this session yet.</td></tr>
               `}
             </tbody>
           </table>
         </div>
       </div>`;
     }).join('');
+  }
+
+  function editParticipantRow(recId, currentStatus, currentRemarks) {
+    const statCell = document.getElementById(`att-stat-cell-${recId}`);
+    const remCell  = document.getElementById(`att-rem-cell-${recId}`);
+    const actCell  = document.getElementById(`att-act-cell-${recId}`);
+
+    if (!statCell || !remCell || !actCell) return;
+
+    statCell.innerHTML = `
+      <select id="edit-stat-${recId}" class="input-th" style="font-size:12px;padding:4px 8px;height:32px;width:130px">
+        ${STATUS_OPTIONS.map(s => `<option value="${s}" ${s === currentStatus ? 'selected' : ''}>${s}</option>`).join('')}
+      </select>
+    `;
+
+    remCell.innerHTML = `
+      <input id="edit-rem-${recId}" class="input-th" style="font-size:12px;padding:4px 8px;height:32px;min-width:180px" value="${currentRemarks}" placeholder="Enter remarks...">
+    `;
+
+    actCell.innerHTML = `
+      <div style="display:flex;gap:4px">
+        <button class="btn-th btn-primary btn-xs" onclick="saveParticipantRow('${recId}')">
+          <span class="icon sm">save</span> Save
+        </button>
+        <button class="btn-th btn-secondary btn-xs" onclick="loadAttendance()">
+          <span class="icon sm">close</span> Cancel
+        </button>
+      </div>
+    `;
+  }
+
+  async function saveParticipantRow(recId) {
+    const statEl = document.getElementById(`edit-stat-${recId}`);
+    const remEl  = document.getElementById(`edit-rem-${recId}`);
+    if (!statEl || !remEl) return;
+
+    const newStatus  = statEl.value;
+    const newRemarks = remEl.value.trim();
+
+    try {
+      await callServer('updateAttendanceRecord', recId, newStatus, newRemarks);
+      showToast('Participant attendance & remarks saved!', 'success');
+      loadAttendance();
+    } catch(e) {
+      showToast(e.message, 'error');
+    }
   }
 
   let recordRowCount = 0;

@@ -56,12 +56,12 @@ function saveTrainingEvaluation(data) {
     const training = validation.training;
     const empName  = (emp && emp.Name) ? emp.Name : (data.EmployeeName || employeeId);
 
-    const scores = [data.Q1, data.Q2, data.Q3, data.Q4, data.Q5, data.Q6, data.Q7]
-      .map(Number).filter(n => !isNaN(n) && n > 0);
+    const scores = [data.Q1, data.Q2, data.Q3, data.Q4, data.Q5, data.Q6, data.Q7].map(Number);
+    if (scores.some(s => isNaN(s) || s < 1 || s > 5)) {
+      return err('All 7 evaluation questions (scale 1-5) are required.');
+    }
     
-    const avg = scores.length > 0
-      ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2)
-      : '0.00';
+    const avg = (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2);
 
     const sheet = getSheet(SHEET_NAMES.trainingEval);
     if (!sheet) return err('TrainingEval sheet not found.');
@@ -72,8 +72,8 @@ function saveTrainingEvaluation(data) {
       trainingId,
       employeeId,
       empName,
-      data.Q1 || 0, data.Q2 || 0, data.Q3 || 0,
-      data.Q4 || 0, data.Q5 || 0, data.Q6 || 0, data.Q7 || 0,
+      data.Q1, data.Q2, data.Q3,
+      data.Q4, data.Q5, data.Q6, data.Q7,
       data.SectionB1 || '',
       data.SectionB2 || '',
       data.SectionB3 || '',
@@ -111,6 +111,12 @@ function savePostEvaluation(data) {
       return err('Evaluator (Supervisor) Name is required.');
     }
 
+    const cb = Number(data.CompetencyBefore);
+    const ca = Number(data.CompetencyAfter);
+    if (isNaN(cb) || cb < 1 || cb > 5 || isNaN(ca) || ca < 1 || ca > 5) {
+      return err('Competency levels before and after training (scale 1-5) are required.');
+    }
+
     // 1. Validate on Server Side
     const validation = validatePublicPostEvaluation(trainingId, employeeId, token);
     if (!validation.valid) {
@@ -130,8 +136,8 @@ function savePostEvaluation(data) {
       finalEmpId,
       String(evaluatorName).trim(),
       data.EvaluatorID      || '',
-      data.CompetencyBefore   || 0,
-      data.CompetencyAfter    || 0,
+      cb,
+      ca,
       data.Improvement        || '',
       data.CanApply           || '',
       data.FurtherTraining    || '',

@@ -270,6 +270,52 @@
   </div>
 </div>
 
+<!-- Create New Session Modal (Embedded directly in Training Programme tab) -->
+<div id="modal-session" class="modal-overlay" style="display:none">
+  <div class="modal-box" style="max-width:540px">
+    <div class="modal-header">
+      <div>
+        <h3 class="modal-title" id="session-modal-title">New Training Session</h3>
+        <p class="modal-sub">Create a session with auto-generated QR code</p>
+      </div>
+      <button class="modal-close" onclick="closeModal('modal-session')">✕</button>
+    </div>
+    <input type="hidden" id="s-training-id">
+    <div class="row g-3 mt-1">
+      <div class="col-12">
+        <label class="label-th">Session Name <span class="required">*</span></label>
+        <input id="s-name" class="input-th" placeholder="e.g. Day 1, Morning, Day 2 Afternoon">
+      </div>
+      <div class="col-md-6">
+        <label class="label-th">Session Date <span class="required">*</span></label>
+        <input id="s-date" class="input-th" type="date">
+      </div>
+      <div class="col-md-3">
+        <label class="label-th">Start Time</label>
+        <input id="s-start-time" class="input-th" type="time" value="09:00">
+      </div>
+      <div class="col-md-3">
+        <label class="label-th">End Time</label>
+        <input id="s-end-time" class="input-th" type="time" value="17:00">
+      </div>
+      <div class="col-12">
+        <label class="label-th">QR Status</label>
+        <select id="s-status" class="input-th">
+          <option value="Active">Active (Ready for check-in)</option>
+          <option value="Expired">Expired (Check-in closed)</option>
+          <option value="Inactive">Inactive</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid #F1F5F9">
+      <button class="btn-th btn-secondary" onclick="closeModal('modal-session')">Cancel</button>
+      <button class="btn-th btn-primary" id="btn-save-session" onclick="saveSessionFromTrainingTab()">
+        <span class="icon sm">save</span>Save Session
+      </button>
+    </div>
+  </div>
+</div>
+
 <div id="toast-container"></div>
 <script>window.__TRAINHUB_PAGE__ = '<?!= currentPage ?>';</script>
 <?!= include('script') ?>
@@ -542,7 +588,9 @@
       <button class="btn-th btn-secondary" onclick="editTraining('${t.ID}')"><span class="icon sm">edit</span>Edit</button>
     `;
 
-    const baseUrl = window.location.href.split('?')[0];
+    const baseUrl = (window.__PUBLIC_PORTAL_URL__ && window.__PUBLIC_PORTAL_URL__.trim())
+      ? window.__PUBLIC_PORTAL_URL__.trim().split('?')[0]
+      : window.location.href.split('?')[0];
 
     const content = document.getElementById('detail-full-content');
     content.innerHTML = `
@@ -1155,7 +1203,44 @@
   }
 
   function openCreateSessionForTraining(trainingId) {
-    navTo('session', { id: trainingId });
+    const t = allTrainings.find(x => x.ID === trainingId);
+    document.getElementById('s-training-id').value = trainingId || '';
+    document.getElementById('s-name').value = '';
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('s-date').value = (t && t.StartDate) ? toInputDateStr(t.StartDate) : today;
+    document.getElementById('s-start-time').value = '09:00';
+    document.getElementById('s-end-time').value = '17:00';
+    document.getElementById('s-status').value = 'Active';
+    openModal('modal-session');
+  }
+
+  async function saveSessionFromTrainingTab() {
+    const btn = document.getElementById('btn-save-session');
+    const tId = document.getElementById('s-training-id').value;
+    const data = {
+      TrainingID:  tId,
+      SessionName: document.getElementById('s-name').value.trim(),
+      SessionDate: document.getElementById('s-date').value,
+      StartTime:   document.getElementById('s-start-time').value,
+      EndTime:     document.getElementById('s-end-time').value,
+      QRStatus:    document.getElementById('s-status').value
+    };
+
+    if (!data.TrainingID) { showToast('Please select a Training Programme.', 'error'); return; }
+    if (!data.SessionName) { showToast('Please enter a Session Name.', 'error'); return; }
+
+    setBtnLoading(btn, true, 'Saving...');
+    try {
+      await callServer('createSession', data);
+      showToast('New session created successfully!', 'success');
+      closeModal('modal-session');
+      openDetail(tId);
+      loadTrainings();
+    } catch(e) {
+      showToast(e.message, 'error');
+    } finally {
+      setBtnLoading(btn, false, '<span class="icon sm">save</span>Save Session');
+    }
   }
 </script>
 </body>

@@ -486,6 +486,12 @@
     if (!tid) { showToast('Select a training first.', 'error'); return; }
     if (!empId) { showToast('Employee ID is required.', 'error'); return; }
 
+    const unrated = likertScores.findIndex(s => s === 0);
+    if (unrated !== -1) {
+      showToast(`Please answer Question ${unrated + 1} (scale 1-5) in Section A.`, 'error');
+      return;
+    }
+
     const data = {
       TrainingID: tid, EmployeeID: empId, EmployeeName: empName,
       Q1: likertScores[0], Q2: likertScores[1], Q3: likertScores[2],
@@ -516,12 +522,19 @@
 
     const getComp = name => {
       const el = document.querySelector(`input[name="${name}"]:checked`);
-      return el ? el.value : 0;
+      return el ? Number(el.value) : 0;
     };
     const getOpt = name => {
       const el = document.querySelector(`input[name="${name}"]:checked`);
       return el ? el.value : '';
     };
+
+    const cb = getComp('cb');
+    const ca = getComp('ca');
+    if (!cb || !ca) {
+      showToast('Competency levels before and after training (scale 1-5) are required.', 'error');
+      return;
+    }
 
     const data = {
       TrainingID: tid, EmployeeID: empId, EvaluatorName: evName, EvaluatorID: evId,
