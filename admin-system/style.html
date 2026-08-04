@@ -246,4 +246,22 @@
   .autocomplete-item:hover, .autocomplete-item.active { background: #EFF6FF; }
   .autocomplete-item .emp-code { font-family: monospace; font-size: 11px; font-weight: 600; color: #2563EB; background: #EFF6FF; padding: 2px 6px; border-radius: 4px; border: 1px solid #BFDBFE; }
   .autocomplete-item .emp-dept { font-size: 11px; color: #64748B; background: #F8FAFC; padding: 2px 6px; border-radius: 4px; }
+
+  /* ── Global Loading Overlay & Pulse Animation ──────────────────── */
+  .global-loading-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(15, 23, 42, 0.45); backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 9999; opacity: 0; pointer-events: none; transition: opacity 0.2s ease-in-out;
+  }
+  .global-loading-overlay.active { opacity: 1; pointer-events: auto; }
+  .loading-card {
+    background: #ffffff; padding: 28px 36px; border-radius: 16px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.18); text-align: center; max-width: 320px; width: 90%;
+    animation: pulseCard 2s infinite ease-in-out;
+  }
+  @keyframes pulseCard {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.02); }
+  }
 </style>

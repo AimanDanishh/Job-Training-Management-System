@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <?!= include('style') ?>
+  <title>6-Month Post Evaluation — TrainHub</title>
+</head>
+<body>
+
+<div class="portal-container">
+  <div class="portal-card">
+    
+    <!-- Header -->
+    <div class="brand-header">
+      <span class="badge-pillar">Supervisor Review</span>
+      <h1 class="portal-title">Post-Training Evaluation</h1>
+      <p class="portal-subtitle">6-Month Competency Assessment Form</p>
+    </div>
+
+    <!-- Loading Spinner View -->
+    <div id="view-loading" style="text-align:center; padding: 20px 0;">
+      <div class="spinner"></div>
+      <p style="color:#64748B; font-size:13px;">Preparing post-evaluation form...</p>
+    </div>
+
+    <!-- Form View -->
+    <div id="view-form" style="display:none;">
+      <form onsubmit="handlePostEvalSubmit(event)">
+        
+        <div class="form-group mb-3">
+          <label class="form-label">Training ID <span class="req">*</span></label>
+          <input type="text" id="inp-post-tid" class="form-control" placeholder="TRN-XXXX" required>
+        </div>
+
+        <!-- Participant ID & Auto-Display Card -->
+        <div class="form-group mb-3">
+          <label class="form-label">Employee ID (Participant to Evaluate) <span class="req">*</span></label>
+          <input type="text" id="inp-post-empid" class="form-control" placeholder="EMP-XXXX" required autocomplete="off">
+          <div id="post-part-info-card" style="display:none; margin-top:8px; padding:10px 14px; background:#EFF6FF; border:1px solid #BFDBFE; border-radius:8px;">
+            <div style="font-size:11px; font-weight:700; color:#1D4ED8; text-transform:uppercase;">Participant to Evaluate</div>
+            <div style="font-size:14px; font-weight:700; color:#1E293B; margin-top:2px;" id="post-part-name">—</div>
+            <div style="font-size:12px; color:#64748B;" id="post-part-dept">—</div>
+          </div>
+        </div>
+
+        <!-- Supervisor ID & Auto-Display Card -->
+        <div class="form-group mb-3">
+          <label class="form-label">Supervisor Employee ID <span class="req">*</span></label>
+          <input type="text" id="inp-post-evid" class="form-control" placeholder="Enter your Supervisor Employee ID" required autocomplete="off">
+          <div id="post-sup-info-card" style="display:none; margin-top:8px; padding:10px 14px; background:#F0FDF4; border:1px solid #BBF7D0; border-radius:8px;">
+            <div style="font-size:11px; font-weight:700; color:#15803D; text-transform:uppercase;">Supervisor Identified</div>
+            <div style="font-size:14px; font-weight:700; color:#166534; margin-top:2px;" id="post-sup-name">—</div>
+          </div>
+        </div>
+
+        <div class="form-group mb-4">
+          <label class="form-label">Supervisor Full Name <span class="req">*</span></label>
+          <input type="text" id="inp-post-evname" class="form-control" placeholder="Supervisor Full Name" required>
+        </div>
+
+        <!-- Competency Before -->
+        <div class="form-group mb-4">
+          <label class="form-label">1. Competency Level BEFORE Training <span class="req">*</span></label>
+          <div class="radio-pill-group" id="group-comp-before"></div>
+        </div>
+
+        <!-- Competency After -->
+        <div class="form-group mb-4">
+          <label class="form-label">2. Competency Level AFTER Training <span class="req">*</span></label>
+          <div class="radio-pill-group" id="group-comp-after"></div>
+        </div>
+
+        <!-- Improvement Questions -->
+        <div class="form-group mb-3">
+          <label class="form-label">3. Has the employee shown improvement after training?</label>
+          <div class="radio-pill-group" style="flex-direction:row; gap:10px;" id="opts-improvement">
+            <label class="radio-pill-item" onclick="selectRadioOption('improvement', 'Yes')"><input type="radio" name="improvement" value="Yes" style="display:none"> Yes</label>
+            <label class="radio-pill-item" onclick="selectRadioOption('improvement', 'Partially')"><input type="radio" name="improvement" value="Partially" style="display:none"> Partially</label>
+            <label class="radio-pill-item" onclick="selectRadioOption('improvement', 'No')"><input type="radio" name="improvement" value="No" style="display:none"> No</label>
+          </div>
+        </div>
+
+        <div class="form-group mb-3">
+          <label class="form-label">4. Can the employee apply what was learned to daily work?</label>
+          <div class="radio-pill-group" style="flex-direction:row; gap:10px;" id="opts-canApply">
+            <label class="radio-pill-item" onclick="selectRadioOption('canApply', 'Yes')"><input type="radio" name="canApply" value="Yes" style="display:none"> Yes</label>
+            <label class="radio-pill-item" onclick="selectRadioOption('canApply', 'Partially')"><input type="radio" name="canApply" value="Partially" style="display:none"> Partially</label>
+            <label class="radio-pill-item" onclick="selectRadioOption('canApply', 'No')"><input type="radio" name="canApply" value="No" style="display:none"> No</label>
+          </div>
+        </div>
+
+        <div class="form-group mb-4">
+          <label class="form-label">5. Does the employee require further training?</label>
+          <div class="radio-pill-group" style="flex-direction:row; gap:10px;" id="opts-further">
+            <label class="radio-pill-item" onclick="selectRadioOption('further', 'Yes')"><input type="radio" name="further" value="Yes" style="display:none"> Yes</label>
+            <label class="radio-pill-item" onclick="selectRadioOption('further', 'No')"><input type="radio" name="further" value="No" style="display:none"> No</label>
+          </div>
+        </div>
+
+        <div class="form-group mb-4">
+          <label class="form-label">Supervisor Comments & Recommendation</label>
+          <textarea id="inp-post-comments" class="form-control" rows="3" placeholder="Additional observations..."></textarea>
+        </div>
+
+        <button type="submit" id="btn-submit-post" class="btn-submit">
+          Submit Post-Training Review
+        </button>
+
+      </form>
+    </div>
+
+    <!-- Success View -->
+    <div id="view-success" style="display:none; text-align:center; padding: 20px 0;">
+      <div style="width: 56px; height: 56px; background: #F0FDF4; border-radius: 50%; color: #16A34A; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; font-size: 28px; font-weight: 800;">
+        ✓
+      </div>
+      <h3 style="font-size: 18px; font-weight: 800; color: #166534; margin-bottom: 6px;">Post Evaluation Submitted!</h3>
+      <p style="font-size: 13.5px; color: #15803D; margin-bottom: 16px;">The 6-month post-training evaluation has been recorded.</p>
+    </div>
+
+    <!-- Error View -->
+    <div id="view-error" style="display:none; text-align:center; padding: 16px 0;">
+      <div style="width: 56px; height: 56px; background: #FEF2F2; border-radius: 50%; color: #DC2626; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; font-size: 26px; font-weight: 800;">
+        ✕
+      </div>
+      <h3 style="font-size: 18px; font-weight: 800; color: #991B1B; margin-bottom: 6px;">Submission Rejected</h3>
+      <p style="font-size: 13.5px; color: #B91C1C; margin-bottom: 16px;" id="txt-error-msg">Validation error.</p>
+    </div>
+
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<?!= include('script') ?>
+
+<script>
+  const COMPETENCY_LEVELS = [
+    { v:1, label:'1. Basic / Novice',   desc:'Limited understanding; requires constant supervision' },
+    { v:2, label:'2. Intermediate',     desc:'Developing skill; requires occasional guidance' },
+    { v:3, label:'3. Competent',        desc:'Fully proficient; can work independently' },
+    { v:4, label:'4. Advanced',         desc:'High proficiency; can guide others' },
+    { v:5, label:'5. Expert',           desc:'Mastery level; recognized authority' },
+  ];
+
+  let selectedCompBefore = 0;
+  let selectedCompAfter = 0;
+  let activeToken = '';
+
+  document.addEventListener('DOMContentLoaded', () => {
+    activeToken = getQueryParam('token') || "<?= (params && params.token) ? params.token : '' ?>";
+    const preTid = getQueryParam('id') || "<?= (params && params.id) ? params.id : '' ?>";
+    const preEmp = getQueryParam('emp') || "<?= (params && params.emp) ? params.emp : '' ?>";
+
+    if (preTid) document.getElementById('inp-post-tid').value = preTid;
+    if (preEmp) {
+      document.getElementById('inp-post-empid').value = preEmp;
+      fetchAndDisplayEmpInfo(preEmp, 'part');
+    }
+
+    renderCompetencySelectors();
+    setupPostAutoLookups();
+
+    document.getElementById('view-loading').style.display = 'none';
+    document.getElementById('view-form').style.display = 'block';
+  });
+
+  function setupPostAutoLookups() {
+    const partInput = document.getElementById('inp-post-empid');
+    const supInput  = document.getElementById('inp-post-evid');
+
+    let partTimer = null;
+    let supTimer  = null;
+
+    partInput.addEventListener('input', () => {
+      clearTimeout(partTimer);
+      partTimer = setTimeout(() => fetchAndDisplayEmpInfo(partInput.value.trim(), 'part'), 350);
+    });
+
+    supInput.addEventListener('input', () => {
+      clearTimeout(supTimer);
+      supTimer = setTimeout(() => fetchAndDisplayEmpInfo(supInput.value.trim(), 'sup'), 350);
+    });
+  }
+
+  async function fetchAndDisplayEmpInfo(empId, type) {
+    if (!empId || empId.length < 2) {
+      document.getElementById(type === 'part' ? 'post-part-info-card' : 'post-sup-info-card').style.display = 'none';
+      return;
+    }
+    try {
+      const emp = await callServer('getEmployeeDetails', empId);
+      if (emp && emp.Name) {
+        if (type === 'part') {
+          document.getElementById('post-part-name').textContent = emp.Name;
+          document.getElementById('post-part-dept').textContent = emp.CostCentre || emp.Department || 'Employee';
+          document.getElementById('post-part-info-card').style.display = 'block';
+        } else {
+          document.getElementById('post-sup-name').textContent = emp.Name;
+          document.getElementById('inp-post-evname').value = emp.Name;
+          document.getElementById('post-sup-info-card').style.display = 'block';
+        }
+      } else {
+        document.getElementById(type === 'part' ? 'post-part-info-card' : 'post-sup-info-card').style.display = 'none';
+      }
+    } catch(e) {
+      document.getElementById(type === 'part' ? 'post-part-info-card' : 'post-sup-info-card').style.display = 'none';
+    }
+  }
+
+  function renderCompetencySelectors() {
+    const beforeEl = document.getElementById('group-comp-before');
+    const afterEl  = document.getElementById('group-comp-after');
+
+    const buildItems = (name, setter) => COMPETENCY_LEVELS.map(c => `
+      <div class="radio-pill-item" id="${name}-pill-${c.v}" onclick="${setter}(${c.v})">
+        <strong style="margin-right:6px">${c.label}</strong> — <span style="font-size:12px; color:#64748B">${c.desc}</span>
+      </div>
+    `).join('');
+
+    beforeEl.innerHTML = buildItems('cb', 'setCompBefore');
+    afterEl.innerHTML  = buildItems('ca', 'setCompAfter');
+  }
+
+  function setCompBefore(val) {
+    selectedCompBefore = val;
+    document.querySelectorAll('[id^="cb-pill-"]').forEach(el => el.classList.remove('active'));
+    document.getElementById(`cb-pill-${val}`).classList.add('active');
+  }
+
+  function setCompAfter(val) {
+    selectedCompAfter = val;
+    document.querySelectorAll('[id^="ca-pill-"]').forEach(el => el.classList.remove('active'));
+    document.getElementById(`ca-pill-${val}`).classList.add('active');
+  }
+
+  function selectRadioOption(groupName, value) {
+    const parent = document.getElementById(`opts-${groupName}`);
+    if (!parent) return;
+    parent.querySelectorAll('.radio-pill-item').forEach(el => el.classList.remove('active'));
+    
+    event.currentTarget.classList.add('active');
+    const radio = event.currentTarget.querySelector('input[type="radio"]');
+    if (radio) radio.checked = true;
+  }
+
+  async function handlePostEvalSubmit(e) {
+    e.preventDefault();
+
+    const tid    = document.getElementById('inp-post-tid').value.trim();
+    const empId  = document.getElementById('inp-post-empid').value.trim();
+    const evName = document.getElementById('inp-post-evname').value.trim();
+    const evId   = document.getElementById('inp-post-evid').value.trim();
+
+    if (!tid || !empId || !evName) {
+      showToast('Training ID, Employee ID and Evaluator Name are required.', 'error');
+      return;
+    }
+
+    if (selectedCompBefore === 0 || selectedCompAfter === 0) {
+      showToast('Please select competency levels before and after training.', 'error');
+      return;
+    }
+
+    const getRadioVal = (name) => {
+      const el = document.querySelector(`input[name="${name}"]:checked`);
+      return el ? el.value : '';
+    };
+
+    const btn = document.getElementById('btn-submit-post');
+    setBtnLoading(btn, true, 'Submitting Post-Evaluation...');
+
+    try {
+      const payload = {
+        TrainingID: tid,
+        EmployeeID: empId,
+        Token: activeToken,
+        EvaluatorName: evName,
+        EvaluatorID: evId,
+        CompetencyBefore: selectedCompBefore,
+        CompetencyAfter: selectedCompAfter,
+        Improvement: getRadioVal('improvement'),
+        CanApply: getRadioVal('canApply'),
+        FurtherTraining: getRadioVal('further'),
+        Comments: document.getElementById('inp-post-comments').value.trim()
+      };
+
+      const res = await callServer('savePostEvaluation', payload);
+
+      document.getElementById('view-form').style.display = 'none';
+      document.getElementById('view-success').style.display = 'block';
+    } catch(err) {
+      showToast(err.message, 'error');
+    } finally {
+      setBtnLoading(btn, false);
+    }
+  }
+</script>
+
+</body>
+</html>

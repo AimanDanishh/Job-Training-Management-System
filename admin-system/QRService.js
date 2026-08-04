@@ -128,3 +128,36 @@ function generateMissingQRCodes(forceRegenerate = false) {
     return err('Failed to generate missing QR codes: ' + e.message);
   }
 }
+
+/**
+ * Generate Evaluation Form URLs and QR Codes targeting Participant Portal
+ * Level 1 Participant Training Evaluation: page=evaluation&id=TRN-xxx
+ * Level 3 6-Month Supervisor Evaluation:  page=post&id=TRN-xxx
+ */
+function getEvaluationQRCodes(trainingId) {
+  try {
+    if (!trainingId) return err('Training ID is required.');
+    let baseUrl = getAppUrl();
+    if (!baseUrl) {
+      baseUrl = 'https://script.google.com/macros/s/CURRENT_DEPLOYMENT_ID/exec';
+    }
+    const cleanBase = baseUrl.split('?')[0];
+
+    const evalUrl = `${cleanBase}?page=evaluation&id=${encodeURIComponent(trainingId)}`;
+    const postUrl = `${cleanBase}?page=post&id=${encodeURIComponent(trainingId)}`;
+
+    return ok({
+      participantEval: {
+        url: evalUrl,
+        qrCodeUrl: generateQRCode(evalUrl)
+      },
+      supervisorPostEval: {
+        url: postUrl,
+        qrCodeUrl: generateQRCode(postUrl)
+      }
+    });
+  } catch (e) {
+    return err('Failed to generate evaluation QRs: ' + e.message);
+  }
+}
+

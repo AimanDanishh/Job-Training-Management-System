@@ -42,6 +42,42 @@
             <button class="btn-th btn-primary" style="width:100%" onclick="loadEvaluations()"><span class="icon sm">search</span>Load</button>
           </div>
         </div>
+      <!-- Evaluation Form QR Codes & Share Links Card (Participant Portal Linkage) -->
+      <div id="eval-qr-card" class="card-th mb-4" style="display:none">
+        <div style="margin-bottom:14px">
+          <h3 style="font-size:15px;font-weight:700;color:#1E293B;margin:0 0 2px">Public Participant Portal Evaluation QR Codes</h3>
+          <p style="font-size:12px;color:#64748B;margin:0">Scan or copy links to open evaluation forms on the public participant portal</p>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div style="border:1px solid #E2E8F0;border-radius:10px;padding:14px;background:#fff;display:flex;align-items:center;gap:14px">
+              <img id="eval-qr-img-l1" src="" alt="Level 1 QR" style="width:110px;height:110px;border-radius:6px;border:1px solid #CBD5E1;padding:3px;background:#fff;flex-shrink:0">
+              <div style="flex:1;min-width:0">
+                <div style="font-size:12.5px;font-weight:700;color:#1E293B;margin-bottom:2px">Level 1: Participant Training Evaluation</div>
+                <div style="font-size:10.5px;color:#64748B;margin-bottom:8px">Participant self-evaluation form</div>
+                <div style="display:flex;gap:6px">
+                  <button class="btn-th btn-secondary btn-xs" onclick="copyEvalUrl('l1')"><span class="icon sm">content_copy</span> Copy Link</button>
+                  <a id="eval-qr-dl-l1" class="btn-th btn-primary btn-xs" style="text-decoration:none" href="" download="ParticipantEval_QR.png" target="_blank"><span class="icon sm">download</span> QR</a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-md-6">
+            <div style="border:1px solid #E2E8F0;border-radius:10px;padding:14px;background:#fff;display:flex;align-items:center;gap:14px">
+              <img id="eval-qr-img-l3" src="" alt="Level 3 QR" style="width:110px;height:110px;border-radius:6px;border:1px solid #CBD5E1;padding:3px;background:#fff;flex-shrink:0">
+              <div style="flex:1;min-width:0">
+                <div style="font-size:12.5px;font-weight:700;color:#1E293B;margin-bottom:2px">Level 3: Supervisor 6-Month Evaluation</div>
+                <div style="font-size:10.5px;color:#64748B;margin-bottom:8px">Supervisor post-training evaluation form</div>
+                <div style="display:flex;gap:6px">
+                  <button class="btn-th btn-secondary btn-xs" onclick="copyEvalUrl('l3')"><span class="icon sm">content_copy</span> Copy Link</button>
+                  <a id="eval-qr-dl-l3" class="btn-th btn-primary btn-xs" style="text-decoration:none" href="" download="SupervisorPostEval_QR.png" target="_blank"><span class="icon sm">download</span> QR</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Sub-tabs -->
@@ -377,6 +413,17 @@
     );
   }
 
+  let activeEvalUrls = { l1: '', l3: '' };
+
+  function copyEvalUrl(type) {
+    const url = activeEvalUrls[type];
+    if (url) {
+      navigator.clipboard.writeText(url).then(() => {
+        showToast('Evaluation Form link copied!', 'success');
+      });
+    }
+  }
+
   async function loadEvaluations() {
     const id = document.getElementById('sel-eval-t').value;
     if (!id) { showToast('Select a training.', 'error'); return; }
@@ -386,11 +433,25 @@
     document.getElementById('post-tid').value  = id;
 
     try {
-      const [sum, evals, posts] = await Promise.all([
+      const [sum, evals, posts, qrData] = await Promise.all([
         callServer('getEvaluationSummary', id),
         callServer('getTrainingEvaluations', id),
-        callServer('getPostEvaluations', id)
+        callServer('getPostEvaluations', id),
+        callServer('getEvaluationQRCodes', id).catch(() => null)
       ]);
+
+      if (qrData && qrData.participantEval) {
+        activeEvalUrls.l1 = qrData.participantEval.url;
+        activeEvalUrls.l3 = qrData.supervisorPostEval.url;
+
+        document.getElementById('eval-qr-img-l1').src = qrData.participantEval.qrCodeUrl;
+        document.getElementById('eval-qr-dl-l1').href = qrData.participantEval.qrCodeUrl;
+
+        document.getElementById('eval-qr-img-l3').src = qrData.supervisorPostEval.qrCodeUrl;
+        document.getElementById('eval-qr-dl-l3').href = qrData.supervisorPostEval.qrCodeUrl;
+
+        document.getElementById('eval-qr-card').style.display = 'block';
+      }
 
       document.getElementById('eval-summary').style.display = '';
       document.getElementById('e-completed').textContent = sum.evalCompleted || 0;

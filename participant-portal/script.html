@@ -1,0 +1,81 @@
+<script>
+  /**
+   * Universal async wrapper for calling backend Google Apps Script functions.
+   */
+  function callServer(functionName, ...args) {
+    return new Promise((resolve, reject) => {
+      if (typeof google === 'undefined' || !google.script || !google.script.run) {
+        reject(new Error('Google Apps Script environment not detected.'));
+        return;
+      }
+
+      google.script.run
+        .withSuccessHandler((jsonStr) => {
+          try {
+            const res = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr;
+            if (res && res.success) {
+              resolve(res.data);
+            } else {
+              reject(new Error((res && res.message) ? res.message : 'Server returned error status.'));
+            }
+          } catch (e) {
+            reject(new Error('Failed to parse server response: ' + e.message));
+          }
+        })
+        .withFailureHandler((err) => {
+          reject(new Error(err && err.message ? err.message : String(err)));
+        })
+        [functionName](...args);
+    });
+  }
+
+  /**
+   * Helper to retrieve URL Query Parameters
+   */
+  function getQueryParam(param) {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get(param) || '';
+  }
+
+  /**
+   * Helper to display non-blocking Toast messages
+   */
+  function showToast(message, type = 'info') {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'toast-container';
+      document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+
+    container.appendChild(toast);
+
+    setTimeout(() => { toast.classList.add('show'); }, 10);
+
+    setTimeout(() => {
+      toast.classList.remove('show');
+      setTimeout(() => { toast.remove(); }, 300);
+    }, 4000);
+  }
+
+  /**
+   * Helper to toggle button loading states
+   */
+  function setBtnLoading(btn, isLoading, loadingText = 'Submitting...') {
+    if (!btn) return;
+    if (isLoading) {
+      btn.dataset.originalHtml = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = `<span class="spinner" style="width:16px;height:16px;border-width:2px;display:inline-block;margin:0 4px 0 0;vertical-align:middle"></span> ${loadingText}`;
+    } else {
+      btn.disabled = false;
+      if (btn.dataset.originalHtml) {
+        btn.innerHTML = btn.dataset.originalHtml;
+      }
+    }
+  }
+</script>

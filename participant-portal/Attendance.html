@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <?!= include('style') ?>
+  <title>Attendance Check-In — TrainHub</title>
+</head>
+<body>
+
+<div class="portal-container">
+  <div class="portal-card">
+    
+    <!-- Header -->
+    <div class="brand-header">
+      <span class="badge-pillar" id="badge-session">Session Check-In</span>
+      <h1 class="portal-title" id="txt-training-title">Loading Training...</h1>
+      <p class="portal-subtitle" id="txt-session-name" style="color:#2563EB;">Verifying session details...</p>
+      
+      <div class="meta-pills-row" id="meta-row" style="display:none;">
+        <div>📅 <span id="txt-session-date">—</span></div>
+        <div>⏰ <span id="txt-session-time">—</span></div>
+      </div>
+    </div>
+
+    <!-- Loading Spinner View -->
+    <div id="view-loading" style="text-align:center; padding: 20px 0;">
+      <div class="spinner"></div>
+      <p style="color:#64748B; font-size:13px;">Validating QR session link...</p>
+    </div>
+
+    <!-- Attendance Form View -->
+    <div id="view-form" style="display:none;">
+      <form onsubmit="handleAttendanceSubmit(event)">
+        <div class="form-group">
+          <label class="form-label">Employee ID / Number <span class="req">*</span></label>
+          <input type="text" id="inp-emp-id" class="form-control" placeholder="e.g. EMP-1001" required autocomplete="off">
+          <p style="font-size:11px; color:#94A3B8; margin-top:4px;">Enter your registered company Employee ID</p>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Full Name <small style="color:#94A3B8; font-weight:400;">(Optional)</small></label>
+          <input type="text" id="inp-emp-name" class="form-control" placeholder="Your full name">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Department / Cost Centre <small style="color:#94A3B8; font-weight:400;">(Optional)</small></label>
+          <input type="text" id="inp-emp-dept" class="form-control" placeholder="Department">
+        </div>
+
+        <button type="submit" id="btn-submit-att" class="btn-submit">
+          ✓ Record Attendance
+        </button>
+      </form>
+    </div>
+
+    <!-- Success Feedback View -->
+    <div id="view-success" style="display:none; text-align:center; padding: 16px 0;">
+      <div style="width: 56px; height: 56px; background: #F0FDF4; border-radius: 50%; color: #16A34A; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; font-size: 28px; font-weight: 800;">
+        ✓
+      </div>
+      <h3 style="font-size: 18px; font-weight: 800; color: #166534; margin-bottom: 6px;">Attendance Recorded!</h3>
+      <p style="font-size: 13.5px; color: #15803D; margin-bottom: 16px;" id="txt-success-msg">Your check-in has been successfully saved.</p>
+      
+      <div style="font-size: 12.5px; color: #475569; background: #F8FAFC; padding: 10px; border-radius: 8px; border: 1px solid #E2E8F0;">
+        Check-In Time: <strong id="txt-success-time">—</strong>
+      </div>
+    </div>
+
+    <!-- Already Recorded View -->
+    <div id="view-already-recorded" style="display:none; text-align:center; padding: 16px 0;">
+      <div style="width: 56px; height: 56px; background: #EFF6FF; border-radius: 50%; color: #2563EB; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; font-size: 26px; font-weight: 800;">
+        ℹ
+      </div>
+      <h3 style="font-size: 18px; font-weight: 800; color: #1E40AF; margin-bottom: 6px;">Attendance Already Recorded</h3>
+      <p style="font-size: 13.5px; color: #1E3A8A; margin-bottom: 16px;" id="txt-already-msg">You have already checked into this session.</p>
+      
+      <div style="font-size: 12.5px; color: #334155; background: #F1F5F9; padding: 12px; border-radius: 8px; border: 1px solid #CBD5E1; text-align:left; line-height:1.6;">
+        <div>👤 Employee: <strong id="txt-already-emp">—</strong></div>
+        <div>⏰ Recorded At: <strong id="txt-already-time">—</strong></div>
+        <div style="font-size:11px; color:#64748B; margin-top:6px; border-top:1px solid #E2E8F0; padding-top:6px;">
+          ✓ Your check-in status for this session is already confirmed. No duplicate entry is created.
+        </div>
+      </div>
+    </div>
+
+    <!-- Error View -->
+    <div id="view-error" style="display:none; text-align:center; padding: 16px 0;">
+      <div style="width: 56px; height: 56px; background: #FEF2F2; border-radius: 50%; color: #DC2626; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; font-size: 26px; font-weight: 800;">
+        ✕
+      </div>
+      <h3 style="font-size: 18px; font-weight: 800; color: #991B1B; margin-bottom: 6px;">Check-In Rejected</h3>
+      <p style="font-size: 13.5px; color: #B91C1C; margin-bottom: 16px;" id="txt-error-msg">Failed to validate attendance submission.</p>
+      <button class="btn-submit" style="background:#64748B; box-shadow:none; padding:8px 16px; font-size:13px; max-width:140px; margin:0 auto;" onclick="resetForm()">Try Again</button>
+    </div>
+
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<?!= include('script') ?>
+
+<script>
+  let activeSessionId = '';
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    activeSessionId = getQueryParam('session') || "<?= (params && params.session) ? params.session : '' ?>";
+    
+    if (!activeSessionId) {
+      const tid = getQueryParam('id') || "<?= (params && params.id) ? params.id : '' ?>";
+      if (tid) {
+        showErrorState('Specific Session ID is required for QR attendance check-in.');
+        return;
+      }
+      showErrorState('Missing session parameter. Please scan a valid session QR code.');
+      return;
+    }
+
+    try {
+      const session = await callServer('getSessionInfo', activeSessionId);
+      
+      document.getElementById('badge-session').textContent = session.SessionID || 'Session Check-In';
+      document.getElementById('txt-training-title').textContent = session.TrainingTitle || 'Training Programme';
+      document.getElementById('txt-session-name').textContent = session.SessionName || 'Attendance Registration';
+      document.getElementById('txt-session-date').textContent = session.SessionDate || '—';
+      document.getElementById('txt-session-time').textContent = `${session.StartTime || '09:00'} - ${session.EndTime || '17:00'}`;
+
+      document.getElementById('meta-row').style.display = 'flex';
+      document.getElementById('view-loading').style.display = 'none';
+
+      if (session.QRStatus === 'Expired' || session.QRStatus === 'Inactive') {
+        showErrorState(`This session is currently ${session.QRStatus}. Attendance registration is closed.`);
+        return;
+      }
+
+      document.getElementById('view-form').style.display = 'block';
+
+      // Attach real-time employee lookup listener on Employee ID input
+      const empIdInp = document.getElementById('inp-emp-id');
+      let lookupTimeout = null;
+      empIdInp.addEventListener('input', () => {
+        clearTimeout(lookupTimeout);
+        const val = empIdInp.value.trim();
+        if (val.length >= 2) {
+          lookupTimeout = setTimeout(async () => {
+            try {
+              const info = await callServer('lookupEmployeeInfo', val);
+              if (info && info.Name) {
+                document.getElementById('inp-emp-name').value = info.Name;
+                if (info.Department) document.getElementById('inp-emp-dept').value = info.Department;
+                showToast(`Employee verified: ${info.Name}`, 'success');
+              }
+            } catch(e) {}
+          }, 400);
+        }
+      });
+    } catch(e) {
+      document.getElementById('view-loading').style.display = 'none';
+      showErrorState(e.message || 'Failed to verify session link.');
+    }
+  });
+
+  async function handleAttendanceSubmit(e) {
+    e.preventDefault();
+    const empId = document.getElementById('inp-emp-id').value.trim();
+    const empName = document.getElementById('inp-emp-name').value.trim();
+    const empDept = document.getElementById('inp-emp-dept').value.trim();
+
+    if (!empId) {
+      showToast('Please enter your Employee ID.', 'error');
+      return;
+    }
+
+    const btn = document.getElementById('btn-submit-att');
+    setBtnLoading(btn, true, 'Verifying & Saving...');
+
+    try {
+      const res = await callServer('submitAttendance', {
+        sessionId: activeSessionId,
+        employeeNo: empId,
+        employeeName: empName,
+        department: empDept
+      });
+
+      document.getElementById('view-form').style.display = 'none';
+
+      if (res.alreadyRecorded) {
+        document.getElementById('view-already-recorded').style.display = 'block';
+        document.getElementById('txt-already-msg').textContent = res.message || 'You have already checked into this session.';
+        document.getElementById('txt-already-emp').textContent = `${res.employeeName || empName || empId} (${empId})`;
+        document.getElementById('txt-already-time').textContent = res.scanTime || 'Earlier';
+      } else {
+        document.getElementById('view-success').style.display = 'block';
+        document.getElementById('txt-success-msg').textContent = res.message || 'Check-in recorded successfully!';
+        document.getElementById('txt-success-time').textContent = res.scanTime || new Date().toLocaleString();
+      }
+    } catch(err) {
+      showToast(err.message, 'error');
+      showErrorState(err.message);
+    } finally {
+      setBtnLoading(btn, false);
+    }
+  }
+
+  function showErrorState(msg) {
+    document.getElementById('view-loading').style.display = 'none';
+    document.getElementById('view-form').style.display = 'none';
+    document.getElementById('view-already-recorded').style.display = 'none';
+    document.getElementById('view-error').style.display = 'block';
+    document.getElementById('txt-error-msg').textContent = msg;
+  }
+
+  function resetForm() {
+    document.getElementById('view-error').style.display = 'none';
+    document.getElementById('view-already-recorded').style.display = 'none';
+    document.getElementById('view-form').style.display = 'block';
+  }
+</script>
+
+</body>
+</html>

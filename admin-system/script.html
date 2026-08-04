@@ -6,18 +6,63 @@
 // Shared Utilities
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// ─── Global Loading Screen & Animation Overlay ──────────────────────────────
+let _activeLoadersCount = 0;
+let _loaderTimeout = null;
+
+function showLoadingOverlay(message = 'Processing request...') {
+  _activeLoadersCount++;
+  let el = document.getElementById('global-loading-overlay');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'global-loading-overlay';
+    el.className = 'global-loading-overlay';
+    el.innerHTML = `
+      <div class="loading-card">
+        <div class="spinner" style="width:36px;height:36px;border-width:3px;border-top-color:#2563EB;margin:0 auto 12px"></div>
+        <div id="loading-msg-text" style="font-size:13.5px;font-weight:600;color:#1E293B">Loading...</div>
+        <div style="font-size:11.5px;color:#64748B;margin-top:4px">Please wait a moment</div>
+      </div>
+    `;
+    document.body.appendChild(el);
+  }
+  document.getElementById('loading-msg-text').textContent = message;
+  el.classList.add('active');
+}
+
+function hideLoadingOverlay() {
+  _activeLoadersCount = Math.max(0, _activeLoadersCount - 1);
+  if (_activeLoadersCount === 0) {
+    const el = document.getElementById('global-loading-overlay');
+    if (el) el.classList.remove('active');
+  }
+}
+
 // ─── google.script.run wrapper (returns a Promise) ───────────────────────────
 function callServer(fnName, ...args) {
   return new Promise((resolve, reject) => {
+    let loaderTimer = setTimeout(() => {
+      showLoadingOverlay('Communicating with server...');
+    }, 400);
+
+    const cleanup = () => {
+      clearTimeout(loaderTimer);
+      hideLoadingOverlay();
+    };
+
     const runner = google.script.run
       .withSuccessHandler(raw => {
+        cleanup();
         try {
           const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
           if (res && res.success === false) reject(new Error(res.message || 'Server error'));
           else resolve(res && res.data !== undefined ? res.data : res);
         } catch(e) { reject(e); }
       })
-      .withFailureHandler(e => reject(new Error(e.message || String(e))));
+      .withFailureHandler(e => {
+        cleanup();
+        reject(new Error(e.message || String(e)));
+      });
     runner[fnName](...args);
   });
 }

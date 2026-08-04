@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <?!= include('style') ?>
+  <title>Submission Rejected — TrainHub</title>
+</head>
+<body>
+
+<div class="portal-container">
+  <div class="portal-card" style="text-align: center; padding: 40px 24px;">
+    
+    <div style="width: 64px; height: 64px; background: #FEF2F2; border: 2px solid #FCA5A5; border-radius: 50%; color: #DC2626; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 30px; font-weight: 800;">
+      ✕
+    </div>
+
+    <h2 class="portal-title" style="color: #991B1B; margin-bottom: 8px;">
+      <?= (params && params.title) ? params.title : 'Submission Rejected' ?>
+    </h2>
+
+    <p class="portal-subtitle" style="color: #B91C1C; margin-bottom: 24px; font-size: 14.5px;">
+      <?= (params && params.message) ? params.message : ((params && params.msg) ? params.msg : 'The request could not be processed due to validation restrictions.') ?>
+    </p>
+
+    <button onclick="window.history.back()" class="btn-submit" style="background: #64748B; box-shadow: none; max-width: 200px; margin: 0 auto;">
+      ← Go Back
+    </button>
+
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<?!= include('script') ?>
+</body>
+</html>

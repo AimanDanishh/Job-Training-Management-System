@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <?!= include('style') ?>
+  <title>Training Evaluation — TrainHub</title>
+</head>
+<body>
+
+<div class="portal-container">
+  <div class="portal-card">
+    
+    <!-- Header -->
+    <div class="brand-header">
+      <span class="badge-pillar">Programme Evaluation</span>
+      <h1 class="portal-title" id="txt-eval-title">Loading Training...</h1>
+      <p class="portal-subtitle" id="txt-eval-sub">Borang Penilaian Latihan</p>
+    </div>
+
+    <!-- Loading Spinner View -->
+    <div id="view-loading" style="text-align:center; padding: 20px 0;">
+      <div class="spinner"></div>
+      <p style="color:#64748B; font-size:13px;">Loading evaluation form...</p>
+    </div>
+
+    <!-- Evaluation Form View -->
+    <div id="view-form" style="display:none;">
+      <form onsubmit="handleEvalSubmit(event)">
+        
+        <div class="form-group mb-4">
+          <label class="form-label">Employee ID <span class="req">*</span></label>
+          <input type="text" id="inp-eval-empid" class="form-control" placeholder="e.g. EMP-1001" required autocomplete="off">
+          <p style="font-size:11px; color:#94A3B8; margin-top:4px;">Enter your assigned Employee ID to verify enrollment</p>
+
+          <!-- Auto-fetched Employee Info Display Card -->
+          <div id="emp-info-card" style="display:none; margin-top:10px; padding:10px 14px; background:#EFF6FF; border:1px solid #BFDBFE; border-radius:8px;">
+            <div style="font-size:11px; font-weight:700; color:#1D4ED8; text-transform:uppercase;">Participant Verified</div>
+            <div style="font-size:14px; font-weight:700; color:#1E293B; margin-top:2px;" id="emp-info-name">—</div>
+            <div style="font-size:12px; color:#64748B;" id="emp-info-dept">—</div>
+          </div>
+        </div>
+
+        <!-- Section A: Likert Ratings -->
+        <div style="background:#EFF6FF; border-radius:10px; padding:12px 16px; margin-bottom:18px;">
+          <h3 style="font-size:13.5px; font-weight:700; color:#1E293B;">Section A — Programme Assessment</h3>
+          <p style="font-size:11.5px; color:#1D4ED8;">Rate each statement: 1 = Strongly Disagree, 5 = Strongly Agree</p>
+        </div>
+
+        <div id="likert-container" style="margin-bottom: 24px;"></div>
+
+        <!-- Section B: Open Feedback -->
+        <div style="background:#F8FAFC; border-radius:10px; padding:12px 16px; margin-bottom:18px;">
+          <h3 style="font-size:13.5px; font-weight:700; color:#1E293B;">Section B — Open Feedback</h3>
+          <p style="font-size:11.5px; color:#64748B;">Maklum Balas Terbuka</p>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">1. What was the most valuable part of the training?<br><small style="color:#94A3B8; font-weight:400;">Apakah bahagian latihan yang paling bernilai kepada anda?</small></label>
+          <textarea id="inp-b1" class="form-control" rows="2" placeholder="Your response..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">2. What could be improved?<br><small style="color:#94A3B8; font-weight:400;">Apa yang boleh diperbaiki?</small></label>
+          <textarea id="inp-b2" class="form-control" rows="2" placeholder="Your response..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">3. Suggestions for future training topics<br><small style="color:#94A3B8; font-weight:400;">Cadangan topik latihan akan datang</small></label>
+          <textarea id="inp-b3" class="form-control" rows="2" placeholder="Your response..."></textarea>
+        </div>
+
+        <button type="submit" id="btn-submit-eval" class="btn-submit" style="margin-top: 10px;">
+          Submit Evaluation
+        </button>
+
+      </form>
+    </div>
+
+    <!-- Success View -->
+    <div id="view-success" style="display:none; text-align:center; padding: 20px 0;">
+      <div style="width: 56px; height: 56px; background: #F0FDF4; border-radius: 50%; color: #16A34A; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; font-size: 28px; font-weight: 800;">
+        ✓
+      </div>
+      <h3 style="font-size: 18px; font-weight: 800; color: #166534; margin-bottom: 6px;">Evaluation Submitted!</h3>
+      <p style="font-size: 13.5px; color: #15803D; margin-bottom: 16px;" id="txt-success-msg">Thank you for your valuable feedback.</p>
+    </div>
+
+    <!-- Error View -->
+    <div id="view-error" style="display:none; text-align:center; padding: 16px 0;">
+      <div style="width: 56px; height: 56px; background: #FEF2F2; border-radius: 50%; color: #DC2626; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; font-size: 26px; font-weight: 800;">
+        ✕
+      </div>
+      <h3 style="font-size: 18px; font-weight: 800; color: #991B1B; margin-bottom: 6px;">Evaluation Rejected</h3>
+      <p style="font-size: 13.5px; color: #B91C1C; margin-bottom: 16px;" id="txt-error-msg">Validation failed.</p>
+    </div>
+
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<?!= include('script') ?>
+
+<script>
+  const LIKERT_QUESTIONS = [
+    { en: 'The training objectives were clearly defined.', ms: 'Objektif latihan dinyatakan dengan jelas.' },
+    { en: 'The content was relevant to my job.',           ms: 'Kandungan latihan berkaitan dengan tugas saya.' },
+    { en: 'The training materials were useful.',           ms: 'Bahan latihan berguna dan disediakan dengan baik.' },
+    { en: 'The trainer was knowledgeable and effective.',  ms: 'Penceramah mempunyai pengetahuan dan berkesan.' },
+    { en: 'The training was engaging and interactive.',    ms: 'Latihan ini menarik dan interaktif.' },
+    { en: 'The duration of the training was appropriate.', ms: 'Tempoh latihan adalah sesuai.' },
+    { en: 'I will be able to apply what I learned.',       ms: 'Saya dapat mempraktikkan apa yang saya pelajari.' }
+  ];
+
+  let likertScores = Array(7).fill(0);
+  let activeTrainingId = '';
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    activeTrainingId = getQueryParam('id') || "<?= (params && params.id) ? params.id : '' ?>";
+    
+    if (!activeTrainingId) {
+      showErrorState('Training ID parameter missing from URL link.');
+      return;
+    }
+
+    renderLikertQuestions();
+    setupEmpIdLookup();
+
+    try {
+      const t = await callServer('getTrainingInfo', activeTrainingId);
+      document.getElementById('txt-eval-title').textContent = t.Name || 'Training Evaluation';
+      document.getElementById('txt-eval-sub').textContent = `[${t.Code || ''}] ${t.Category || 'Programme'}`;
+
+      document.getElementById('view-loading').style.display = 'none';
+      document.getElementById('view-form').style.display = 'block';
+    } catch(e) {
+      showErrorState(e.message || 'Training programme not found.');
+    }
+  });
+
+  function setupEmpIdLookup() {
+    const input = document.getElementById('inp-eval-empid');
+    const card  = document.getElementById('emp-info-card');
+    const nameEl = document.getElementById('emp-info-name');
+    const deptEl = document.getElementById('emp-info-dept');
+
+    let debounceTimer = null;
+
+    input.addEventListener('input', () => {
+      clearTimeout(debounceTimer);
+      const val = input.value.trim();
+      if (val.length < 2) {
+        card.style.display = 'none';
+        return;
+      }
+
+      debounceTimer = setTimeout(async () => {
+        try {
+          const emp = await callServer('getEmployeeDetails', val);
+          if (emp && emp.Name) {
+            nameEl.textContent = emp.Name;
+            deptEl.textContent = emp.CostCentre || emp.Department || 'Employee';
+            card.style.display = 'block';
+          } else {
+            card.style.display = 'none';
+          }
+        } catch (e) {
+          card.style.display = 'none';
+        }
+      }, 400);
+    });
+  }
+
+  function renderLikertQuestions() {
+    const container = document.getElementById('likert-container');
+    container.innerHTML = LIKERT_QUESTIONS.map((q, idx) => `
+      <div class="likert-question-block">
+        <p class="likert-q-text">${idx + 1}. ${q.en}</p>
+        <p class="likert-q-sub">${q.ms}</p>
+        <div class="likert-btn-group" id="lgroup-${idx}">
+          ${[1,2,3,4,5].map(n => `
+            <button type="button" class="likert-btn" data-q="${idx}" data-v="${n}" onclick="setLikertScore(${idx}, ${n})">
+              ${n}
+            </button>
+          `).join('')}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function setLikertScore(qIdx, val) {
+    likertScores[qIdx] = val;
+    document.querySelectorAll(`#lgroup-${qIdx} .likert-btn`).forEach(btn => {
+      const bVal = Number(btn.dataset.v);
+      btn.className = 'likert-btn' + (bVal === val ? ` active-${val}` : '');
+    });
+  }
+
+  async function handleEvalSubmit(e) {
+    e.preventDefault();
+    const empId = document.getElementById('inp-eval-empid').value.trim();
+
+    if (!empId) {
+      showToast('Employee ID is required.', 'error');
+      return;
+    }
+
+    const unrated = likertScores.findIndex(s => s === 0);
+    if (unrated !== -1) {
+      showToast(`Please answer Question ${unrated + 1} in Section A.`, 'error');
+      return;
+    }
+
+    const btn = document.getElementById('btn-submit-eval');
+    setBtnLoading(btn, true, 'Submitting Evaluation...');
+
+    try {
+      const payload = {
+        TrainingID: activeTrainingId,
+        EmployeeID: empId,
+        Q1: likertScores[0], Q2: likertScores[1], Q3: likertScores[2],
+        Q4: likertScores[3], Q5: likertScores[4], Q6: likertScores[5], Q7: likertScores[6],
+        SectionB1: document.getElementById('inp-b1').value.trim(),
+        SectionB2: document.getElementById('inp-b2').value.trim(),
+        SectionB3: document.getElementById('inp-b3').value.trim()
+      };
+
+      const res = await callServer('saveTrainingEvaluation', payload);
+
+      document.getElementById('view-form').style.display = 'none';
+      document.getElementById('view-success').style.display = 'block';
+      document.getElementById('txt-success-msg').textContent = res.message || 'Evaluation submitted successfully!';
+    } catch(err) {
+      showToast(err.message, 'error');
+    } finally {
+      setBtnLoading(btn, false);
+    }
+  }
+
+  function showErrorState(msg) {
+    document.getElementById('view-loading').style.display = 'none';
+    document.getElementById('view-form').style.display = 'none';
+    document.getElementById('view-error').style.display = 'block';
+    document.getElementById('txt-error-msg').textContent = msg;
+  }
+</script>
+
+</body>
+</html>

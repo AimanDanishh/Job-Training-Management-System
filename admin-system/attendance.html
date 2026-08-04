@@ -185,21 +185,36 @@
         <div class="card-th">
           <h4 style="font-size:14px;font-weight:700;color:#1E293B;margin:0 0 16px">Add Manual Attendance Records</h4>
           <div class="row g-3 mb-3">
-            <div class="col-md-3">
-              <label class="label-th">Day Number / Session</label>
-              <input id="add-day" class="input-th" type="text" placeholder="Day 1 or SES0001">
+            <div class="col-md-6">
+              <label class="label-th">Training Session <span class="required">*</span></label>
+              <select id="add-session-select" class="input-th" onchange="onManualSessionSelect()">
+                <option value="">— Select session —</option>
+              </select>
             </div>
             <div class="col-md-3">
-              <label class="label-th">Date</label>
+              <label class="label-th">Session Date</label>
               <input id="add-date" class="input-th" type="date">
             </div>
           </div>
+
+          <!-- Quick Participant Search Bar -->
+          <div class="mb-3" style="background:#F8FAFC;padding:12px;border-radius:8px;border:1px solid #E2E8F0">
+            <label class="label-th" style="margin-bottom:6px">Search Participant by Name or Employee ID</label>
+            <div class="autocomplete-wrapper">
+              <div style="position:relative">
+                <span class="icon" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94A3B8;font-size:15px">search</span>
+                <input id="manual-att-search" class="input-th" style="padding-left:32px" placeholder="Type Employee Name or Employee ID to quick add..." autocomplete="off">
+              </div>
+              <div id="manual-att-search-drop" class="autocomplete-dropdown" style="display:none"></div>
+            </div>
+          </div>
+
           <div id="records-editor">
-            <div class="section-label">Attendance Records</div>
+            <div class="section-label">Attendance Records Table</div>
             <div id="records-list"></div>
             <div style="display:flex;gap:8px;flex-wrap:wrap" class="mt-2">
-              <button class="btn-th btn-primary btn-sm" onclick="loadTrainingParticipantsIntoEditor()"><span class="icon sm">group</span>Load Enrolled Participants</button>
-              <button class="btn-th btn-secondary btn-sm" onclick="addRecordRow()"><span class="icon sm">add</span>Add Row</button>
+              <button class="btn-th btn-primary btn-sm" onclick="loadTrainingParticipantsIntoEditor()"><span class="icon sm">group</span>Load All Enrolled Participants</button>
+              <button class="btn-th btn-secondary btn-sm" onclick="addRecordRow()"><span class="icon sm">add</span>Add Blank Row</button>
               <button class="btn-th btn-secondary btn-sm" onclick="openParticipantModal()"><span class="icon sm">group_add</span>Select from Master Registry</button>
             </div>
           </div>
@@ -415,16 +430,87 @@
     if (sel.value) document.getElementById('add-day-section').style.display = 'none';
   }
 
+  let currentTrainingParticipants = [];
+
+  function onManualSessionSelect() {
+    const sel = document.getElementById('add-session-select');
+    const selectedOpt = sel.options[sel.selectedIndex];
+    if (selectedOpt && selectedOpt.dataset.date) {
+      document.getElementById('add-date').value = selectedOpt.dataset.date;
+    }
+  }
+
+  function setupManualAttSearch() {
+    const searchInp = document.getElementById('manual-att-search');
+    const searchDrop = document.getElementById('manual-att-search-drop');
+    if (!searchInp || !searchDrop) return;
+
+    searchInp.addEventListener('input', () => {
+      const q = searchInp.value.trim().toLowerCase();
+      if (q.length < 1) { searchDrop.style.display = 'none'; return; }
+
+      const combinedList = [...currentTrainingParticipants, ...allEmployeesList];
+      const seen = new Set();
+      const matches = [];
+
+      combinedList.forEach(e => {
+        const empId = e.EmployeeID || e.ID || '';
+        const empName = e.EmployeeName || e.Name || '';
+        if (!empId || seen.has(empId)) return;
+
+        if (empId.toLowerCase().includes(q) || empName.toLowerCase().includes(q)) {
+          seen.add(empId);
+          matches.push({
+            ID: empId,
+            Name: empName,
+            Department: e.Department || ''
+          });
+        }
+      });
+
+      if (!matches.length) { searchDrop.style.display = 'none'; return; }
+
+      searchDrop.innerHTML = matches.slice(0, 8).map(m => `
+        <div class="autocomplete-item" onclick="addParticipantFromSearch('${m.ID}')">
+          <div><span class="emp-code">${m.ID}</span> <strong style="margin-left:6px">${m.Name}</strong></div>
+          <span class="emp-dept">${m.Department || '—'}</span>
+        </div>
+      `).join('');
+      searchDrop.style.display = 'block';
+    });
+
+    searchInp.addEventListener('blur', () => {
+      setTimeout(() => { searchDrop.style.display = 'none'; }, 200);
+    });
+  }
+
+  function addParticipantFromSearch(empId) {
+    const item = [...currentTrainingParticipants, ...allEmployeesList].find(e => (e.EmployeeID || e.ID) === empId);
+    if (item) {
+      addRecordRow({
+        ID: item.EmployeeID || item.ID,
+        Name: item.EmployeeName || item.Name,
+        Department: item.Department || ''
+      });
+      showToast(`Added ${item.EmployeeName || item.Name} to attendance table.`, 'success');
+    }
+    document.getElementById('manual-att-search').value = '';
+    document.getElementById('manual-att-search-drop').style.display = 'none';
+  }
+
   async function loadAttendance() {
     const id = document.getElementById('sel-training').value;
     if (!id) { showToast('Please select a training first.', 'error'); return; }
 
-    const [t, sum, grouped] = await Promise.all([
+    const [t, sum, grouped, sessions, participants] = await Promise.all([
       callServer('getTrainingById', id),
       callServer('getAttendanceSummary', id),
-      callServer('getAttendanceByTraining', id).catch(() => [])
+      callServer('getAttendanceByTraining', id).catch(() => []),
+      callServer('getSessions', id).catch(() => []),
+      callServer('getTrainingParticipants', id).catch(() => [])
     ]);
     currentTraining = t;
+    currentTrainingParticipants = participants || [];
     document.getElementById('topbar-sub').textContent = t.Name;
 
     // Summary
@@ -433,6 +519,16 @@
     document.getElementById('s-absent').textContent  = sum.absent  || 0;
     document.getElementById('s-late').textContent    = sum.late    || 0;
     document.getElementById('s-pct').textContent     = (sum.pct || 0) + '%';
+
+    // Populate Session Selector Dropdown with Session Name & Date ONLY
+    const sSelect = document.getElementById('add-session-select');
+    if (sSelect) {
+      sSelect.innerHTML = '<option value="">— Select session —</option>' + (sessions || []).map(s => `
+        <option value="${s.SessionID}" data-date="${s.SessionDate || ''}">${s.SessionName} (${s.SessionDate || '—'})</option>
+      `).join('');
+    }
+
+    setupManualAttSearch();
 
     renderSessionsAccordion(grouped);
     document.getElementById('add-day-section').style.display = '';

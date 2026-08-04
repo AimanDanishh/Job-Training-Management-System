@@ -1,0 +1,245 @@
+/**
+ * Helper.gs — Shared database connection, sheet access, script properties, and response wrappers
+ * 
+ * Reuses existing Google Spreadsheet DB without modifying database schema or sheet names.
+ */
+
+// ─── Script Properties & Config ───────────────────────────────────────────────
+function getConfigProperty(key, defaultValue) {
+  try {
+    const value = PropertiesService.getScriptProperties().getProperty(key);
+    if (value !== null && value !== undefined && String(value).trim() !== '') {
+      return String(value).trim();
+    }
+  } catch (e) {
+    Logger.log('Error reading script property ' + key + ': ' + e.message);
+  }
+  return defaultValue;
+}
+
+const SHEET_NAMES = {
+  get employees()            { return getConfigProperty('SHEET_EMPLOYEES', 'Employees'); },
+  get trainings()            { return getConfigProperty('SHEET_TRAININGS', 'Trainings'); },
+  get trainingSessions()     { return getConfigProperty('SHEET_TRAINING_SESSIONS', 'TrainingSessions'); },
+  get attendance()           { return getConfigProperty('SHEET_ATTENDANCE', 'Attendance'); },
+  get trainingEval()         { return getConfigProperty('SHEET_TRAINING_EVAL', 'TrainingEval'); },
+  get postEval()             { return getConfigProperty('SHEET_POST_EVAL', 'PostEval'); },
+  get trainingParticipants() { return getConfigProperty('SHEET_TRAINING_PARTICIPANTS', 'TrainingParticipants'); }
+};
+
+// ─── Spreadsheet Access ────────────────────────────────────────────────────────
+let _cachedSpreadsheet = null;
+
+function getSpreadsheet() {
+  if (_cachedSpreadsheet) return _cachedSpreadsheet;
+  const spreadsheetId = getConfigProperty('SPREADSHEET_ID', '');
+  if (spreadsheetId) {
+    _cachedSpreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    return _cachedSpreadsheet;
+  }
+  _cachedSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  return _cachedSpreadsheet;
+}
+
+function getEmployeeSpreadsheetId() {
+  return getConfigProperty('EMPLOYEE_SPREADSHEET_ID', getConfigProperty('SPREADSHEET_ID', ''));
+}
+
+let _cachedEmployeeSpreadsheet = null;
+function getEmployeeSpreadsheet() {
+  if (_cachedEmployeeSpreadsheet) return _cachedEmployeeSpreadsheet;
+  const empSpreadsheetId = getEmployeeSpreadsheetId();
+  if (empSpreadsheetId) {
+    try {
+      _cachedEmployeeSpreadsheet = SpreadsheetApp.openById(empSpreadsheetId);
+      return _cachedEmployeeSpreadsheet;
+    } catch(e) {
+      Logger.log('Failed to open separate EMPLOYEE_SPREADSHEET_ID: ' + e.message);
+    }
+  }
+  return getSpreadsheet();
+}
+
+function getSheet(name) {
+  const ss = (name === SHEET_NAMES.employees) ? getEmployeeSpreadsheet() : getSpreadsheet();
+  if (!ss) return null;
+  
+  let sheet = ss.getSheetByName(name);
+  if (!sheet) {
+    const allSheets = ss.getSheets();
+    const targetClean = String(name).toLowerCase().replace(/[^a-z0-9]/g, '');
+    sheet = allSheets.find(s => {
+      const sClean = s.getName().toLowerCase().replace(/[^a-z0-9]/g, '');
+      return sClean === targetClean ||
+             sClean === targetClean + 's' ||
+             sClean + 's' === targetClean;
+    });
+
+    if (!sheet && name === SHEET_NAMES.employees && ss !== getSpreadsheet() && allSheets.length > 0) {
+      sheet = allSheets[0];
+    }
+    if (!sheet && name === SHEET_NAMES.employees && allSheets.length > 0) {
+      sheet = allSheets.find(s => s.getName().toLowerCase().includes('emp') || s.getName().toLowerCase().includes('staff'));
+    }
+  }
+
+  if (sheet) {
+    const cleanName = String(name).toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (cleanName === 'attendance') {
+      ensureAttendanceSheetColumns(sheet);
+    }
+  }
+
+  return sheet;
+}
+
+// ─── ID Generation & Header Normalization ─────────────────────────────────────
+function generateId(prefix) {
+  return prefix + '-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+}
+
+function normalizeHeader(header) {
+  const h = String(header).trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (['id', 'empid', 'employeeid', 'employeeno', 'staffid', 'badgenumber'].includes(h)) return 'ID';
+  if (['name', 'fullname', 'employeename', 'staffname'].includes(h)) return 'Name';
+  if (['costcentre', 'costcenter'].includes(h)) return 'CostCentre';
+  if (['department', 'dept', 'company', 'division'].includes(h)) return 'Department';
+  if (['position', 'positiontitle', 'jobtitle', 'title', 'designation', 'role'].includes(h)) return 'Position';
+  if (['email', 'emailaddress'].includes(h)) return 'Email';
+  if (['status'].includes(h)) return 'Status';
+  return header;
+}
+
+/**
+ * Convert sheet data rows into JSON objects keyed by column headers
+ */
+function sheetToJson(sheet) {
+  if (!sheet) return [];
+  const data = sheet.getDataRange().getValues();
+  if (data.length < 2) return [];
+
+  const headers = data[0];
+  const rows = [];
+
+  for (let i = 1; i < data.length; i++) {
+    const isRowEmpty = data[i].every(val => val === '' || val === null || val === undefined);
+    if (isRowEmpty) continue;
+
+    const obj = {};
+    headers.forEach((h, j) => {
+      const cleanH = String(h).trim();
+      const val = data[i][j] !== undefined ? String(data[i][j]) : '';
+      obj[cleanH] = val;
+
+      const normKey = cleanH.replace(/[^a-zA-Z0-9]/g, '');
+      if (normKey && !obj[normKey]) {
+        obj[normKey] = val;
+      }
+      const customNormKey = normalizeHeader(cleanH);
+      if (customNormKey && !obj[customNormKey]) {
+        obj[customNormKey] = val;
+      }
+    });
+    if (!obj.ID && data[i][0] !== undefined) obj.ID = String(data[i][0]);
+    if (!obj.Name && data[i][1] !== undefined) obj.Name = String(data[i][1]);
+
+    // Smart fallback for shifted columns
+    if (obj.TrainingID && String(obj.TrainingID).trim().toUpperCase().startsWith('SES')) {
+      obj.SessionID = obj.TrainingID;
+      if (obj.TrainingCode && String(obj.TrainingCode).trim().toUpperCase().startsWith('TRN')) {
+        obj.TrainingID = obj.TrainingCode;
+      }
+    }
+    if (!obj.Status && (obj.Date === 'Present' || obj.Date === 'Absent' || obj.Date === 'Late')) {
+      obj.Status = obj.Date;
+    }
+    if (!obj.ScanTime && obj.Day && String(obj.Day).includes(':')) {
+      obj.ScanTime = obj.Day;
+    }
+
+    obj._row = i + 1;
+    rows.push(obj);
+  }
+  return rows;
+}
+
+/** Repair & standardize Attendance sheet columns and legacy shifted data rows. */
+function ensureAttendanceSheetColumns(sheet) {
+  if (!sheet) return;
+  const data = sheet.getDataRange().getValues();
+  if (data.length === 0) return;
+
+  const targetHeaders = [
+    'AttendanceID', 'SessionID', 'TrainingID', 'EmployeeNo', 'EmployeeName',
+    'Department', 'ScanTime', 'Status', 'TrainingCode', 'Day',
+    'Date', 'Hours', 'Remarks', 'EditedBy', 'EditedAt'
+  ];
+
+  // 1. Ensure Row 1 has standard modern headers if old headers exist
+  const firstRowStr = data[0].join(',').toLowerCase();
+  if (!firstRowStr.includes('sessionid')) {
+    sheet.getRange(1, 1, 1, targetHeaders.length).setValues([targetHeaders])
+      .setFontWeight('bold').setBackground('#2563EB').setFontColor('#FFFFFF');
+    sheet.setFrozenRows(1);
+  }
+
+  // 2. Fix shifted legacy rows where Col 2 contains SES... and Col 3 contains TRN...
+  if (data.length > 1) {
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const col2 = String(row[1] || '').trim();
+      const col3 = String(row[2] || '').trim();
+
+      if (col2.toUpperCase().startsWith('SES') && col3.toUpperCase().startsWith('TRN')) {
+        const fixedRow = [
+          row[0] || generateId('ATT'),                     // AttendanceID
+          col2,                                           // SessionID (SES0003)
+          col3,                                           // TrainingID (TRN-xxx)
+          row[3] || '',                                    // EmployeeNo
+          row[4] || '',                                    // EmployeeName
+          row[5] || '',                                    // Department
+          row[6] || row[14] || now(),                      // ScanTime
+          row[7] === 'Present' || row[7] === 'Late' || row[7] === 'Absent' ? row[7] : 'Present', // Status
+          row[8] || '',                                    // TrainingCode
+          row[9] || '',                                    // Day
+          row[10] || '',                                   // Date
+          row[11] || 0,                                    // Hours
+          row[12] || 'QR Code Public Check-In',            // Remarks
+          row[13] || 'Public Portal',                      // EditedBy
+          row[14] || now()                                 // EditedAt
+        ];
+        sheet.getRange(i + 1, 1, 1, fixedRow.length).setValues([fixedRow]);
+      }
+    }
+  }
+}
+
+function findRowById(sheet, id) {
+  if (!sheet) return -1;
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]).trim() === String(id).trim()) return i + 1;
+  }
+  return -1;
+}
+
+// ─── Date & Utilities ─────────────────────────────────────────────────────────
+function formatDate(date) {
+  if (!date) return '';
+  const d = new Date(date);
+  if (isNaN(d)) return String(date);
+  return Utilities.formatDate(d, Session.getScriptTimeZone(), 'dd MMM yyyy');
+}
+
+function now() {
+  return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd MMM yyyy HH:mm');
+}
+
+// ─── Standardized JSON Response Helpers ────────────────────────────────────────
+function ok(data) {
+  return JSON.stringify({ success: true, data: data });
+}
+
+function err(message) {
+  return JSON.stringify({ success: false, message: message });
+}
