@@ -25,7 +25,6 @@
   <div class="main-area">
     <header class="topbar">
       <div style="flex:1"><h1 class="topbar-title">Evaluation</h1><p class="topbar-sub">Training & Post-Training Evaluations</p></div>
-      <button class="btn-th btn-primary" onclick="openModal('modal-eval')"><span class="icon sm">rate_review</span>Submit Evaluation</button>
     </header>
 
     <main class="page-content">
@@ -111,9 +110,6 @@
               <tbody id="post-tbody"><tr><td colspan="6" style="text-align:center;color:#94A3B8;padding:40px">Select a training to view post-evaluations</td></tr></tbody>
             </table>
           </div>
-        </div>
-        <div style="margin-top:16px;text-align:right">
-          <button class="btn-th btn-primary" onclick="openModal('modal-post-eval')"><span class="icon sm">add</span>Submit Post-Training Evaluation</button>
         </div>
       </div>
     </main>
@@ -338,7 +334,9 @@
       const sel = document.getElementById('sel-eval-t');
       trainings.forEach(t => {
         const o = document.createElement('option');
-        o.value = t.ID; o.textContent = `[${t.Code}] ${t.Name}`;
+        o.value = t.ID;
+        const tag = (t.isSixMonthsReached || t.Stage === 'Waiting for 6-Month Review') ? '⏰ [6-MO REVIEW DUE] ' : '';
+        o.textContent = `${tag}[${t.Code}] ${t.Name}`;
         sel.appendChild(o);
       });
       const pid = getQueryParam('id');

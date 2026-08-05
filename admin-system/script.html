@@ -177,7 +177,10 @@ function statusBadge(status) {
 }
 
 // ─── Stage badge ─────────────────────────────────────────────────────────────
-function stageBadge(stage) {
+function stageBadge(stage, isSixMonthsReached) {
+  if (stage === 'Waiting for 6-Month Review' || isSixMonthsReached) {
+    return `<span class="badge-th badge-yellow" style="white-space:nowrap;background:#FFFBEB;color:#D97706;border:1px solid #FCD34D">⏰ 6-Month Review Due</span>`;
+  }
   return `<span class="badge-th badge-blue" style="white-space:nowrap">${stage}</span>`;
 }
 

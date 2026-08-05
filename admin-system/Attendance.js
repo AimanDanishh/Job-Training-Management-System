@@ -39,7 +39,7 @@ function saveAttendance(trainingId, trainingCode, dayNumber, date, records) {
 
     // Append updated records
     records.forEach(r => {
-      sheet.appendRow([
+      const rec = [
         generateId('ATT'),
         trainingId,
         trainingCode,
@@ -55,9 +55,12 @@ function saveAttendance(trainingId, trainingCode, dayNumber, date, records) {
         r.Remarks      || '',
         r.EditedBy     || '',
         r.EditedAt     || ''
-      ]);
+      ];
+      sheet.appendRow(rec);
+      try { syncAttendanceToTrainingDriveSheet(trainingId, rec); } catch(e) {}
     });
 
+    try { updateTrainingStage(trainingId, 'Attendance In Progress'); } catch(e) {}
     syncTrainingRequisitionParticipants(trainingId);
 
     return ok({ message: 'Attendance saved for Day ' + dayNumber });

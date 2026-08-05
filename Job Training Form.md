@@ -110,16 +110,23 @@ Additional Improvement:
 
 **Improvement 4**
 
-1. Overall UI
-2. When create the session attendance, auto change the lifecycle stage to attendance in progress, then when the training is passed the date, change to training completed, (automate lifecycle stage)
-3. Show indicator or noti for training that have reach 6 months
-4. Auto fill the employee no, name, department and job title in the Training Requisition Form (the template)
-5. Allow the evaluation to be filled once for each participant
-6. Make the evaluation form required for the question that have scale 1 until 5
-7. Remove submit evaluation button on the admin system
-8. 
+Overall UI
+
+1. When create the session attendance, auto change the lifecycle stage to attendance in progress, then when the training is passed the date, change to training completed, (automate lifecycle stage)
+2. Show indicator or noti for training that have reach 6 months
+3. Auto fill the employee no, name, department and job title in the Training Requisition Form (the template)
+4. Allow the evaluation to be filled once for each participant
+5. Make the evaluation form required for the question that have scale 1 until 5
+6. Remove submit evaluation button on the admin system
+7. Remove unnecessary folder from the drive, certificates, evaluation, materials, photos, reports, trainer notes
+8. Add attendance sheet to each folder training, 1 attendance sheet per training, not dump everything in the database including the training evaluation and post evaluation 
 
 
 
-
+1. Participant added to the backend but not frontend
+2. Bulk add participant not working, it should retrieve the participant from the employee database
+3. The database still have the other tabs besides the Training tab
+4. Use single sheets for attendance, post evaluation, training evaluation, participant, training session (just different tab)
+5. Training Requisition From sheets keep it separated (individual sheets)
+6. Fix all the routing and functions to the new structure
 

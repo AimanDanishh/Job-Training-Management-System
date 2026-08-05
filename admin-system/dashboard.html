@@ -85,6 +85,24 @@
         </div>
       </div>
 
+      <!-- 6-Month Post Training Evaluation Alert Banner -->
+      <div id="noti-6month-banner" class="card-th mb-4" style="display:none; background:#FFFBEB; border:1.5px solid #FCD34D; border-left:5px solid #F59E0B">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap">
+          <div style="display:flex; align-items:center; gap:12px">
+            <div style="width:40px; height:40px; border-radius:10px; background:#FEF3C7; display:flex; align-items:center; justify-content:center; flex-shrink:0">
+              <span class="icon filled" style="color:#D97706">notifications_active</span>
+            </div>
+            <div>
+              <div style="font-size:14px; font-weight:700; color:#92400E">⏰ 6-Month Post-Training Evaluation Reminder</div>
+              <div style="font-size:12.5px; color:#B45309" id="noti-6month-text">Some training programmes have reached the 6-month milestone and require supervisor post-evaluations.</div>
+            </div>
+          </div>
+          <button class="btn-th btn-sm" style="background:#D97706; color:#fff; border:none" onclick="navTo('evaluation')">
+            <span class="icon sm">rate_review</span> Review 6-Month Evals
+          </button>
+        </div>
+      </div>
+
       <!-- Quick Actions Bar -->
       <div class="card-th mb-4">
         <div class="section-label" style="margin-bottom:12px">Quick Actions & Shortcuts</div>
@@ -157,6 +175,17 @@
       document.getElementById('kpi-completed').textContent = s.completed  || 0;
       document.getElementById('kpi-eval').textContent      = s.pendingEval|| 0;
       document.getElementById('kpi-post').textContent      = s.pendingPost|| 0;
+
+      // 6-Month Post Evaluation Notification Banner Check
+      const sixMonthTrainings = tList.filter(t => t.isSixMonthsReached || t.Stage === 'Waiting for 6-Month Review');
+      const banner = document.getElementById('noti-6month-banner');
+      const bannerText = document.getElementById('noti-6month-text');
+      if (sixMonthTrainings.length > 0) {
+        bannerText.textContent = `${sixMonthTrainings.length} training programme(s) have reached the 6-month milestone and require supervisor post-evaluations: ${sixMonthTrainings.map(x => x.Code || x.Name).join(', ')}`;
+        banner.style.display = 'block';
+      } else {
+        banner.style.display = 'none';
+      }
 
       // Active/upcoming programmes list
       const active = tList.filter(t => t.Status === 'In Progress' || t.Status === 'Upcoming' || t.Status === 'Draft').slice(0, 6);

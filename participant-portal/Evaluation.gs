@@ -67,7 +67,7 @@ function saveTrainingEvaluation(data) {
     if (!sheet) return err('TrainingEval sheet not found.');
 
     // Columns: ['ID', 'TrainingID', 'EmployeeID', 'EmployeeName', 'Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6', 'Q7', 'SectionB1', 'SectionB2', 'SectionB3', 'AvgScore', 'SubmittedAt']
-    sheet.appendRow([
+    const evalRow = [
       generateId('EVL'),
       trainingId,
       employeeId,
@@ -79,7 +79,9 @@ function saveTrainingEvaluation(data) {
       data.SectionB3 || '',
       avg,
       now()
-    ]);
+    ];
+    sheet.appendRow(evalRow);
+    try { syncEvaluationToTrainingDriveSheet(trainingId, evalRow); } catch(e) {}
 
     return ok({ 
       message: 'Training evaluation submitted successfully!',
@@ -130,7 +132,7 @@ function savePostEvaluation(data) {
     if (!sheet) return err('PostEval sheet not found.');
 
     // Columns: ['ID', 'TrainingID', 'EmployeeID', 'EvaluatorName', 'EvaluatorID', 'CompetencyBefore', 'CompetencyAfter', 'Improvement', 'CanApply', 'FurtherTraining', 'Comments', 'SubmittedAt']
-    sheet.appendRow([
+    const postRow = [
       generateId('PEV'),
       finalTId,
       finalEmpId,
@@ -143,7 +145,9 @@ function savePostEvaluation(data) {
       data.FurtherTraining    || '',
       data.Comments           || '',
       now()
-    ]);
+    ];
+    sheet.appendRow(postRow);
+    try { syncPostEvalToTrainingDriveSheet(finalTId, postRow); } catch(e) {}
 
     return ok({ message: '6-Month Post-Training Evaluation submitted successfully!' });
 

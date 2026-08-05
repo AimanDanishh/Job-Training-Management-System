@@ -33,7 +33,7 @@ function saveTrainingEvaluation(data) {
 
     const avg = (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2);
 
-    sheet.appendRow([
+    const evalRow = [
       generateId('EVL'),
       data.TrainingID,
       data.EmployeeID,
@@ -45,7 +45,10 @@ function saveTrainingEvaluation(data) {
       data.SectionB3     || '',
       avg,
       now()
-    ]);
+    ];
+    sheet.appendRow(evalRow);
+    try { syncEvaluationToTrainingDriveSheet(data.TrainingID, evalRow); } catch(e) {}
+
     return ok({ message: 'Training evaluation submitted. Average score: ' + avg });
   } catch (e) {
     return err('Failed to save evaluation: ' + e.message);
@@ -81,7 +84,7 @@ function savePostEvaluation(data) {
     );
     if (exists) return err('A post-training evaluation has already been submitted for this employee.');
 
-    sheet.appendRow([
+    const postRow = [
       generateId('PEV'),
       data.TrainingID,
       data.EmployeeID,
@@ -94,7 +97,9 @@ function savePostEvaluation(data) {
       data.FurtherTraining    || '',
       data.Comments           || '',
       now()
-    ]);
+    ];
+    sheet.appendRow(postRow);
+    try { syncPostEvalToTrainingDriveSheet(data.TrainingID, postRow); } catch(e) {}
 
     // Auto-advance training stage if all post-evals are done
     tryAdvanceToEvaluationCompleted(data.TrainingID);

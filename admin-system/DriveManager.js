@@ -3,15 +3,7 @@
  * Automatically creates and manages training folders, subfolder hierarchies, and template files.
  */
 
-const SUBFOLDER_NAMES = [
-  'Attendance',
-  'Evaluation',
-  'Certificates',
-  'Materials',
-  'Photos',
-  'Reports',
-  'Trainer Notes'
-];
+const SUBFOLDER_NAMES = [];
 
 /**
  * Gets or creates the root directory for training workspaces.
@@ -40,18 +32,16 @@ function getOrCreateRootFolder() {
 
 /**
  * Automatically creates a dedicated Google Drive workspace for a training programme.
+ * Creates per-training sheets directly in the training folder (1 folder per training).
  * 
  * Workspace Structure:
  * Job Training System/
  * └── Training/
  *     └── TR-2026-001 Safety Induction/
- *         ├── Attendance/
- *         ├── Evaluation/
- *         ├── Certificates/
- *         ├── Materials/
- *         ├── Photos/
- *         ├── Reports/
- *         └── Trainer Notes/
+ *         ├── TR-2026-001 Attendance Sheet
+ *         ├── TR-2026-001 Training Evaluation Sheet
+ *         ├── TR-2026-001 Post Evaluation Sheet
+ *         └── TR-2026-001 Training Requisition Form
  *
  * @param {string} code - Training Code (e.g. TR-2026-001)
  * @param {string} name - Training Name (e.g. Safety Induction)
@@ -66,38 +56,212 @@ function createTrainingWorkspace(code, name) {
     let existingIter = parentFolder.getFoldersByName(folderName);
     let mainFolder = existingIter.hasNext() ? existingIter.next() : parentFolder.createFolder(folderName);
 
-    const subfolders = {};
-    SUBFOLDER_NAMES.forEach(subName => {
-      let subIter = mainFolder.getFoldersByName(subName);
-      let subFolder = subIter.hasNext() ? subIter.next() : mainFolder.createFolder(subName);
-      subfolders[subName] = subFolder;
-    });
-
-    // Optionally copy configured template files into subfolders
-    copyTemplateIfConfigured('ATTENDANCE_TEMPLATE_ID', subfolders['Attendance'], `${code} Attendance Record`);
-    copyTemplateIfConfigured('EVALUATION_TEMPLATE_ID', subfolders['Evaluation'], `${code} Evaluation Form`);
-    copyTemplateIfConfigured('CERTIFICATE_TEMPLATE_ID', subfolders['Certificates'], `${code} Certificate Template`);
-    copyTemplateIfConfigured('REPORT_TEMPLATE_ID', subfolders['Reports'], `${code} Training Summary Report`);
+    // Create 1 single Google Sheet containing all tabs for this training
+    let singleSheetFile = getOrCreateSingleTrainingSheet(mainFolder, code);
+    const singleSheetId = singleSheetFile.getId();
 
     return {
       folderId:            mainFolder.getId(),
       folderUrl:           mainFolder.getUrl(),
-      attendanceFolderId:  subfolders['Attendance'].getId(),
-      evaluationFolderId:  subfolders['Evaluation'].getId(),
-      certificateFolderId: subfolders['Certificates'].getId(),
-      materialsFolderId:   subfolders['Materials'].getId(),
-      photosFolderId:      subfolders['Photos'].getId(),
-      reportsFolderId:     subfolders['Reports'].getId(),
-      trainerNotesFolderId:subfolders['Trainer Notes'].getId()
+      partSheetId:         singleSheetId,
+      sessionSheetId:      singleSheetId,
+      attendanceSheetId:   singleSheetId,
+      evaluationSheetId:   singleSheetId,
+      postSheetId:         singleSheetId,
+      attendanceFolderId:  mainFolder.getId(),
+      evaluationFolderId:  mainFolder.getId(),
+      certificateFolderId: mainFolder.getId(),
+      materialsFolderId:   mainFolder.getId(),
+      photosFolderId:      mainFolder.getId(),
+      reportsFolderId:     mainFolder.getId(),
+      trainerNotesFolderId:mainFolder.getId()
     };
   } catch (e) {
     Logger.log('DriveManager.createTrainingWorkspace error: ' + e.message);
     return {
-      folderId: '', folderUrl: '', attendanceFolderId: '', evaluationFolderId: '',
-      certificateFolderId: '', materialsFolderId: '', photosFolderId: '',
-      reportsFolderId: '', trainerNotesFolderId: ''
+      folderId: '', folderUrl: '', partSheetId: '', sessionSheetId: '', attendanceSheetId: '', evaluationSheetId: '', postSheetId: '',
+      attendanceFolderId: '', evaluationFolderId: '', certificateFolderId: '',
+      materialsFolderId: '', photosFolderId: '', reportsFolderId: '', trainerNotesFolderId: ''
     };
   }
+}
+
+/**
+ * Gets or creates the single Google Sheet file for a training workspace,
+ * ensuring tabs exist for TrainingParticipants, TrainingSessions, Attendance, TrainingEval, PostEval, and Summary.
+ */
+function getOrCreateSingleTrainingSheet(folder, code) {
+  const fileName = `${code} Training Data`;
+  let fileIter = folder.getFilesByName(fileName);
+  let file;
+  let ss;
+
+  if (fileIter.hasNext()) {
+    file = fileIter.next();
+    ss = SpreadsheetApp.openById(file.getId());
+  } else {
+    // Also check for legacy sheet names in case of existing folders
+    let legacyIter = folder.getFilesByName(`${code} Attendance Sheet`);
+    if (legacyIter.hasNext()) {
+      file = legacyIter.next();
+      ss = SpreadsheetApp.openById(file.getId());
+    } else {
+      ss = SpreadsheetApp.create(fileName);
+      file = DriveApp.getFileById(ss.getId());
+      folder.addFile(file);
+      DriveApp.getRootFolder().removeFile(file);
+    }
+  }
+
+  const tabDefs = [
+    {
+      name: 'TrainingParticipants',
+      headers: ['ID', 'TrainingID', 'EmployeeID', 'EmployeeName', 'Department', 'Position', 'AddedAt']
+    },
+    {
+      name: 'TrainingSessions',
+      headers: ['SessionID', 'TrainingID', 'SessionName', 'SessionDate', 'StartTime', 'EndTime', 'AttendanceURL', 'QRCodeURL', 'QRStatus', 'CreatedDate']
+    },
+    {
+      name: 'Attendance',
+      headers: ['AttendanceID', 'SessionID', 'TrainingID', 'EmployeeNo', 'EmployeeName', 'Department', 'ScanTime', 'Status', 'TrainingCode', 'Day', 'Date', 'Hours', 'Remarks', 'EditedBy', 'EditedAt']
+    },
+    {
+      name: 'TrainingEval',
+      headers: ['ID', 'TrainingID', 'EmployeeID', 'EmployeeName', 'Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6', 'Q7', 'SectionB1', 'SectionB2', 'SectionB3', 'AvgScore', 'SubmittedAt']
+    },
+    {
+      name: 'PostEval',
+      headers: ['ID', 'TrainingID', 'EmployeeID', 'EvaluatorName', 'EvaluatorID', 'CompetencyBefore', 'CompetencyAfter', 'Improvement', 'CanApply', 'FurtherTraining', 'Comments', 'SubmittedAt']
+    }
+  ];
+
+  tabDefs.forEach(def => {
+    let sheet = ss.getSheetByName(def.name);
+    if (!sheet) {
+      const allSheets = ss.getSheets();
+      sheet = allSheets.find(s => s.getName().toLowerCase().includes(def.name.toLowerCase()));
+      if (!sheet) {
+        sheet = ss.insertSheet(def.name);
+      } else {
+        sheet.setName(def.name);
+      }
+    }
+    if (sheet.getLastRow() === 0) {
+      sheet.appendRow(def.headers);
+      sheet.getRange(1, 1, 1, def.headers.length)
+        .setFontWeight('bold')
+        .setBackground('#2563EB')
+        .setFontColor('#FFFFFF');
+      sheet.setFrozenRows(1);
+    }
+  });
+
+  // Remove default sheet if present and empty
+  const defaultSheet = ss.getSheetByName('Sheet1') || ss.getSheetByName('Data');
+  if (defaultSheet && ss.getSheets().length > 1 && defaultSheet.getLastRow() <= 1) {
+    try { ss.deleteSheet(defaultSheet); } catch(e) {}
+  }
+
+  // Ensure Summary tab
+  let summarySheet = ss.getSheetByName('Summary');
+  if (!summarySheet) {
+    summarySheet = ss.insertSheet('Summary');
+    summarySheet.getRange('A1:B1').setValues([['Metric / Category', 'Live Formula / Output']]);
+    summarySheet.getRange('A1:B1').setFontWeight('bold').setBackground('#1E293B').setFontColor('#FFFFFF');
+
+    summarySheet.getRange('A2:B8').setFormulas([
+      ['Total Enrolled Participants', '=IF(ISREF(TrainingParticipants!A2), COUNTA(TrainingParticipants!A2:A), 0)'],
+      ['Total Sessions Created', '=IF(ISREF(TrainingSessions!A2), COUNTA(TrainingSessions!A2:A), 0)'],
+      ['Total Attendance Logs', '=IF(ISREF(Attendance!A2), COUNTA(Attendance!A2:A), 0)'],
+      ['Present Count', '=IF(ISREF(Attendance!H2), COUNTIF(Attendance!H2:H, "Present"), 0)'],
+      ['Total Evaluations Submitted', '=IF(ISREF(TrainingEval!A2), COUNTA(TrainingEval!A2:A), 0)'],
+      ['Overall Average Score', '=IF(AND(ISREF(TrainingEval!O2), COUNTA(TrainingEval!O2:O)>0), AVERAGE(TrainingEval!O2:O), 0)'],
+      ['Total Post-Reviews Completed', '=IF(ISREF(PostEval!A2), COUNTA(PostEval!A2:A), 0)']
+    ]);
+  }
+
+  SpreadsheetApp.flush();
+  return file;
+}
+
+/**
+ * Helper to get or create a Google Sheet inside a target Google Drive folder,
+ * equipping it with a Data tab and a formula-powered Summary tab.
+ */
+function getOrCreateSheetInFolder(folder, fileName, headers, sheetType = '') {
+  let fileIter = folder.getFilesByName(fileName);
+  if (fileIter.hasNext()) {
+    return fileIter.next();
+  }
+  const ss = SpreadsheetApp.create(fileName);
+  const file = DriveApp.getFileById(ss.getId());
+  folder.addFile(file);
+  DriveApp.getRootFolder().removeFile(file); // Move from root to target folder
+
+  // 1. Raw Data tab
+  const dataSheet = ss.getActiveSheet();
+  dataSheet.setName('Data');
+  dataSheet.appendRow(headers);
+  dataSheet.getRange(1, 1, 1, headers.length)
+    .setFontWeight('bold')
+    .setBackground('#2563EB')
+    .setFontColor('#FFFFFF');
+  dataSheet.setFrozenRows(1);
+
+  // 2. Dynamic Summary tab equipped with live Google Sheets formulas
+  try {
+    const summarySheet = ss.insertSheet('Summary');
+    summarySheet.getRange('A1:B1').setValues([['Metric / Category', 'Live Formula / Output']]);
+    summarySheet.getRange('A1:B1').setFontWeight('bold').setBackground('#1E293B').setFontColor('#FFFFFF');
+
+    if (sheetType === 'Attendance' || fileName.includes('Attendance')) {
+      summarySheet.getRange('A2:B6').setFormulas([
+        ['Total Attendance Logs', '=COUNTA(Data!A2:A)'],
+        ['Present Count', '=COUNTIF(Data!H2:H, "Present")'],
+        ['Absent Count', '=COUNTIF(Data!H2:H, "Absent")'],
+        ['Late Count', '=COUNTIF(Data!H2:H, "Late")'],
+        ['Attendance Rate', '=IF(COUNTA(Data!A2:A)>0, COUNTIF(Data!H2:H, "Present")/COUNTA(Data!A2:A), 0)']
+      ]);
+      summarySheet.getRange('B6').setNumberFormat('0.0%');
+    } else if (sheetType === 'Sessions' || fileName.includes('Sessions')) {
+      summarySheet.getRange('A2:B4').setFormulas([
+        ['Total Sessions Created', '=COUNTA(Data!A2:A)'],
+        ['Active Sessions', '=COUNTIF(Data!I2:I, "Active")'],
+        ['Expired Sessions', '=COUNTIF(Data!I2:I, "Expired")']
+      ]);
+    } else if (sheetType === 'Evaluation' || fileName.includes('Training Evaluation')) {
+      summarySheet.getRange('A2:B9').setFormulas([
+        ['Total Evaluations Submitted', '=COUNTA(Data!A2:A)'],
+        ['Overall Average Score', '=IF(COUNTA(Data!O2:O)>0, AVERAGE(Data!O2:O), 0)'],
+        ['Q1 Objectives Avg Score', '=IF(COUNTA(Data!E2:E)>0, AVERAGE(Data!E2:E), 0)'],
+        ['Q2 Content Avg Score', '=IF(COUNTA(Data!F2:F)>0, AVERAGE(Data!F2:F), 0)'],
+        ['Q3 Materials Avg Score', '=IF(COUNTA(Data!G2:G)>0, AVERAGE(Data!G2:G), 0)'],
+        ['Q4 Trainer Avg Score', '=IF(COUNTA(Data!H2:H)>0, AVERAGE(Data!H2:H), 0)'],
+        ['Q5 Engagement Avg Score', '=IF(COUNTA(Data!I2:I)>0, AVERAGE(Data!I2:I), 0)'],
+        ['Q6 Duration Avg Score', '=IF(COUNTA(Data!J2:J)>0, AVERAGE(Data!J2:J), 0)']
+      ]);
+      summarySheet.getRange('B3:B9').setNumberFormat('0.00');
+    } else if (sheetType === 'PostEval' || fileName.includes('Post Evaluation')) {
+      summarySheet.getRange('A2:B6').setFormulas([
+        ['Total Post-Reviews Completed', '=COUNTA(Data!A2:A)'],
+        ['Avg Competency Level Before', '=IF(COUNTA(Data!F2:F)>0, AVERAGE(Data!F2:F), 0)'],
+        ['Avg Competency Level After', '=IF(COUNTA(Data!G2:G)>0, AVERAGE(Data!G2:G), 0)'],
+        ['Net Competency Gain', '=IF(AND(COUNTA(Data!F2:F)>0, COUNTA(Data!G2:G)>0), AVERAGE(Data!G2:G)-AVERAGE(Data!F2:F), 0)'],
+        ['Shown Improvement (Yes)', '=COUNTIF(Data!H2:H, "Yes")']
+      ]);
+      summarySheet.getRange('B3:B5').setNumberFormat('0.00');
+    } else if (sheetType === 'Participants' || fileName.includes('Participants')) {
+      summarySheet.getRange('A2:B2').setFormulas([
+        ['Total Enrolled Participants', '=COUNTA(Data!A2:A)']
+      ]);
+    }
+  } catch (e) {
+    Logger.log('Summary sheet formula setup error: ' + e.message);
+  }
+
+  SpreadsheetApp.flush();
+  return file;
 }
 
 /**
@@ -138,15 +302,20 @@ function createTrainingRequisitionForm(code, training, targetFolderId) {
 
     const startDate = formatDate(training.StartDate);
     const endDate = formatDate(training.EndDate);
-    const dateText = endDate && endDate !== startDate ? `${startDate} - ${endDate}` : startDate;
-    const duration = training.Duration || 1;
+    const duration = Number(training.Duration) || 1;
     const hours = training.TotalHours ? ` (${training.TotalHours} hours)` : '';
 
-    // These top-left cells are intentionally used because the supplied form uses merged ranges.
+    // Equip programme detail fields with Google Sheets formulas for date range & duration
     sheet.getRange('C5').setValue(training.Name || '');
     sheet.getRange('C6').setValue(training.CourseFee !== undefined ? training.CourseFee : '');
-    sheet.getRange('F6').setValue(dateText);
-    sheet.getRange('C7').setValue(`${duration} day${Number(duration) === 1 ? '' : 's'}${hours}`);
+
+    if (endDate && endDate !== startDate) {
+      sheet.getRange('F6').setFormula(`="${startDate}" & " - " & "${endDate}"`);
+    } else {
+      sheet.getRange('F6').setValue(startDate || '');
+    }
+
+    sheet.getRange('C7').setFormula(`="${duration} day" & IF(${duration}>1, "s", "") & "${hours}"`);
     sheet.getRange('F7').setValue(training.Venue || '');
     sheet.getRange('C8').setValue(training.Trainer || '');
     sheet.getRange('A11').setValue(training.Objectives || '');
@@ -325,4 +494,162 @@ function populateDocTemplate(templateFileId, targetFolder, newFileName, replacem
 
 function escapeRegex(string) {
   return string.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+}
+
+/**
+ * Appends a new attendance record row to the training's dedicated Drive Attendance Sheet.
+ */
+/**
+ * Appends a new attendance record row to the training's dedicated single Drive spreadsheet (Attendance tab).
+ */
+function syncAttendanceToTrainingDriveSheet(trainingId, recordRow) {
+  try {
+    const tSheet = getSheet(SHEET_NAMES.trainings);
+    const row = findRowById(tSheet, trainingId);
+    if (row === -1) return;
+
+    const tData = tSheet.getRange(row, 1, 1, 27).getValues()[0];
+    const folderId = tData[15]; // Column P = FolderID
+    const code     = tData[1] || trainingId;
+
+    if (!folderId) return;
+
+    const folder = DriveApp.getFolderById(folderId);
+    const file = getOrCreateSingleTrainingSheet(folder, code);
+
+    const ss = SpreadsheetApp.openById(file.getId());
+    let sheet = ss.getSheetByName('Attendance') || ss.getActiveSheet();
+    sheet.appendRow(recordRow);
+    SpreadsheetApp.flush();
+  } catch (e) {
+    Logger.log('syncAttendanceToTrainingDriveSheet error: ' + e.message);
+  }
+}
+
+/**
+ * Appends a new training evaluation record row to the training's dedicated single Drive spreadsheet (TrainingEval tab).
+ */
+function syncEvaluationToTrainingDriveSheet(trainingId, recordRow) {
+  try {
+    const tSheet = getSheet(SHEET_NAMES.trainings);
+    const row = findRowById(tSheet, trainingId);
+    if (row === -1) return;
+
+    const tData = tSheet.getRange(row, 1, 1, 27).getValues()[0];
+    const folderId = tData[15]; // Column P = FolderID
+    const code     = tData[1] || trainingId;
+
+    if (!folderId) return;
+
+    const folder = DriveApp.getFolderById(folderId);
+    const file = getOrCreateSingleTrainingSheet(folder, code);
+
+    const ss = SpreadsheetApp.openById(file.getId());
+    let sheet = ss.getSheetByName('TrainingEval') || ss.getActiveSheet();
+    sheet.appendRow(recordRow);
+    SpreadsheetApp.flush();
+  } catch (e) {
+    Logger.log('syncEvaluationToTrainingDriveSheet error: ' + e.message);
+  }
+}
+
+/**
+ * Appends a new 6-month post evaluation record row to the training's dedicated single Drive spreadsheet (PostEval tab).
+ */
+function syncPostEvalToTrainingDriveSheet(trainingId, recordRow) {
+  try {
+    const tSheet = getSheet(SHEET_NAMES.trainings);
+    const row = findRowById(tSheet, trainingId);
+    if (row === -1) return;
+
+    const tData = tSheet.getRange(row, 1, 1, 27).getValues()[0];
+    const folderId = tData[15]; // Column P = FolderID
+    const code     = tData[1] || trainingId;
+
+    if (!folderId) return;
+
+    const folder = DriveApp.getFolderById(folderId);
+    const file = getOrCreateSingleTrainingSheet(folder, code);
+
+    const ss = SpreadsheetApp.openById(file.getId());
+    let sheet = ss.getSheetByName('PostEval') || ss.getActiveSheet();
+    sheet.appendRow(recordRow);
+    SpreadsheetApp.flush();
+  } catch (e) {
+    Logger.log('syncPostEvalToTrainingDriveSheet error: ' + e.message);
+  }
+}
+
+/**
+ * Appends a new training session row to the training's dedicated single Drive spreadsheet (TrainingSessions tab).
+ */
+function syncSessionToTrainingDriveSheet(trainingId, recordRow) {
+  try {
+    const tSheet = getSheet(SHEET_NAMES.trainings);
+    const row = findRowById(tSheet, trainingId);
+    if (row === -1) return;
+
+    const tData = tSheet.getRange(row, 1, 1, 27).getValues()[0];
+    const folderId = tData[15]; // Column P = FolderID
+    const code     = tData[1] || trainingId;
+
+    if (!folderId) return;
+
+    const folder = DriveApp.getFolderById(folderId);
+    const file = getOrCreateSingleTrainingSheet(folder, code);
+
+    const ss = SpreadsheetApp.openById(file.getId());
+    let sheet = ss.getSheetByName('TrainingSessions') || ss.getActiveSheet();
+    sheet.appendRow(recordRow);
+    SpreadsheetApp.flush();
+  } catch (e) {
+    Logger.log('syncSessionToTrainingDriveSheet error: ' + e.message);
+  }
+}
+
+/**
+ * Syncs the full list of enrolled training participants to the training's dedicated single Drive spreadsheet (TrainingParticipants tab).
+ */
+function syncParticipantsToTrainingDriveSheet(trainingId) {
+  try {
+    const tSheet = getSheet(SHEET_NAMES.trainings);
+    const row = findRowById(tSheet, trainingId);
+    if (row === -1) return;
+
+    const tData = tSheet.getRange(row, 1, 1, 27).getValues()[0];
+    const folderId = tData[15]; // Column P = FolderID
+    const code     = tData[1] || trainingId;
+
+    if (!folderId) return;
+
+    const tpSheet = getSheet(SHEET_NAMES.trainingParticipants);
+    const tpRows = tpSheet ? sheetToJson(tpSheet).filter(r => String(r.TrainingID) === String(trainingId)) : [];
+
+    const folder = DriveApp.getFolderById(folderId);
+    const headers = ['ID', 'TrainingID', 'EmployeeID', 'EmployeeName', 'Department', 'Position', 'AddedAt'];
+    const file = getOrCreateSingleTrainingSheet(folder, code);
+
+    const ss = SpreadsheetApp.openById(file.getId());
+    let sheet = ss.getSheetByName('TrainingParticipants') || ss.getActiveSheet();
+
+    if (sheet.getLastRow() > 1) {
+      sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).clearContent();
+    }
+
+    if (tpRows.length > 0) {
+      const dataToAppend = tpRows.map(p => [
+        p.ID || generateId('TP'),
+        trainingId,
+        p.EmployeeID || '',
+        p.EmployeeName || p.Name || '',
+        p.Department || '',
+        p.Position || p.JobTitle || '',
+        p.AddedAt || now()
+      ]);
+      sheet.getRange(2, 1, dataToAppend.length, headers.length).setValues(dataToAppend);
+    }
+    SpreadsheetApp.flush();
+  } catch (e) {
+    Logger.log('syncParticipantsToTrainingDriveSheet error: ' + e.message);
+  }
 }

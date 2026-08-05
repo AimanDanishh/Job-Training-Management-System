@@ -228,9 +228,9 @@ function initSheetHeaders(sheet, name) {
     Trainings:        ['ID', 'Code', 'Name', 'Category', 'Trainer', 'Venue', 'StartDate',
                        'EndDate', 'Duration', 'TotalHours', 'Department', 'Objectives',
                        'Status', 'Stage', 'Participants',
-                       'FolderID', 'AttendanceFolderID', 'EvaluationFolderID', 'CertificateFolderID',
-                       'MaterialsFolderID', 'PhotosFolderID', 'ReportsFolderID', 'TrainerNotesFolderID',
-                       'CreatedDate', 'UpdatedDate', 'CourseFee', 'RequisitionFormFileID'],
+                       'FolderID', 'ParticipantsSheetID', 'SessionsSheetID', 'AttendanceSheetID',
+                       'EvaluationSheetID', 'PostSheetID', 'RequisitionFormFileID',
+                       'CreatedDate', 'UpdatedDate', 'CourseFee'],
     TrainingSessions: ['SessionID', 'TrainingID', 'SessionName', 'SessionDate', 'StartTime', 'EndTime', 'AttendanceURL', 'QRCodeURL', 'QRStatus', 'CreatedDate'],
     Attendance:       ['AttendanceID', 'SessionID', 'TrainingID', 'EmployeeNo', 'EmployeeName',
                        'Department', 'ScanTime', 'Status', 'TrainingCode', 'Day', 'Date', 'Hours',
@@ -319,7 +319,10 @@ function seedInitialSheetData(sheet, name) {
 
 /** Adds fields introduced after the original training sheet was deployed. */
 function ensureTrainingSheetColumns(sheet) {
-  const requiredHeaders = ['CourseFee', 'RequisitionFormFileID'];
+  const requiredHeaders = [
+    'FolderID', 'ParticipantsSheetID', 'SessionsSheetID', 'AttendanceSheetID',
+    'EvaluationSheetID', 'PostSheetID', 'RequisitionFormFileID', 'CourseFee'
+  ];
   const headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
   requiredHeaders.forEach(header => {
     if (headers.indexOf(header) === -1) {
@@ -448,9 +451,111 @@ function err(message) {
 
 // ─── Setup (run once) ───────────────────────────────────────────────────────────
 /**
- * Run setupSheets() once from the Apps Script editor to initialise all sheets.
+ * Run setupSheets() once from the Apps Script editor to initialise all sheets
+ * and auto-create single-sheet formula-equipped Drive workspaces for all training programmes.
  */
 function setupSheets() {
   Object.values(SHEET_NAMES).forEach(name => getSheet(name));
-  Logger.log('All sheets initialised successfully.');
+
+  // Ensure Master Database Spreadsheet (SPREADSHEET_ID) contains only the Trainings tab (and Employees tab if stored in master SS)
+  try {
+    const masterSS = getSpreadsheet();
+    if (masterSS) {
+      const allowedNames = [SHEET_NAMES.trainings, SHEET_NAMES.employees];
+      const sheets = masterSS.getSheets();
+      if (sheets.length > 1) {
+        sheets.forEach(s => {
+          const sName = s.getName();
+          if (!allowedNames.includes(sName) && !sName.toLowerCase().includes('training') && !sName.toLowerCase().includes('emp')) {
+            try { masterSS.deleteSheet(s); } catch(e) {}
+          }
+        });
+      }
+    }
+  } catch(e) {}
+
+  // Sync per-training Google Drive workspaces and single sheet tabs
+  try {
+    const tSheet = getSheet(SHEET_NAMES.trainings);
+    if (tSheet && tSheet.getLastRow() > 1) {
+      ensureTrainingSheetColumns(tSheet);
+      const rows = sheetToJson(tSheet);
+      rows.forEach(t => {
+        if (t.ID && t.Code && t.Name) {
+          const workspace = createTrainingWorkspace(t.Code, t.Name);
+          const reqForm = createTrainingRequisitionForm(t.Code, t, workspace.folderId);
+
+          if (t._row) {
+            const h = ensureTrainingSheetColumns(tSheet);
+            const setColVal = (colName, val) => {
+              const idx = h.indexOf(colName) + 1;
+              if (idx > 0 && val) tSheet.getRange(t._row, idx).setValue(val);
+            };
+            setColVal('FolderID', workspace.folderId);
+            setColVal('ParticipantsSheetID', workspace.partSheetId);
+            setColVal('SessionsSheetID', workspace.sessionSheetId);
+            setColVal('AttendanceSheetID', workspace.attendanceSheetId);
+            setColVal('EvaluationSheetID', workspace.evaluationSheetId);
+            setColVal('PostSheetID', workspace.postSheetId);
+            if (reqForm.fileId) setColVal('RequisitionFormFileID', reqForm.fileId);
+          }
+
+          try { syncParticipantsToTrainingDriveSheet(t.ID); } catch(e) {}
+          try { syncTrainingRequisitionParticipants(t.ID); } catch(e) {}
+
+          // Sync sessions to single sheet
+          try {
+            const sessSheet = getSheet(SHEET_NAMES.trainingSessions);
+            if (sessSheet) {
+              const sessions = sheetToJson(sessSheet).filter(s => String(s.TrainingID) === String(t.ID));
+              sessions.forEach(s => {
+                const sRow = [s.SessionID, s.TrainingID, s.SessionName, s.SessionDate, s.StartTime, s.EndTime, s.AttendanceURL, s.QRCodeURL, s.QRStatus, s.CreatedDate];
+                syncSessionToTrainingDriveSheet(t.ID, sRow);
+              });
+            }
+          } catch(e) {}
+
+          // Sync attendance to single sheet
+          try {
+            const attSheet = getSheet(SHEET_NAMES.attendance);
+            if (attSheet) {
+              const atts = sheetToJson(attSheet).filter(a => String(a.TrainingID) === String(t.ID));
+              atts.forEach(a => {
+                const aRow = [a.AttendanceID, a.SessionID, a.TrainingID, a.EmployeeNo, a.EmployeeName, a.Department, a.ScanTime, a.Status, a.TrainingCode, a.Day, a.Date, a.Hours, a.Remarks, a.EditedBy, a.EditedAt];
+                syncAttendanceToTrainingDriveSheet(t.ID, aRow);
+              });
+            }
+          } catch(e) {}
+
+          // Sync evaluations to single sheet
+          try {
+            const evalSheet = getSheet(SHEET_NAMES.trainingEval);
+            if (evalSheet) {
+              const evals = sheetToJson(evalSheet).filter(ev => String(ev.TrainingID) === String(t.ID));
+              evals.forEach(ev => {
+                const evRow = [ev.ID, ev.TrainingID, ev.EmployeeID, ev.EmployeeName, ev.Q1, ev.Q2, ev.Q3, ev.Q4, ev.Q5, ev.Q6, ev.Q7, ev.SectionB1, ev.SectionB2, ev.SectionB3, ev.AvgScore, ev.SubmittedAt];
+                syncEvaluationToTrainingDriveSheet(t.ID, evRow);
+              });
+            }
+          } catch(e) {}
+
+          // Sync post evaluations to single sheet
+          try {
+            const postSheet = getSheet(SHEET_NAMES.postEval);
+            if (postSheet) {
+              const posts = sheetToJson(postSheet).filter(p => String(p.TrainingID) === String(t.ID));
+              posts.forEach(p => {
+                const pRow = [p.ID, p.TrainingID, p.EmployeeID, p.EvaluatorName, p.EvaluatorID, p.CompetencyBefore, p.CompetencyAfter, p.Improvement, p.CanApply, p.FurtherTraining, p.Comments, p.SubmittedAt];
+                syncPostEvalToTrainingDriveSheet(t.ID, pRow);
+              });
+            }
+          } catch(e) {}
+        }
+      });
+    }
+  } catch (e) {
+    Logger.log('setupSheets workspace sync error: ' + e.message);
+  }
+
+  Logger.log('All database sheets and per-training single-sheet Drive workspaces initialised successfully.');
 }

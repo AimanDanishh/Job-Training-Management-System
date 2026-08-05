@@ -58,7 +58,7 @@ function createSession(data) {
       CreatedDate:   timeNow
     };
 
-    sheet.appendRow([
+    const sessionRow = [
       newSession.SessionID,
       newSession.TrainingID,
       newSession.SessionName,
@@ -69,7 +69,23 @@ function createSession(data) {
       newSession.QRCodeURL,
       newSession.QRStatus,
       newSession.CreatedDate
-    ]);
+    ];
+
+    sheet.appendRow(sessionRow);
+
+    // Sync session record to the training's dedicated Drive Training Sessions Sheet
+    try {
+      syncSessionToTrainingDriveSheet(data.TrainingID, sessionRow);
+    } catch (e) {
+      Logger.log('syncSessionToTrainingDriveSheet error: ' + e.message);
+    }
+
+    // Automatically update lifecycle stage to 'Attendance In Progress' when session attendance is created
+    try {
+      updateTrainingStage(data.TrainingID, 'Attendance In Progress');
+    } catch (e) {
+      Logger.log('Auto update stage error: ' + e.message);
+    }
 
     return ok(newSession);
   } catch (e) {

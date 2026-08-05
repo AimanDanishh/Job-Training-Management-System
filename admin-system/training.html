@@ -1007,6 +1007,12 @@
     const raw = document.getElementById('pm-bulk-input').value.trim();
     if (!raw) { showToast('Please paste Employee IDs or text.', 'info'); return; }
 
+    if (!allMasterEmployees.length) {
+      try {
+        allMasterEmployees = await callServer('getEmployees');
+      } catch(e) {}
+    }
+
     const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
     const parsedEntries = [];
 
@@ -1014,9 +1020,14 @@
       const parts = line.split(/[\t,]/).map(p => p.trim()).filter(Boolean);
       if (parts.length > 0) {
         const empId = parts[0];
-        const name = parts[1] || empId;
-        const dept = parts[2] || 'General';
-        parsedEntries.push({ ID: empId, EmployeeID: empId, Name: name, EmployeeName: name, Department: dept });
+        const dbEmp = allMasterEmployees.find(e => String(e.ID || e.EmployeeID || '').trim().toLowerCase() === String(empId).trim().toLowerCase());
+        if (dbEmp) {
+          parsedEntries.push(dbEmp);
+        } else {
+          const name = parts[1] || empId;
+          const dept = parts[2] || 'General';
+          parsedEntries.push({ ID: empId, EmployeeID: empId, Name: name, EmployeeName: name, Department: dept });
+        }
       }
     });
 
@@ -1031,7 +1042,11 @@
       document.getElementById('pm-bulk-input').value = '';
       switchPmTab('enrolled');
       await loadEnrolledParticipants(currentPmTrainingId);
-      loadTrainings();
+      await loadTrainings();
+      const detailSection = document.getElementById('training-detail-section');
+      if (detailSection && detailSection.style.display !== 'none') {
+        openDetail(currentPmTrainingId);
+      }
     } catch(e) {
       showToast(e.message, 'error');
     } finally {
@@ -1167,9 +1182,13 @@
     try {
       const res = await callServer('addTrainingParticipants', currentPmTrainingId, selected);
       showToast(res.message || 'Participants added successfully.', 'success');
-      document.getElementById('pm-picker-section').style.display = 'none';
+      switchPmTab('enrolled');
       await loadEnrolledParticipants(currentPmTrainingId);
-      loadTrainings();
+      await loadTrainings();
+      const detailSection = document.getElementById('training-detail-section');
+      if (detailSection && detailSection.style.display !== 'none') {
+        openDetail(currentPmTrainingId);
+      }
     } catch(e) {
       showToast(e.message, 'error');
     }
@@ -1181,7 +1200,11 @@
       await callServer('removeTrainingParticipant', currentPmTrainingId, empId);
       showToast('Participant removed.', 'success');
       await loadEnrolledParticipants(currentPmTrainingId);
-      loadTrainings();
+      await loadTrainings();
+      const detailSection = document.getElementById('training-detail-section');
+      if (detailSection && detailSection.style.display !== 'none') {
+        openDetail(currentPmTrainingId);
+      }
     } catch(e) { showToast(e.message, 'error'); }
   }
 

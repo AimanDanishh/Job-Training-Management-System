@@ -15,9 +15,8 @@ const LIFECYCLE_STAGES = [
 // ─── Read ───────────────────────────────────────────────────────────────────────
 function getTrainings() {
   try {
-    const sheet = getSheet(SHEET_NAMES.trainings);
-    ensureTrainingSheetColumns(sheet);
-    return ok(sheetToJson(sheet));
+    const rows = autoUpdateTrainingLifecycleStages();
+    return ok(rows);
   } catch (e) {
     return err('Failed to load trainings: ' + e.message);
   }
@@ -25,14 +24,96 @@ function getTrainings() {
 
 function getTrainingById(id) {
   try {
-    const sheet = getSheet(SHEET_NAMES.trainings);
-    ensureTrainingSheetColumns(sheet);
-    const rows = sheetToJson(sheet);
+    const rows = autoUpdateTrainingLifecycleStages();
     const t = rows.find(r => r.ID === id);
     if (!t) return err('Training not found.');
     return ok(t);
   } catch (e) {
     return err(e.message);
+  }
+}
+
+/**
+ * Automatically checks and updates lifecycle stages & status for trainings based on training start and end dates.
+ */
+function autoUpdateTrainingLifecycleStages() {
+  try {
+    const sheet = getSheet(SHEET_NAMES.trainings);
+    if (!sheet) return [];
+    ensureTrainingSheetColumns(sheet);
+    const rows = sheetToJson(sheet);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let sheetModified = false;
+
+    rows.forEach(t => {
+      let isUpdated = false;
+      const startDateStr = t.StartDate;
+      const endDateStr   = t.EndDate || t.StartDate;
+
+      if (startDateStr) {
+        const startDate = new Date(startDateStr);
+        const endDate   = new Date(endDateStr);
+
+        if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+          startDate.setHours(0, 0, 0, 0);
+          endDate.setHours(23, 59, 59, 999);
+
+          // 1. If today has reached or is within training date range (StartDate <= today <= EndDate)
+          if (today >= startDate && today <= endDate) {
+            if (['Upcoming', 'Draft'].includes(t.Status)) {
+              t.Status = 'In Progress';
+              isUpdated = true;
+            }
+            if (['Created', 'Participants Imported'].includes(t.Stage)) {
+              t.Stage = 'Attendance In Progress';
+              isUpdated = true;
+            }
+          }
+          // 2. If training end date has passed (today > EndDate)
+          else if (today > endDate) {
+            if (['Created', 'Participants Imported', 'Attendance In Progress'].includes(t.Stage)) {
+              t.Stage = 'Training Completed';
+              isUpdated = true;
+            }
+            if (['Upcoming', 'In Progress', 'Draft'].includes(t.Status)) {
+              t.Status = 'Completed';
+              isUpdated = true;
+            }
+          }
+
+          // 3. Check 6-month milestone (approx 180 days after endDate)
+          const diffMs = today.getTime() - endDate.getTime();
+          const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+          t.daysSinceEnd = diffDays;
+          t.isSixMonthsReached = diffDays >= 180;
+
+          if (t.isSixMonthsReached) {
+            if (['Training Completed', 'Evaluation Completed'].includes(t.Stage)) {
+              t.Stage = 'Waiting for 6-Month Review';
+              isUpdated = true;
+            }
+          }
+
+          if (isUpdated && t._row) {
+            sheet.getRange(t._row, 13).setValue(t.Status); // Col M = Status
+            sheet.getRange(t._row, 14).setValue(t.Stage);  // Col N = Stage
+            sheet.getRange(t._row, 25).setValue(now());    // Col Y = UpdatedDate
+            sheetModified = true;
+          }
+        }
+      } else {
+        t.isSixMonthsReached = false;
+      }
+    });
+
+    if (sheetModified) SpreadsheetApp.flush();
+    return rows;
+  } catch (e) {
+    Logger.log('autoUpdateTrainingLifecycleStages error: ' + e.message);
+    const sheet = getSheet(SHEET_NAMES.trainings);
+    return sheet ? sheetToJson(sheet) : [];
   }
 }
 
@@ -69,18 +150,16 @@ function addTraining(data) {
       data.Status      || 'Draft',
       data.Stage       || 'Created',
       data.Participants|| 0,
-      workspace.folderId            || '',
-      workspace.attendanceFolderId  || '',
-      workspace.evaluationFolderId  || '',
-      workspace.certificateFolderId || '',
-      workspace.materialsFolderId   || '',
-      workspace.photosFolderId      || '',
-      workspace.reportsFolderId     || '',
-      workspace.trainerNotesFolderId|| '',
+      workspace.folderId          || '',
+      workspace.partSheetId       || '',
+      workspace.sessionSheetId    || '',
+      workspace.attendanceSheetId || '',
+      workspace.evaluationSheetId || '',
+      workspace.postSheetId       || '',
+      requisitionForm.fileId      || '',
       timeNow,
       timeNow,
-      data.CourseFee !== undefined ? data.CourseFee : '',
-      requisitionForm.fileId || ''
+      data.CourseFee !== undefined ? data.CourseFee : ''
     ]);
 
     return ok({
@@ -128,15 +207,15 @@ function updateTraining(data) {
       data.Stage       || dataRange[13] || 'Created',
       data.Participants|| dataRange[14] || 0,
       dataRange[15]    || '', // Preserve FolderID
-      dataRange[16]    || '', // Preserve AttendanceFolderID
-      dataRange[17]    || '', // Preserve EvaluationFolderID
-      dataRange[18]    || '', // Preserve CertificateFolderID
-      dataRange[19]    || '', // Preserve MaterialsFolderID
-      dataRange[20]    || '', // Preserve PhotosFolderID
-      dataRange[21]    || '', // Preserve ReportsFolderID
-      dataRange[22]    || '', // Preserve TrainerNotesFolderID
-      dataRange[23]    || now(), // CreatedDate
-      now()                    // UpdatedDate
+      dataRange[16]    || '', // Preserve ParticipantsSheetID
+      dataRange[17]    || '', // Preserve SessionsSheetID
+      dataRange[18]    || '', // Preserve AttendanceSheetID
+      dataRange[19]    || '', // Preserve EvaluationSheetID
+      dataRange[20]    || '', // Preserve PostSheetID
+      dataRange[21]    || '', // Preserve RequisitionFormFileID
+      dataRange[22]    || now(), // CreatedDate
+      now(),                   // UpdatedDate
+      data.CourseFee !== undefined ? data.CourseFee : (dataRange[24] || '')
     ]]);
     const feeColumn = headers.indexOf('CourseFee') + 1;
     if (feeColumn) {
@@ -233,6 +312,16 @@ function addTrainingParticipants(trainingId, participants) {
       return err('No participants provided.');
     }
 
+    const empSheet = getSheet(SHEET_NAMES.employees);
+    const empMap = {};
+    if (empSheet) {
+      const empRows = sheetToJson(empSheet);
+      empRows.forEach(e => {
+        const idKey = String(e.ID || e.EmployeeID || '').trim();
+        if (idKey) empMap[idKey] = e;
+      });
+    }
+
     const sheet = getSheet(SHEET_NAMES.trainingParticipants);
     const existingRows = sheetToJson(sheet).filter(r => String(r.TrainingID) === String(trainingId));
     const existingEmpIds = new Set(existingRows.map(r => r.EmployeeID));
@@ -241,15 +330,20 @@ function addTrainingParticipants(trainingId, participants) {
     const addedAt = now();
 
     participants.forEach(p => {
-      const empId = p.ID || p.EmployeeID;
+      const empId = String(p.ID || p.EmployeeID || p.EmployeeNo || '').trim();
       if (empId && !existingEmpIds.has(empId)) {
+        const dbEmp = empMap[empId] || {};
+        const empName = dbEmp.Name || dbEmp.EmployeeName || p.Name || p.EmployeeName || empId;
+        const empDept = dbEmp.Department || p.Department || '';
+        const empPos  = dbEmp.Position || dbEmp.JobTitle || p.Position || '';
+
         sheet.appendRow([
           generateId('TP'),
           trainingId,
           empId,
-          p.Name || p.EmployeeName || '',
-          p.Department || '',
-          p.Position || '',
+          empName,
+          empDept,
+          empPos,
           addedAt
         ]);
         existingEmpIds.add(empId);
@@ -261,6 +355,7 @@ function addTrainingParticipants(trainingId, participants) {
     updateTrainingParticipantCount(trainingId, totalCount);
 
     try { syncTrainingRequisitionParticipants(trainingId); } catch(e) {}
+    try { syncParticipantsToTrainingDriveSheet(trainingId); } catch(e) {}
 
     return ok({ message: `Added ${addedCount} participants successfully.`, count: totalCount });
   } catch (e) {
@@ -289,6 +384,7 @@ function removeTrainingParticipant(trainingId, employeeId) {
     updateTrainingParticipantCount(trainingId, totalCount);
 
     try { syncTrainingRequisitionParticipants(trainingId); } catch(e) {}
+    try { syncParticipantsToTrainingDriveSheet(trainingId); } catch(e) {}
 
     return ok({ message: 'Participant removed successfully.', count: totalCount });
   } catch (e) {

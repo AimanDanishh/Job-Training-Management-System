@@ -80,9 +80,14 @@ function submitAttendance(arg1, arg2, arg3, arg4) {
 
     attSheet.appendRow(newRecord);
 
-    // Automatically update training stage to 'Attendance In Progress' if still 'Created' or 'Participants Imported'
+    // Automatically update training stage to 'Attendance In Progress'
     try {
       updateTrainingStage(session.TrainingID, 'Attendance In Progress');
+    } catch (e) {}
+
+    // Sync attendance record to the training's dedicated Drive Attendance Sheet
+    try {
+      syncAttendanceToTrainingDriveSheet(session.TrainingID, newRecord);
     } catch (e) {}
 
     return ok({
