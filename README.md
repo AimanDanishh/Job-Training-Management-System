@@ -2,9 +2,11 @@
 
 Welcome to the **Job Training Management System (TrainHub)**, an enterprise-grade Google Workspace application built with Google Apps Script, Google Sheets, Google Drive, and HTML5 Web Components.
 
-This repository comprises two decoupled Apps Script projects:
+This repository comprises four decoupled Apps Script projects:
 1. **`admin-system`**: Admin Web Application for managing training programmes, participants, QR code generation, session scheduling, evaluation summaries, requisition forms, and automated Google Drive folder workspaces.
-2. **`participant-portal`**: Lightweight, public-facing Web Application for QR code attendance check-in, Level 1 participant training evaluations, and Level 3 supervisor 6-month post-training evaluations.
+2. **`participant-portal`**: Lightweight, public-facing Web Application for QR code attendance check-in and Level 1 participant training evaluations.
+3. **`hod-portal`**: Dedicated HOD & Managerial Portal for reviewing employee training requisition forms, digitally stamping approvals/rejections/postponements/reschedules, and conducting 3-month post-training evaluations for participants under their Cost Centre.
+4. **`employee-requisition`**: Dedicated Employee Web Application for filling out and submitting Training Requisition Forms (`AP-HRD-F01-00`) with custom deployment access permissions.
 
 ---
 
@@ -15,26 +17,31 @@ Job Training Management System
 ├── Admin System (admin-system)
 │   ├── Interactive Admin Web Dashboard
 │   ├── Training Programme & Session Creator
-│   ├── Automated Lifecycle Stage Transitions
-│   ├── 6-Month Post-Training Notification Engine
-│   ├── Training Requisition Form (AP-HRD-F01-00) Auto-Fill
-│   └── Automated Google Drive Workspace Generator
+│   ├── Requisition Approval Status Tracking & History
+│   ├── QR Attendance Restriction (Approved Trainings Only)
+│   └── 3-Month Post-Training Notification Engine
 │
 ├── Public Participant Portal (participant-portal)
 │   ├── Session Attendance QR Check-In
-│   ├── Level 1 Participant Training Evaluation (Required 1–5 Scale)
-│   ├── Level 3 Supervisor 6-Month Review (Required 1–5 Scale)
-│   └── Server-Side Validation & Single-Submission Protection
+│   ├── Level 1 Participant Training Evaluation (2-Week Post-Completion Limit)
+│   └── Attendance Prerequisite Verification (Disallows Absent Participants)
+│
+├── Employee Requisition System (employee-requisition) [NEW]
+│   ├── Decoupled Deployment Access & Execution Permissions
+│   ├── Company Email Account Authentication
+│   ├── Employee ID Lookup & Autofill (Name, Cost Centre, Position, Date)
+│   └── Automated HOD Review Email Triggering
+│
+├── HOD System (hod-portal)
+│   ├── Company Account Authentication & Access Restriction
+│   ├── Requisition Form Review & Scroll-Down Approval Section
+│   ├── HOD Profile Stamp (Employee ID, Name, Cost Centre, Timestamp)
+│   ├── Actions: Approve / Reject / Postpone / Reschedule + Requester Status Email
+│   └── 3-Month Post Evaluation (Lists pending participants under HOD Cost Centre only)
 │
 └── Shared Database & Drive Hierarchy
-    ├── Master Google Spreadsheet (7 Database Sheets)
+    ├── Master Google Spreadsheet
     └── Google Drive Training Workspace Folders
-        ├── TR-2026-0001 Training Participants Sheet (Summary Formulas)
-        ├── TR-2026-0001 Training Sessions Sheet (Summary Formulas)
-        ├── TR-2026-0001 Attendance Sheet (Summary Formulas)
-        ├── TR-2026-0001 Training Evaluation Sheet (Summary Formulas)
-        ├── TR-2026-0001 Post Evaluation Sheet (Summary Formulas)
-        └── TR-2026-0001 Training Requisition Form (Formula-Equipped)
 ```
 
 ### Key Automated Capabilities:

@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <title>Error — TrainHub Requisition</title>
+  <?!= include('style'); ?>
+</head>
+<body>
+  <div class="container" style="max-width:500px;margin-top:60px;text-align:center;">
+    <div class="card" style="border-top:4px solid var(--danger);">
+      <div style="font-size:56px;margin-bottom:16px;">⚠️</div>
+      <h2 style="color:var(--danger);margin-bottom:12px;">Submission Error</h2>
+      <p style="color:var(--text-secondary);margin-bottom:24px;"><?= params.message || 'An error occurred during submission.' ?></p>
+      <a href="<?= getAppUrl() ?>" style="display:inline-block;padding:10px 20px;background:var(--primary);color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">Return to Requisition Form</a>
+    </div>
+  </div>
+</body>
+</html>

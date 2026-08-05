@@ -54,31 +54,20 @@ function initDefaultScriptProperties() {
     // Company logo Drive link or public image URL to embed in center of session QR codes
     'COMPANY_LOGO_URL':        '',
     // Public Participant Portal Apps Script Web App Deployment URL
-    'PUBLIC_PORTAL_URL':       ''
+    'PUBLIC_PORTAL_URL':       '',
+    // Separate HOD Portal Web App Deployment URL
+    'HOD_PORTAL_URL':          ''
   };
   PropertiesService.getScriptProperties().setProperties(defaults, false);
   Logger.log('Default Script Properties successfully initialized in Project Settings.');
 }
 
-// ─── Dynamic Sheet Names & Spreadsheet ID ─────────────────────────────────────
 function getSpreadsheetId() {
   return getConfigProperty('SPREADSHEET_ID', '');
 }
 
-function setSpreadsheetId(id) {
-  setConfigProperty('SPREADSHEET_ID', id);
-  Logger.log('SPREADSHEET_ID updated in Project Settings: ' + id);
-  return 'SPREADSHEET_ID set to: ' + id;
-}
-
 function getEmployeeSpreadsheetId() {
   return getConfigProperty('EMPLOYEE_SPREADSHEET_ID', getSpreadsheetId());
-}
-
-function setEmployeeSpreadsheetId(id) {
-  setConfigProperty('EMPLOYEE_SPREADSHEET_ID', id);
-  Logger.log('EMPLOYEE_SPREADSHEET_ID updated in Project Settings: ' + id);
-  return 'EMPLOYEE_SPREADSHEET_ID set to: ' + id;
 }
 
 function getCompanyLogoUrl() {
@@ -97,10 +86,8 @@ function getPublicPortalUrl() {
   return getAppUrl();
 }
 
-function setPublicPortalUrl(url) {
-  setConfigProperty('PUBLIC_PORTAL_URL', url || '');
-  Logger.log('PUBLIC_PORTAL_URL updated in Project Settings: ' + url);
-  return 'PUBLIC_PORTAL_URL set to: ' + url;
+function getHodPortalUrl() {
+  return getConfigProperty('HOD_PORTAL_URL', '');
 }
 
 /**
@@ -230,7 +217,8 @@ function initSheetHeaders(sheet, name) {
                        'Status', 'Stage', 'Participants',
                        'FolderID', 'ParticipantsSheetID', 'SessionsSheetID', 'AttendanceSheetID',
                        'EvaluationSheetID', 'PostSheetID', 'RequisitionFormFileID',
-                       'CreatedDate', 'UpdatedDate', 'CourseFee'],
+                       'CreatedDate', 'UpdatedDate', 'CourseFee',
+                       'ApprovalStatus', 'RequestedBy', 'RequestedDate', 'ApprovedBy', 'ApprovedCostCentre', 'ApprovedAt', 'ApprovalRemarks', 'RescheduledDate'],
     TrainingSessions: ['SessionID', 'TrainingID', 'SessionName', 'SessionDate', 'StartTime', 'EndTime', 'AttendanceURL', 'QRCodeURL', 'QRStatus', 'CreatedDate'],
     Attendance:       ['AttendanceID', 'SessionID', 'TrainingID', 'EmployeeNo', 'EmployeeName',
                        'Department', 'ScanTime', 'Status', 'TrainingCode', 'Day', 'Date', 'Hours',

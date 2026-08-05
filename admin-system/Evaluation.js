@@ -153,26 +153,4 @@ function tryAdvanceToEvaluationCompleted(trainingId) {
   }
 }
 
-/**
- * Bulk email 6-month post-training evaluation form link to supervisor
- */
-function sendSupervisorPostEvalEmails(trainingId, supervisorEmail, selectedEmpIds) {
-  try {
-    if (!trainingId || !supervisorEmail) {
-      return err('Training ID and Supervisor Email are required.');
-    }
-    const cleanEmail = String(supervisorEmail).trim();
-    const cleanBase = getPublicPortalUrl().split('?')[0];
-    const postUrl = `${cleanBase}?page=post&id=${encodeURIComponent(trainingId)}`;
-
-    const count = (Array.isArray(selectedEmpIds) && selectedEmpIds.length > 0) ? selectedEmpIds.length : 1;
-
-    const subject = `[Action Required] 6-Month Post-Training Evaluation — TrainHub`;
-    const body = `Dear Supervisor,\n\nYou have been requested to complete the 6-Month Post-Training Evaluation for your team member(s).\n\nPlease click the link below to open the evaluation form on the TrainHub Participant Portal:\n${postUrl}\n\nThank you,\nTrainHub Management System`;
-
-    MailApp.sendEmail(cleanEmail, subject, body);
-    return ok({ message: `Sent 6-month evaluation link to ${cleanEmail} for ${count} participant(s).` });
-  } catch (e) {
-    return err('Failed to send supervisor email: ' + e.message);
-  }
-}
+

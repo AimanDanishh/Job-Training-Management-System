@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <title>TrainHub — Training Requisition Form (AP-HRD-F01-00)</title>
+  <?!= include('style'); ?>
+</head>
+<body>
+  <div class="container">
+    <header class="portal-header">
+      <div class="brand-title">Training Requisition Form (AP-HRD-F01-00)</div>
+      <div class="brand-subtitle">Fill and submit your training request for managerial & HOD approval</div>
+    </header>
+
+    <div class="card">
+      <!-- Step 1: Requester Identification -->
+      <div class="section-box">
+        <div class="section-title">👤 Step 1: Requester Identification (Company Email Accounts)</div>
+        <div style="display:flex;gap:12px;">
+          <input type="text" id="employeeIdInput" class="form-control" placeholder="Enter Your Employee ID (e.g. EMP-1001)" style="flex:1;">
+          <button type="button" class="btn btn-primary" onclick="lookupEmployee()">Lookup Employee</button>
+        </div>
+
+        <div id="autofillBox" style="display:none;margin-top:16px;padding-top:14px;border-top:1px dashed var(--border-color);">
+          <div class="grid-2" style="margin-bottom:12px;">
+            <div>
+              <div class="label-sm">EMPLOYEE NAME</div>
+              <div class="val-lg" id="autoName">--</div>
+            </div>
+            <div>
+              <div class="label-sm">COST CENTRE / DEPARTMENT</div>
+              <div class="val-lg" id="autoDept">--</div>
+            </div>
+          </div>
+          <div class="grid-2">
+            <div>
+              <div class="label-sm">POSITION</div>
+              <div class="val-lg" id="autoPos">--</div>
+            </div>
+            <div>
+              <div class="label-sm">REQUEST DATE</div>
+              <div class="val-lg" id="autoDate">--</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2: Training Specifications -->
+      <div id="requisitionFormBody" style="display:none;">
+        <div class="section-title">🎓 Step 2: Training Programme Specifications</div>
+
+        <div style="margin-bottom:16px;">
+          <label class="label-sm">Training Programme Name *</label>
+          <input type="text" id="reqTrainingName" class="form-control" placeholder="e.g. Leadership Excellence & Strategic Management">
+        </div>
+
+        <div class="grid-2" style="margin-bottom:16px;">
+          <div>
+            <label class="label-sm">Course Category *</label>
+            <select id="reqCategory" class="form-control">
+              <option value="Leadership & Management">Leadership & Management</option>
+              <option value="Compliance & Regulatory">Compliance & Regulatory</option>
+              <option value="Technical Skills">Technical Skills</option>
+              <option value="Safety & Quality">Safety & Quality</option>
+              <option value="Soft Skills">Soft Skills</option>
+            </select>
+          </div>
+          <div>
+            <label class="label-sm">Trainer / Training Provider *</label>
+            <input type="text" id="reqTrainer" class="form-control" placeholder="Trainer or Company Provider Name">
+          </div>
+        </div>
+
+        <div class="grid-3" style="margin-bottom:16px;">
+          <div>
+            <label class="label-sm">Proposed Start Date *</label>
+            <input type="date" id="reqStartDate" class="form-control">
+          </div>
+          <div>
+            <label class="label-sm">Proposed End Date</label>
+            <input type="date" id="reqEndDate" class="form-control">
+          </div>
+          <div>
+            <label class="label-sm">Total Hours</label>
+            <input type="number" id="reqHours" class="form-control" value="8" min="1">
+          </div>
+        </div>
+
+        <div class="grid-2" style="margin-bottom:16px;">
+          <div>
+            <label class="label-sm">Proposed Venue</label>
+            <input type="text" id="reqVenue" class="form-control" placeholder="Ballroom A / Online / Training Center">
+          </div>
+          <div>
+            <label class="label-sm">Estimated Course Fee (RM)</label>
+            <input type="number" id="reqFee" class="form-control" placeholder="1500.00" step="0.01">
+          </div>
+        </div>
+
+        <div style="margin-bottom:16px;">
+          <label class="label-sm">Programme Objectives & Justification</label>
+          <textarea id="reqObjectives" class="form-control" rows="3" placeholder="Describe the key learning outcomes and business benefits..."></textarea>
+        </div>
+
+        <div style="margin-bottom:24px;">
+          <label class="label-sm">HOD / Manager Email for Approval Notification *</label>
+          <input type="email" id="reqHodEmail" class="form-control" placeholder="manager@company.com">
+        </div>
+
+        <button type="button" class="btn btn-success" style="width:100%;padding:14px;font-size:16px;" onclick="submitRequisition()">
+          <span>📤</span> Submit Training Requisition for HOD Approval
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <?!= include('script'); ?>
+
+  <script>
+    let activeEmployee = null;
+
+    function lookupEmployee() {
+      const empId = document.getElementById('employeeIdInput').value.trim();
+      if (!empId) {
+        alert('Please enter your Employee ID.');
+        return;
+      }
+
+      showLoading('Verifying Employee ID...');
+      google.script.run
+        .withSuccessHandler(resStr => {
+          hideLoading();
+          const res = JSON.parse(resStr);
+          if (!res.success) {
+            showAlert(res.message, true);
+            return;
+          }
+          activeEmployee = res.data;
+          displayAutofill(activeEmployee);
+        })
+        .withFailureHandler(err => {
+          hideLoading();
+          showAlert('Lookup failed: ' + err.message, true);
+        })
+        .getEmployeeDetails(empId);
+    }
+
+    function displayAutofill(emp) {
+      document.getElementById('autoName').innerText = emp.Name || emp.ID;
+      document.getElementById('autoDept').innerText = emp.Department || 'N/A';
+      document.getElementById('autoPos').innerText = emp.Position || 'Staff';
+      document.getElementById('autoDate').innerText = emp.RequestDate || new Date().toLocaleDateString();
+
+      document.getElementById('autofillBox').style.display = 'block';
+      document.getElementById('requisitionFormBody').style.display = 'block';
+    }
+
+    function submitRequisition() {
+      if (!activeEmployee) {
+        alert('Please lookup your Employee ID first.');
+        return;
+      }
+
+      const name = document.getElementById('reqTrainingName').value.trim();
+      const startDate = document.getElementById('reqStartDate').value;
+      const hodEmail = document.getElementById('reqHodEmail').value.trim();
+
+      if (!name || !startDate || !hodEmail) {
+        alert('Training Name, Start Date, and HOD Email are required.');
+        return;
+      }
+
+      showLoading('Submitting Requisition Request...');
+
+      const payload = {
+        EmployeeID: activeEmployee.ID,
+        Email: activeEmployee.Email || '',
+        Department: activeEmployee.Department || '',
+        TrainingName: name,
+        Category: document.getElementById('reqCategory').value,
+        Trainer: document.getElementById('reqTrainer').value,
+        StartDate: startDate,
+        EndDate: document.getElementById('reqEndDate').value || startDate,
+        TotalHours: document.getElementById('reqHours').value || 8,
+        Venue: document.getElementById('reqVenue').value,
+        CourseFee: document.getElementById('reqFee').value || '0.00',
+        Objectives: document.getElementById('reqObjectives').value,
+        HodEmail: hodEmail
+      };
+
+      google.script.run
+        .withSuccessHandler(resStr => {
+          hideLoading();
+          const res = JSON.parse(resStr);
+          if (!res.success) {
+            showAlert(res.message, true);
+            return;
+          }
+          showAlert(res.data.message, false);
+          window.location.reload();
+        })
+        .withFailureHandler(err => {
+          hideLoading();
+          showAlert('Submission failed: ' + err.message, true);
+        })
+        .submitEmployeeRequisition(payload);
+    }
+  </script>
+</body>
+</html>

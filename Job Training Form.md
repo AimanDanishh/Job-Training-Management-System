@@ -119,7 +119,7 @@ Overall UI
 5. Make the evaluation form required for the question that have scale 1 until 5
 6. Remove submit evaluation button on the admin system
 7. Remove unnecessary folder from the drive, certificates, evaluation, materials, photos, reports, trainer notes
-8. Add attendance sheet to each folder training, 1 attendance sheet per training, not dump everything in the database including the training evaluation and post evaluation 
+8. Add attendance sheet to each folder training, 1 attendance sheet per training, not dump everything in the database including the training evaluation and post evaluation
 
 
 
@@ -129,4 +129,35 @@ Overall UI
 4. Use single sheets for attendance, post evaluation, training evaluation, participant, training session (just different tab)
 5. Training Requisition From sheets keep it separated (individual sheets)
 6. Fix all the routing and functions to the new structure
+
+
+
+
+
+**NEW FLOW**
+
+1. Employee fill \& submit the Training Requisition Form, employee ID requester (only those with company email can fill the form)
+2. The system autofill the Training Requisition Form including the Request By (employee name, cost centre and date)
+3. System send email to HOD/Manager (the system link)
+4. HOD/Manager approve/reject/postpone/reschedule the request through the system
+5. System marks the form as approve/reject digitally with timestamp
+6. The status of the request will be emailed to the person who request
+7. Postponed or cancelled training still recorded in history (may be reschedule/carry forward)
+8. Admin can view the request status
+9. For the approved training, admin can generate QR attendance
+10. When participant finish the training, the participant need to fill the training evaluation form
+11. Participant need to submit the training form within 2 weeks after the course completion
+12. The system disallow training evaluation for participant who absent the training
+13. The system auto email to correspond HOD after 3 months to evaluate the participant
+14. HOD can click the link in the email to answer the post evaluation form for each participant under the HOD
+15. The post evaluation form have list of participant to be evaluated (UNDER THE HOD ONLY) and each submission will display the list of participant that have not been evaluated yet
+16. The system will create report based on the report format (will give later/ next time)
+
+
+
+**NEW REQUIREMENT**
+
+1. New separate App Script for HOD, the system is to display the training request for HOD to review (add new separate folder for this system) (can be access by company acc only)
+2. On the bottom of the training request (scroll down), have a section to approve (show the HOD employee ID, name and Cost Centre)
+3. The post evaluation form are also here after 3 month of the programme
 

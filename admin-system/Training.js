@@ -83,15 +83,16 @@ function autoUpdateTrainingLifecycleStages() {
             }
           }
 
-          // 3. Check 6-month milestone (approx 180 days after endDate)
+          // 3. Check 3-month milestone (approx 90 days after endDate)
           const diffMs = today.getTime() - endDate.getTime();
           const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
           t.daysSinceEnd = diffDays;
-          t.isSixMonthsReached = diffDays >= 180;
+          t.isThreeMonthsReached = diffDays >= 90;
+          t.isSixMonthsReached = diffDays >= 90; // Backward compatibility alias
 
-          if (t.isSixMonthsReached) {
+          if (t.isThreeMonthsReached) {
             if (['Training Completed', 'Evaluation Completed'].includes(t.Stage)) {
-              t.Stage = 'Waiting for 6-Month Review';
+              t.Stage = 'Waiting for 3-Month Review';
               isUpdated = true;
             }
           }
@@ -104,6 +105,7 @@ function autoUpdateTrainingLifecycleStages() {
           }
         }
       } else {
+        t.isThreeMonthsReached = false;
         t.isSixMonthsReached = false;
       }
     });
@@ -114,6 +116,44 @@ function autoUpdateTrainingLifecycleStages() {
     Logger.log('autoUpdateTrainingLifecycleStages error: ' + e.message);
     const sheet = getSheet(SHEET_NAMES.trainings);
     return sheet ? sheetToJson(sheet) : [];
+  }
+}
+
+/**
+ * Automated 3-Month Post Evaluation Email Trigger Engine
+ * Sends email notifications to corresponding HODs after 3 months (90 days) post course completion.
+ */
+function send3MonthPostEvalNotifications() {
+  try {
+    const trainings = autoUpdateTrainingLifecycleStages();
+    const hodPortalUrl = getHodPortalUrl();
+    let sentCount = 0;
+
+    trainings.forEach(t => {
+      if (t.isThreeMonthsReached && ['Training Completed', 'Evaluation Completed', 'Waiting for 3-Month Review'].includes(t.Stage)) {
+        const hodEmail = getConfigProperty('ADMIN_EMAILS', '');
+        const postEvalUrl = hodPortalUrl ? `${hodPortalUrl}?page=posteval&id=${t.ID}` : getAppUrl();
+
+        if (hodEmail) {
+          const subject = `[TrainHub] 3-Month Post-Training Evaluation Due - ${t.Name}`;
+          const body = `Dear HOD / Manager,\n\n` +
+            `The 3-month milestone after course completion has elapsed for training programme:\n` +
+            `Training Name: ${t.Name} (${t.Code || t.ID})\n` +
+            `Completed Date: ${t.EndDate || t.StartDate}\n\n` +
+            `Please click the link below to answer the post evaluation form for participants under your Cost Centre:\n` +
+            `${postEvalUrl}\n\n` +
+            `Thank you,\nTrainHub Training Management System`;
+
+          MailApp.sendEmail(hodEmail, subject, body);
+          sentCount++;
+        }
+      }
+    });
+
+    return ok(`Successfully sent 3-month post evaluation email notifications for ${sentCount} training programmes.`);
+  } catch (e) {
+    Logger.log('send3MonthPostEvalNotifications error: ' + e.message);
+    return err('Failed to send 3-month post evaluation emails: ' + e.message);
   }
 }
 

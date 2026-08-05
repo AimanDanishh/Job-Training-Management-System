@@ -1,0 +1,23 @@
+<script>
+  function showLoading(msg) {
+    let overlay = document.getElementById('loadingOverlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'loadingOverlay';
+      overlay.className = 'loading-overlay';
+      overlay.innerHTML = '<div class="spinner"></div><div id="loadingMsg" style="font-weight:600;color:#fff;">Processing...</div>';
+      document.body.appendChild(overlay);
+    }
+    document.getElementById('loadingMsg').innerText = msg || 'Processing...';
+    overlay.style.display = 'flex';
+  }
+
+  function hideLoading() {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) overlay.style.display = 'none';
+  }
+
+  function showAlert(msg, isError) {
+    alert((isError ? '⚠️ Error: ' : '✅ Success: ') + msg);
+  }
+</script>

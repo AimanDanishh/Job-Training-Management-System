@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <title>TrainHub — HOD 3-Month Post Evaluation</title>
+  <?!= include('style'); ?>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="portal-header">
+      <div class="brand-logo">
+        <div class="brand-icon">E</div>
+        <div>
+          <div class="brand-title">TrainHub HOD Post Evaluation</div>
+          <div class="brand-subtitle">3-Month Post-Training Employee Performance Review</div>
+        </div>
+      </div>
+      <div class="hod-badge" id="hodProfileBadge">
+        <span>👤</span> <span id="badgeHodName">Loading HOD Profile...</span>
+      </div>
+    </header>
+
+    <!-- Training Overview -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title" id="evalTrainingTitle">Loading Training Details...</div>
+          <div style="font-size:13px;color:var(--text-secondary);" id="evalTrainingCode">Please wait...</div>
+        </div>
+        <div>
+          <span class="badge badge-approved" id="evalCountBadge">0 PENDING EVALUATIONS</span>
+        </div>
+      </div>
+
+      <!-- Pending Participants under HOD selection box -->
+      <div style="margin-bottom:20px;">
+        <label class="data-label" style="font-size:13px;color:#60a5fa;">Select Participant To Evaluate (UNDER YOUR COST CENTRE ONLY)</label>
+        <select id="participantSelect" class="form-control" onchange="onParticipantSelectChange()" style="font-size:15px;padding:12px;">
+          <option value="">-- Loading pending participants... --</option>
+        </select>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:6px;" id="pendingStatsInfo">
+          List shows participants under your cost centre who have not been evaluated yet.
+        </div>
+      </div>
+
+      <div class="section-divider"></div>
+
+      <!-- Evaluation Form Section -->
+      <div id="evalFormContainer" style="display:none;">
+        <h4 style="color:#60a5fa;margin-bottom:16px;font-size:16px;">📝 Evaluation Questions for <span id="selectedEmpNameDisplay" style="color:#fff;">--</span></h4>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+          <div class="data-group">
+            <div class="data-label">1. Pre-Training Competency Level</div>
+            <select id="qCompetencyBefore" class="form-control">
+              <option value="1 - Novice">1 - Novice (Basic awareness)</option>
+              <option value="2 - Advanced Beginner">2 - Advanced Beginner (Limited experience)</option>
+              <option value="3 - Competent" selected>3 - Competent (Capable performance)</option>
+              <option value="4 - Proficient">4 - Proficient (High performance)</option>
+              <option value="5 - Expert">5 - Expert (Mastery)</option>
+            </select>
+          </div>
+
+          <div class="data-group">
+            <div class="data-label">2. Post-Training Competency Level (3 Months After)</div>
+            <select id="qCompetencyAfter" class="form-control">
+              <option value="1 - Novice">1 - Novice</option>
+              <option value="2 - Advanced Beginner">2 - Advanced Beginner</option>
+              <option value="3 - Competent">3 - Competent</option>
+              <option value="4 - Proficient">4 - Proficient</option>
+              <option value="5 - Expert" selected>5 - Expert (Significant mastery)</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+          <div class="data-group">
+            <div class="data-label">3. Observed Performance Improvement</div>
+            <select id="qImprovement" class="form-control">
+              <option value="High" selected>High (Clear productivity gains)</option>
+              <option value="Moderate">Moderate (Noticeable improvement)</option>
+              <option value="Slight">Slight (Minimal change)</option>
+              <option value="None">None</option>
+            </select>
+          </div>
+
+          <div class="data-group">
+            <div class="data-label">4. Can Apply Knowledge To Current Work?</div>
+            <select id="qCanApply" class="form-control">
+              <option value="Yes" selected>Yes - Fully Applicable</option>
+              <option value="Partially">Partially Applicable</option>
+              <option value="No">No - Not Applicable</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="data-group" style="margin-bottom:20px;">
+          <div class="data-label">5. Further Training / Coaching Recommendation</div>
+          <input type="text" id="qFurtherTraining" class="form-control" placeholder="e.g. Advanced Certification, On-the-job refresher..." value="No further training needed at this stage">
+        </div>
+
+        <div class="data-group" style="margin-bottom:24px;">
+          <div class="data-label">6. HOD Overall Comments & Impact Assessment</div>
+          <textarea id="qComments" class="form-control" rows="3" placeholder="Describe the participant's application of training skills..."></textarea>
+        </div>
+
+        <button class="btn btn-approve" style="width:100%;padding:14px;font-size:16px;" onclick="submitEvaluation()">
+          <span>💾</span> Submit Post Evaluation for Participant
+        </button>
+      </div>
+
+      <!-- All Completed Screen -->
+      <div id="allCompletedBox" style="display:none;text-align:center;padding:40px 20px;">
+        <div style="font-size:48px;margin-bottom:12px;">🎉</div>
+        <h3 style="color:var(--success);margin-bottom:8px;">All Participants Under Your HOD Cost Centre Have Been Evaluated!</h3>
+        <p style="color:var(--text-secondary);font-size:14px;">Thank you. Your 3-month post-training evaluation submissions have been recorded in the central system database.</p>
+      </div>
+    </div>
+  </div>
+
+  <?!= include('script'); ?>
+
+  <script>
+    let currentTrainingId = '<?= params.id || params.trn || "" ?>';
+    let currentHOD = null;
+    let pendingParticipants = [];
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadPostEvalData();
+    });
+
+    function loadPostEvalData() {
+      showLoading('Loading Post Evaluation Data...');
+      google.script.run
+        .withSuccessHandler(resStr => {
+          hideLoading();
+          const res = JSON.parse(resStr);
+          if (!res.success) {
+            showAlert(res.message, true);
+            return;
+          }
+          renderPostEval(res.data);
+        })
+        .withFailureHandler(err => {
+          hideLoading();
+          showAlert('Failed to connect to server: ' + err.message, true);
+        })
+        .getPendingPostEvalParticipants(currentTrainingId);
+    }
+
+    function renderPostEval(data) {
+      currentHOD = data.hod;
+      const t = data.training;
+      currentTrainingId = t.ID;
+
+      document.getElementById('badgeHodName').innerText = `${currentHOD.Name} (${currentHOD.CostCentre})`;
+      document.getElementById('evalTrainingTitle').innerText = t.Name || 'Training Programme';
+      document.getElementById('evalTrainingCode').innerText = `Training Code: ${t.Code || t.ID} | Venue: ${t.Venue || 'N/A'}`;
+
+      pendingParticipants = data.pendingParticipants || [];
+      document.getElementById('evalCountBadge').innerText = `${pendingParticipants.length} REMAINING TO EVALUATE`;
+      document.getElementById('pendingStatsInfo').innerText = `Displaying participants under Cost Centre: "${currentHOD.CostCentre}". ${data.completedCount} evaluated, ${pendingParticipants.length} pending.`;
+
+      const select = document.getElementById('participantSelect');
+      select.innerHTML = '';
+
+      if (pendingParticipants.length === 0) {
+        document.getElementById('evalFormContainer').style.display = 'none';
+        document.getElementById('allCompletedBox').style.display = 'block';
+      } else {
+        document.getElementById('allCompletedBox').style.display = 'none';
+        
+        let defaultOpt = document.createElement('option');
+        defaultOpt.value = '';
+        defaultOpt.innerText = `-- Select Participant (${pendingParticipants.length} pending) --`;
+        select.appendChild(defaultOpt);
+
+        pendingParticipants.forEach(p => {
+          let opt = document.createElement('option');
+          opt.value = p.EmployeeID || p.ID;
+          opt.innerText = `${p.EmployeeName || p.Name} (${p.EmployeeID || p.ID}) - ${p.Position || 'Staff'}`;
+          select.appendChild(opt);
+        });
+
+        // Auto-select first participant if present
+        select.selectedIndex = 1;
+        onParticipantSelectChange();
+      }
+    }
+
+    function onParticipantSelectChange() {
+      const select = document.getElementById('participantSelect');
+      const val = select.value;
+      const formContainer = document.getElementById('evalFormContainer');
+
+      if (!val) {
+        formContainer.style.display = 'none';
+        return;
+      }
+
+      const emp = pendingParticipants.find(p => String(p.EmployeeID || p.ID) === String(val));
+      if (emp) {
+        document.getElementById('selectedEmpNameDisplay').innerText = `${emp.EmployeeName || emp.Name} (${emp.EmployeeID || emp.ID})`;
+        formContainer.style.display = 'block';
+      }
+    }
+
+    function submitEvaluation() {
+      const empId = document.getElementById('participantSelect').value;
+      if (!empId) {
+        alert('Please select a participant to evaluate.');
+        return;
+      }
+
+      showLoading('Submitting 3-Month Post Evaluation...');
+
+      const payload = {
+        trainingId: currentTrainingId,
+        employeeId: empId,
+        competencyBefore: document.getElementById('qCompetencyBefore').value,
+        competencyAfter: document.getElementById('qCompetencyAfter').value,
+        improvement: document.getElementById('qImprovement').value,
+        canApply: document.getElementById('qCanApply').value,
+        furtherTraining: document.getElementById('qFurtherTraining').value,
+        comments: document.getElementById('qComments').value
+      };
+
+      google.script.run
+        .withSuccessHandler(resStr => {
+          hideLoading();
+          const res = JSON.parse(resStr);
+          if (!res.success) {
+            showAlert(res.message, true);
+            return;
+          }
+          showAlert('Post evaluation successfully saved! Updating pending list...', false);
+          renderPostEval(res.data);
+        })
+        .withFailureHandler(err => {
+          hideLoading();
+          showAlert('Submission failed: ' + err.message, true);
+        })
+        .submitHODPostEval(payload);
+    }
+  </script>
+</body>
+</html>

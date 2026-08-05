@@ -147,43 +147,5 @@ function submitAttendance(arg1, arg2, arg3, arg4) {
  * Real-time employee lookup for attendance check-in
  */
 function lookupEmployeeInfo(employeeNo) {
-  try {
-    if (!employeeNo || String(employeeNo).trim() === '') {
-      return err('Employee ID is required.');
-    }
-    const cleanId = String(employeeNo).trim().toLowerCase();
-    
-    // Check Employees sheet first
-    const empSheet = getSheet(SHEET_NAMES.employees);
-    if (empSheet) {
-      const rows = sheetToJson(empSheet);
-      const emp = rows.find(r => String(r.ID || r.EmployeeID || '').trim().toLowerCase() === cleanId);
-      if (emp) {
-        return ok({
-          ID: emp.ID || emp.EmployeeID,
-          Name: emp.Name || emp.EmployeeName,
-          Department: emp.Department || ''
-        });
-      }
-    }
-    
-    // Fallback check in TrainingParticipants sheet
-    const tpSheet = getSheet(SHEET_NAMES.trainingParticipants);
-    if (tpSheet) {
-      const tpRows = sheetToJson(tpSheet);
-      const tp = tpRows.find(r => String(r.EmployeeID || r.ID || '').trim().toLowerCase() === cleanId);
-      if (tp) {
-        return ok({
-          ID: tp.EmployeeID || tp.ID,
-          Name: tp.EmployeeName || tp.Name,
-          Department: tp.Department || ''
-        });
-      }
-    }
-    
-    return err('Employee not found in registry.');
-  } catch (e) {
-    return err(e.message);
-  }
+  return getEmployeeDetails(employeeNo);
 }
-

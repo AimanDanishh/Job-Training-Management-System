@@ -193,3 +193,45 @@ function updateAttendanceRecord(id, status, remarks) {
     return err('Failed to update record: ' + e.message);
   }
 }
+
+/**
+ * Read all attendance records for a training ID.
+ */
+function getAttendance(trainingId) {
+  try {
+    const sheet = getSheet(SHEET_NAMES.attendance);
+    const rows = sheetToJson(sheet);
+    const filtered = rows.filter(r => r.TrainingID === trainingId);
+
+    // Group by day
+    const days = {};
+    filtered.forEach(r => {
+      const d = r.Day;
+      if (!days[d]) days[d] = { day: d, date: r.Date, records: [] };
+      days[d].records.push(r);
+    });
+
+    return ok(Object.values(days).sort((a, b) => Number(a.day) - Number(b.day)));
+  } catch (e) {
+    return err('Failed to load attendance: ' + e.message);
+  }
+}
+
+/**
+ * Attendance Summary for Dashboard / Reports.
+ */
+function getAttendanceSummary(trainingId) {
+  try {
+    const sheet = getSheet(SHEET_NAMES.attendance);
+    const rows = sheetToJson(sheet).filter(r => r.TrainingID === trainingId);
+    const total   = rows.length;
+    const present = rows.filter(r => r.Status === 'Present').length;
+    const absent  = rows.filter(r => r.Status === 'Absent').length;
+    const late    = rows.filter(r => r.Status === 'Late').length;
+    const pct     = total > 0 ? Math.round((present / total) * 100) : 0;
+    return ok({ total, present, absent, late, pct });
+  } catch (e) {
+    return err(e.message);
+  }
+}
+

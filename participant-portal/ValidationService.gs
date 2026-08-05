@@ -230,7 +230,47 @@ function validatePublicEvaluation(trainingId, employeeId) {
     const enrollCheck = validateParticipantEnrollment(cleanTId, cleanEmpId);
     if (!enrollCheck.valid) return enrollCheck;
 
-    // D. Prevent Duplicate Evaluation Submission
+    // D. 2-Week Submission Deadline Enforcement (14 days post completion)
+    const endDateStr = tCheck.training.EndDate || tCheck.training.StartDate;
+    if (endDateStr) {
+      try {
+        const endDate = new Date(endDateStr);
+        if (!isNaN(endDate.getTime())) {
+          endDate.setHours(23, 59, 59, 999);
+          const now = new Date();
+          const diffMs = now.getTime() - endDate.getTime();
+          const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+          if (diffDays > 14) {
+            return {
+              valid: false,
+              message: `Participant evaluation must be submitted within 2 weeks (14 days) after course completion. The deadline for this training passed on ${formatDate(new Date(endDate.getTime() + 14 * 24 * 60 * 60 * 1000))}.`
+            };
+          }
+        }
+      } catch (errDate) {
+        Logger.log('Date validation check error: ' + errDate.message);
+      }
+    }
+
+    // E. Attendance Verification: Disallow evaluation for absent participants
+    const attSheet = getSheet(SHEET_NAMES.attendance);
+    if (attSheet) {
+      const attRows = sheetToJson(attSheet);
+      const attRecord = attRows.find(r => 
+        String(r.TrainingID || '').trim() === cleanTId &&
+        String(r.EmployeeNo || r.EmployeeID || '').trim().toLowerCase() === cleanEmpId.toLowerCase()
+      );
+
+      // If record exists and status is Absent, or no Present record exists when attendance is required
+      if (attRecord && String(attRecord.Status || '').toLowerCase() === 'absent') {
+        return {
+          valid: false,
+          message: `Training evaluation is disallowed for participant (${cleanEmpId}) who was marked ABSENT for this training.`
+        };
+      }
+    }
+
+    // F. Prevent Duplicate Evaluation Submission
     const evalSheet = getSheet(SHEET_NAMES.trainingEval);
     if (evalSheet) {
       const evalRows = sheetToJson(evalSheet);

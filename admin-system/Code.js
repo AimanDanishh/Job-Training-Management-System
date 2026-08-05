@@ -110,21 +110,6 @@ function getCurrentUser() {
   return verifyGoogleUser(email);
 }
 
-// ─── Legacy / Fallback Auth Handler ─────────────────────────────────────────────
-function verifyLogin(username, password) {
-  if (username && username.includes('@')) {
-    return verifyGoogleUser(username);
-  }
-
-  const adminUser = getConfigProperty('ADMIN_USER', 'admin');
-  const adminPass = getConfigProperty('ADMIN_PASS', 'admin123');
-
-  if (username === adminUser && password === adminPass) {
-    return { success: true, name: 'Administrator', role: 'admin', email: username };
-  }
-  return { success: false, message: 'Invalid username or password.' };
-}
-
 function getAppUrl() {
   return ScriptApp.getService().getUrl();
 }

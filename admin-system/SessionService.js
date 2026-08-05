@@ -37,6 +37,19 @@ function createSession(data) {
     if (!data.TrainingID) return err('Training ID is required.');
     if (!data.SessionName) return err('Session Name is required.');
 
+    // Enforce Approval Check: QR attendance generation is only allowed for Approved trainings
+    const tSheet = getSheet(SHEET_NAMES.trainings);
+    if (tSheet) {
+      const trainings = sheetToJson(tSheet);
+      const training = trainings.find(t => String(t.ID || '').trim() === String(data.TrainingID).trim());
+      if (training) {
+        const appStatus = String(training.ApprovalStatus || '').toLowerCase();
+        if (appStatus && !appStatus.includes('approved')) {
+          return err(`QR Attendance generation is only allowed for APPROVED training requisitions. Current status: ${training.ApprovalStatus || 'Pending Approval'}.`);
+        }
+      }
+    }
+
     const sheet = getSheet(SHEET_NAMES.trainingSessions);
     if (!sheet) return err('Could not open TrainingSessions sheet.');
 
@@ -168,43 +181,6 @@ function getSession(sessionId) {
 }
 
 /**
- * Update an existing session.
- * 
- * @param {string} sessionId - The session ID to update
- * @param {Object} data - Updated session fields
- * @returns {string} JSON response
- */
-function updateSession(sessionId, data) {
-  try {
-    if (!sessionId) return err('Session ID is required.');
-
-    const sheet = getSheet(SHEET_NAMES.trainingSessions);
-    const row = findRowById(sheet, sessionId);
-    if (row === -1) return err('Session not found.');
-
-    const dataRange = sheet.getRange(row, 1, 1, 10).getValues()[0];
-
-    const updatedSession = [
-      sessionId,
-      data.TrainingID  || dataRange[1],
-      data.SessionName || dataRange[2],
-      data.SessionDate || dataRange[3],
-      data.StartTime   || dataRange[4],
-      data.EndTime     || dataRange[5],
-      dataRange[6]     || generateAttendanceURL(sessionId),
-      dataRange[7]     || generateQRCode(dataRange[6] || generateAttendanceURL(sessionId)),
-      data.QRStatus    || dataRange[8] || 'Active',
-      dataRange[9]     || now()
-    ];
-
-    sheet.getRange(row, 1, 1, 10).setValues([updatedSession]);
-    return ok({ message: 'Session updated successfully.' });
-  } catch (e) {
-    return err('Failed to update session: ' + e.message);
-  }
-}
-
-/**
  * Update the QR status of a session (e.g. Active, Expired, Inactive)
  * 
  * @param {string} sessionId - Session ID
@@ -222,25 +198,5 @@ function updateSessionQRStatus(sessionId, status) {
     return ok({ message: `Session status updated to: ${status}` });
   } catch (e) {
     return err('Failed to update session status: ' + e.message);
-  }
-}
-
-/**
- * Delete a session by SessionID.
- * 
- * @param {string} sessionId - Session ID to delete
- * @returns {string} JSON response
- */
-function deleteSession(sessionId) {
-  try {
-    if (!sessionId) return err('Session ID is required.');
-    const sheet = getSheet(SHEET_NAMES.trainingSessions);
-    const row = findRowById(sheet, sessionId);
-    if (row === -1) return err('Session not found.');
-
-    sheet.deleteRow(row);
-    return ok({ message: 'Session deleted successfully.' });
-  } catch (e) {
-    return err('Failed to delete session: ' + e.message);
   }
 }

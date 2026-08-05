@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <title>TrainHub — HOD Training Requisition Review</title>
+  <?!= include('style'); ?>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="portal-header">
+      <div class="brand-logo">
+        <div class="brand-icon">T</div>
+        <div>
+          <div class="brand-title">TrainHub HOD Portal</div>
+          <div class="brand-subtitle">Training Requisition Review & Managerial Approval</div>
+        </div>
+      </div>
+      <div class="hod-badge" id="hodProfileBadge">
+        <span>👤</span> <span id="badgeHodName">Loading HOD Profile...</span>
+      </div>
+    </header>
+
+    <!-- Training Request Card (Scroll down to review) -->
+    <div class="card" id="reqCard">
+      <div class="card-header">
+        <div>
+          <div class="card-title" id="reqTitle">Loading Training Requisition Request...</div>
+          <div style="font-size:13px;color:var(--text-secondary);" id="reqCode">Please wait while data is loaded</div>
+        </div>
+        <div id="statusBadgeContainer">
+          <span class="badge badge-pending">PENDING HOD REVIEW</span>
+        </div>
+      </div>
+
+      <!-- Section 1: Requester Details -->
+      <div style="margin-bottom:20px;">
+        <h4 style="color:#60a5fa;margin-bottom:12px;font-size:15px;">📋 Requester Information</h4>
+        <div class="grid-2">
+          <div class="data-group">
+            <div class="data-label">Requested By (Name & ID)</div>
+            <div class="data-value" id="reqEmployee">--</div>
+          </div>
+          <div class="data-group">
+            <div class="data-label">Cost Centre / Department</div>
+            <div class="data-value" id="reqCostCentre">--</div>
+          </div>
+          <div class="data-group">
+            <div class="data-label">Requester Email</div>
+            <div class="data-value" id="reqEmail">--</div>
+          </div>
+          <div class="data-group">
+            <div class="data-label">Submission Date</div>
+            <div class="data-value" id="reqDate">--</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-divider"></div>
+
+      <!-- Section 2: Programme Specifications -->
+      <div style="margin-bottom:20px;">
+        <h4 style="color:#60a5fa;margin-bottom:12px;font-size:15px;">🎓 Training Programme Specifications</h4>
+        <div class="grid-2">
+          <div class="data-group">
+            <div class="data-label">Course Category</div>
+            <div class="data-value" id="reqCategory">--</div>
+          </div>
+          <div class="data-group">
+            <div class="data-label">Trainer / Training Provider</div>
+            <div class="data-value" id="reqTrainer">--</div>
+          </div>
+          <div class="data-group">
+            <div class="data-label">Proposed Venue</div>
+            <div class="data-value" id="reqVenue">--</div>
+          </div>
+          <div class="data-group">
+            <div class="data-label">Proposed Schedule (Start - End)</div>
+            <div class="data-value" id="reqSchedule">--</div>
+          </div>
+          <div class="data-group">
+            <div class="data-label">Duration & Total Hours</div>
+            <div class="data-value" id="reqHours">--</div>
+          </div>
+          <div class="data-group">
+            <div class="data-label">Estimated Course Fee</div>
+            <div class="data-value" id="reqFee">--</div>
+          </div>
+        </div>
+        <div class="data-group" style="margin-top:10px;">
+          <div class="data-label">Training Objectives & Justification</div>
+          <div class="data-value" id="reqObjectives" style="background:#0f172a;padding:12px;border-radius:8px;border:1px solid #334155;">--</div>
+        </div>
+      </div>
+
+      <div class="section-divider"></div>
+
+      <!-- Section 3: Target Participants -->
+      <div>
+        <h4 style="color:#60a5fa;margin-bottom:12px;font-size:15px;">👥 Target Participants List</h4>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>No</th>
+                <th>Employee ID</th>
+                <th>Participant Name</th>
+                <th>Department / Cost Centre</th>
+                <th>Position</th>
+              </tr>
+            </thead>
+            <tbody id="participantsTableBody">
+              <tr>
+                <td colspan="5" style="text-align:center;color:var(--text-muted);padding:16px;">Loading participants...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Scroll Down Indicator -->
+      <div style="text-align:center;margin-top:30px;color:var(--text-secondary);font-size:13px;">
+        👇 Scroll down to HOD Approval Section
+      </div>
+    </div>
+
+    <!-- BOTTOM APPROVAL SECTION -->
+    <div class="approval-section" id="approvalSection">
+      <div class="approval-header">
+        <span style="font-size:24px;">🛡️</span>
+        <div>
+          <div class="approval-title">HOD Managerial Review & Digital Decision</div>
+          <div style="font-size:13px;color:var(--text-secondary);">Verify request details above and select decision below</div>
+        </div>
+      </div>
+
+      <!-- HOD Profile Display Box -->
+      <div class="hod-profile-box">
+        <div class="profile-item">
+          <div class="data-label">HOD Employee ID</div>
+          <div class="data-value" id="hodIdDisplay">Loading...</div>
+        </div>
+        <div class="profile-item">
+          <div class="data-label">HOD Name</div>
+          <div class="data-value" id="hodNameDisplay">Loading...</div>
+        </div>
+        <div class="profile-item">
+          <div class="data-label">HOD Cost Centre</div>
+          <div class="data-value" id="hodCostCentreDisplay">Loading...</div>
+        </div>
+      </div>
+
+      <!-- Reschedule Date (Shown when Reschedule is selected) -->
+      <div id="rescheduleGroup" style="display:none;margin-bottom:16px;">
+        <label class="data-label" style="color:var(--warning);">Proposed New Date for Rescheduling</label>
+        <input type="date" id="rescheduledDateInput" class="form-control" style="border-color:var(--warning);">
+      </div>
+
+      <!-- HOD Remarks / Justification -->
+      <div style="margin-bottom:16px;">
+        <label class="data-label">HOD Remarks / Comments / Justification</label>
+        <textarea id="hodRemarksInput" class="form-control" rows="3" placeholder="Enter remarks or approval notes..."></textarea>
+      </div>
+
+      <!-- Digital Stamp Container -->
+      <div id="digitalStampBox" class="digital-stamp" style="display:none;">
+        <div class="digital-stamp-title" id="stampStatusTitle">DIGITALLY STAMPED</div>
+        <div class="digital-stamp-details" id="stampDetails">--</div>
+      </div>
+
+      <!-- Decision Action Buttons -->
+      <div class="action-buttons" id="actionButtonsContainer">
+        <button class="btn btn-approve" onclick="handleDecision('Approved')">
+          <span>✅</span> Approve Request
+        </button>
+        <button class="btn btn-reject" onclick="handleDecision('Rejected')">
+          <span>❌</span> Reject Request
+        </button>
+        <button class="btn btn-postpone" onclick="handleDecision('Postponed')">
+          <span>⏸️</span> Postpone
+        </button>
+        <button class="btn btn-reschedule" onclick="toggleRescheduleMode()">
+          <span>📅</span> Reschedule
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <?!= include('script'); ?>
+
+  <script>
+    let currentTrainingId = '<?= params.id || params.req || "" ?>';
+    let currentHOD = null;
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadData();
+    });
+
+    function loadData() {
+      showLoading('Loading Requisition Request...');
+      google.script.run
+        .withSuccessHandler(resStr => {
+          hideLoading();
+          const res = JSON.parse(resStr);
+          if (!res.success) {
+            showAlert(res.message, true);
+            return;
+          }
+          renderRequisition(res.data);
+        })
+        .withFailureHandler(err => {
+          hideLoading();
+          showAlert('Failed to connect to server: ' + err.message, true);
+        })
+        .getRequisitionDetails(currentTrainingId);
+    }
+
+    function renderRequisition(data) {
+      const t = data.training;
+      const req = data.requester;
+      currentHOD = data.hod;
+      currentTrainingId = t.ID;
+
+      // Header HOD profile
+      document.getElementById('badgeHodName').innerText = `${currentHOD.Name} (${currentHOD.CostCentre})`;
+      document.getElementById('hodIdDisplay').innerText = currentHOD.ID;
+      document.getElementById('hodNameDisplay').innerText = currentHOD.Name;
+      document.getElementById('hodCostCentreDisplay').innerText = currentHOD.CostCentre;
+
+      // Requisition details
+      document.getElementById('reqTitle').innerText = t.Name || 'Training Programme';
+      document.getElementById('reqCode').innerText = `Requisition Code: ${t.Code || t.ID} | Category: ${t.Category || 'N/A'}`;
+      
+      // Badge
+      const status = t.ApprovalStatus || t.Status || 'Pending Approval';
+      renderStatusBadge(status);
+
+      // Requester
+      document.getElementById('reqEmployee').innerText = `${req.Name} (${req.ID})`;
+      document.getElementById('reqCostCentre').innerText = req.Department || t.Department || 'N/A';
+      document.getElementById('reqEmail').innerText = req.Email || t.RequestedByEmail || 'N/A';
+      document.getElementById('reqDate').innerText = t.CreatedDate || t.RequestedDate || 'N/A';
+
+      // Specifications
+      document.getElementById('reqCategory').innerText = t.Category || 'General';
+      document.getElementById('reqTrainer').innerText = t.Trainer || 'TBD';
+      document.getElementById('reqVenue').innerText = t.Venue || 'TBD';
+      document.getElementById('reqSchedule').innerText = `${t.StartDate || 'N/A'} to ${t.EndDate || t.StartDate || 'N/A'}`;
+      document.getElementById('reqHours').innerText = `${t.Duration || 1} Days (${t.TotalHours || 8} Total Hours)`;
+      document.getElementById('reqFee').innerText = t.CourseFee ? `RM ${t.CourseFee}` : 'N/A';
+      document.getElementById('reqObjectives').innerText = t.Objectives || 'No objectives specified.';
+
+      // Participants Table
+      const tbody = document.getElementById('participantsTableBody');
+      if (!data.participants || data.participants.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:16px;">No participants specified.</td></tr>';
+      } else {
+        tbody.innerHTML = data.participants.map((p, idx) => `
+          <tr>
+            <td>${idx + 1}</td>
+            <td><strong>${p.EmployeeID || p.ID || 'N/A'}</strong></td>
+            <td>${p.EmployeeName || p.Name || 'N/A'}</td>
+            <td>${p.Department || p.CostCentre || 'N/A'}</td>
+            <td>${p.Position || 'Participant'}</td>
+          </tr>
+        `).join('');
+      }
+
+      // If already stamped, show digital stamp box
+      if (t.ApprovedAt && t.ApprovedBy) {
+        showDigitalStamp(t.ApprovalStatus || 'Approved', t.ApprovedBy, t.ApprovedCostCentre, t.ApprovedAt, t.ApprovalRemarks);
+      }
+    }
+
+    function renderStatusBadge(status) {
+      const container = document.getElementById('statusBadgeContainer');
+      const st = String(status).toUpperCase();
+      let badgeHtml = '';
+      if (st.includes('APPROV')) {
+        badgeHtml = '<span class="badge badge-approved">APPROVED BY HOD</span>';
+      } else if (st.includes('REJECT')) {
+        badgeHtml = '<span class="badge badge-rejected">REJECTED BY HOD</span>';
+      } else if (st.includes('POSTPON')) {
+        badgeHtml = '<span class="badge badge-postponed">POSTPONED</span>';
+      } else if (st.includes('RESCHED')) {
+        badgeHtml = '<span class="badge badge-postponed">RESCHEDULED</span>';
+      } else {
+        badgeHtml = '<span class="badge badge-pending">PENDING HOD APPROVAL</span>';
+      }
+      container.innerHTML = badgeHtml;
+    }
+
+    function toggleRescheduleMode() {
+      const group = document.getElementById('rescheduleGroup');
+      if (group.style.display === 'none') {
+        group.style.display = 'block';
+        alert('Please select the proposed new date above and click Reschedule again to confirm.');
+      } else {
+        const newDate = document.getElementById('rescheduledDateInput').value;
+        if (!newDate) {
+          alert('Please select a valid new date for rescheduling.');
+          return;
+        }
+        handleDecision('Rescheduled');
+      }
+    }
+
+    function handleDecision(decision) {
+      if (!currentTrainingId) {
+        alert('Invalid training request identifier.');
+        return;
+      }
+
+      const remarks = document.getElementById('hodRemarksInput').value.trim();
+      const rescheduledDate = document.getElementById('rescheduledDateInput').value;
+
+      if (!confirm(`Are you sure you want to mark this Training Requisition as ${decision.toUpperCase()}?`)) {
+        return;
+      }
+
+      showLoading(`Stamping ${decision.toUpperCase()} decision & sending email...`);
+
+      const payload = {
+        trainingId: currentTrainingId,
+        decision: decision,
+        remarks: remarks,
+        rescheduledDate: rescheduledDate,
+        hodId: currentHOD ? currentHOD.ID : '',
+        hodName: currentHOD ? currentHOD.Name : '',
+        hodCostCentre: currentHOD ? currentHOD.CostCentre : ''
+      };
+
+      google.script.run
+        .withSuccessHandler(resStr => {
+          hideLoading();
+          const res = JSON.parse(resStr);
+          if (!res.success) {
+            showAlert(res.message, true);
+            return;
+          }
+          showAlert(res.data.message, false);
+          renderStatusBadge(decision);
+          showDigitalStamp(decision, `${res.data.approvedBy} (${currentHOD.ID})`, currentHOD.CostCentre, res.data.timestamp, remarks);
+        })
+        .withFailureHandler(err => {
+          hideLoading();
+          showAlert('Submission failed: ' + err.message, true);
+        })
+        .submitHODDecision(payload);
+    }
+
+    function showDigitalStamp(decision, by, costCentre, timestamp, remarks) {
+      const box = document.getElementById('digitalStampBox');
+      box.style.display = 'block';
+      
+      const stTitle = document.getElementById('stampStatusTitle');
+      stTitle.innerText = `DIGITALLY STAMPED: ${String(decision).toUpperCase()}`;
+      if (decision === 'Approved') stTitle.style.color = 'var(--success)';
+      else if (decision === 'Rejected') stTitle.style.color = 'var(--danger)';
+      else stTitle.style.color = 'var(--warning)';
+
+      document.getElementById('stampDetails').innerHTML = `
+        <strong>Manager:</strong> ${by} | <strong>Cost Centre:</strong> ${costCentre}<br>
+        <strong>Timestamp:</strong> ${timestamp} ${remarks ? '<br><strong>Remarks:</strong> ' + remarks : ''}
+      `;
+    }
+  </script>
+</body>
+</html>
