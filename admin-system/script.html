@@ -194,13 +194,13 @@ const LIFECYCLE_STAGES = [
   { id: 'attendance',   label: 'Attendance\nIn Progress',   icon: 'fact_check' },
   { id: 'completed',    label: 'Training\nCompleted',        icon: 'task_alt' },
   { id: 'evaluation',   label: 'Evaluation\nCompleted',      icon: 'rate_review' },
-  { id: 'sixmonth',     label: 'Waiting for\n6-Month Review',icon: 'schedule' },
+  { id: 'threemonth',   label: 'Waiting for\n3-Month Review',icon: 'schedule' },
   { id: 'closed',       label: 'Programme\nClosed',          icon: 'verified' }
 ];
 const STAGE_INDEX = {
   'Created': 0, 'Participants Imported': 1, 'Attendance In Progress': 2,
   'Training Completed': 3, 'Evaluation Completed': 4,
-  'Waiting for 6-Month Review': 5, 'Programme Closed': 6
+  'Waiting for 3-Month Review': 5, 'Programme Closed': 6
 };
 
 function renderLifecycle(currentStage) {

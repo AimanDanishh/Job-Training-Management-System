@@ -48,12 +48,20 @@ function getDashboardReport() {
 
     // Monthly breakdown (last 6 months)
     const tSheet = getSheet(SHEET_NAMES.trainings);
-    const tRows  = sheetToJson(tSheet);
+    const tRows  = tSheet ? sheetToJson(tSheet) : [];
     const monthly = buildMonthlyData(tRows);
 
-    // Dept participation from attendance sheet
-    const aSheet = getSheet(SHEET_NAMES.attendance);
-    const aRows  = sheetToJson(aSheet);
+    // Dept participation from per-training attendance sheets
+    let aRows = [];
+    tRows.forEach(t => {
+      if (t.ID) {
+        const ss = getTrainingDataSpreadsheet(t.ID);
+        if (ss) {
+          const sheet = ss.getSheetByName('Attendance');
+          if (sheet) aRows = aRows.concat(sheetToJson(sheet));
+        }
+      }
+    });
     const deptData = buildDeptData(aRows);
 
     return ok({
@@ -190,8 +198,8 @@ function exportReportExcel(trainingId) {
       sEval.appendRow([ev.ID, ev.EmployeeID, ev.EmployeeName, ev.Q1, ev.Q2, ev.Q3, ev.Q4, ev.Q5, ev.Q6, ev.Q7, ev.AvgScore, ev.SectionB1, ev.SectionB2, ev.SectionB3, ev.SubmittedAt]);
     });
 
-    // Sheet 4: 6-Month Post Evaluation
-    const sPost = ss.insertSheet('6-Month Post Evaluations');
+    // Sheet 4: 3-Month Post Evaluation
+    const sPost = ss.insertSheet('3-Month Post Evaluations');
     const postHeaders = ['Post Eval ID', 'Employee ID', 'Evaluator Name', 'Evaluator ID', 'Competency Before', 'Competency After', 'Improvement', 'Can Apply', 'Further Training', 'Comments', 'Submitted At'];
     sPost.appendRow(postHeaders);
     sPost.getRange(1, 1, 1, postHeaders.length).setFontWeight('bold').setBackground('#2563EB').setFontColor('#FFFFFF');
@@ -320,7 +328,7 @@ function exportReportPdf(trainingId) {
               <div class="cell"><strong>${rep.evaluation.summary.avgScore || 'N/A'} / 5.0</strong></div>
             </div>
             <div class="row">
-              <div class="cell cell-label">6-Month Post Evaluations:</div>
+              <div class="cell cell-label">3-Month Post Evaluations:</div>
               <div class="cell">${rep.evaluation.summary.postCompleted || 0} completed</div>
               <div class="cell cell-label">Workspace Folder ID:</div>
               <div class="cell">${t.FolderID || 'N/A'}</div>

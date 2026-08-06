@@ -61,7 +61,8 @@ function validateAttendance(sessionId, employeeNo) {
     }
 
     // 4. Duplicate Check: One employee can only submit attendance once per session
-    const attSheet = getSheet(SHEET_NAMES.attendance);
+    const ss = getTrainingDataSpreadsheet(session.TrainingID);
+    const attSheet = ss ? ss.getSheetByName('Attendance') : null;
     if (attSheet) {
       const rows = sheetToJson(attSheet);
       const duplicate = rows.find(r => {

@@ -8,7 +8,7 @@ const LIFECYCLE_STAGES = [
   'Attendance In Progress',
   'Training Completed',
   'Evaluation Completed',
-  'Waiting for 6-Month Review',
+  'Waiting for 3-Month Review',
   'Programme Closed'
 ];
 
@@ -83,12 +83,27 @@ function autoUpdateTrainingLifecycleStages() {
             }
           }
 
-          // 3. Check 3-month milestone (approx 90 days after endDate)
+          // 3. Check 3-month milestone (90 days after endDate) & countdown calculation
+          const targetPostEvalDate = new Date(endDate.getTime() + 90 * 24 * 60 * 60 * 1000);
+          const remainingMs = targetPostEvalDate.getTime() - new Date().getTime();
           const diffMs = today.getTime() - endDate.getTime();
           const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+          
           t.daysSinceEnd = diffDays;
           t.isThreeMonthsReached = diffDays >= 90;
           t.isSixMonthsReached = diffDays >= 90; // Backward compatibility alias
+
+          if (remainingMs > 0) {
+            const remDays = Math.floor(remainingMs / (1000 * 60 * 60 * 24));
+            const remHours = Math.floor(remainingMs / (1000 * 60 * 60));
+            if (remDays >= 1) {
+              t.countdownText = `${remDays} day${remDays > 1 ? 's' : ''} remaining`;
+            } else {
+              t.countdownText = `${remHours} hour${remHours > 1 ? 's' : ''} remaining`;
+            }
+          } else {
+            t.countdownText = '3-Month Evaluation Due Now';
+          }
 
           if (t.isThreeMonthsReached) {
             if (['Training Completed', 'Evaluation Completed'].includes(t.Stage)) {
@@ -107,6 +122,7 @@ function autoUpdateTrainingLifecycleStages() {
       } else {
         t.isThreeMonthsReached = false;
         t.isSixMonthsReached = false;
+        t.countdownText = 'No date set';
       }
     });
 
@@ -313,7 +329,7 @@ function getTrainingSummary() {
       completed:  rows.filter(r => r.Status === 'Completed').length,
       draft:      rows.filter(r => r.Status === 'Draft').length,
       pendingEval: rows.filter(r => r.Stage === 'Training Completed').length,
-      pendingPost: rows.filter(r => r.Stage === 'Waiting for 6-Month Review').length,
+      pendingPost: rows.filter(r => r.Stage === 'Waiting for 3-Month Review' || r.Stage === 'Waiting for 6-Month Review').length,
     });
   } catch (e) {
     return err(e.message);
@@ -336,10 +352,13 @@ function generateTrainingCode(category) {
 // ─── Training Participants Management ──────────────────────────────────────────
 function getTrainingParticipants(trainingId) {
   try {
-    const sheet = getSheet(SHEET_NAMES.trainingParticipants);
+    if (!trainingId) return ok([]);
+    const ss = getTrainingDataSpreadsheet(trainingId);
+    if (!ss) return ok([]);
+    const sheet = ss.getSheetByName('TrainingParticipants');
+    if (!sheet) return ok([]);
     const rows = sheetToJson(sheet);
-    const filtered = rows.filter(r => String(r.TrainingID) === String(trainingId));
-    return ok(filtered);
+    return ok(rows);
   } catch (e) {
     return err('Failed to get training participants: ' + e.message);
   }
@@ -362,20 +381,38 @@ function addTrainingParticipants(trainingId, participants) {
       });
     }
 
-    const sheet = getSheet(SHEET_NAMES.trainingParticipants);
-    const existingRows = sheetToJson(sheet).filter(r => String(r.TrainingID) === String(trainingId));
-    const existingEmpIds = new Set(existingRows.map(r => r.EmployeeID));
+    const ss = getTrainingDataSpreadsheet(trainingId);
+    if (!ss) return err('Could not access training data spreadsheet for ID: ' + trainingId);
+
+    let sheet = ss.getSheetByName('TrainingParticipants');
+    if (!sheet) {
+      sheet = ss.insertSheet('TrainingParticipants');
+      sheet.appendRow(['ID', 'TrainingID', 'EmployeeID', 'EmployeeName', 'Department', 'Position', 'AddedAt']);
+      sheet.getRange('A1:G1').setFontWeight('bold').setBackground('#2563EB').setFontColor('#FFFFFF');
+      sheet.setFrozenRows(1);
+    }
+
+    const existingRows = sheetToJson(sheet);
+    const existingEmpIds = new Set(existingRows.map(r => String(r.EmployeeID || r.ID || '').trim().toLowerCase()));
 
     let addedCount = 0;
     const addedAt = now();
 
     participants.forEach(p => {
-      const empId = String(p.ID || p.EmployeeID || p.EmployeeNo || '').trim();
-      if (empId && !existingEmpIds.has(empId)) {
-        const dbEmp = empMap[empId] || {};
-        const empName = dbEmp.Name || dbEmp.EmployeeName || p.Name || p.EmployeeName || empId;
-        const empDept = dbEmp.Department || p.Department || '';
-        const empPos  = dbEmp.Position || dbEmp.JobTitle || p.Position || '';
+      const empIdInput = String(p.ID || p.EmployeeID || p.EmployeeNo || '').trim();
+      if (!empIdInput) return;
+
+      const empIdLower = empIdInput.toLowerCase();
+      // Case-insensitive lookup in master employee database
+      const dbEmpKey = Object.keys(empMap).find(k => k.toLowerCase() === empIdLower);
+      const dbEmp = dbEmpKey ? empMap[dbEmpKey] : null;
+
+      // Only add participant if valid record exists in EMPLOYEE_SPREADSHEET_ID
+      if (dbEmp && !existingEmpIds.has(empIdLower)) {
+        const empId   = dbEmp.ID || empIdInput;
+        const empName = dbEmp.Name || dbEmp.EmployeeName || empId;
+        const empDept = dbEmp.Department || dbEmp.CostCentre || '';
+        const empPos  = dbEmp.Position || dbEmp.JobTitle || dbEmp.PositionTitle || '';
 
         sheet.appendRow([
           generateId('TP'),
@@ -386,7 +423,7 @@ function addTrainingParticipants(trainingId, participants) {
           empPos,
           addedAt
         ]);
-        existingEmpIds.add(empId);
+        existingEmpIds.add(empIdLower);
         addedCount++;
       }
     });
@@ -395,7 +432,6 @@ function addTrainingParticipants(trainingId, participants) {
     updateTrainingParticipantCount(trainingId, totalCount);
 
     try { syncTrainingRequisitionParticipants(trainingId); } catch(e) {}
-    try { syncParticipantsToTrainingDriveSheet(trainingId); } catch(e) {}
 
     return ok({ message: `Added ${addedCount} participants successfully.`, count: totalCount });
   } catch (e) {
@@ -405,12 +441,18 @@ function addTrainingParticipants(trainingId, participants) {
 
 function removeTrainingParticipant(trainingId, employeeId) {
   try {
-    const sheet = getSheet(SHEET_NAMES.trainingParticipants);
+    if (!trainingId || !employeeId) return err('Training ID and Employee ID are required.');
+    const ss = getTrainingDataSpreadsheet(trainingId);
+    if (!ss) return err('Could not access training data spreadsheet.');
+    const sheet = ss.getSheetByName('TrainingParticipants');
+    if (!sheet) return err('Participant record not found.');
+
     const data = sheet.getDataRange().getValues();
     let foundRow = -1;
 
     for (let i = 1; i < data.length; i++) {
-      if (String(data[i][1]) === String(trainingId) && String(data[i][2]) === String(employeeId)) {
+      const rowEmpId = String(data[i][2] || data[i][0] || '').trim().toLowerCase();
+      if (rowEmpId === String(employeeId).trim().toLowerCase()) {
         sheet.deleteRow(i + 1);
         foundRow = i;
         break;
@@ -419,12 +461,11 @@ function removeTrainingParticipant(trainingId, employeeId) {
 
     if (foundRow === -1) return err('Participant record not found.');
 
-    const remainingRows = sheetToJson(sheet).filter(r => String(r.TrainingID) === String(trainingId));
+    const remainingRows = sheetToJson(sheet);
     const totalCount = remainingRows.length;
     updateTrainingParticipantCount(trainingId, totalCount);
 
     try { syncTrainingRequisitionParticipants(trainingId); } catch(e) {}
-    try { syncParticipantsToTrainingDriveSheet(trainingId); } catch(e) {}
 
     return ok({ message: 'Participant removed successfully.', count: totalCount });
   } catch (e) {

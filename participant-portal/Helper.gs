@@ -93,6 +93,80 @@ function getSheet(name) {
   return sheet;
 }
 
+/**
+ * Resolves and opens the single per-training Google Sheet containing tabs:
+ * TrainingParticipants, TrainingSessions, Attendance, TrainingEval, PostEval, Summary
+ *
+ * @param {string} trainingId - Training ID (e.g. TRN-1001) or Training Code (e.g. LM-2026-0001)
+ * @returns {Spreadsheet|null} Google Spreadsheet object for the training, or null
+ */
+function getTrainingDataSpreadsheet(trainingId) {
+  if (!trainingId) return null;
+  const cleanId = String(trainingId).trim();
+
+  const tSheet = getSheet(SHEET_NAMES.trainings);
+  if (!tSheet) return null;
+
+  const trainings = sheetToJson(tSheet);
+  const t = trainings.find(r => String(r.ID || r.TrainingID || r.Code || '').trim() === cleanId);
+  if (!t) return null;
+
+  // 1. Try sheet ID stored in ParticipantsSheetID, SessionsSheetID, AttendanceSheetID, etc.
+  const sheetId = t.ParticipantsSheetID || t.AttendanceSheetID || t.SessionsSheetID || t.EvaluationSheetID || t.PostSheetID;
+  if (sheetId) {
+    try {
+      return SpreadsheetApp.openById(sheetId);
+    } catch (e) {
+      Logger.log('Error opening per-training sheet by ID (' + sheetId + '): ' + e.message);
+    }
+  }
+
+  // 2. Try FolderID
+  if (t.FolderID) {
+    try {
+      const folder = DriveApp.getFolderById(t.FolderID);
+      const code = t.Code || t.ID;
+      const fileIter = folder.getFilesByName(`${code} Training Data`);
+      if (fileIter.hasNext()) {
+        return SpreadsheetApp.openById(fileIter.next().getId());
+      }
+    } catch (e) {
+      Logger.log('Error opening per-training sheet from FolderID: ' + e.message);
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Helper to look up a training session across all per-training sheets
+ * 
+ * @param {string} sessionId - Session ID (e.g. SES0001)
+ * @returns {Object|null} { session: Object, training: Object, spreadsheet: Spreadsheet, sessionSheet: Sheet }
+ */
+function findTrainingBySessionId(sessionId) {
+  if (!sessionId) return null;
+  const cleanSessionId = String(sessionId).trim();
+
+  const tSheet = getSheet(SHEET_NAMES.trainings);
+  if (!tSheet) return null;
+
+  const trainings = sheetToJson(tSheet);
+  for (const t of trainings) {
+    if (!t.ID) continue;
+    const ss = getTrainingDataSpreadsheet(t.ID);
+    if (!ss) continue;
+    const sessSheet = ss.getSheetByName('TrainingSessions');
+    if (!sessSheet) continue;
+    const sessions = sheetToJson(sessSheet);
+    const session = sessions.find(s => String(s.SessionID || '').trim() === cleanSessionId);
+    if (session) {
+      return { session: session, training: t, spreadsheet: ss, sessionSheet: sessSheet };
+    }
+  }
+  return null;
+}
+
 // ─── ID Generation & Header Normalization ─────────────────────────────────────
 function generateId(prefix) {
   return prefix + '-' + Date.now() + '-' + Math.floor(Math.random() * 1000);

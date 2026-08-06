@@ -33,9 +33,11 @@
             </select>
             <select id="cat-t" class="input-th" style="width:auto">
               <option value="">All Categories</option>
-              <option>Leadership & Management</option><option>Compliance & Regulatory</option>
-              <option>Technology & Innovation</option><option>Project Management</option>
-              <option>Data & Analytics</option><option>Customer Experience</option>
+              <option>Behavioral Skills (Soft Skills + Leadership + Customer Service)</option>
+              <option>Technical Skills (Technical + Quality + SHE + Digital)</option>
+              <option>Compliance Training (Compliance + Safety)</option>
+              <option>Business Skills (Finance + Sales & Marketing + Project Management)</option>
+              <option>Onboarding</option>
             </select>
           </div>
           <button class="btn-th btn-secondary btn-sm" onclick="loadTrainings()"><span class="icon sm">refresh</span>Refresh</button>
@@ -75,9 +77,11 @@
       <div class="col-md-6">
         <label class="label-th">Category</label>
         <select id="t-cat" class="input-th">
-          <option>Leadership & Management</option><option>Compliance & Regulatory</option>
-          <option>Technology & Innovation</option><option>Project Management</option>
-          <option>Data & Analytics</option><option>Customer Experience</option>
+          <option>Behavioral Skills (Soft Skills + Leadership + Customer Service)</option>
+          <option>Technical Skills (Technical + Quality + SHE + Digital)</option>
+          <option>Compliance Training (Compliance + Safety)</option>
+          <option>Business Skills (Finance + Sales & Marketing + Project Management)</option>
+          <option>Onboarding</option>
         </select>
       </div>
       <div class="col-md-6">
@@ -96,8 +100,6 @@
         <label class="label-th">Department / Cost Centre</label>
         <select id="t-dept" class="input-th">
           <option value="">All Departments / Cost Centres</option>
-          <option>Engineering</option><option>HR</option><option>Finance</option>
-          <option>Operations</option><option>IT</option><option>Sales</option>
         </select>
       </div>
       <div class="col-md-4">
@@ -116,19 +118,10 @@
         <label class="label-th">Hours/Day</label>
         <input id="t-hours" class="input-th" type="number" min="1" value="8">
       </div>
-      <div class="col-md-6">
+      <div class="col-md-12">
         <label class="label-th">Status</label>
         <select id="t-status" class="input-th">
           <option>Draft</option><option>Upcoming</option><option>In Progress</option><option>Completed</option>
-        </select>
-      </div>
-      <div class="col-md-6">
-        <label class="label-th">Lifecycle Stage</label>
-        <select id="t-stage" class="input-th">
-          <option>Created</option><option>Participants Imported</option>
-          <option>Attendance In Progress</option><option>Training Completed</option>
-          <option>Evaluation Completed</option><option>Waiting for 6-Month Review</option>
-          <option>Programme Closed</option>
         </select>
       </div>
       <div class="col-12">
@@ -332,6 +325,7 @@
     if (catEl)    catEl.addEventListener('change', filterTrainings);
 
     loadTrainings();
+    loadCostCentres();
   });
 
   async function loadTrainings() {
@@ -339,11 +333,11 @@
     if (grid) grid.innerHTML = '<div class="col-12 text-center py-5" style="color:#94A3B8"><div class="spinner mb-2"></div><br>Loading programmes...</div>';
     try {
       const res = await callServer('getTrainings');
-      allTrainings = Array.isArray(res) ? res : [];
+      allTrainings = Array.isArray(res) ? res : (res && Array.isArray(res.data) ? res.data : []);
       filterTrainings();
     } catch(e) {
-      showToast('Failed to load trainings: ' + e.message, 'error');
-      renderGrid([]);
+      allTrainings = [];
+      filterTrainings();
     }
   }
 
@@ -377,10 +371,25 @@
   }
 
   const CAT_COLORS = {
-    'Leadership & Management': '#2563EB', 'Compliance & Regulatory': '#EF4444',
-    'Technology & Innovation': '#8B5CF6', 'Project Management': '#0891B2',
-    'Data & Analytics': '#F59E0B', 'Customer Experience': '#22C55E'
+    'Behavioral Skills (Soft Skills + Leadership + Customer Service)': '#2563EB',
+    'Technical Skills (Technical + Quality + SHE + Digital)': '#8B5CF6',
+    'Compliance Training (Compliance + Safety)': '#EF4444',
+    'Business Skills (Finance + Sales & Marketing + Project Management)': '#0891B2',
+    'Onboarding': '#22C55E'
   };
+
+  async function loadCostCentres() {
+    try {
+      const depts = await callServer('getCostCentres');
+      if (Array.isArray(depts) && depts.length > 0) {
+        const select = document.getElementById('t-dept');
+        if (select) {
+          select.innerHTML = '<option value="">All Departments / Cost Centres</option>' +
+            depts.map(d => `<option value="${d}">${d}</option>`).join('');
+        }
+      }
+    } catch(e) {}
+  }
 
   // Keep external URLs out of the HTML script source. Apps Script can inject
   // page scripts with document.write and has been observed to corrupt them.
@@ -744,14 +753,14 @@
             </div>
           </div>
 
-          <!-- Level 3 Supervisor 6-Month Post-Evaluation -->
+          <!-- Level 3 Supervisor 3-Month Post-Evaluation -->
           <div class="col-md-6">
             <div style="border:1px solid #E2E8F0;border-radius:10px;padding:16px;background:#fff;height:100%;display:flex;flex-direction:column">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-                <span style="font-size:13px;font-weight:700;color:#1E293B">Level 3: Supervisor 6-Month Evaluation</span>
+                <span style="font-size:13px;font-weight:700;color:#1E293B">Level 3: Supervisor 3-Month Post Evaluation</span>
                 <span class="badge-th badge-purple">Supervisor Form</span>
               </div>
-              <p style="font-size:11.5px;color:#64748B;margin-bottom:12px">Scanned/opened by supervisors 6 months post-training.</p>
+              <p style="font-size:11.5px;color:#64748B;margin-bottom:12px">Scanned/opened by supervisors 3 months post-training (${t.countdownText || 'Countdown Active'}).</p>
               
               ${(() => {
                 const postObj = (evalQrs && evalQrs.supervisorPostEval) ? evalQrs.supervisorPostEval : null;

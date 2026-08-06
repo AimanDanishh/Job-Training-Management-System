@@ -6,22 +6,30 @@
  * Generate sequential Session ID (e.g., SES0001, SES0002, ...)
  */
 function generateSessionId() {
-  const sheet = getSheet(SHEET_NAMES.trainingSessions);
-  if (!sheet) return 'SES' + Date.now();
-
-  const data = sheet.getDataRange().getValues();
-  if (data.length < 2) return 'SES0001';
-
   let maxNum = 0;
-  for (let i = 1; i < data.length; i++) {
-    const id = String(data[i][0]).trim();
-    if (id.startsWith('SES')) {
-      const num = parseInt(id.replace('SES', ''), 10);
-      if (!isNaN(num) && num > maxNum) {
-        maxNum = num;
+  try {
+    const tSheet = getSheet(SHEET_NAMES.trainings);
+    if (tSheet) {
+      const trainings = sheetToJson(tSheet);
+      for (const t of trainings) {
+        if (!t.ID) continue;
+        const ss = getTrainingDataSpreadsheet(t.ID);
+        if (!ss) continue;
+        const sessSheet = ss.getSheetByName('TrainingSessions');
+        if (!sessSheet) continue;
+        const data = sessSheet.getDataRange().getValues();
+        for (let i = 1; i < data.length; i++) {
+          const id = String(data[i][0]).trim();
+          if (id.startsWith('SES')) {
+            const num = parseInt(id.replace('SES', ''), 10);
+            if (!isNaN(num) && num > maxNum) {
+              maxNum = num;
+            }
+          }
+        }
       }
     }
-  }
+  } catch (e) {}
   const nextNum = maxNum + 1;
   return 'SES' + String(nextNum).padStart(4, '0');
 }
@@ -50,8 +58,16 @@ function createSession(data) {
       }
     }
 
-    const sheet = getSheet(SHEET_NAMES.trainingSessions);
-    if (!sheet) return err('Could not open TrainingSessions sheet.');
+    const ss = getTrainingDataSpreadsheet(data.TrainingID);
+    if (!ss) return err('Could not open per-training sheet for ID: ' + data.TrainingID);
+
+    let sheet = ss.getSheetByName('TrainingSessions');
+    if (!sheet) {
+      sheet = ss.insertSheet('TrainingSessions');
+      sheet.appendRow(['SessionID', 'TrainingID', 'SessionName', 'SessionDate', 'StartTime', 'EndTime', 'AttendanceURL', 'QRCodeURL', 'QRStatus', 'CreatedDate']);
+      sheet.getRange('A1:J1').setFontWeight('bold').setBackground('#2563EB').setFontColor('#FFFFFF');
+      sheet.setFrozenRows(1);
+    }
 
     const sessionId = generateSessionId();
     const attendanceUrl = generateAttendanceURL(sessionId);
@@ -86,13 +102,6 @@ function createSession(data) {
 
     sheet.appendRow(sessionRow);
 
-    // Sync session record to the training's dedicated Drive Training Sessions Sheet
-    try {
-      syncSessionToTrainingDriveSheet(data.TrainingID, sessionRow);
-    } catch (e) {
-      Logger.log('syncSessionToTrainingDriveSheet error: ' + e.message);
-    }
-
     // Automatically update lifecycle stage to 'Attendance In Progress' when session attendance is created
     try {
       updateTrainingStage(data.TrainingID, 'Attendance In Progress');
@@ -115,15 +124,31 @@ function createSession(data) {
  */
 function getSessions(trainingId) {
   try {
-    const sheet = getSheet(SHEET_NAMES.trainingSessions);
-    if (!sheet) return ok([]);
-
-    const rows = sheetToJson(sheet);
     if (trainingId) {
-      const filtered = rows.filter(r => String(r.TrainingID).trim() === String(trainingId).trim());
-      return ok(filtered);
+      const ss = getTrainingDataSpreadsheet(trainingId);
+      if (!ss) return ok([]);
+      const sheet = ss.getSheetByName('TrainingSessions');
+      if (!sheet) return ok([]);
+      return ok(sheetToJson(sheet));
     }
-    return ok(rows);
+
+    // Iterate across all trainings if trainingId omitted
+    const tSheet = getSheet(SHEET_NAMES.trainings);
+    if (!tSheet) return ok([]);
+    const trainings = sheetToJson(tSheet);
+    let allSessions = [];
+    trainings.forEach(t => {
+      if (t.ID) {
+        const ss = getTrainingDataSpreadsheet(t.ID);
+        if (ss) {
+          const sheet = ss.getSheetByName('TrainingSessions');
+          if (sheet) {
+            allSessions = allSessions.concat(sheetToJson(sheet));
+          }
+        }
+      }
+    });
+    return ok(allSessions);
   } catch (e) {
     Logger.log('getSessions error: ' + e.message);
     return err('Failed to load sessions: ' + e.message);
@@ -140,13 +165,10 @@ function getSession(sessionId) {
   try {
     if (!sessionId) return err('Session ID is required.');
 
-    const sheet = getSheet(SHEET_NAMES.trainingSessions);
-    if (!sheet) return err('TrainingSessions sheet not found.');
+    const found = findTrainingBySessionId(sessionId);
+    if (!found || !found.session) return err('Session not found.');
 
-    const rows = sheetToJson(sheet);
-    const session = rows.find(r => String(r.SessionID || '').trim() === String(sessionId).trim());
-
-    if (!session) return err('Session not found.');
+    const session = found.session;
 
     // Ensure AttendanceURL and QRCodeURL are present
     if (!session.AttendanceURL) {
@@ -157,20 +179,11 @@ function getSession(sessionId) {
     }
 
     // Attach parent Training details
-    try {
-      const tSheet = getSheet(SHEET_NAMES.trainings);
-      if (tSheet) {
-        const tRows = sheetToJson(tSheet);
-        const parentTraining = tRows.find(t => String(t.ID || t.TrainingID || '').trim() === String(session.TrainingID).trim());
-        if (parentTraining) {
-          session.TrainingTitle = parentTraining.Name || parentTraining.TrainingTitle || '';
-          session.Trainer       = parentTraining.Trainer || '';
-          session.Venue         = parentTraining.Venue || '';
-          session.Category      = parentTraining.Category || '';
-        }
-      }
-    } catch (e) {
-      Logger.log('Non-fatal parent training lookup error: ' + e.message);
+    if (found.training) {
+      session.TrainingTitle = found.training.Name || found.training.TrainingTitle || '';
+      session.Trainer       = found.training.Trainer || '';
+      session.Venue         = found.training.Venue || '';
+      session.Category      = found.training.Category || '';
     }
 
     return ok(session);
@@ -190,7 +203,10 @@ function getSession(sessionId) {
 function updateSessionQRStatus(sessionId, status) {
   try {
     if (!sessionId) return err('Session ID is required.');
-    const sheet = getSheet(SHEET_NAMES.trainingSessions);
+    const found = findTrainingBySessionId(sessionId);
+    if (!found || !found.sessionSheet) return err('Session not found.');
+
+    const sheet = found.sessionSheet;
     const row = findRowById(sheet, sessionId);
     if (row === -1) return err('Session not found.');
 

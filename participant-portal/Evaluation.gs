@@ -63,10 +63,17 @@ function saveTrainingEvaluation(data) {
     
     const avg = (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2);
 
-    const sheet = getSheet(SHEET_NAMES.trainingEval);
-    if (!sheet) return err('TrainingEval sheet not found.');
+    const ss = getTrainingDataSpreadsheet(trainingId);
+    if (!ss) return err('Could not open per-training sheet for ID: ' + trainingId);
 
-    // Columns: ['ID', 'TrainingID', 'EmployeeID', 'EmployeeName', 'Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6', 'Q7', 'SectionB1', 'SectionB2', 'SectionB3', 'AvgScore', 'SubmittedAt']
+    let sheet = ss.getSheetByName('TrainingEval');
+    if (!sheet) {
+      sheet = ss.insertSheet('TrainingEval');
+      sheet.appendRow(['ID', 'TrainingID', 'EmployeeID', 'EmployeeName', 'Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6', 'Q7', 'SectionB1', 'SectionB2', 'SectionB3', 'AvgScore', 'SubmittedAt']);
+      sheet.getRange('A1:P1').setFontWeight('bold').setBackground('#2563EB').setFontColor('#FFFFFF');
+      sheet.setFrozenRows(1);
+    }
+
     const evalRow = [
       generateId('EVL'),
       trainingId,
@@ -81,7 +88,6 @@ function saveTrainingEvaluation(data) {
       now()
     ];
     sheet.appendRow(evalRow);
-    try { syncEvaluationToTrainingDriveSheet(trainingId, evalRow); } catch(e) {}
 
     return ok({ 
       message: 'Training evaluation submitted successfully!',
@@ -128,10 +134,17 @@ function savePostEvaluation(data) {
     const finalTId   = validation.trainingId;
     const finalEmpId = validation.employeeId;
 
-    const sheet = getSheet(SHEET_NAMES.postEval);
-    if (!sheet) return err('PostEval sheet not found.');
+    const ss = getTrainingDataSpreadsheet(finalTId);
+    if (!ss) return err('Could not open per-training sheet for ID: ' + finalTId);
 
-    // Columns: ['ID', 'TrainingID', 'EmployeeID', 'EvaluatorName', 'EvaluatorID', 'CompetencyBefore', 'CompetencyAfter', 'Improvement', 'CanApply', 'FurtherTraining', 'Comments', 'SubmittedAt']
+    let sheet = ss.getSheetByName('PostEval');
+    if (!sheet) {
+      sheet = ss.insertSheet('PostEval');
+      sheet.appendRow(['ID', 'TrainingID', 'EmployeeID', 'EvaluatorName', 'EvaluatorID', 'CompetencyBefore', 'CompetencyAfter', 'Improvement', 'CanApply', 'FurtherTraining', 'Comments', 'SubmittedAt']);
+      sheet.getRange('A1:L1').setFontWeight('bold').setBackground('#2563EB').setFontColor('#FFFFFF');
+      sheet.setFrozenRows(1);
+    }
+
     const postRow = [
       generateId('PEV'),
       finalTId,
@@ -147,14 +160,14 @@ function savePostEvaluation(data) {
       now()
     ];
     sheet.appendRow(postRow);
-    try { syncPostEvalToTrainingDriveSheet(finalTId, postRow); } catch(e) {}
 
-    return ok({ message: '6-Month Post-Training Evaluation submitted successfully!' });
+    return ok({
+      message: 'Post-training evaluation submitted successfully!',
+      trainingTitle: validation.training ? validation.training.Name : ''
+    });
 
   } catch (e) {
     Logger.log('savePostEvaluation error: ' + e.message);
     return err('Failed to save post-evaluation: ' + e.message);
   }
 }
-
-

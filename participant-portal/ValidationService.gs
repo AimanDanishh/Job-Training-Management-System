@@ -77,7 +77,8 @@ function validateParticipantEnrollment(trainingId, employeeId) {
   const cleanTId   = String(trainingId || '').trim();
   const cleanEmpId = String(employeeId || '').trim().toLowerCase();
 
-  const tpSheet = getSheet(SHEET_NAMES.trainingParticipants);
+  const ss = getTrainingDataSpreadsheet(cleanTId);
+  const tpSheet = ss ? ss.getSheetByName('TrainingParticipants') : null;
   if (!tpSheet) {
     // Fallback: If TrainingParticipants sheet isn't populated, permit lookup in Employees
     return getValidEmployee(employeeId);
@@ -85,8 +86,7 @@ function validateParticipantEnrollment(trainingId, employeeId) {
 
   const tpRows = sheetToJson(tpSheet);
   const enrolled = tpRows.find(r => 
-    String(r.TrainingID || '').trim() === cleanTId && 
-    String(r.EmployeeID || r.EmployeeNo || '').trim().toLowerCase() === cleanEmpId
+    String(r.EmployeeID || r.EmployeeNo || r.ID || '').trim().toLowerCase() === cleanEmpId
   );
 
   if (!enrolled) {
@@ -113,16 +113,13 @@ function validatePublicAttendance(sessionId, employeeId) {
     const cleanEmpId     = String(employeeId).trim();
 
     // A. Validate Session Existence & Status
-    const sSheet = getSheet(SHEET_NAMES.trainingSessions);
-    if (!sSheet) return { valid: false, message: 'Training Sessions sheet not found.' };
-
-    const sessionRows = sheetToJson(sSheet);
-    const session = sessionRows.find(r => String(r.SessionID || '').trim() === cleanSessionId);
-
-    if (!session) {
+    const found = findTrainingBySessionId(cleanSessionId);
+    if (!found || !found.session) {
       return { valid: false, message: 'Invalid session ID. Session does not exist.' };
     }
 
+    const session = found.session;
+    const sSheet  = found.sessionSheet;
     const qrStatus = String(session.QRStatus || 'Active').trim();
 
     // Check if SessionDate + EndTime has passed
@@ -172,7 +169,8 @@ function validatePublicAttendance(sessionId, employeeId) {
     if (!enrollCheck.valid) return enrollCheck;
 
     // E. Prevent Duplicate Attendance Submission
-    const attSheet = getSheet(SHEET_NAMES.attendance);
+    const ss = found.spreadsheet;
+    const attSheet = ss ? ss.getSheetByName('Attendance') : null;
     if (attSheet) {
       const attRows = sheetToJson(attSheet);
       const duplicate = attRows.find(r => {
@@ -253,15 +251,15 @@ function validatePublicEvaluation(trainingId, employeeId) {
     }
 
     // E. Attendance Verification: Disallow evaluation for absent participants
-    const attSheet = getSheet(SHEET_NAMES.attendance);
+    const ss = getTrainingDataSpreadsheet(cleanTId);
+    const attSheet = ss ? ss.getSheetByName('Attendance') : null;
     if (attSheet) {
       const attRows = sheetToJson(attSheet);
       const attRecord = attRows.find(r => 
-        String(r.TrainingID || '').trim() === cleanTId &&
         String(r.EmployeeNo || r.EmployeeID || '').trim().toLowerCase() === cleanEmpId.toLowerCase()
       );
 
-      // If record exists and status is Absent, or no Present record exists when attendance is required
+      // If record exists and status is Absent
       if (attRecord && String(attRecord.Status || '').toLowerCase() === 'absent') {
         return {
           valid: false,
@@ -271,11 +269,10 @@ function validatePublicEvaluation(trainingId, employeeId) {
     }
 
     // F. Prevent Duplicate Evaluation Submission
-    const evalSheet = getSheet(SHEET_NAMES.trainingEval);
+    const evalSheet = ss ? ss.getSheetByName('TrainingEval') : null;
     if (evalSheet) {
       const evalRows = sheetToJson(evalSheet);
       const duplicate = evalRows.find(r => 
-        String(r.TrainingID || '').trim() === cleanTId &&
         String(r.EmployeeID || '').trim().toLowerCase() === cleanEmpId.toLowerCase()
       );
 
@@ -298,7 +295,7 @@ function validatePublicEvaluation(trainingId, employeeId) {
   }
 }
 
-// ─── 6. Public Post-Evaluation Validation (6-Month Supervisor Review) ────────────
+// ─── 6. Public Post-Evaluation Validation (3-Month Supervisor Review) ────────────
 function validatePublicPostEvaluation(trainingId, employeeId, token) {
   try {
     const cleanTId   = String(trainingId || '').trim();
@@ -312,7 +309,6 @@ function validatePublicPostEvaluation(trainingId, employeeId, token) {
       return { valid: false, message: 'Employee ID is required.' };
     }
 
-    // Optional token resolution if token format is used: TOKEN_TRN_ID_EMP_ID or similar
     let effectiveTId   = cleanTId;
     let effectiveEmpId = cleanEmpId;
 
@@ -337,18 +333,18 @@ function validatePublicPostEvaluation(trainingId, employeeId, token) {
     if (!enrollCheck.valid) return enrollCheck;
 
     // D. Prevent Duplicate Post-Evaluation Submission
-    const postSheet = getSheet(SHEET_NAMES.postEval);
+    const ss = getTrainingDataSpreadsheet(effectiveTId);
+    const postSheet = ss ? ss.getSheetByName('PostEval') : null;
     if (postSheet) {
       const postRows = sheetToJson(postSheet);
       const duplicate = postRows.find(r =>
-        String(r.TrainingID || '').trim() === effectiveTId &&
         String(r.EmployeeID || '').trim().toLowerCase() === effectiveEmpId.toLowerCase()
       );
 
       if (duplicate) {
         return {
           valid: false,
-          message: `A 6-Month Post-Training Evaluation has already been submitted for employee (${effectiveEmpId}).`
+          message: `A 3-Month Post-Training Evaluation has already been submitted for employee (${effectiveEmpId}).`
         };
       }
     }

@@ -246,12 +246,13 @@ function syncTrainingRequisitionParticipants(trainingId) {
     const formId = formColumn ? trainingSheet.getRange(trainingRow, formColumn).getValue() : '';
     if (!formId) return;
 
-    // Combine participants from TrainingParticipants sheet & Attendance sheet
-    const tpSheet = getSheet(SHEET_NAMES.trainingParticipants);
-    const tpRows  = tpSheet ? sheetToJson(tpSheet).filter(row => String(row.TrainingID) === String(trainingId)) : [];
+    // Combine participants from TrainingParticipants tab & Attendance tab in per-training sheet
+    const ss = getTrainingDataSpreadsheet(trainingId);
+    const tpSheet = ss ? ss.getSheetByName('TrainingParticipants') : null;
+    const tpRows  = tpSheet ? sheetToJson(tpSheet) : [];
 
-    const attSheet = getSheet(SHEET_NAMES.attendance);
-    const attRows  = attSheet ? sheetToJson(attSheet).filter(row => String(row.TrainingID) === String(trainingId)) : [];
+    const attSheet = ss ? ss.getSheetByName('Attendance') : null;
+    const attRows  = attSheet ? sheetToJson(attSheet) : [];
 
     const uniqueParticipants = [];
     const seen = {};
@@ -298,7 +299,7 @@ function syncTrainingRequisitionParticipants(trainingId) {
       sheet.getRange(`C${row}`).setValue(participant.EmployeeName || employee.Name || '');
       sheet.getRange(`D${row}`).setValue(participant.Department || employee.Department || '');
       sheet.getRange(`E${row}`).setValue(employee.NRIC || '');
-      sheet.getRange(`G${row}`).setValue(participant.Position || employee.Position || employee.JobTitle || '');
+      sheet.getRange(`G${row}`).setValue(participant.Position || employee.Position || employee.JobTitle || employee.PositionTitle || '');
     });
 
     trainingSheet.getRange(trainingRow, 15).setValue(uniqueParticipants.length);

@@ -217,16 +217,24 @@
     }
 
     function renderRequisition(data) {
-      const t = data.training;
-      const req = data.requester;
-      currentHOD = data.hod;
-      currentTrainingId = t.ID;
+      currentHOD = data.hod || { Name: 'HOD Manager', ID: 'HOD-1001', CostCentre: 'Management' };
 
       // Header HOD profile
       document.getElementById('badgeHodName').innerText = `${currentHOD.Name} (${currentHOD.CostCentre})`;
       document.getElementById('hodIdDisplay').innerText = currentHOD.ID;
       document.getElementById('hodNameDisplay').innerText = currentHOD.Name;
       document.getElementById('hodCostCentreDisplay').innerText = currentHOD.CostCentre;
+
+      const t = data.training;
+      if (!t) {
+        document.getElementById('reqTitle').innerText = 'No Pending Requisitions';
+        document.getElementById('reqCode').innerText = 'There are currently no training requisitions pending your managerial approval.';
+        document.getElementById('approvalSection').style.display = 'none';
+        return;
+      }
+
+      const req = data.requester || { Name: 'N/A', ID: 'N/A', Department: 'N/A', Email: 'N/A' };
+      currentTrainingId = t.ID;
 
       // Requisition details
       document.getElementById('reqTitle').innerText = t.Name || 'Training Programme';

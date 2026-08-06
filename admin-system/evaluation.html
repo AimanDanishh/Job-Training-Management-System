@@ -67,7 +67,7 @@
             <div style="border:1px solid #E2E8F0;border-radius:10px;padding:14px;background:#fff;display:flex;align-items:center;gap:14px">
               <img id="eval-qr-img-l3" src="" alt="Level 3 QR" style="width:110px;height:110px;border-radius:6px;border:1px solid #CBD5E1;padding:3px;background:#fff;flex-shrink:0">
               <div style="flex:1;min-width:0">
-                <div style="font-size:12.5px;font-weight:700;color:#1E293B;margin-bottom:2px">Level 3: Supervisor 6-Month Evaluation</div>
+                <div style="font-size:12.5px;font-weight:700;color:#1E293B;margin-bottom:2px">Level 3: Supervisor 3-Month Post Evaluation</div>
                 <div style="font-size:10.5px;color:#64748B;margin-bottom:8px">Supervisor post-training evaluation form</div>
                 <div style="display:flex;gap:6px">
                   <button class="btn-th btn-secondary btn-xs" onclick="copyEvalUrl('l3')"><span class="icon sm">content_copy</span> Copy Link</button>
@@ -82,7 +82,7 @@
       <!-- Sub-tabs -->
       <div class="subtab-row" id="eval-subtabs" style="display:none">
         <button class="subtab active" data-tab="training-eval" onclick="switchTab(this)"><span class="icon sm">rate_review</span>Training Evaluation</button>
-        <button class="subtab" data-tab="post-eval" onclick="switchTab(this)"><span class="icon sm">timeline</span>6-Month Post Evaluation</button>
+        <button class="subtab" data-tab="post-eval" onclick="switchTab(this)"><span class="icon sm">timeline</span>3-Month Post Evaluation</button>
       </div>
 
       <!-- Training Eval Tab -->
@@ -335,7 +335,7 @@
       trainings.forEach(t => {
         const o = document.createElement('option');
         o.value = t.ID;
-        const tag = (t.isSixMonthsReached || t.Stage === 'Waiting for 6-Month Review') ? '⏰ [6-MO REVIEW DUE] ' : '';
+        const tag = (t.isThreeMonthsReached || t.isSixMonthsReached || t.Stage === 'Waiting for 3-Month Review') ? '⏰ [3-MO REVIEW DUE] ' : '';
         o.textContent = `${tag}[${t.Code}] ${t.Name}`;
         sel.appendChild(o);
       });

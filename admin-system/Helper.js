@@ -249,67 +249,18 @@ function seedInitialSheetData(sheet, name) {
   if (sheet.getLastRow() === 0) {
     initSheetHeaders(sheet, name);
   }
-  if (sheet.getLastRow() > 1) return;
-
-  const key = Object.keys(SHEET_NAMES).find(k => SHEET_NAMES[k] === name || k === name || name.toLowerCase().includes(k.toLowerCase())) || name;
-  const timeNow = now();
-
-  if (key === 'employees' || name === 'Employees' || name === 'Employees') {
-    const sampleEmployees = [
-      ['EMP-1001', 'Ahmad Razak', 'Engineering / Cost Centre 101', 'Senior Engineer', 'ahmad.razak@company.com', '+60 12-3456789', 'Active'],
-      ['EMP-1002', 'Siti Nurhaliza', 'HR / Cost Centre 102', 'HR Executive', 'siti.nurhaliza@company.com', '+60 13-9876543', 'Active'],
-      ['EMP-1003', 'Tan Wei Liang', 'Finance / Cost Centre 103', 'Financial Analyst', 'wei.liang@company.com', '+60 16-4567890', 'Active'],
-      ['EMP-1004', 'Muthu Kumar', 'Operations / Cost Centre 104', 'Operations Supervisor', 'muthu.k@company.com', '+60 17-2345678', 'Active'],
-      ['EMP-1005', 'Lee Jia Hui', 'IT / Cost Centre 105', 'System Admin', 'jiahui.lee@company.com', '+60 19-8765432', 'Active'],
-      ['EMP-1006', 'Faridah Hashim', 'Sales / Cost Centre 106', 'Sales Manager', 'faridah.h@company.com', '+60 11-1234567', 'Active'],
-      ['EMP-1007', 'Chong Jin Hoe', 'Engineering / Cost Centre 101', 'Software Engineer', 'jinhoe.c@company.com', '+60 14-5678901', 'Active'],
-      ['EMP-1008', 'Nadia Azman', 'HR / Cost Centre 102', 'Talent Acquisition Specialist', 'nadia.a@company.com', '+60 18-9012345', 'Active']
-    ];
-    sampleEmployees.forEach(r => sheet.appendRow(r));
-  } else if (key === 'trainings' || name === 'Trainings') {
-    const sampleTrainings = [
-      [
-        'TRN-1001', 'LM-2026-0001', 'Leadership Excellence & Strategic Management',
-        'Leadership & Management', 'Dr. Aris Thorne', 'Grand Ballroom / Online',
-        '2026-08-10', '2026-08-12', 3, 24, 'HR / Cost Centre 102',
-        'Enhance strategic leadership capabilities and team management skills.',
-        'Upcoming', 'Created', 4, '', '', '', '', '', '', '', '', timeNow, timeNow, '1500.00', ''
-      ],
-      [
-        'TRN-1002', 'CR-2026-0002', 'ISO 27001 Cybersecurity & Data Compliance',
-        'Compliance & Regulatory', 'Sarah Jenkins', 'Training Room A',
-        '2026-08-01', '2026-08-02', 2, 16, 'IT / Cost Centre 105',
-        'Comprehensive security protocols and compliance training.',
-        'In Progress', 'Attendance In Progress', 2, '', '', '', '', '', '', '', '', timeNow, timeNow, '1200.00', ''
-      ]
-    ];
-    sampleTrainings.forEach(r => sheet.appendRow(r));
-  } else if (key === 'trainingParticipants' || name === 'TrainingParticipants') {
-    const sampleParticipants = [
-      ['TP-1001', 'TRN-1001', 'EMP-1001', 'Ahmad Razak', 'Engineering / Cost Centre 101', 'Senior Engineer', timeNow],
-      ['TP-1002', 'TRN-1001', 'EMP-1002', 'Siti Nurhaliza', 'HR / Cost Centre 102', 'HR Executive', timeNow],
-      ['TP-1003', 'TRN-1001', 'EMP-1003', 'Tan Wei Liang', 'Finance / Cost Centre 103', 'Financial Analyst', timeNow],
-      ['TP-1004', 'TRN-1001', 'EMP-1004', 'Muthu Kumar', 'Operations / Cost Centre 104', 'Operations Supervisor', timeNow],
-      ['TP-1005', 'TRN-1002', 'EMP-1005', 'Lee Jia Hui', 'IT / Cost Centre 105', 'System Admin', timeNow],
-      ['TP-1006', 'TRN-1002', 'EMP-1007', 'Chong Jin Hoe', 'Engineering / Cost Centre 101', 'Software Engineer', timeNow]
-    ];
-    sampleParticipants.forEach(r => sheet.appendRow(r));
-  } else if (key === 'trainingSessions' || name === 'TrainingSessions') {
-    const sampleSessions = [
-      ['SES0001', 'TRN-1001', 'Day 1 - Morning', '2026-08-10', '09:00', '12:00', '', '', 'Active', timeNow],
-      ['SES0002', 'TRN-1001', 'Day 1 - Afternoon', '2026-08-10', '13:30', '17:00', '', '', 'Active', timeNow],
-      ['SES0003', 'TRN-1002', 'Day 1', '2026-08-01', '09:00', '17:00', '', '', 'Active', timeNow],
-      ['SES0004', 'TRN-1002', 'Day 2', '2026-08-02', '09:00', '17:00', '', '', 'Active', timeNow]
-    ];
-    sampleSessions.forEach(r => sheet.appendRow(r));
-  }
 }
 
 /** Adds fields introduced after the original training sheet was deployed. */
 function ensureTrainingSheetColumns(sheet) {
   const requiredHeaders = [
+    'ID', 'Code', 'Name', 'Category', 'Trainer', 'Venue', 'StartDate',
+    'EndDate', 'Duration', 'TotalHours', 'Department', 'Objectives',
+    'Status', 'Stage', 'Participants',
     'FolderID', 'ParticipantsSheetID', 'SessionsSheetID', 'AttendanceSheetID',
-    'EvaluationSheetID', 'PostSheetID', 'RequisitionFormFileID', 'CourseFee'
+    'EvaluationSheetID', 'PostSheetID', 'RequisitionFormFileID',
+    'CreatedDate', 'UpdatedDate', 'CourseFee',
+    'ApprovalStatus', 'RequestedBy', 'RequestedDate', 'ApprovedBy', 'ApprovedCostCentre', 'ApprovedAt', 'ApprovalRemarks', 'RescheduledDate'
   ];
   const headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
   requiredHeaders.forEach(header => {
@@ -357,6 +308,80 @@ function ensureTrainingSessionsSheetColumns(sheet) {
   return headers;
 }
 
+/**
+ * Resolves and opens the single per-training Google Sheet containing tabs:
+ * TrainingParticipants, TrainingSessions, Attendance, TrainingEval, PostEval, Summary
+ *
+ * @param {string} trainingId - Training ID (e.g. TRN-1001) or Training Code (e.g. LM-2026-0001)
+ * @returns {Spreadsheet|null} Google Spreadsheet object for the training, or null
+ */
+function getTrainingDataSpreadsheet(trainingId) {
+  if (!trainingId) return null;
+  const cleanId = String(trainingId).trim();
+
+  const tSheet = getSheet(SHEET_NAMES.trainings);
+  if (!tSheet) return null;
+
+  const trainings = sheetToJson(tSheet);
+  const t = trainings.find(r => String(r.ID || r.TrainingID || r.Code || '').trim() === cleanId);
+  if (!t) return null;
+
+  // 1. Try sheet ID stored in ParticipantsSheetID, SessionsSheetID, AttendanceSheetID, etc.
+  const sheetId = t.ParticipantsSheetID || t.AttendanceSheetID || t.SessionsSheetID || t.EvaluationSheetID || t.PostSheetID;
+  if (sheetId) {
+    try {
+      return SpreadsheetApp.openById(sheetId);
+    } catch (e) {
+      Logger.log('Error opening per-training sheet by ID (' + sheetId + '): ' + e.message);
+    }
+  }
+
+  // 2. Try FolderID
+  if (t.FolderID) {
+    try {
+      const folder = DriveApp.getFolderById(t.FolderID);
+      const code = t.Code || t.ID;
+      if (typeof getOrCreateSingleTrainingSheet === 'function') {
+        const file = getOrCreateSingleTrainingSheet(folder, code);
+        return SpreadsheetApp.openById(file.getId());
+      }
+    } catch (e) {
+      Logger.log('Error opening per-training sheet from FolderID: ' + e.message);
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Helper to look up a training session across all per-training sheets
+ * 
+ * @param {string} sessionId - Session ID (e.g. SES0001)
+ * @returns {Object|null} { session: Object, training: Object, spreadsheet: Spreadsheet, sessionSheet: Sheet }
+ */
+function findTrainingBySessionId(sessionId) {
+  if (!sessionId) return null;
+  const cleanSessionId = String(sessionId).trim();
+
+  const tSheet = getSheet(SHEET_NAMES.trainings);
+  if (!tSheet) return null;
+
+  const trainings = sheetToJson(tSheet);
+  for (const t of trainings) {
+    if (!t.ID) continue;
+    const ss = getTrainingDataSpreadsheet(t.ID);
+    if (!ss) continue;
+    const sessSheet = ss.getSheetByName('TrainingSessions');
+    if (!sessSheet) continue;
+    const sessions = sheetToJson(sessSheet);
+    const session = sessions.find(s => String(s.SessionID || '').trim() === cleanSessionId);
+    if (session) {
+      return { session: session, training: t, spreadsheet: ss, sessionSheet: sessSheet };
+    }
+  }
+  return null;
+}
+
 // ─── ID Generation ─────────────────────────────────────────────────────────────
 function generateId(prefix) {
   return prefix + '-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
@@ -374,13 +399,17 @@ function normalizeEmployeeHeader(header) {
   return header;
 }
 
-/**
- * Convert a sheet's data rows into an array of objects keyed by header row.
- */
+let _sheetDataCache = {};
 function sheetToJson(sheet) {
-  const data = sheet.getDataRange().getValues();
-  if (data.length < 2) return [];
+  if (!sheet) return [];
+  const sheetName = sheet.getName();
+  if (_sheetDataCache[sheetName]) return _sheetDataCache[sheetName];
 
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  if (lastRow < 2 || lastCol < 1) return [];
+
+  const data = sheet.getRange(1, 1, lastRow, lastCol).getValues();
   const headers = data[0];
   const rows = [];
 
@@ -404,6 +433,8 @@ function sheetToJson(sheet) {
     obj._row = i + 1; // 1-indexed sheet row number
     rows.push(obj);
   }
+
+  _sheetDataCache[sheetName] = rows;
   return rows;
 }
 
@@ -443,9 +474,10 @@ function err(message) {
  * and auto-create single-sheet formula-equipped Drive workspaces for all training programmes.
  */
 function setupSheets() {
-  Object.values(SHEET_NAMES).forEach(name => getSheet(name));
+  getSheet(SHEET_NAMES.trainings);
+  getSheet(SHEET_NAMES.employees);
 
-  // Ensure Master Database Spreadsheet (SPREADSHEET_ID) contains only the Trainings tab (and Employees tab if stored in master SS)
+  // Ensure Master Database Spreadsheet (SPREADSHEET_ID) contains ONLY the Trainings tab (and Employees tab if stored in master SS)
   try {
     const masterSS = getSpreadsheet();
     if (masterSS) {
@@ -454,7 +486,7 @@ function setupSheets() {
       if (sheets.length > 1) {
         sheets.forEach(s => {
           const sName = s.getName();
-          if (!allowedNames.includes(sName) && !sName.toLowerCase().includes('training') && !sName.toLowerCase().includes('emp')) {
+          if (!allowedNames.includes(sName)) {
             try { masterSS.deleteSheet(s); } catch(e) {}
           }
         });
@@ -490,54 +522,6 @@ function setupSheets() {
 
           try { syncParticipantsToTrainingDriveSheet(t.ID); } catch(e) {}
           try { syncTrainingRequisitionParticipants(t.ID); } catch(e) {}
-
-          // Sync sessions to single sheet
-          try {
-            const sessSheet = getSheet(SHEET_NAMES.trainingSessions);
-            if (sessSheet) {
-              const sessions = sheetToJson(sessSheet).filter(s => String(s.TrainingID) === String(t.ID));
-              sessions.forEach(s => {
-                const sRow = [s.SessionID, s.TrainingID, s.SessionName, s.SessionDate, s.StartTime, s.EndTime, s.AttendanceURL, s.QRCodeURL, s.QRStatus, s.CreatedDate];
-                syncSessionToTrainingDriveSheet(t.ID, sRow);
-              });
-            }
-          } catch(e) {}
-
-          // Sync attendance to single sheet
-          try {
-            const attSheet = getSheet(SHEET_NAMES.attendance);
-            if (attSheet) {
-              const atts = sheetToJson(attSheet).filter(a => String(a.TrainingID) === String(t.ID));
-              atts.forEach(a => {
-                const aRow = [a.AttendanceID, a.SessionID, a.TrainingID, a.EmployeeNo, a.EmployeeName, a.Department, a.ScanTime, a.Status, a.TrainingCode, a.Day, a.Date, a.Hours, a.Remarks, a.EditedBy, a.EditedAt];
-                syncAttendanceToTrainingDriveSheet(t.ID, aRow);
-              });
-            }
-          } catch(e) {}
-
-          // Sync evaluations to single sheet
-          try {
-            const evalSheet = getSheet(SHEET_NAMES.trainingEval);
-            if (evalSheet) {
-              const evals = sheetToJson(evalSheet).filter(ev => String(ev.TrainingID) === String(t.ID));
-              evals.forEach(ev => {
-                const evRow = [ev.ID, ev.TrainingID, ev.EmployeeID, ev.EmployeeName, ev.Q1, ev.Q2, ev.Q3, ev.Q4, ev.Q5, ev.Q6, ev.Q7, ev.SectionB1, ev.SectionB2, ev.SectionB3, ev.AvgScore, ev.SubmittedAt];
-                syncEvaluationToTrainingDriveSheet(t.ID, evRow);
-              });
-            }
-          } catch(e) {}
-
-          // Sync post evaluations to single sheet
-          try {
-            const postSheet = getSheet(SHEET_NAMES.postEval);
-            if (postSheet) {
-              const posts = sheetToJson(postSheet).filter(p => String(p.TrainingID) === String(t.ID));
-              posts.forEach(p => {
-                const pRow = [p.ID, p.TrainingID, p.EmployeeID, p.EvaluatorName, p.EvaluatorID, p.CompetencyBefore, p.CompetencyAfter, p.Improvement, p.CanApply, p.FurtherTraining, p.Comments, p.SubmittedAt];
-                syncPostEvalToTrainingDriveSheet(t.ID, pRow);
-              });
-            }
-          } catch(e) {}
         }
       });
     }
@@ -545,5 +529,5 @@ function setupSheets() {
     Logger.log('setupSheets workspace sync error: ' + e.message);
   }
 
-  Logger.log('All database sheets and per-training single-sheet Drive workspaces initialised successfully.');
+  Logger.log('Master database cleaned and per-training single-sheet Drive workspaces initialised successfully.');
 }

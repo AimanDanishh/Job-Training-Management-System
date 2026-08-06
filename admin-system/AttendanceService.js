@@ -40,8 +40,16 @@ function submitAttendance(arg1, arg2, arg3, arg4) {
     const finalEmpName = employeeName || (empInfo ? empInfo.Name : cleanEmpNo);
     const finalDept    = department   || (empInfo ? empInfo.Department : '');
 
-    const attSheet = getSheet(SHEET_NAMES.attendance);
-    if (!attSheet) return err('Could not open Attendance sheet.');
+    const ss = getTrainingDataSpreadsheet(session.TrainingID);
+    if (!ss) return err('Could not open per-training sheet for ID: ' + session.TrainingID);
+
+    let attSheet = ss.getSheetByName('Attendance');
+    if (!attSheet) {
+      attSheet = ss.insertSheet('Attendance');
+      attSheet.appendRow(['AttendanceID', 'SessionID', 'TrainingID', 'EmployeeNo', 'EmployeeName', 'Department', 'ScanTime', 'Status', 'TrainingCode', 'Day', 'Date', 'Hours', 'Remarks', 'EditedBy', 'EditedAt']);
+      attSheet.getRange('A1:O1').setFontWeight('bold').setBackground('#2563EB').setFontColor('#FFFFFF');
+      attSheet.setFrozenRows(1);
+    }
 
     const attId = generateId('ATT');
     const scanTime = now();
@@ -58,8 +66,6 @@ function submitAttendance(arg1, arg2, arg3, arg4) {
       }
     } catch (e) {}
 
-    // Attendance Row format matching sheet headers:
-    // ['AttendanceID', 'SessionID', 'TrainingID', 'EmployeeNo', 'EmployeeName', 'Department', 'ScanTime', 'Status', 'TrainingCode', 'Day', 'Date', 'Hours', 'Remarks', 'EditedBy', 'EditedAt']
     const newRecord = [
       attId,
       session.SessionID,
@@ -83,11 +89,6 @@ function submitAttendance(arg1, arg2, arg3, arg4) {
     // Automatically update training stage to 'Attendance In Progress'
     try {
       updateTrainingStage(session.TrainingID, 'Attendance In Progress');
-    } catch (e) {}
-
-    // Sync attendance record to the training's dedicated Drive Attendance Sheet
-    try {
-      syncAttendanceToTrainingDriveSheet(session.TrainingID, newRecord);
     } catch (e) {}
 
     return ok({
@@ -115,10 +116,13 @@ function getAttendanceBySession(sessionId) {
   try {
     if (!sessionId) return err('Session ID is required.');
 
-    const sheet = getSheet(SHEET_NAMES.attendance);
-    if (!sheet) return ok([]);
+    const found = findTrainingBySessionId(sessionId);
+    if (!found || !found.spreadsheet) return ok([]);
 
-    const rows = sheetToJson(sheet);
+    const attSheet = found.spreadsheet.getSheetByName('Attendance');
+    if (!attSheet) return ok([]);
+
+    const rows = sheetToJson(attSheet);
     const filtered = rows.filter(r => String(r.SessionID || '').trim() === String(sessionId).trim());
 
     return ok(filtered);
@@ -138,14 +142,13 @@ function getAttendanceByTraining(trainingId) {
   try {
     if (!trainingId) return err('Training ID is required.');
 
-    // Fetch sessions
     const sessionsRes = getSessions(trainingId);
     const sessionsObj = typeof sessionsRes === 'string' ? JSON.parse(sessionsRes) : sessionsRes;
     const sessions = (sessionsObj && sessionsObj.success && sessionsObj.data) ? sessionsObj.data : [];
 
-    // Fetch all attendance for training
-    const attSheet = getSheet(SHEET_NAMES.attendance);
-    const allAtt = attSheet ? sheetToJson(attSheet).filter(r => String(r.TrainingID || '').trim() === String(trainingId).trim()) : [];
+    const ss = getTrainingDataSpreadsheet(trainingId);
+    const attSheet = ss ? ss.getSheetByName('Attendance') : null;
+    const allAtt = attSheet ? sheetToJson(attSheet) : [];
 
     const grouped = sessions.map(s => {
       const records = allAtt.filter(a => String(a.SessionID || '').trim() === String(s.SessionID).trim());
@@ -170,24 +173,37 @@ function getAttendanceByTraining(trainingId) {
 function updateAttendanceRecord(id, status, remarks) {
   try {
     if (!id) return err('Record ID is required.');
-    const sheet = getSheet(SHEET_NAMES.attendance);
-    if (!sheet) return err('Attendance sheet not found.');
 
-    const row = findRowById(sheet, id);
-    if (row === -1) return err('Attendance record not found.');
+    // Locate training sheet containing this attendance ID
+    const tSheet = getSheet(SHEET_NAMES.trainings);
+    if (!tSheet) return err('Trainings sheet unavailable.');
+    const trainings = sheetToJson(tSheet);
 
-    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    const statusCol   = headers.indexOf('Status') + 1;
-    const remarksCol  = headers.indexOf('Remarks') + 1;
-    const editedByCol = headers.indexOf('EditedBy') + 1;
-    const editedAtCol = headers.indexOf('EditedAt') + 1;
+    for (const t of trainings) {
+      if (!t.ID) continue;
+      const ss = getTrainingDataSpreadsheet(t.ID);
+      if (!ss) continue;
+      const attSheet = ss.getSheetByName('Attendance');
+      if (!attSheet) continue;
 
-    if (statusCol)  sheet.getRange(row, statusCol).setValue(status || 'Present');
-    if (remarksCol) sheet.getRange(row, remarksCol).setValue(remarks || '');
-    if (editedByCol) sheet.getRange(row, editedByCol).setValue('Admin');
-    if (editedAtCol) sheet.getRange(row, editedAtCol).setValue(now());
+      const row = findRowById(attSheet, id);
+      if (row !== -1) {
+        const headers = attSheet.getRange(1, 1, 1, attSheet.getLastColumn()).getValues()[0];
+        const statusCol   = headers.indexOf('Status') + 1;
+        const remarksCol  = headers.indexOf('Remarks') + 1;
+        const editedByCol = headers.indexOf('EditedBy') + 1;
+        const editedAtCol = headers.indexOf('EditedAt') + 1;
 
-    return ok({ message: 'Attendance record updated successfully.' });
+        if (statusCol)  attSheet.getRange(row, statusCol).setValue(status || 'Present');
+        if (remarksCol) attSheet.getRange(row, remarksCol).setValue(remarks || '');
+        if (editedByCol) attSheet.getRange(row, editedByCol).setValue('Admin');
+        if (editedAtCol) attSheet.getRange(row, editedAtCol).setValue(now());
+
+        return ok({ message: 'Attendance record updated successfully.' });
+      }
+    }
+
+    return err('Attendance record not found.');
   } catch (e) {
     Logger.log('updateAttendanceRecord error: ' + e.message);
     return err('Failed to update record: ' + e.message);
@@ -199,14 +215,18 @@ function updateAttendanceRecord(id, status, remarks) {
  */
 function getAttendance(trainingId) {
   try {
-    const sheet = getSheet(SHEET_NAMES.attendance);
+    if (!trainingId) return ok([]);
+    const ss = getTrainingDataSpreadsheet(trainingId);
+    if (!ss) return ok([]);
+    const sheet = ss.getSheetByName('Attendance');
+    if (!sheet) return ok([]);
+
     const rows = sheetToJson(sheet);
-    const filtered = rows.filter(r => r.TrainingID === trainingId);
 
     // Group by day
     const days = {};
-    filtered.forEach(r => {
-      const d = r.Day;
+    rows.forEach(r => {
+      const d = r.Day || '1';
       if (!days[d]) days[d] = { day: d, date: r.Date, records: [] };
       days[d].records.push(r);
     });
@@ -222,8 +242,13 @@ function getAttendance(trainingId) {
  */
 function getAttendanceSummary(trainingId) {
   try {
-    const sheet = getSheet(SHEET_NAMES.attendance);
-    const rows = sheetToJson(sheet).filter(r => r.TrainingID === trainingId);
+    if (!trainingId) return ok({ total: 0, present: 0, absent: 0, late: 0, pct: 0 });
+    const ss = getTrainingDataSpreadsheet(trainingId);
+    if (!ss) return ok({ total: 0, present: 0, absent: 0, late: 0, pct: 0 });
+    const sheet = ss.getSheetByName('Attendance');
+    if (!sheet) return ok({ total: 0, present: 0, absent: 0, late: 0, pct: 0 });
+
+    const rows = sheetToJson(sheet);
     const total   = rows.length;
     const present = rows.filter(r => r.Status === 'Present').length;
     const absent  = rows.filter(r => r.Status === 'Absent').length;

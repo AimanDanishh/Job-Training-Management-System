@@ -5,8 +5,12 @@
 // ─── Training Evaluation ────────────────────────────────────────────────────────
 function getTrainingEvaluations(trainingId) {
   try {
-    const sheet = getSheet(SHEET_NAMES.trainingEval);
-    const rows  = sheetToJson(sheet).filter(r => r.TrainingID === trainingId);
+    if (!trainingId) return ok([]);
+    const ss = getTrainingDataSpreadsheet(trainingId);
+    if (!ss) return ok([]);
+    const sheet = ss.getSheetByName('TrainingEval');
+    if (!sheet) return ok([]);
+    const rows  = sheetToJson(sheet);
     return ok(rows);
   } catch (e) {
     return err(e.message);
@@ -18,11 +22,22 @@ function saveTrainingEvaluation(data) {
     if (!data.TrainingID || !data.EmployeeID)
       return err('TrainingID and EmployeeID are required.');
 
+    const ss = getTrainingDataSpreadsheet(data.TrainingID);
+    if (!ss) return err('Could not open per-training sheet for ID: ' + data.TrainingID);
+
+    let sheet = ss.getSheetByName('TrainingEval');
+    if (!sheet) {
+      sheet = ss.insertSheet('TrainingEval');
+      sheet.appendRow(['ID', 'TrainingID', 'EmployeeID', 'EmployeeName', 'Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6', 'Q7', 'SectionB1', 'SectionB2', 'SectionB3', 'AvgScore', 'SubmittedAt']);
+      sheet.getRange('A1:P1').setFontWeight('bold').setBackground('#2563EB').setFontColor('#FFFFFF');
+      sheet.setFrozenRows(1);
+    }
+
     // Prevent duplicate submission
-    const sheet = getSheet(SHEET_NAMES.trainingEval);
-    const rows  = sheetToJson(sheet);
+    const rows = sheetToJson(sheet);
     const exists = rows.find(r =>
-      r.TrainingID === data.TrainingID && r.EmployeeID === data.EmployeeID
+      String(r.TrainingID || '').trim() === String(data.TrainingID).trim() &&
+      String(r.EmployeeID || '').trim().toLowerCase() === String(data.EmployeeID).trim().toLowerCase()
     );
     if (exists) return err('You have already submitted an evaluation for this training.');
 
@@ -47,7 +62,6 @@ function saveTrainingEvaluation(data) {
       now()
     ];
     sheet.appendRow(evalRow);
-    try { syncEvaluationToTrainingDriveSheet(data.TrainingID, evalRow); } catch(e) {}
 
     return ok({ message: 'Training evaluation submitted. Average score: ' + avg });
   } catch (e) {
@@ -58,9 +72,29 @@ function saveTrainingEvaluation(data) {
 // ─── Post-Training Evaluation (6-month) ────────────────────────────────────────
 function getPostEvaluations(trainingId) {
   try {
-    const sheet = getSheet(SHEET_NAMES.postEval);
-    const rows  = sheetToJson(sheet).filter(r => r.TrainingID === trainingId);
-    return ok(rows);
+    if (trainingId) {
+      const ss = getTrainingDataSpreadsheet(trainingId);
+      if (!ss) return ok([]);
+      const sheet = ss.getSheetByName('PostEval');
+      if (!sheet) return ok([]);
+      return ok(sheetToJson(sheet));
+    }
+
+    // Iterate across all trainings if trainingId omitted
+    const tSheet = getSheet(SHEET_NAMES.trainings);
+    if (!tSheet) return ok([]);
+    const trainings = sheetToJson(tSheet);
+    let allPosts = [];
+    trainings.forEach(t => {
+      if (t.ID) {
+        const ss = getTrainingDataSpreadsheet(t.ID);
+        if (ss) {
+          const sheet = ss.getSheetByName('PostEval');
+          if (sheet) allPosts = allPosts.concat(sheetToJson(sheet));
+        }
+      }
+    });
+    return ok(allPosts);
   } catch (e) {
     return err(e.message);
   }
@@ -77,10 +111,21 @@ function savePostEvaluation(data) {
       return err('Competency levels before and after training (scale 1-5) are required.');
     }
 
-    const sheet = getSheet(SHEET_NAMES.postEval);
-    const rows  = sheetToJson(sheet);
+    const ss = getTrainingDataSpreadsheet(data.TrainingID);
+    if (!ss) return err('Could not open per-training sheet for ID: ' + data.TrainingID);
+
+    let sheet = ss.getSheetByName('PostEval');
+    if (!sheet) {
+      sheet = ss.insertSheet('PostEval');
+      sheet.appendRow(['ID', 'TrainingID', 'EmployeeID', 'EvaluatorName', 'EvaluatorID', 'CompetencyBefore', 'CompetencyAfter', 'Improvement', 'CanApply', 'FurtherTraining', 'Comments', 'SubmittedAt']);
+      sheet.getRange('A1:L1').setFontWeight('bold').setBackground('#2563EB').setFontColor('#FFFFFF');
+      sheet.setFrozenRows(1);
+    }
+
+    const rows = sheetToJson(sheet);
     const exists = rows.find(r =>
-      r.TrainingID === data.TrainingID && r.EmployeeID === data.EmployeeID
+      String(r.TrainingID || '').trim() === String(data.TrainingID).trim() &&
+      String(r.EmployeeID || '').trim().toLowerCase() === String(data.EmployeeID).trim().toLowerCase()
     );
     if (exists) return err('A post-training evaluation has already been submitted for this employee.');
 
@@ -99,7 +144,6 @@ function savePostEvaluation(data) {
       now()
     ];
     sheet.appendRow(postRow);
-    try { syncPostEvalToTrainingDriveSheet(data.TrainingID, postRow); } catch(e) {}
 
     // Auto-advance training stage if all post-evals are done
     tryAdvanceToEvaluationCompleted(data.TrainingID);
@@ -113,11 +157,15 @@ function savePostEvaluation(data) {
 // ─── Evaluation Summary ─────────────────────────────────────────────────────────
 function getEvaluationSummary(trainingId) {
   try {
-    const evalSheet = getSheet(SHEET_NAMES.trainingEval);
-    const evalRows  = sheetToJson(evalSheet).filter(r => r.TrainingID === trainingId);
+    if (!trainingId) return ok({ evalCompleted: 0, avgScore: null, postCompleted: 0 });
+    const ss = getTrainingDataSpreadsheet(trainingId);
+    if (!ss) return ok({ evalCompleted: 0, avgScore: null, postCompleted: 0 });
 
-    const postSheet = getSheet(SHEET_NAMES.postEval);
-    const postRows  = sheetToJson(postSheet).filter(r => r.TrainingID === trainingId);
+    const evalSheet = ss.getSheetByName('TrainingEval');
+    const evalRows  = evalSheet ? sheetToJson(evalSheet) : [];
+
+    const postSheet = ss.getSheetByName('PostEval');
+    const postRows  = postSheet ? sheetToJson(postSheet) : [];
 
     const scores = evalRows.map(r => Number(r.AvgScore)).filter(n => n > 0);
     const avgScore = scores.length > 0
@@ -142,8 +190,9 @@ function tryAdvanceToEvaluationCompleted(trainingId) {
     const t = tRows.find(r => r.ID === trainingId);
     if (!t) return;
 
-    const eSheet = getSheet(SHEET_NAMES.trainingEval);
-    const evalCount = sheetToJson(eSheet).filter(r => r.TrainingID === trainingId).length;
+    const ss = getTrainingDataSpreadsheet(trainingId);
+    const eSheet = ss ? ss.getSheetByName('TrainingEval') : null;
+    const evalCount = eSheet ? sheetToJson(eSheet).length : 0;
 
     if (evalCount >= Number(t.Participants) && t.Stage === 'Training Completed') {
       updateTrainingStage(trainingId, 'Evaluation Completed');

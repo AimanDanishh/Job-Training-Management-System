@@ -19,38 +19,78 @@ function getSpreadsheetId() {
   return getConfigProperty('SPREADSHEET_ID', '');
 }
 
+let _cachedSpreadsheet = null;
 function getSpreadsheet() {
+  if (_cachedSpreadsheet) return _cachedSpreadsheet;
   const ssId = getSpreadsheetId();
   if (ssId) {
-    return SpreadsheetApp.openById(ssId);
+    try {
+      _cachedSpreadsheet = SpreadsheetApp.openById(ssId);
+      return _cachedSpreadsheet;
+    } catch (e) {
+      Logger.log('Error opening spreadsheet by ID: ' + e.message);
+    }
   }
-  return SpreadsheetApp.getActiveSpreadsheet();
+  _cachedSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  return _cachedSpreadsheet;
+}
+
+function getEmployeeSpreadsheetId() {
+  return getConfigProperty('EMPLOYEE_SPREADSHEET_ID', getSpreadsheetId());
+}
+
+let _cachedEmployeeSpreadsheet = null;
+function getEmployeeSpreadsheet() {
+  if (_cachedEmployeeSpreadsheet) return _cachedEmployeeSpreadsheet;
+  const empSpreadsheetId = getEmployeeSpreadsheetId();
+  if (empSpreadsheetId) {
+    try {
+      _cachedEmployeeSpreadsheet = SpreadsheetApp.openById(empSpreadsheetId);
+      return _cachedEmployeeSpreadsheet;
+    } catch(e) {
+      Logger.log('Failed to open separate EMPLOYEE_SPREADSHEET_ID: ' + e.message);
+    }
+  }
+  return getSpreadsheet();
 }
 
 function getSheet(name) {
-  const ss = getSpreadsheet();
+  const isEmpSheet = ['employees', 'cost centre', 'costcentre', 'hod email', 'hodemail', 'for it', 'forit', 'for_it'].includes(String(name).toLowerCase().trim());
+  const ss = isEmpSheet ? getEmployeeSpreadsheet() : getSpreadsheet();
   if (!ss) return null;
   let sheet = ss.getSheetByName(name);
   if (!sheet) {
     const allSheets = ss.getSheets();
     const targetClean = String(name).toLowerCase().replace(/[^a-z0-9]/g, '');
     sheet = allSheets.find(s => s.getName().toLowerCase().replace(/[^a-z0-9]/g, '') === targetClean);
+    if (!sheet && allSheets.length > 0 && isEmpSheet) {
+      sheet = allSheets[0];
+    }
   }
   return sheet;
 }
 
+let _sheetDataCache = {};
 function sheetToJson(sheet) {
   if (!sheet) return [];
-  const data = sheet.getDataRange().getValues();
-  if (data.length < 2) return [];
+  const sheetName = sheet.getName();
+  if (_sheetDataCache[sheetName]) return _sheetDataCache[sheetName];
 
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  if (lastRow < 2 || lastCol < 1) return [];
+
+  const data = sheet.getRange(1, 1, lastRow, lastCol).getValues();
   const headers = data[0].map(h => String(h).trim());
   const rows = [];
 
   for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (!row.some(cell => cell !== '' && cell !== null)) continue;
+
     const obj = {};
     headers.forEach((h, colIndex) => {
-      let val = data[i][colIndex];
+      let val = row[colIndex];
       if (val instanceof Date) {
         val = formatDate(val);
       }
@@ -59,6 +99,8 @@ function sheetToJson(sheet) {
     obj._row = i + 1;
     rows.push(obj);
   }
+
+  _sheetDataCache[sheetName] = rows;
   return rows;
 }
 

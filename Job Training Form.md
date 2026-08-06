@@ -132,32 +132,97 @@ Overall UI
 
 
 
-
-
-**NEW FLOW**
-
-1. Employee fill \& submit the Training Requisition Form, employee ID requester (only those with company email can fill the form)
-2. The system autofill the Training Requisition Form including the Request By (employee name, cost centre and date)
-3. System send email to HOD/Manager (the system link)
-4. HOD/Manager approve/reject/postpone/reschedule the request through the system
-5. System marks the form as approve/reject digitally with timestamp
-6. The status of the request will be emailed to the person who request
-7. Postponed or cancelled training still recorded in history (may be reschedule/carry forward)
-8. Admin can view the request status
-9. For the approved training, admin can generate QR attendance
-10. When participant finish the training, the participant need to fill the training evaluation form
-11. Participant need to submit the training form within 2 weeks after the course completion
-12. The system disallow training evaluation for participant who absent the training
-13. The system auto email to correspond HOD after 3 months to evaluate the participant
-14. HOD can click the link in the email to answer the post evaluation form for each participant under the HOD
-15. The post evaluation form have list of participant to be evaluated (UNDER THE HOD ONLY) and each submission will display the list of participant that have not been evaluated yet
-16. The system will create report based on the report format (will give later/ next time)
+1. Employee fill \& submit the Training Requisition Form
+2. System send email to HOD/Manager (the system link)
+3. HOD/Manager approve/reject the request through the system
+4. System marks the form as approve/reject digitally with timestamp
+5. Admin can view the request status, email
 
 
 
-**NEW REQUIREMENT**
+**New Backend Structure**
 
-1. New separate App Script for HOD, the system is to display the training request for HOD to review (add new separate folder for this system) (can be access by company acc only)
-2. On the bottom of the training request (scroll down), have a section to approve (show the HOD employee ID, name and Cost Centre)
-3. The post evaluation form are also here after 3 month of the programme
+1. All training data stored in Training Data sheets only, contains participants, sessions, attendance, evaluation and post evaluation
+2. The main sheets (SPREADSHEET\_ID) contains only the training information (please update the table header to latest database structure and remove the other sheets tab inside this sheets)
+3. Ensure all the frontend is connected to the latest backend structure
+
+
+
+**Sheets table update**
+
+1. By referring to the EMPLOYEE\_SPREADSHEET\_ID, do not use Company as Department, please use Cost Centre as Department and Position Title as Job Title (update this across all the system and remove the old one)
+2. Remove all the dummy data when first setup the Sheets, leave it empty if no data inserted
+3. Remove the lifecycle stage in the New Training Form
+4. Change the Department/ Cost Centre drop down in New Training Form to real Cost Centre from the EMPLOYEE\_SPREADSHEET\_ID under Cost Centre tab
+5. Change the Training Category drop down to Behavioral Skills (Soft Skills + Leadership + Customer Service | Technical Skills (Technical + Quality + SHE + Digital) | Compliance Training (Compliance + Safety) | Business Skills (Finance + Sales \& Marketing + Project Management) | Onboarding
+6. The programme lifecycle stage is not aligned, ensure each step is done before updating the lifecycle stage, after participant added then participant imported, then after session created then attendance is in progress, when pass the date then the training is completed and so on
+7. Update the UI from 6-Month to 3-Month Post Evaluation with countdown by day and if less then 1 day shown countdown by hours
+8. The course fee in the UI display the date instead of Course Fee
+9. When add bulk participant, please get the employee details from the EMPLOYEE\_SPREADSHEET\_ID only, not adding directly from the pasted text
+
+
+
+**Training Form Requirement (The Training Request Form)**
+
+1. Employee details (user just need to enter their Employee ID), the detail will be use to fill the REQUEST BY column in the Training Requisition Form in the template (employee no., Name, Job position, date)
+2. Training Title
+3. Training Fee 
+4. Training Date (From \& Until)
+5. Training Duration (hrs, 0.5 accuracy)
+6. Training Venue
+7. Department (Cost Centre) (All department or multiple selection)
+8. Trainer's name (if applicable)
+9. Training Provider (Text box) (if applicable)
+10. Training Type (In-House Training | Public)
+11. Certificate Expiry Date (if applicable)
+12. Total Pax (no. of participant)
+13. Participant list (can search and select or bulk add, from EMPLOYEE\_SPREADSHEET\_ID only)
+14. Reason for training (optional)
+15. Brochure upload (to support the application) (optional)
+
+
+
+**Training Requisition Form Flow (After request)**
+
+1. HOD approve, reject, return (remarks)
+2. Fill the Verified By Head of Department column, (request status, employee no., name, job position, date)
+3. Approve By (c-suite \& HOHR) (after c-suite approve, HOHR approve)
+4. Acknowledge by Arina
+
+
+
+**Notes**
+
+1. The system will use one email for all the process of emailing or automation (not use the user email)
+2. All request need to be approved by HOD first (depends on the employee) (email the HOD using the email from HOD email tab in EMPLOYEE\_SPREADSHEET\_ID
+3. If the Requester name == HOD name, directly fill request and verify
+4. If the HOD name == Csuite name, directly verify \& approve both
+5. If the HOD name == Csuite name == HOHR name, directly verify \& approve both (Csuite \& HOHR)
+6. Lastly after all HOD, Csuite and HOHR approve, notify Arina (arina.ismail@apollofood.com.my) and allow the admin to create session \& everything
+
+
+
+**Improvement/Problem (Training Request Form)**
+
+1. No multiple selection for Cost Centre
+2. Add file button
+3. Participant name displayed wrongly contains "()"
+4. When add participant B, participant A are added
+5. Bulk add participant not working
+6. Missing No. of pax question
+7. When trying to send form, it says "⚠️ Error: Official company email is required to submit a training requisition."
+8. FOR TESTING/DEVELOPEMENT ADD THE EMAIL TO DRAFT FIRST
+
+
+
+**Improvement/Problem (HOD system)**
+
+1. Only allow HOD (match the HOD email) can access the system
+2. If the user don't have access, give a proper UI access denied
+
+
+
+**Improvement/Problem (Admin system)**
+
+1. Training keeps loading forever, unable to see "No training list" or create new training
 

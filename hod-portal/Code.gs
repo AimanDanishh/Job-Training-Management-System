@@ -78,14 +78,22 @@ function getRequisitionDetails(trainingId) {
       training = trainings.find(t => String(t.ApprovalStatus || t.Status || '').toLowerCase().includes('pending')) || trainings[0];
     }
 
-    if (!training) return err('Training requisition request not found.');
+    if (!training) {
+      return ok({
+        training: null,
+        participants: [],
+        requester: null,
+        hod: auth.hod,
+        message: 'No pending training requisitions found.'
+      });
+    }
 
     // Fetch Participants for this training
-    const partSheet = getSheet('TrainingParticipants');
+    const ss = getTrainingDataSpreadsheet(training.ID);
+    const partSheet = ss ? ss.getSheetByName('TrainingParticipants') : null;
     let participants = [];
     if (partSheet) {
-      const allParts = sheetToJson(partSheet);
-      participants = allParts.filter(p => String(p.TrainingID || '').trim() === String(training.ID || '').trim());
+      participants = sheetToJson(partSheet);
     }
 
     // Requester employee info lookup
@@ -154,15 +162,27 @@ function submitHODDecision(data) {
     const remarks = data.remarks || '';
     const rescheduledDate = data.rescheduledDate || '';
 
-    updateCol('ApprovalStatus', validDecision);
+    let nextApprovalStatus = validDecision;
+    if (validDecision === 'Approved') {
+      const currentAppStatus = String(tSheet.getRange(row, headers.indexOf('ApprovalStatus') + 1).getValue() || '');
+      if (currentAppStatus.includes('C-Suite')) {
+        nextApprovalStatus = 'Pending HOHR Approval';
+      } else if (currentAppStatus.includes('HOHR')) {
+        nextApprovalStatus = 'Approved';
+      } else {
+        nextApprovalStatus = 'Pending C-Suite Approval';
+      }
+    }
+
+    updateCol('ApprovalStatus', nextApprovalStatus);
     updateCol('ApprovedBy', `${hodName} (${hodId})`);
     updateCol('ApprovedCostCentre', hodCostCentre);
     updateCol('ApprovedAt', timestamp);
     updateCol('ApprovalRemarks', remarks);
     if (rescheduledDate) updateCol('RescheduledDate', rescheduledDate);
 
-    // Update Status & Stage if Approved or Rejected/Postponed
-    if (validDecision === 'Approved') {
+    // Update Status & Stage if fully Approved or Rejected/Postponed
+    if (nextApprovalStatus === 'Approved' || validDecision === 'Approved') {
       updateCol('Status', 'Upcoming');
       updateCol('Stage', 'Created');
     } else if (validDecision === 'Rejected') {
@@ -176,7 +196,7 @@ function submitHODDecision(data) {
     updateCol('UpdatedDate', timestamp);
     SpreadsheetApp.flush();
 
-    // Send email notification to requester
+    // Send email notifications
     try {
       const trainings = sheetToJson(tSheet);
       const currentT = trainings.find(t => String(t.ID) === cleanId);
@@ -190,17 +210,39 @@ function submitHODDecision(data) {
       }
 
       if (requesterEmail) {
-        const subject = `[TrainHub] Training Requisition Request ${validDecision.toUpperCase()} - ${currentT.Name || cleanId}`;
-        const body = `Dear Requester,\n\nYour Training Requisition Request for "${currentT.Name || cleanId}" (${currentT.Code || cleanId}) has been updated by HOD/Manager:\n\n` +
-          `Decision Status: ${validDecision.toUpperCase()}\n` +
+        const subject = `[TrainHub DRAFT] Training Requisition Request ${nextApprovalStatus.toUpperCase()} - ${currentT.Name || cleanId}`;
+        const body = `Dear Requester,\n\nYour Training Requisition Request for "${currentT.Name || cleanId}" (${currentT.Code || cleanId}) has been updated:\n\n` +
+          `Decision Status: ${nextApprovalStatus.toUpperCase()}\n` +
           `Reviewed By: ${hodName} (${hodId})\n` +
           `Cost Centre: ${hodCostCentre}\n` +
           `Timestamp: ${timestamp}\n` +
           (rescheduledDate ? `Rescheduled Date: ${rescheduledDate}\n` : '') +
-          (remarks ? `HOD Remarks: ${remarks}\n` : '') +
+          (remarks ? `Remarks: ${remarks}\n` : '') +
           `\nThank you,\nTrainHub Training Management System`;
 
-        MailApp.sendEmail(requesterEmail, subject, body);
+        try {
+          GmailApp.createDraft(requesterEmail, subject, body);
+        } catch (draftErr) {
+          Logger.log('Draft error: ' + draftErr.message);
+        }
+      }
+
+      // If final stage reached, draft notification for Arina
+      if (nextApprovalStatus === 'Approved') {
+        const arinaSubject = `[TrainHub DRAFT] Training Requisition Approved & Ready - ${currentT.Name || cleanId}`;
+        const arinaBody = `Dear Arina,\n\nThe following Training Requisition has received all required approvals (HOD, C-Suite, HOHR):\n\n` +
+          `Training Name: ${currentT.Name || cleanId} (${currentT.Code || cleanId})\n` +
+          `Approved By: ${hodName} (${hodId})\n` +
+          `Cost Centre: ${hodCostCentre}\n` +
+          `Date Approved: ${timestamp}\n\n` +
+          `The Admin System can now proceed with session creation and attendance tracking.\n\n` +
+          `Thank you,\nTrainHub Training Management System`;
+
+        try {
+          GmailApp.createDraft('arina.ismail@apollofood.com.my', arinaSubject, arinaBody);
+        } catch (draftErr) {
+          Logger.log('Draft error: ' + draftErr.message);
+        }
       }
     } catch (mailErr) {
       Logger.log('Notification mail error: ' + mailErr.message);
@@ -208,10 +250,10 @@ function submitHODDecision(data) {
 
     return ok({
       trainingId: cleanId,
-      decision: validDecision,
+      decision: nextApprovalStatus,
       approvedBy: hodName,
       timestamp: timestamp,
-      message: `Training requisition request successfully marked as ${validDecision.toUpperCase()}.`
+      message: `Training requisition request marked as ${nextApprovalStatus.toUpperCase()}.`
     });
   } catch (e) {
     return err('Failed to process HOD decision: ' + e.message);
@@ -249,12 +291,9 @@ function getPendingPostEvalParticipants(trainingId, hodCostCentre) {
     if (!training) return err('No training programme found for post evaluation.');
 
     // Fetch all participants enrolled in this training
-    const partSheet = getSheet('TrainingParticipants');
-    let allParticipants = [];
-    if (partSheet) {
-      const pRows = sheetToJson(partSheet);
-      allParticipants = pRows.filter(p => String(p.TrainingID || '').trim() === String(training.ID || '').trim());
-    }
+    const ss = getTrainingDataSpreadsheet(training.ID);
+    const partSheet = ss ? ss.getSheetByName('TrainingParticipants') : null;
+    let allParticipants = partSheet ? sheetToJson(partSheet) : [];
 
     // Filter participants under this HOD's Cost Centre / Department
     let hodParticipants = allParticipants.filter(p => {
@@ -269,13 +308,11 @@ function getPendingPostEvalParticipants(trainingId, hodCostCentre) {
     }
 
     // Check which participants have already been evaluated in PostEval sheet
-    const postSheet = getSheet('PostEval');
+    const postSheet = ss ? ss.getSheetByName('PostEval') : null;
     let evaluatedEmpIds = [];
     if (postSheet) {
       const postRows = sheetToJson(postSheet);
-      evaluatedEmpIds = postRows
-        .filter(pr => String(pr.TrainingID || '').trim() === String(training.ID || '').trim())
-        .map(pr => String(pr.EmployeeID || '').trim().toLowerCase());
+      evaluatedEmpIds = postRows.map(pr => String(pr.EmployeeID || '').trim().toLowerCase());
     }
 
     const pendingList = hodParticipants.filter(p => !evaluatedEmpIds.includes(String(p.EmployeeID || p.ID || '').trim().toLowerCase()));
@@ -307,16 +344,23 @@ function submitHODPostEval(data) {
     const auth = validateHODAccess();
     if (!auth.valid) return err(auth.message);
 
-    const postSheet = getSheet('PostEval');
-    if (!postSheet) return err('PostEval sheet unavailable.');
-
     const cleanTId = String(data.trainingId).trim();
     const cleanEmpId = String(data.employeeId).trim();
+
+    const ss = getTrainingDataSpreadsheet(cleanTId);
+    if (!ss) return err('Could not open per-training sheet for ID: ' + cleanTId);
+
+    let postSheet = ss.getSheetByName('PostEval');
+    if (!postSheet) {
+      postSheet = ss.insertSheet('PostEval');
+      postSheet.appendRow(['ID', 'TrainingID', 'EmployeeID', 'EvaluatorName', 'EvaluatorID', 'CompetencyBefore', 'CompetencyAfter', 'Improvement', 'CanApply', 'FurtherTraining', 'Comments', 'SubmittedAt']);
+      postSheet.getRange('A1:L1').setFontWeight('bold').setBackground('#2563EB').setFontColor('#FFFFFF');
+      postSheet.setFrozenRows(1);
+    }
 
     // Check for duplicate submission
     const existingRows = sheetToJson(postSheet);
     const duplicate = existingRows.find(r =>
-      String(r.TrainingID || '').trim() === cleanTId &&
       String(r.EmployeeID || '').trim().toLowerCase() === cleanEmpId.toLowerCase()
     );
 

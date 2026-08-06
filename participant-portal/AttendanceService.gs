@@ -12,28 +12,11 @@ function getSessionInfo(sessionId) {
     }
     const cleanSessionId = String(sessionId).trim();
 
-    const sSheet = getSheet(SHEET_NAMES.trainingSessions);
-    if (!sSheet) return err('Could not access Training Sessions sheet.');
+    const found = findTrainingBySessionId(cleanSessionId);
+    if (!found || !found.session) return err('Session not found.');
 
-    const sessions = sheetToJson(sSheet);
-    const session = sessions.find(s => String(s.SessionID || '').trim() === cleanSessionId);
-
-    if (!session) return err('Session not found.');
-
-    // Fetch parent training info
-    let trainingTitle = 'Training Programme';
-    let trainingCode = '';
-    try {
-      const tSheet = getSheet(SHEET_NAMES.trainings);
-      if (tSheet) {
-        const trainings = sheetToJson(tSheet);
-        const parentT = trainings.find(t => String(t.ID || t.TrainingID || '').trim() === String(session.TrainingID).trim());
-        if (parentT) {
-          trainingTitle = parentT.Name || parentT.TrainingTitle || trainingTitle;
-          trainingCode  = parentT.Code || '';
-        }
-      }
-    } catch (e) {}
+    const session  = found.session;
+    const training = found.training;
 
     return ok({
       SessionID:     session.SessionID,
@@ -43,8 +26,8 @@ function getSessionInfo(sessionId) {
       StartTime:     session.StartTime || '09:00',
       EndTime:       session.EndTime || '17:00',
       QRStatus:      session.QRStatus || 'Active',
-      TrainingTitle: trainingTitle,
-      TrainingCode:  trainingCode
+      TrainingTitle: training ? (training.Name || training.TrainingTitle || 'Training Programme') : 'Training Programme',
+      TrainingCode:  training ? (training.Code || '') : ''
     });
   } catch (e) {
     Logger.log('getSessionInfo error: ' + e.message);
@@ -99,15 +82,21 @@ function submitAttendance(arg1, arg2, arg3, arg4) {
     const finalDept    = (empInfo && empInfo.Department) ? empInfo.Department : (department || '');
     const trainingCode = training ? (training.Code || '') : '';
 
-    const attSheet = getSheet(SHEET_NAMES.attendance);
-    if (!attSheet) return err('Could not open Attendance sheet.');
+    const ss = getTrainingDataSpreadsheet(session.TrainingID);
+    if (!ss) return err('Could not open training data spreadsheet.');
+
+    let attSheet = ss.getSheetByName('Attendance');
+    if (!attSheet) {
+      attSheet = ss.insertSheet('Attendance');
+      attSheet.appendRow(['AttendanceID', 'SessionID', 'TrainingID', 'EmployeeNo', 'EmployeeName', 'Department', 'ScanTime', 'Status', 'TrainingCode', 'Day', 'Date', 'Hours', 'Remarks', 'EditedBy', 'EditedAt']);
+      attSheet.getRange('A1:O1').setFontWeight('bold').setBackground('#2563EB').setFontColor('#FFFFFF');
+      attSheet.setFrozenRows(1);
+    }
 
     const attId = generateId('ATT');
     const scanTime = now();
     const status = 'Present';
 
-    // Append to existing Attendance sheet columns:
-    // ['AttendanceID', 'SessionID', 'TrainingID', 'EmployeeNo', 'EmployeeName', 'Department', 'ScanTime', 'Status', 'TrainingCode', 'Day', 'Date', 'Hours', 'Remarks', 'EditedBy', 'EditedAt']
     const newRecord = [
       attId,
       session.SessionID,

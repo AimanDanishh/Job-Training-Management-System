@@ -14,9 +14,9 @@
     </header>
 
     <div class="card">
-      <!-- Step 1: Requester Identification -->
+      <!-- Step 1: Requester Identification (Fills REQUEST BY column) -->
       <div class="section-box">
-        <div class="section-title">👤 Step 1: Requester Identification (Company Email Accounts)</div>
+        <div class="section-title">👤 Step 1: Requester Identification (REQUEST BY)</div>
         <div style="display:flex;gap:12px;">
           <input type="text" id="employeeIdInput" class="form-control" placeholder="Enter Your Employee ID (e.g. EMP-1001)" style="flex:1;">
           <button type="button" class="btn btn-primary" onclick="lookupEmployee()">Lookup Employee</button>
@@ -25,18 +25,22 @@
         <div id="autofillBox" style="display:none;margin-top:16px;padding-top:14px;border-top:1px dashed var(--border-color);">
           <div class="grid-2" style="margin-bottom:12px;">
             <div>
+              <div class="label-sm">EMPLOYEE NO.</div>
+              <div class="val-lg" id="autoEmpNo">--</div>
+            </div>
+            <div>
               <div class="label-sm">EMPLOYEE NAME</div>
               <div class="val-lg" id="autoName">--</div>
+            </div>
+          </div>
+          <div class="grid-3">
+            <div>
+              <div class="label-sm">JOB POSITION (POSITION TITLE)</div>
+              <div class="val-lg" id="autoPos">--</div>
             </div>
             <div>
               <div class="label-sm">COST CENTRE / DEPARTMENT</div>
               <div class="val-lg" id="autoDept">--</div>
-            </div>
-          </div>
-          <div class="grid-2">
-            <div>
-              <div class="label-sm">POSITION</div>
-              <div class="val-lg" id="autoPos">--</div>
             </div>
             <div>
               <div class="label-sm">REQUEST DATE</div>
@@ -51,61 +55,111 @@
         <div class="section-title">🎓 Step 2: Training Programme Specifications</div>
 
         <div style="margin-bottom:16px;">
-          <label class="label-sm">Training Programme Name *</label>
+          <label class="label-sm">Training Title *</label>
           <input type="text" id="reqTrainingName" class="form-control" placeholder="e.g. Leadership Excellence & Strategic Management">
         </div>
 
         <div class="grid-2" style="margin-bottom:16px;">
           <div>
-            <label class="label-sm">Course Category *</label>
+            <label class="label-sm">Training Category *</label>
             <select id="reqCategory" class="form-control">
-              <option value="Leadership & Management">Leadership & Management</option>
-              <option value="Compliance & Regulatory">Compliance & Regulatory</option>
-              <option value="Technical Skills">Technical Skills</option>
-              <option value="Safety & Quality">Safety & Quality</option>
-              <option value="Soft Skills">Soft Skills</option>
+              <option value="Behavioral Skills (Soft Skills + Leadership + Customer Service)">Behavioral Skills (Soft Skills + Leadership + Customer Service)</option>
+              <option value="Technical Skills (Technical + Quality + SHE + Digital)">Technical Skills (Technical + Quality + SHE + Digital)</option>
+              <option value="Compliance Training (Compliance + Safety)">Compliance Training (Compliance + Safety)</option>
+              <option value="Business Skills (Finance + Sales & Marketing + Project Management)">Business Skills (Finance + Sales & Marketing + Project Management)</option>
+              <option value="Onboarding">Onboarding</option>
             </select>
           </div>
           <div>
-            <label class="label-sm">Trainer / Training Provider *</label>
-            <input type="text" id="reqTrainer" class="form-control" placeholder="Trainer or Company Provider Name">
+            <label class="label-sm">Training Type *</label>
+            <select id="reqTrainingType" class="form-control">
+              <option value="In-House Training">In-House Training</option>
+              <option value="Public">Public Training</option>
+            </select>
           </div>
         </div>
 
         <div class="grid-3" style="margin-bottom:16px;">
           <div>
-            <label class="label-sm">Proposed Start Date *</label>
+            <label class="label-sm">Training Date (From) *</label>
             <input type="date" id="reqStartDate" class="form-control">
           </div>
           <div>
-            <label class="label-sm">Proposed End Date</label>
+            <label class="label-sm">Training Date (Until) *</label>
             <input type="date" id="reqEndDate" class="form-control">
           </div>
           <div>
-            <label class="label-sm">Total Hours</label>
-            <input type="number" id="reqHours" class="form-control" value="8" min="1">
+            <label class="label-sm">Training Duration (hrs, 0.5 accuracy) *</label>
+            <input type="number" id="reqHours" class="form-control" value="8" min="0.5" step="0.5">
           </div>
         </div>
 
-        <div class="grid-2" style="margin-bottom:16px;">
+        <div class="grid-3" style="margin-bottom:16px;">
           <div>
-            <label class="label-sm">Proposed Venue</label>
-            <input type="text" id="reqVenue" class="form-control" placeholder="Ballroom A / Online / Training Center">
+            <label class="label-sm">Training Fee (RM) *</label>
+            <input type="number" id="reqFee" class="form-control" placeholder="1500.00" step="0.01">
           </div>
           <div>
-            <label class="label-sm">Estimated Course Fee (RM)</label>
-            <input type="number" id="reqFee" class="form-control" placeholder="1500.00" step="0.01">
+            <label class="label-sm">Training Venue *</label>
+            <input type="text" id="reqVenue" class="form-control" placeholder="Training Room A / Hotel Ballroom">
+          </div>
+          <div>
+            <label class="label-sm">Department (Cost Centre) * <span style="font-size:10.5px;color:var(--text-muted);font-weight:normal;">(Hold Ctrl/Cmd for multi-select)</span></label>
+            <select id="reqCostCentre" class="form-control" multiple size="3" style="height: auto;">
+              <option value="ALL" selected>All Departments / Cost Centres</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid-3" style="margin-bottom:16px;">
+          <div>
+            <label class="label-sm">Trainer's Name (if applicable)</label>
+            <input type="text" id="reqTrainer" class="form-control" placeholder="Trainer Name">
+          </div>
+          <div>
+            <label class="label-sm">Training Provider (Text Box) (if applicable)</label>
+            <input type="text" id="reqProvider" class="form-control" placeholder="Provider / Vendor Company Name">
+          </div>
+          <div>
+            <label class="label-sm">Certificate Expiry Date (if applicable)</label>
+            <input type="date" id="reqCertExpiry" class="form-control">
           </div>
         </div>
 
         <div style="margin-bottom:16px;">
-          <label class="label-sm">Programme Objectives & Justification</label>
-          <textarea id="reqObjectives" class="form-control" rows="3" placeholder="Describe the key learning outcomes and business benefits..."></textarea>
+          <label class="label-sm">Reason for Training (Optional)</label>
+          <textarea id="reqReason" class="form-control" rows="2" placeholder="State business reason or skill gap..."></textarea>
         </div>
 
         <div style="margin-bottom:24px;">
-          <label class="label-sm">HOD / Manager Email for Approval Notification *</label>
-          <input type="email" id="reqHodEmail" class="form-control" placeholder="manager@company.com">
+          <label class="label-sm">Brochure Upload / Link (Optional, to support application)</label>
+          <div class="grid-2" style="gap:12px;">
+            <div>
+              <input type="file" id="reqBrochureFile" class="form-control" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onchange="handleBrochureFileSelect(this)">
+              <div id="fileUploadStatus" style="font-size:11px;color:#38bdf8;margin-top:4px;"></div>
+            </div>
+            <div>
+              <input type="url" id="reqBrochureUrl" class="form-control" placeholder="Or paste link (https://drive.google.com/...)">
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3: Participant List Selection & Total Pax -->
+        <div class="section-title">👥 Step 3: Participant List (Master Registry Only) & Total Pax</div>
+        
+        <div class="grid-2" style="margin-bottom:16px;">
+          <div>
+            <label class="label-sm">No. of Pax (Total Participants) *</label>
+            <input type="number" id="reqTotalPax" class="form-control" min="1" value="0">
+          </div>
+          <div style="display:flex;align-items:flex-end;">
+            <button type="button" class="btn btn-secondary btn-sm" style="width:100%;padding:10px;" onclick="openParticipantPicker()">+ Search & Select / Bulk Add Participants</button>
+          </div>
+        </div>
+
+        <div id="selectedParticipantsBox" style="min-height:60px;padding:12px;border:1px solid var(--border-color);border-radius:8px;background:#0f172a;margin-bottom:24px;">
+          <div id="emptyPaxMsg" style="color:var(--text-muted);font-size:13px;text-align:center;padding:10px;">No participants selected yet. Click "+ Search & Select / Bulk Add Participants" above.</div>
+          <div id="paxChipContainer" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
         </div>
 
         <button type="button" class="btn btn-success" style="width:100%;padding:14px;font-size:16px;" onclick="submitRequisition()">
@@ -115,10 +169,91 @@
     </div>
   </div>
 
+  <!-- Participant Selection & Bulk Add Modal -->
+  <div id="paxModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.75);z-index:999;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:#1e293b;border-radius:12px;max-width:700px;width:100%;padding:20px;border:1px solid #334155;color:#fff;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <h3 style="margin:0;font-size:16px;">Select Enrolled Participants (EMPLOYEE_SPREADSHEET_ID)</h3>
+        <button type="button" onclick="closePaxModal()" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;">✕</button>
+      </div>
+
+      <!-- Tab selection inside modal: Search List vs Bulk Paste -->
+      <div style="display:flex;gap:8px;margin-bottom:12px;border-bottom:1px solid #334155;padding-bottom:8px;">
+        <button type="button" class="btn btn-secondary btn-sm" id="tabBtnSearch" onclick="switchPaxModalTab('search')">🔍 Search & Click</button>
+        <button type="button" class="btn btn-secondary btn-sm" id="tabBtnBulk" onclick="switchPaxModalTab('bulk')">📋 Bulk Paste Employee IDs</button>
+      </div>
+
+      <!-- Search View -->
+      <div id="paxViewSearch">
+        <div style="display:flex;gap:8px;margin-bottom:12px;">
+          <input type="text" id="paxSearchInput" class="form-control" placeholder="Search by Employee ID or Name..." oninput="filterPaxList()" style="flex:1;">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="selectAllMatchingPax()">Select All Matching</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="clearPaxSelection()">Clear All</button>
+        </div>
+        <div id="paxListContainer" style="max-height:260px;overflow-y:auto;border:1px solid #334155;border-radius:8px;padding:8px;background:#0f172a;">
+          <div style="text-align:center;color:#94a3b8;padding:16px;">Loading employees from registry...</div>
+        </div>
+      </div>
+
+      <!-- Bulk Paste View -->
+      <div id="paxViewBulk" style="display:none;">
+        <div style="margin-bottom:8px;font-size:12.5px;color:#94a3b8;">
+          Paste employee IDs separated by commas, spaces, or newlines (e.g. <code>EMP-1001, EMP-1002, EMP-1003</code>):
+        </div>
+        <textarea id="paxBulkInput" class="form-control" rows="5" placeholder="EMP-1001&#10;EMP-1002&#10;EMP-1003" style="background:#0f172a;color:#fff;font-family:monospace;margin-bottom:10px;"></textarea>
+        <button type="button" class="btn btn-primary btn-sm" onclick="applyBulkPastePax()">Apply Bulk Selection</button>
+        <div id="bulkPasteFeedback" style="font-size:12px;margin-top:6px;color:#38bdf8;"></div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding-top:12px;border-top:1px solid #334155;">
+        <span style="font-size:13px;color:#94a3b8;" id="paxSelectedCounter">0 selected</span>
+        <button type="button" class="btn btn-success" onclick="confirmPaxSelection()">Confirm Selection</button>
+      </div>
+    </div>
+  </div>
+
   <?!= include('script'); ?>
 
   <script>
     let activeEmployee = null;
+    let masterParticipants = [];
+    let selectedParticipants = [];
+    let uploadedFileObject = null;
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadCostCentres();
+      loadMasterParticipants();
+    });
+
+    function loadCostCentres() {
+      google.script.run
+        .withSuccessHandler(resStr => {
+          const res = JSON.parse(resStr);
+          if (res.success && Array.isArray(res.data)) {
+            const sel = document.getElementById('reqCostCentre');
+            sel.innerHTML = '<option value="ALL" selected>All Departments / Cost Centres</option>' +
+              res.data.map(c => `<option value="${c}">${c}</option>`).join('');
+          }
+        })
+        .getCostCentres();
+    }
+
+    function loadMasterParticipants() {
+      google.script.run
+        .withSuccessHandler(resStr => {
+          const res = JSON.parse(resStr);
+          if (res.success && Array.isArray(res.data)) {
+            masterParticipants = res.data.map((p, idx) => ({
+              _uid: p.ID ? String(p.ID).trim() : `EMP-IDX-${idx}`,
+              ID: String(p.ID || '').trim(),
+              Name: String(p.Name || p.ID || 'Employee').trim(),
+              Department: String(p.Department || '').trim(),
+              Position: String(p.Position || '').trim()
+            }));
+          }
+        })
+        .getParticipantsList();
+    }
 
     function lookupEmployee() {
       const empId = document.getElementById('employeeIdInput').value.trim();
@@ -147,6 +282,7 @@
     }
 
     function displayAutofill(emp) {
+      document.getElementById('autoEmpNo').innerText = emp.ID;
       document.getElementById('autoName').innerText = emp.Name || emp.ID;
       document.getElementById('autoDept').innerText = emp.Department || 'N/A';
       document.getElementById('autoPos').innerText = emp.Position || 'Staff';
@@ -154,6 +290,172 @@
 
       document.getElementById('autofillBox').style.display = 'block';
       document.getElementById('requisitionFormBody').style.display = 'block';
+    }
+
+    function handleBrochureFileSelect(input) {
+      if (input.files && input.files[0]) {
+        const file = input.files[0];
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          uploadedFileObject = {
+            name: file.name,
+            mimeType: file.type,
+            data: e.target.result.split(',')[1]
+          };
+          document.getElementById('fileUploadStatus').innerText = `✓ File attached: ${file.name}`;
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    function openParticipantPicker() {
+      switchPaxModalTab('search');
+      renderPaxList(masterParticipants);
+      document.getElementById('paxModal').style.display = 'flex';
+    }
+
+    function closePaxModal() {
+      document.getElementById('paxModal').style.display = 'none';
+    }
+
+    function switchPaxModalTab(tab) {
+      if (tab === 'search') {
+        document.getElementById('paxViewSearch').style.display = 'block';
+        document.getElementById('paxViewBulk').style.display = 'none';
+        document.getElementById('tabBtnSearch').classList.add('btn-primary');
+        document.getElementById('tabBtnBulk').classList.remove('btn-primary');
+      } else {
+        document.getElementById('paxViewSearch').style.display = 'none';
+        document.getElementById('paxViewBulk').style.display = 'block';
+        document.getElementById('tabBtnBulk').classList.add('btn-primary');
+        document.getElementById('tabBtnSearch').classList.remove('btn-primary');
+      }
+    }
+
+    function filterPaxList() {
+      const q = document.getElementById('paxSearchInput').value.trim().toLowerCase();
+      const filtered = masterParticipants.filter(p =>
+        (p.ID && p.ID.toLowerCase().includes(q)) ||
+        (p.Name && p.Name.toLowerCase().includes(q)) ||
+        (p.Department && p.Department.toLowerCase().includes(q))
+      );
+      renderPaxList(filtered);
+    }
+
+    function formatPaxLabel(p) {
+      const name = p.Name || 'Employee';
+      const id = p.ID ? ` (${p.ID})` : '';
+      return `${name}${id}`;
+    }
+
+    function renderPaxList(list) {
+      const container = document.getElementById('paxListContainer');
+      if (!list || list.length === 0) {
+        container.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:16px;">No matching employees found in master registry.</div>';
+        return;
+      }
+
+      container.innerHTML = list.map(p => {
+        const isChecked = selectedParticipants.some(sp => sp._uid === p._uid);
+        return `
+          <label style="display:flex;align-items:center;gap:10px;padding:8px;border-bottom:1px solid #1e293b;cursor:pointer;">
+            <input type="checkbox" value="${p._uid}" ${isChecked ? 'checked' : ''} onchange="togglePaxSelection('${p._uid}', this.checked)">
+            <div>
+              <div style="font-weight:600;font-size:13px;color:#fff;">${formatPaxLabel(p)}</div>
+              <div style="font-size:11px;color:#94a3b8;">${p.Department || 'N/A'} · ${p.Position || 'Staff'}</div>
+            </div>
+          </label>
+        `;
+      }).join('');
+      updatePaxCounter();
+    }
+
+    function togglePaxSelection(uid, checked) {
+      const emp = masterParticipants.find(p => p._uid === uid);
+      if (!emp) return;
+      if (checked) {
+        if (!selectedParticipants.some(p => p._uid === uid)) selectedParticipants.push(emp);
+      } else {
+        selectedParticipants = selectedParticipants.filter(p => p._uid !== uid);
+      }
+      updatePaxCounter();
+    }
+
+    function selectAllMatchingPax() {
+      const q = document.getElementById('paxSearchInput').value.trim().toLowerCase();
+      const filtered = masterParticipants.filter(p =>
+        (p.ID && p.ID.toLowerCase().includes(q)) ||
+        (p.Name && p.Name.toLowerCase().includes(q)) ||
+        (p.Department && p.Department.toLowerCase().includes(q))
+      );
+      filtered.forEach(p => {
+        if (!selectedParticipants.some(sp => sp._uid === p._uid)) {
+          selectedParticipants.push(p);
+        }
+      });
+      renderPaxList(filtered);
+    }
+
+    function clearPaxSelection() {
+      selectedParticipants = [];
+      renderPaxList(masterParticipants);
+    }
+
+    function applyBulkPastePax() {
+      const text = document.getElementById('paxBulkInput').value;
+      if (!text || !text.trim()) {
+        document.getElementById('bulkPasteFeedback').innerText = 'Please enter employee IDs.';
+        return;
+      }
+      const rawIds = text.split(/[\n,; \t]+/).map(s => s.trim().toLowerCase()).filter(s => s);
+      let countAdded = 0;
+
+      rawIds.forEach(idStr => {
+        const matched = masterParticipants.find(p => p.ID.toLowerCase() === idStr || p.Name.toLowerCase().includes(idStr));
+        if (matched && !selectedParticipants.some(sp => sp._uid === matched._uid)) {
+          selectedParticipants.push(matched);
+          countAdded++;
+        }
+      });
+
+      document.getElementById('bulkPasteFeedback').innerText = `✓ Matched and added ${countAdded} participant(s) from registry.`;
+      updatePaxCounter();
+    }
+
+    function updatePaxCounter() {
+      document.getElementById('paxSelectedCounter').innerText = `${selectedParticipants.length} selected`;
+    }
+
+    function confirmPaxSelection() {
+      closePaxModal();
+      renderSelectedChips();
+    }
+
+    function renderSelectedChips() {
+      const box = document.getElementById('paxChipContainer');
+      const emptyMsg = document.getElementById('emptyPaxMsg');
+      const paxInput = document.getElementById('reqTotalPax');
+
+      paxInput.value = selectedParticipants.length;
+
+      if (selectedParticipants.length === 0) {
+        emptyMsg.style.display = 'block';
+        box.innerHTML = '';
+        return;
+      }
+
+      emptyMsg.style.display = 'none';
+      box.innerHTML = selectedParticipants.map(p => `
+        <span style="background:#2563eb;color:#fff;padding:4px 10px;border-radius:999px;font-size:12px;display:inline-flex;align-items:center;gap:6px;">
+          ${formatPaxLabel(p)}
+          <span style="cursor:pointer;" onclick="removePaxChip('${p._uid}')">✕</span>
+        </span>
+      `).join('');
+    }
+
+    function removePaxChip(uid) {
+      selectedParticipants = selectedParticipants.filter(p => p._uid !== uid);
+      renderSelectedChips();
     }
 
     function submitRequisition() {
@@ -164,10 +466,17 @@
 
       const name = document.getElementById('reqTrainingName').value.trim();
       const startDate = document.getElementById('reqStartDate').value;
-      const hodEmail = document.getElementById('reqHodEmail').value.trim();
+      const endDate = document.getElementById('reqEndDate').value || startDate;
+      const fee = document.getElementById('reqFee').value || '0.00';
+      const venue = document.getElementById('reqVenue').value.trim();
+      
+      const costCentreSelect = document.getElementById('reqCostCentre');
+      const selectedDepts = Array.from(costCentreSelect.selectedOptions).map(o => o.value).filter(v => v);
+      const costCentreStr = selectedDepts.length > 0 ? selectedDepts.join(', ') : 'ALL';
+      const totalPax = parseInt(document.getElementById('reqTotalPax').value) || selectedParticipants.length || 1;
 
-      if (!name || !startDate || !hodEmail) {
-        alert('Training Name, Start Date, and HOD Email are required.');
+      if (!name || !startDate || !fee || !venue) {
+        alert('Training Title, Dates, Fee, and Venue are required.');
         return;
       }
 
@@ -176,17 +485,24 @@
       const payload = {
         EmployeeID: activeEmployee.ID,
         Email: activeEmployee.Email || '',
-        Department: activeEmployee.Department || '',
+        Department: costCentreStr,
         TrainingName: name,
         Category: document.getElementById('reqCategory').value,
-        Trainer: document.getElementById('reqTrainer').value,
+        TrainingType: document.getElementById('reqTrainingType').value,
+        Trainer: document.getElementById('reqTrainer').value.trim(),
+        TrainingProvider: document.getElementById('reqProvider').value.trim(),
         StartDate: startDate,
-        EndDate: document.getElementById('reqEndDate').value || startDate,
+        EndDate: endDate,
+        Duration: Math.max(1, Math.ceil((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24)) + 1),
         TotalHours: document.getElementById('reqHours').value || 8,
-        Venue: document.getElementById('reqVenue').value,
-        CourseFee: document.getElementById('reqFee').value || '0.00',
-        Objectives: document.getElementById('reqObjectives').value,
-        HodEmail: hodEmail
+        Venue: venue,
+        CourseFee: fee,
+        CertExpiryDate: document.getElementById('reqCertExpiry').value,
+        TotalPax: totalPax,
+        ParticipantList: selectedParticipants,
+        Reason: document.getElementById('reqReason').value.trim(),
+        BrochureUrl: document.getElementById('reqBrochureUrl').value.trim(),
+        BrochureFile: uploadedFileObject
       };
 
       google.script.run
