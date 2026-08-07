@@ -88,7 +88,7 @@ function autoUpdateTrainingLifecycleStages() {
           const remainingMs = targetPostEvalDate.getTime() - new Date().getTime();
           const diffMs = today.getTime() - endDate.getTime();
           const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-          
+
           t.daysSinceEnd = diffDays;
           t.isThreeMonthsReached = diffDays >= 90;
           t.isSixMonthsReached = diffDays >= 90; // Backward compatibility alias
@@ -184,11 +184,28 @@ function addTraining(data) {
     const id = generateId('TRN');
     const code = generateTrainingCode(data.Category);
 
+    const timeNow = now();
+    let requesterSigData = {
+      employeeNo: data.RequestedBy || data.EmployeeID || 'ADMIN',
+      name: data.RequestedByName || data.EmployeeName || 'Administrator',
+      position: 'Administrator',
+      date: timeNow
+    };
+
+    if (data.RequestedBy && getSheet(SHEET_NAMES.employees)) {
+      try {
+        const emps = sheetToJson(getSheet(SHEET_NAMES.employees));
+        const m = emps.find(e => String(e.ID || e.EmployeeID).toLowerCase() === String(data.RequestedBy).toLowerCase());
+        if (m) {
+          requesterSigData.name = m.Name || m.EmployeeName || requesterSigData.name;
+          requesterSigData.position = m.Position || m.JobTitle || m.PositionTitle || requesterSigData.position;
+        }
+      } catch(e) {}
+    }
+
     // Automatically create dedicated Google Drive workspace for this training
     const workspace = createTrainingWorkspace(code, data.Name);
-    const requisitionForm = createTrainingRequisitionForm(code, data, workspace.folderId);
-
-    const timeNow = now();
+    const requisitionForm = createTrainingRequisitionForm(code, data, workspace.folderId, requesterSigData);
 
     sheet.appendRow([
       id,
@@ -217,6 +234,37 @@ function addTraining(data) {
       timeNow,
       data.CourseFee !== undefined ? data.CourseFee : ''
     ]);
+
+    const headers = ensureTrainingSheetColumns(sheet);
+    const lastRow = sheet.getLastRow();
+    const appStatusCol = headers.indexOf('ApprovalStatus') + 1;
+    if (appStatusCol) {
+      sheet.getRange(lastRow, appStatusCol).setValue(data.ApprovalStatus || 'Approved');
+    }
+    const reqByCol = headers.indexOf('RequestedBy') + 1;
+    if (reqByCol) sheet.getRange(lastRow, reqByCol).setValue(requesterSigData.employeeNo);
+    const reqByNameCol = headers.indexOf('RequestedByName') + 1;
+    if (reqByNameCol) sheet.getRange(lastRow, reqByNameCol).setValue(requesterSigData.name);
+    const reqDateCol = headers.indexOf('RequestedDate') + 1;
+    if (reqDateCol) sheet.getRange(lastRow, reqDateCol).setValue(timeNow);
+
+    SpreadsheetApp.flush();
+
+    if (requisitionForm.fileId) {
+      try {
+        updateTrainingRequisitionSignatures(id, 'request', requesterSigData, requisitionForm.fileId);
+        updateTrainingRequisitionSignatures(id, 'HOD', { status: 'Approved', employeeNo: requesterSigData.employeeNo, name: requesterSigData.name, position: requesterSigData.position, date: timeNow }, requisitionForm.fileId);
+      } catch(e) {}
+    }
+
+    const participantsList = Array.isArray(data.ParticipantList) ? data.ParticipantList : (Array.isArray(data.participants) ? data.participants : []);
+    if (participantsList.length > 0) {
+      try {
+        addTrainingParticipants(id, participantsList);
+      } catch (pErr) {
+        Logger.log('Error adding participants in addTraining: ' + pErr.message);
+      }
+    }
 
     return ok({
       id: id,
@@ -278,6 +326,11 @@ function updateTraining(data) {
       sheet.getRange(row, feeColumn).setValue(
         data.CourseFee !== undefined ? data.CourseFee : (dataRange[feeColumn - 1] || '')
       );
+    }
+
+    const appStatusCol = headers.indexOf('ApprovalStatus') + 1;
+    if (appStatusCol && data.ApprovalStatus !== undefined) {
+      sheet.getRange(row, appStatusCol).setValue(data.ApprovalStatus);
     }
     return ok({ message: 'Training updated successfully.' });
   } catch (e) {
@@ -358,7 +411,8 @@ function getTrainingParticipants(trainingId) {
     const sheet = ss.getSheetByName('TrainingParticipants');
     if (!sheet) return ok([]);
     const rows = sheetToJson(sheet);
-    return ok(rows);
+    const resolution = canonicalizeTrainingParticipants(rows);
+    return ok(resolution.participants);
   } catch (e) {
     return err('Failed to get training participants: ' + e.message);
   }
@@ -371,14 +425,9 @@ function addTrainingParticipants(trainingId, participants) {
       return err('No participants provided.');
     }
 
-    const empSheet = getSheet(SHEET_NAMES.employees);
-    const empMap = {};
-    if (empSheet) {
-      const empRows = sheetToJson(empSheet);
-      empRows.forEach(e => {
-        const idKey = String(e.ID || e.EmployeeID || '').trim();
-        if (idKey) empMap[idKey] = e;
-      });
+    const resolution = canonicalizeTrainingParticipants(participants);
+    if (resolution.rejected.length > 0) {
+      return err('The following participant(s) do not match an Employee-sheet record: ' + resolution.rejected.join(', '));
     }
 
     const ss = getTrainingDataSpreadsheet(trainingId);
@@ -398,21 +447,13 @@ function addTrainingParticipants(trainingId, participants) {
     let addedCount = 0;
     const addedAt = now();
 
-    participants.forEach(p => {
-      const empIdInput = String(p.ID || p.EmployeeID || p.EmployeeNo || '').trim();
-      if (!empIdInput) return;
-
-      const empIdLower = empIdInput.toLowerCase();
-      // Case-insensitive lookup in master employee database
-      const dbEmpKey = Object.keys(empMap).find(k => k.toLowerCase() === empIdLower);
-      const dbEmp = dbEmpKey ? empMap[dbEmpKey] : null;
-
-      // Only add participant if valid record exists in EMPLOYEE_SPREADSHEET_ID
-      if (dbEmp && !existingEmpIds.has(empIdLower)) {
-        const empId   = dbEmp.ID || empIdInput;
-        const empName = dbEmp.Name || dbEmp.EmployeeName || empId;
-        const empDept = dbEmp.Department || dbEmp.CostCentre || '';
-        const empPos  = dbEmp.Position || dbEmp.JobTitle || dbEmp.PositionTitle || '';
+    resolution.participants.forEach(dbEmp => {
+      const empIdLower = dbEmp.ID.toLowerCase();
+      if (!existingEmpIds.has(empIdLower)) {
+        const empId   = dbEmp.ID;
+        const empName = dbEmp.Name;
+        const empDept = dbEmp.Department;
+        const empPos  = dbEmp.Position;
 
         sheet.appendRow([
           generateId('TP'),
@@ -430,6 +471,24 @@ function addTrainingParticipants(trainingId, participants) {
 
     const totalCount = existingEmpIds.size;
     updateTrainingParticipantCount(trainingId, totalCount);
+
+    try {
+      const tpMasterSheet = getSheet(SHEET_NAMES.trainingParticipants);
+      if (tpMasterSheet) {
+        const tpMasterRows = resolution.participants.map(p => [
+          generateId('TP'),
+          trainingId,
+          p.ID,
+          p.Name,
+          p.Department,
+          p.Position,
+          addedAt
+        ]);
+        tpMasterSheet.getRange(tpMasterSheet.getLastRow() + 1, 1, tpMasterRows.length, 7).setValues(tpMasterRows);
+      }
+    } catch(mErr) {
+      Logger.log('Master TrainingParticipants update error: ' + mErr.message);
+    }
 
     try { syncTrainingRequisitionParticipants(trainingId); } catch(e) {}
 
@@ -487,5 +546,37 @@ function updateTrainingParticipantCount(trainingId, count) {
     }
   } catch (e) {
     Logger.log('updateTrainingParticipantCount error: ' + e.message);
+  }
+}
+
+/**
+ * One-time repair for existing training records created before participant
+ * canonicalisation. It rewrites each Training Data participant tab from the
+ * Employee sheet and refreshes the linked requisition form.
+ */
+function repairAllTrainingParticipantData() {
+  try {
+    const trainingSheet = getSheet(SHEET_NAMES.trainings);
+    const trainings = trainingSheet ? sheetToJson(trainingSheet) : [];
+    let repaired = 0;
+    let skipped = 0;
+
+    trainings.forEach(training => {
+      if (!training.ID) return;
+      const trainingData = getTrainingDataSpreadsheet(training.ID);
+      const participantSheet = trainingData ? trainingData.getSheetByName('TrainingParticipants') : null;
+      const existingParticipants = participantSheet ? sheetToJson(participantSheet) : [];
+      try {
+        syncParticipantsToTrainingDriveSheet(training.ID, existingParticipants);
+        syncTrainingRequisitionParticipants(training.ID);
+        repaired++;
+      } catch (e) {
+        skipped++;
+        Logger.log('Participant repair failed for ' + training.ID + ': ' + e.message);
+      }
+    });
+    return ok({ message: `Repaired ${repaired} training participant record(s).`, repaired: repaired, skipped: skipped });
+  } catch (e) {
+    return err('Could not repair training participant data: ' + e.message);
   }
 }

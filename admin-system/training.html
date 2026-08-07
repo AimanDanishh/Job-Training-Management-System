@@ -31,6 +31,14 @@
               <option value="">All Status</option>
               <option>Draft</option><option>Upcoming</option><option>In Progress</option><option>Completed</option><option>Archived</option>
             </select>
+            <select id="approval-t" class="input-th" style="width:auto">
+              <option value="">All Approval Status</option>
+              <option value="Approved">Approved</option>
+              <option value="Pending HOD Approval">Needs HOD Approval</option>
+              <option value="Pending C-Suite Approval">Needs C-Suite Approval</option>
+              <option value="Pending HOHR Approval">Needs HOHR Approval</option>
+              <option value="Rejected">Rejected</option>
+            </select>
             <select id="cat-t" class="input-th" style="width:auto">
               <option value="">All Categories</option>
               <option>Behavioral Skills (Soft Skills + Leadership + Customer Service)</option>
@@ -118,10 +126,20 @@
         <label class="label-th">Hours/Day</label>
         <input id="t-hours" class="input-th" type="number" min="1" value="8">
       </div>
-      <div class="col-md-12">
+      <div class="col-md-6">
         <label class="label-th">Status</label>
         <select id="t-status" class="input-th">
           <option>Draft</option><option>Upcoming</option><option>In Progress</option><option>Completed</option>
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label class="label-th">Approval Status <span style="font-size:10.5px;color:#64748B">(Automated)</span></label>
+        <select id="t-app-status" class="input-th" disabled style="background:#F8FAFC;cursor:not-allowed">
+          <option value="Approved">Approved</option>
+          <option value="Pending HOD Approval">Pending HOD Approval</option>
+          <option value="Pending C-Suite Approval">Pending C-Suite Approval</option>
+          <option value="Pending HOHR Approval">Pending HOHR Approval</option>
+          <option value="Rejected">Rejected</option>
         </select>
       </div>
       <div class="col-12">
@@ -316,13 +334,15 @@
   let allTrainings = [];
 
   document.addEventListener('DOMContentLoaded', () => {
-    const searchEl = document.getElementById('search-t');
-    const statusEl = document.getElementById('status-t');
-    const catEl    = document.getElementById('cat-t');
+    const searchEl   = document.getElementById('search-t');
+    const statusEl   = document.getElementById('status-t');
+    const approvalEl = document.getElementById('approval-t');
+    const catEl      = document.getElementById('cat-t');
 
-    if (searchEl) searchEl.addEventListener('input', filterTrainings);
-    if (statusEl) statusEl.addEventListener('change', filterTrainings);
-    if (catEl)    catEl.addEventListener('change', filterTrainings);
+    if (searchEl)   searchEl.addEventListener('input', filterTrainings);
+    if (statusEl)   statusEl.addEventListener('change', filterTrainings);
+    if (approvalEl) approvalEl.addEventListener('change', filterTrainings);
+    if (catEl)      catEl.addEventListener('change', filterTrainings);
 
     loadTrainings();
     loadCostCentres();
@@ -342,29 +362,33 @@
   }
 
   function filterTrainings() {
-    const searchEl = document.getElementById('search-t');
-    const statusEl = document.getElementById('status-t');
-    const catEl    = document.getElementById('cat-t');
+    const searchEl   = document.getElementById('search-t');
+    const statusEl   = document.getElementById('status-t');
+    const approvalEl = document.getElementById('approval-t');
+    const catEl      = document.getElementById('cat-t');
 
     const q   = searchEl ? searchEl.value.trim().toLowerCase() : '';
     const st  = statusEl ? statusEl.value : '';
+    const app = approvalEl ? approvalEl.value : '';
     const cat = catEl ? catEl.value : '';
 
     const list = Array.isArray(allTrainings) ? allTrainings : [];
 
     const f = list.filter(t => {
       if (!t) return false;
-      const name    = String(t.Name || t.TrainingTitle || '').toLowerCase();
-      const code    = String(t.Code || t.TrainingCode || t.ID || '').toLowerCase();
-      const trainer = String(t.Trainer || '').toLowerCase();
-      const status  = String(t.Status || '');
-      const category= String(t.Category || '');
+      const name      = String(t.Name || t.TrainingTitle || '').toLowerCase();
+      const code      = String(t.Code || t.TrainingCode || t.ID || '').toLowerCase();
+      const trainer   = String(t.Trainer || '').toLowerCase();
+      const status    = String(t.Status || '');
+      const appStatus = String(t.ApprovalStatus || 'Approved');
+      const category  = String(t.Category || '');
 
       const matchQ   = !q || name.includes(q) || code.includes(q) || trainer.includes(q);
       const matchSt  = !st || status === st;
+      const matchApp = !app || appStatus === app || (app === 'Approved' && (!t.ApprovalStatus || t.ApprovalStatus === 'Auto-Approved'));
       const matchCat = !cat || category === cat;
 
-      return matchQ && matchSt && matchCat;
+      return matchQ && matchSt && matchApp && matchCat;
     });
 
     renderGrid(f);
@@ -423,6 +447,8 @@
     }
     grid.innerHTML = list.map(t => {
       const cc = CAT_COLORS[t.Category] || '#2563EB';
+      const isApproved = isTrainingApproved(t);
+      const appStatusStr = t.ApprovalStatus || 'Approved';
       return `
       <div class="col-md-6 col-xl-4">
         <div style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden;
@@ -432,15 +458,18 @@
           <div style="height:4px;background:${cc}"></div>
           <div style="padding:16px">
             <!-- Header -->
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:8px">
               <div style="flex:1;min-width:0">
-                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;align-items:center">
                   <span style="font-size:10.5px;font-family:monospace;color:#94A3B8;background:#F8FAFC;padding:2px 6px;border-radius:4px;border:1px solid #E2E8F0">${t.Code || '—'}</span>
                   <span style="font-size:10.5px;color:${cc};background:${cc}15;padding:2px 7px;border-radius:999px;font-weight:500">${t.Category}</span>
                 </div>
                 <h3 style="font-size:13.5px;font-weight:700;color:#1E293B;margin:0;line-height:1.3">${t.Name}</h3>
               </div>
-              ${statusBadge(t.Status)}
+              <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+                ${statusBadge(t.Status)}
+                ${approvalStatusBadge(appStatusStr)}
+              </div>
             </div>
             <!-- Meta -->
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;margin-bottom:10px">
@@ -453,6 +482,13 @@
               <span class="icon sm" style="color:#2563EB">linear_scale</span>
               <span style="font-size:11.5px;font-weight:600;color:#1E293B;flex:1">Stage: ${t.Stage||'Created'}</span>
             </div>
+            ${!isApproved ? `
+            <!-- Approval Lock Warning Chip -->
+            <div style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:#FFFBEB;border-radius:7px;margin-bottom:10px;border:1px solid #FDE68A;color:#B45309;font-size:11px">
+              <span class="icon sm" style="color:#D97706">lock</span>
+              <span>Requires ${getApprovalRoleText(appStatusStr)} approval before session creation</span>
+            </div>
+            ` : ''}
             <!-- Actions -->
             <div style="display:flex;gap:6px;border-top:1px solid #F1F5F9;padding-top:12px">
               <button class="btn-th btn-primary btn-sm" style="flex:1;justify-content:center" onclick="openDetail('${t.ID}')"><span class="icon sm">open_in_new</span>Open</button>
@@ -502,6 +538,8 @@
     document.getElementById('t-hours').value    = t.TotalHours|| 8;
     document.getElementById('t-status').value   = t.Status    || 'Draft';
     document.getElementById('t-stage').value    = t.Stage     || 'Created';
+    const appSelect = document.getElementById('t-app-status');
+    if (appSelect) appSelect.value = t.ApprovalStatus || 'Approved';
     document.getElementById('t-obj').value      = t.Objectives|| '';
     openModal('modal-training');
   }
@@ -516,20 +554,24 @@
     if (!trainer) { showToast('Trainer / Facilitator is required.', 'error'); return; }
     if (!startDate) { showToast('Start Date is required.', 'error'); return; }
 
+    const appSelect = document.getElementById('t-app-status');
+    const appStatusVal = appSelect ? appSelect.value : 'Approved';
+
     const data = {
       ID: id, Name: name,
       Category:   document.getElementById('t-cat').value,
       Trainer:    trainer,
-      Venue:      document.getElementById('t-venue').value,
+      Venue:      document.getElementById('t-venue').value.trim(),
       CourseFee:  document.getElementById('t-fee').value,
       Department: document.getElementById('t-dept').value,
       StartDate:  startDate,
       EndDate:    document.getElementById('t-end').value,
-      Duration:   document.getElementById('t-duration').value,
-      TotalHours: document.getElementById('t-hours').value,
+      Duration:   document.getElementById('t-duration').value || 1,
+      TotalHours: document.getElementById('t-hours').value || 8,
       Status:     document.getElementById('t-status').value,
+      ApprovalStatus: appStatusVal,
       Stage:      document.getElementById('t-stage').value,
-      Objectives: document.getElementById('t-obj').value,
+      Objectives: document.getElementById('t-obj').value.trim(),
       Participants: 0
     };
     const btn = document.getElementById('btn-save-t');
@@ -587,9 +629,12 @@
 
   function renderFullDetail(t, participants, sessions, attendance, evalQrs) {
     const cc = CAT_COLORS[t.Category] || '#2563EB';
+    const isApproved = isTrainingApproved(t);
+    const appStatusStr = t.ApprovalStatus || 'Approved';
+
     const topActions = document.getElementById('detail-top-actions');
     topActions.innerHTML = `
-      <button class="btn-th btn-primary" onclick="openCreateSessionForTraining('${t.ID}')"><span class="icon sm">add</span>Add Session</button>
+      <button class="btn-th btn-primary" ${!isApproved ? 'disabled style="opacity:0.65;cursor:not-allowed"' : ''} onclick="${isApproved ? `openCreateSessionForTraining('${t.ID}')` : `showToast('Cannot add session: Training approval status is ${appStatusStr}.', 'error')`}"><span class="icon sm">${isApproved ? 'add' : 'lock'}</span>Add Session</button>
       <button class="btn-th btn-primary" style="background:#059669;border-color:#059669" onclick="navTo('attendance', {id:'${t.ID}'})"><span class="icon sm">fact_check</span>View Attendance</button>
       <button class="btn-th btn-secondary" onclick="navTo('evaluation', {id:'${t.ID}'})"><span class="icon sm">rate_review</span>View Evaluations</button>
       <button class="btn-th btn-secondary" onclick="navTo('report', {id:'${t.ID}'})"><span class="icon sm">bar_chart</span>Reports</button>
@@ -603,6 +648,15 @@
 
     const content = document.getElementById('detail-full-content');
     content.innerHTML = `
+      ${!isApproved ? `
+        <div class="alert-th alert-warning mb-3" style="display:flex;align-items:center;gap:12px;background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:12px 16px;border-radius:10px">
+          <span class="icon filled" style="color:#D97706;font-size:22px">lock</span>
+          <div>
+            <strong>Approval Required (${appStatusStr}):</strong>
+            Creating QR sessions and recording attendance are locked until this training programme is approved by <strong>${getApprovalRoleText(appStatusStr)}</strong>.
+          </div>
+        </div>
+      ` : ''}
       <!-- Header Banner Card -->
       <div class="card-th mb-4" style="border-top:4px solid ${cc}">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:16px">
@@ -613,7 +667,10 @@
             </div>
             <h2 style="font-size:22px;font-weight:800;color:#1E293B;margin:0 0 6px;letter-spacing:-0.02em">${t.Name}</h2>
           </div>
-          <div>${statusBadge(t.Status)}</div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+            ${statusBadge(t.Status)}
+            ${approvalStatusBadge(appStatusStr)}
+          </div>
         </div>
 
         <!-- Lifecycle Timeline -->
@@ -1236,6 +1293,11 @@
 
   function openCreateSessionForTraining(trainingId) {
     const t = allTrainings.find(x => x.ID === trainingId);
+    if (t && !isTrainingApproved(t)) {
+      const appStatusStr = t.ApprovalStatus || 'Pending Approval';
+      showToast(`Cannot create session: Training programme approval status is '${appStatusStr}'. Approval from ${getApprovalRoleText(appStatusStr)} is required first.`, 'error');
+      return;
+    }
     document.getElementById('s-training-id').value = trainingId || '';
     document.getElementById('s-name').value = '';
     const today = new Date().toISOString().split('T')[0];

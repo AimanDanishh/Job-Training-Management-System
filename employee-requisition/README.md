@@ -1,6 +1,6 @@
 # TrainHub — Employee Training Requisition Portal (`employee-requisition`)
 
-The **Employee Training Requisition Portal** is a separate, decoupled Google Apps Script web application dedicated to employees submitting Training Requisition Forms (`AP-HRD-F01-00`).
+The **Employee Training Requisition Portal** is a separate, decoupled Google Apps Script web application dedicated to employees submitting Training Requisition Forms (`AP-HRD-F01-01`).
 
 ## Key Capabilities:
 1. **Decoupled Deployment Access**: Deployed independently from `participant-portal` and `hod-portal` to support custom execution and domain access policies.

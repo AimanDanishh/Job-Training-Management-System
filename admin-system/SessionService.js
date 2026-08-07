@@ -45,15 +45,15 @@ function createSession(data) {
     if (!data.TrainingID) return err('Training ID is required.');
     if (!data.SessionName) return err('Session Name is required.');
 
-    // Enforce Approval Check: QR attendance generation is only allowed for Approved trainings
+    // Enforce Approval Check: QR session creation is only allowed for Approved trainings
     const tSheet = getSheet(SHEET_NAMES.trainings);
     if (tSheet) {
       const trainings = sheetToJson(tSheet);
       const training = trainings.find(t => String(t.ID || '').trim() === String(data.TrainingID).trim());
       if (training) {
-        const appStatus = String(training.ApprovalStatus || '').toLowerCase();
-        if (appStatus && !appStatus.includes('approved')) {
-          return err(`QR Attendance generation is only allowed for APPROVED training requisitions. Current status: ${training.ApprovalStatus || 'Pending Approval'}.`);
+        const appStatus = String(training.ApprovalStatus || '').trim().toLowerCase();
+        if (appStatus && appStatus !== 'approved' && appStatus !== 'auto-approved') {
+          return err(`QR session creation is only allowed for APPROVED training requisitions. Current approval status: '${training.ApprovalStatus || 'Pending Approval'}'.`);
         }
       }
     }

@@ -6,7 +6,7 @@ This repository comprises four decoupled Apps Script projects:
 1. **`admin-system`**: Admin Web Application for managing training programmes, participants, QR code generation, session scheduling, evaluation summaries, requisition forms, and automated Google Drive folder workspaces.
 2. **`participant-portal`**: Lightweight, public-facing Web Application for QR code attendance check-in and Level 1 participant training evaluations.
 3. **`hod-portal`**: Dedicated HOD & Managerial Portal for reviewing employee training requisition forms, digitally stamping multi-tier approvals (HOD, C-Suite, HOHR), and conducting 3-month post-training evaluations for participants under their Cost Centre.
-4. **`employee-requisition`**: Dedicated Employee Web Application for filling out and submitting Training Requisition Forms (`AP-HRD-F01-00`) with custom deployment access permissions.
+4. **`employee-requisition`**: Dedicated Employee Web Application for filling out and submitting Training Requisition Forms (`AP-HRD-F01-01`) with custom deployment access permissions.
 
 ---
 
@@ -28,7 +28,7 @@ Job Training Management System
 │
 ├── Employee Requisition System (employee-requisition)
 │   ├── Employee ID Lookup & Autofill (Name, Cost Centre, Position Title, Date)
-│   ├── Complete 15-Field Training Request Form (AP-HRD-F01-00)
+│   ├── Complete 15-Field Training Request Form (AP-HRD-F01-01)
 │   ├── Dynamic Cost Centre Dropdown & Master Participant Picker
 │   └── Multi-Tier Approval Trigger & Auto-Bypass Engine
 │
@@ -129,7 +129,7 @@ The system operates using **one central system email account** (the deployment e
    - `Employees`: Columns `ID`, `Name`, `Position Title`, `Cost Centre`, `Email`, `Phone`, `Status`.
    - `Cost Centre`: Column `Cost Centre` (list of real cost centres).
    - `HOD email`: Columns `Department`, `HODName`, `HODEmail`, `CsuiteName`, `CsuiteEmail`, `HohrName`, `HohrEmail`.
-3. Upload `AP-HRD-F01-00` Google Sheet template (`TRAINING_REQUISITION_TEMPLATE_ID`).
+3. Upload `AP-HRD-F01-01` Google Sheet template (`TRAINING_REQUISITION_TEMPLATE_ID`).
 
 ### Step 2: Deploy `admin-system` (Admin Web App)
 1. Push project files via `clasp push` or copy to Apps Script editor.

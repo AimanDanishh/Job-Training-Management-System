@@ -166,7 +166,7 @@ Overall UI
 
 1. Employee details (user just need to enter their Employee ID), the detail will be use to fill the REQUEST BY column in the Training Requisition Form in the template (employee no., Name, Job position, date)
 2. Training Title
-3. Training Fee 
+3. Training Fee
 4. Training Date (From \& Until)
 5. Training Duration (hrs, 0.5 accuracy)
 6. Training Venue
@@ -204,25 +204,70 @@ Overall UI
 
 **Improvement/Problem (Training Request Form)**
 
-1. No multiple selection for Cost Centre
-2. Add file button
-3. Participant name displayed wrongly contains "()"
-4. When add participant B, participant A are added
-5. Bulk add participant not working
-6. Missing No. of pax question
-7. When trying to send form, it says "⚠️ Error: Official company email is required to submit a training requisition."
-8. FOR TESTING/DEVELOPEMENT ADD THE EMAIL TO DRAFT FIRST
+1. Get the user email through what email they use to access the website
+2. Save the email to database so that they could get notify if the training status have change (HOD approved, etc.)
 
 
 
 **Improvement/Problem (HOD system)**
 
-1. Only allow HOD (match the HOD email) can access the system
-2. If the user don't have access, give a proper UI access denied
+1. Work out all the UI again, make sure to use real data from the EMPLOYEE\_SPREADSHEET\_ID, no dummy, no fake approve, all real data only
 
 
 
 **Improvement/Problem (Admin system)**
 
 1. Training keeps loading forever, unable to see "No training list" or create new training
+
+
+
+**Latest Database Update/Improvement**
+
+1. For each training request, it should automatically create the Training Requisition Form and autofill
+2. After each approval HOD, Csuite and HOHR it should also update the Training Requisition Form
+3. The details in the request signature must be: (employee no., Name, Job position, date)
+4. The details in the signature must be: (request status, employee no., name, job position, date)
+
+
+
+**JOB TRAINING REQUISITION FORM**
+1. Training Title: C5 until I5
+
+2\. Course Fee: C6 until E6
+
+3\. Date: G6 until I6
+
+4\. Duration: C7 until E7
+
+5\. Venue: G7 until I7
+
+6\. Training Provider: C8 until I8
+
+7\. Reasons for Training: A11 \& A12 until I11 and I12
+
+8\. List of participant:
+
+9\. Employee No: A15 \& B15 until A39 and B39
+
+10\. Name: C15 until C39
+
+11\. Department: D,E,F,G 15 until D,E,F,G 39
+
+12\. Job Title: H15 \& I15 until H39 and I39
+
+13\. Request By: A,B 42 until 45
+
+14\. Verified by HOD: C42 until C45
+
+15\. Approved By:
+
+16\. Csuite: D,E 42 until 45
+
+17\. HOHR: F, G 42 until 45
+
+18\. HR Department (Arina): H, I 42 until 45
+
+
+
+
 

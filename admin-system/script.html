@@ -51,6 +51,12 @@ function callServer(fnName, ...args) {
       hideLoadingOverlay();
     };
 
+    if (typeof google === 'undefined' || !google.script || !google.script.run) {
+      cleanup();
+      reject(new Error('Google Apps Script runtime environment not detected.'));
+      return;
+    }
+
     const runner = google.script.run
       .withSuccessHandler(raw => {
         cleanup();
@@ -64,7 +70,18 @@ function callServer(fnName, ...args) {
         cleanup();
         reject(new Error(e.message || String(e)));
       });
-    runner[fnName](...args);
+
+    try {
+      if (typeof runner[fnName] !== 'function') {
+        cleanup();
+        reject(new Error(`Server function '${fnName}' does not exist on google.script.run.`));
+        return;
+      }
+      runner[fnName](...args);
+    } catch(e) {
+      cleanup();
+      reject(e);
+    }
   });
 }
 
@@ -177,6 +194,43 @@ function statusBadge(status) {
   };
   const cls = map[status] || 'badge-gray';
   return `<span class="badge-th ${cls}">${status}</span>`;
+}
+
+// ─── Automated Approval Status Badge ───────────────────────────────────────────
+function approvalStatusBadge(status) {
+  const s = String(status || '').trim();
+  if (!s || s === 'Approved' || s === 'Auto-Approved') {
+    return `<span class="badge-th badge-green" style="display:inline-flex;align-items:center;gap:4px"><span class="icon sm" style="font-size:13px">check_circle</span>Approved</span>`;
+  }
+  if (s === 'Pending HOD Approval') {
+    return `<span class="badge-th badge-yellow" style="display:inline-flex;align-items:center;gap:4px;background:#FEF3C7;color:#92400E;border:1px solid #FCD34D"><span class="icon sm" style="font-size:13px">hourglass_empty</span>Needs HOD Approval</span>`;
+  }
+  if (s === 'Pending C-Suite Approval') {
+    return `<span class="badge-th badge-yellow" style="display:inline-flex;align-items:center;gap:4px;background:#FFEDD5;color:#9A3412;border:1px solid #FDBA74"><span class="icon sm" style="font-size:13px">gavel</span>Needs C-Suite Approval</span>`;
+  }
+  if (s === 'Pending HOHR Approval') {
+    return `<span class="badge-th badge-yellow" style="display:inline-flex;align-items:center;gap:4px;background:#FDE68A;color:#78350F;border:1px solid #F59E0B"><span class="icon sm" style="font-size:13px">badge</span>Needs HOHR Approval</span>`;
+  }
+  if (s === 'Rejected') {
+    return `<span class="badge-th badge-red" style="display:inline-flex;align-items:center;gap:4px"><span class="icon sm" style="font-size:13px">cancel</span>Rejected</span>`;
+  }
+  return `<span class="badge-th badge-yellow">${s}</span>`;
+}
+
+function isTrainingApproved(training) {
+  if (!training) return false;
+  const s = String(training.ApprovalStatus || '').trim().toLowerCase();
+  if (!s || s === 'approved' || s === 'auto-approved') return true;
+  return false;
+}
+
+function getApprovalRoleText(status) {
+  const s = String(status || '').trim();
+  if (s === 'Pending HOD Approval') return 'HOD';
+  if (s === 'Pending C-Suite Approval') return 'C-Suite';
+  if (s === 'Pending HOHR Approval') return 'HOHR';
+  if (s === 'Rejected') return 'Manager (Rejected)';
+  return 'HOD / C-Suite / HOHR';
 }
 
 // ─── Stage badge ─────────────────────────────────────────────────────────────

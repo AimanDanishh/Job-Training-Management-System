@@ -129,6 +129,9 @@ function getTrainingDataSpreadsheet(trainingId) {
       const fileIter = folder.getFilesByName(`${code} Training Data`);
       if (fileIter.hasNext()) {
         return SpreadsheetApp.openById(fileIter.next().getId());
+      } else {
+        const file = getOrCreateSingleTrainingSheet(folder, code);
+        return SpreadsheetApp.openById(file.getId());
       }
     } catch (e) {
       Logger.log('Error opening per-training sheet from FolderID: ' + e.message);
@@ -136,6 +139,98 @@ function getTrainingDataSpreadsheet(trainingId) {
   }
 
   return null;
+}
+
+function getOrCreateSingleTrainingSheet(folder, code) {
+  const fileName = `${code} Training Data`;
+  let fileIter = folder.getFilesByName(fileName);
+  let file;
+  let ss;
+
+  if (fileIter.hasNext()) {
+    file = fileIter.next();
+    ss = SpreadsheetApp.openById(file.getId());
+  } else {
+    let legacyIter = folder.getFilesByName(`${code} Attendance Sheet`);
+    if (legacyIter.hasNext()) {
+      file = legacyIter.next();
+      ss = SpreadsheetApp.openById(file.getId());
+    } else {
+      ss = SpreadsheetApp.create(fileName);
+      file = DriveApp.getFileById(ss.getId());
+      folder.addFile(file);
+      try { DriveApp.getRootFolder().removeFile(file); } catch(rErr) {}
+    }
+  }
+
+  const tabDefs = [
+    {
+      name: 'TrainingParticipants',
+      headers: ['ID', 'TrainingID', 'EmployeeID', 'EmployeeName', 'Department', 'Position', 'AddedAt']
+    },
+    {
+      name: 'TrainingSessions',
+      headers: ['SessionID', 'TrainingID', 'SessionName', 'SessionDate', 'StartTime', 'EndTime', 'AttendanceURL', 'QRCodeURL', 'QRStatus', 'CreatedDate']
+    },
+    {
+      name: 'Attendance',
+      headers: ['AttendanceID', 'SessionID', 'TrainingID', 'EmployeeNo', 'EmployeeName', 'Department', 'ScanTime', 'Status', 'TrainingCode', 'Day', 'Date', 'Hours', 'Remarks', 'EditedBy', 'EditedAt']
+    },
+    {
+      name: 'TrainingEval',
+      headers: ['ID', 'TrainingID', 'EmployeeID', 'EmployeeName', 'Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6', 'Q7', 'SectionB1', 'SectionB2', 'SectionB3', 'AvgScore', 'SubmittedAt']
+    },
+    {
+      name: 'PostEval',
+      headers: ['ID', 'TrainingID', 'EmployeeID', 'EvaluatorName', 'EvaluatorID', 'CompetencyBefore', 'CompetencyAfter', 'Improvement', 'CanApply', 'FurtherTraining', 'Comments', 'SubmittedAt']
+    }
+  ];
+
+  tabDefs.forEach(def => {
+    let sheet = ss.getSheetByName(def.name);
+    if (!sheet) {
+      const allSheets = ss.getSheets();
+      sheet = allSheets.find(s => s.getName().toLowerCase().includes(def.name.toLowerCase()));
+      if (!sheet) {
+        sheet = ss.insertSheet(def.name);
+      } else {
+        sheet.setName(def.name);
+      }
+    }
+    if (sheet.getLastRow() === 0) {
+      sheet.appendRow(def.headers);
+      sheet.getRange(1, 1, 1, def.headers.length)
+        .setFontWeight('bold')
+        .setBackground('#2563EB')
+        .setFontColor('#FFFFFF');
+      sheet.setFrozenRows(1);
+    }
+  });
+
+  const defaultSheet = ss.getSheetByName('Sheet1') || ss.getSheetByName('Data');
+  if (defaultSheet && ss.getSheets().length > 1 && defaultSheet.getLastRow() <= 1) {
+    try { ss.deleteSheet(defaultSheet); } catch(e) {}
+  }
+
+  let summarySheet = ss.getSheetByName('Summary');
+  if (!summarySheet) {
+    summarySheet = ss.insertSheet('Summary');
+    summarySheet.getRange('A1:B1').setValues([['Metric / Category', 'Live Formula / Output']]);
+    summarySheet.getRange('A1:B1').setFontWeight('bold').setBackground('#1E293B').setFontColor('#FFFFFF');
+
+    summarySheet.getRange('A2:B8').setFormulas([
+      ['Total Enrolled Participants', '=IF(ISREF(TrainingParticipants!A2), COUNTA(TrainingParticipants!A2:A), 0)'],
+      ['Total Sessions Created', '=IF(ISREF(TrainingSessions!A2), COUNTA(TrainingSessions!A2:A), 0)'],
+      ['Total Attendance Logs', '=IF(ISREF(Attendance!A2), COUNTA(Attendance!A2:A), 0)'],
+      ['Present Count', '=IF(ISREF(Attendance!H2), COUNTIF(Attendance!H2:H, "Present"), 0)'],
+      ['Total Evaluations Submitted', '=IF(ISREF(TrainingEval!A2), COUNTA(TrainingEval!A2:A), 0)'],
+      ['Overall Average Score', '=IF(AND(ISREF(TrainingEval!O2), COUNTA(TrainingEval!O2:O)>0), AVERAGE(TrainingEval!O2:O), 0)'],
+      ['Total Post-Reviews Completed', '=IF(ISREF(PostEval!A2), COUNTA(PostEval!A2:A), 0)']
+    ]);
+  }
+
+  SpreadsheetApp.flush();
+  return file;
 }
 
 /**

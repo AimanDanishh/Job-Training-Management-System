@@ -3,13 +3,13 @@
 <head>
   <base target="_top">
   <meta charset="utf-8">
-  <title>TrainHub — Training Requisition Form (AP-HRD-F01-00)</title>
+  <title>TrainHub — Training Requisition Form (AP-HRD-F01-01)</title>
   <?!= include('style'); ?>
 </head>
 <body>
   <div class="container">
     <header class="portal-header">
-      <div class="brand-title">Training Requisition Form (AP-HRD-F01-00)</div>
+      <div class="brand-title">Training Requisition Form (AP-HRD-F01-01)</div>
       <div class="brand-subtitle">Fill and submit your training request for managerial & HOD approval</div>
     </header>
 
@@ -220,10 +220,26 @@
     let selectedParticipants = [];
     let uploadedFileObject = null;
 
+    let loggedInUserEmail = '';
+
     window.addEventListener('DOMContentLoaded', () => {
       loadCostCentres();
       loadMasterParticipants();
+      fetchLoggedInUserEmail();
     });
+
+    function fetchLoggedInUserEmail() {
+      google.script.run
+        .withSuccessHandler(resStr => {
+          try {
+            const res = JSON.parse(resStr);
+            if (res.success && res.data) {
+              loggedInUserEmail = res.data;
+            }
+          } catch(e) {}
+        })
+        .getLoggedInUserEmail();
+    }
 
     function loadCostCentres() {
       google.script.run
@@ -282,6 +298,10 @@
     }
 
     function displayAutofill(emp) {
+      if (loggedInUserEmail) {
+        emp.Email = loggedInUserEmail;
+      }
+
       document.getElementById('autoEmpNo').innerText = emp.ID;
       document.getElementById('autoName').innerText = emp.Name || emp.ID;
       document.getElementById('autoDept').innerText = emp.Department || 'N/A';

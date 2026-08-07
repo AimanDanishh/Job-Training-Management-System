@@ -10,13 +10,13 @@ const SUBFOLDER_NAMES = [];
  * Uses ROOT_FOLDER_ID from Script Properties, or defaults to "Job Training System/Training" in Google Drive.
  */
 function getOrCreateRootFolder() {
-  const rootFolderId = getConfigProperty('ROOT_FOLDER_ID', '');
+  const rootFolderId = getConfigProperty('TRAINING_FOLDER_ID', '') || getConfigProperty('ROOT_FOLDER_ID', '') || getConfigProperty('DRIVE_ROOT_FOLDER_ID', '');
 
   if (rootFolderId) {
     try {
       return DriveApp.getFolderById(rootFolderId);
     } catch (e) {
-      Logger.log('Could not open configured ROOT_FOLDER_ID (' + rootFolderId + '): ' + e.message);
+      Logger.log('Could not open configured folder (' + rootFolderId + '): ' + e.message);
     }
   }
 
@@ -34,15 +34,6 @@ function getOrCreateRootFolder() {
  * Automatically creates a dedicated Google Drive workspace for a training programme.
  * Creates per-training sheets directly in the training folder (1 folder per training).
  * 
- * Workspace Structure:
- * Job Training System/
- * └── Training/
- *     └── TR-2026-001 Safety Induction/
- *         ├── TR-2026-001 Attendance Sheet
- *         ├── TR-2026-001 Training Evaluation Sheet
- *         ├── TR-2026-001 Post Evaluation Sheet
- *         └── TR-2026-001 Training Requisition Form
- *
  * @param {string} code - Training Code (e.g. TR-2026-001)
  * @param {string} name - Training Name (e.g. Safety Induction)
  * @return {Object} Workspace folder IDs and URL dictionary
@@ -109,7 +100,7 @@ function getOrCreateSingleTrainingSheet(folder, code) {
       ss = SpreadsheetApp.create(fileName);
       file = DriveApp.getFileById(ss.getId());
       folder.addFile(file);
-      DriveApp.getRootFolder().removeFile(file);
+      try { DriveApp.getRootFolder().removeFile(file); } catch(rErr) {}
     }
   }
 
@@ -185,57 +176,192 @@ function getOrCreateSingleTrainingSheet(folder, code) {
   return file;
 }
 
-
-
 /**
- * Copies the AP-HRD-F01-00 Google Sheets master into a training workspace and
+ * Copies the AP-HRD-F01-01 Google Sheets master into a training workspace and
  * fills its programme-detail fields without changing the template formatting.
- * The configured template must be a native Google Sheet, not an Excel file.
  */
-function createTrainingRequisitionForm(code, training, targetFolderId) {
-  const templateId = getConfigProperty('TRAINING_REQUISITION_TEMPLATE_ID', '');
-  if (!templateId) {
-    return { message: 'Requisition form skipped: configure TRAINING_REQUISITION_TEMPLATE_ID.' };
-  }
+function createTrainingRequisitionForm(code, training, targetFolderId, requesterSigData) {
   if (!targetFolderId) return { message: 'Requisition form skipped: training workspace is unavailable.' };
+  const templateId = getConfigProperty('TRAINING_REQUISITION_TEMPLATE_ID', '');
 
   try {
     const targetFolder = DriveApp.getFolderById(targetFolderId);
-    const templateFile = DriveApp.getFileById(templateId);
     const fileName = `${code} Training Requisition Form`;
-    const copiedFile = templateFile.makeCopy(fileName, targetFolder);
+    let copiedFile = null;
+
+    if (templateId) {
+      try {
+        const templateFile = DriveApp.getFileById(templateId);
+        copiedFile = templateFile.makeCopy(fileName, targetFolder);
+      } catch (tmplErr) {
+        Logger.log('Template copy error, creating clean form: ' + tmplErr.message);
+      }
+    }
+
+    if (!copiedFile) {
+      const newSs = SpreadsheetApp.create(fileName);
+      copiedFile = DriveApp.getFileById(newSs.getId());
+      targetFolder.addFile(copiedFile);
+      try { DriveApp.getRootFolder().removeFile(copiedFile); } catch(rErr) {}
+    }
+
     const spreadsheet = SpreadsheetApp.openById(copiedFile.getId());
-    const sheet = spreadsheet.getSheetByName('Training Form') || spreadsheet.getSheets()[0];
+    let sheet = spreadsheet.getSheetByName('Training Form');
+    if (!sheet) {
+      sheet = spreadsheet.getActiveSheet();
+      sheet.setName('Training Form');
+    }
 
     const startDate = formatDate(training.StartDate);
     const endDate = formatDate(training.EndDate);
     const duration = Number(training.Duration) || 1;
     const hours = training.TotalHours ? ` (${training.TotalHours} hours)` : '';
 
-    // Equip programme detail fields with Google Sheets formulas for date range & duration
-    sheet.getRange('C5').setValue(training.Name || '');
-    sheet.getRange('C6').setValue(training.CourseFee !== undefined ? training.CourseFee : '');
+    sheet.getRange('A1:I1').merge().setValue('APOLLO FOOD INDUSTRIES (M) SDN BHD').setFontWeight('bold').setFontSize(14).setHorizontalAlignment('center');
+    sheet.getRange('A2:I2').merge().setValue('TRAINING REQUISITION FORM (AP-HRD-F01-01)').setFontWeight('bold').setFontSize(12).setHorizontalAlignment('center');
 
-    if (endDate && endDate !== startDate) {
-      sheet.getRange('F6').setFormula(`="${startDate}" & " - " & "${endDate}"`);
-    } else {
-      sheet.getRange('F6').setValue(startDate || '');
+    const setTemplateValue = (area, value) => sheet.getRange(area.split(':')[0]).setValue(value == null ? '' : value);
+    sheet.getRange('A5').setValue('Training Title:');
+    setTemplateValue('C5:I5', training.Name || training.TrainingName || '');
+    sheet.getRange('A6').setValue('Course Fee (RM):');
+    setTemplateValue('C6:E6', training.CourseFee !== undefined ? training.CourseFee : '0.00');
+    sheet.getRange('F6').setValue('Date:');
+    setTemplateValue('G6:I6', endDate && endDate !== startDate ? `${startDate} - ${endDate}` : (startDate || ''));
+    sheet.getRange('A7').setValue('Duration:');
+    setTemplateValue('C7:E7', `${duration} day(s)${hours}`);
+    sheet.getRange('F7').setValue('Venue:');
+    setTemplateValue('G7:I7', training.Venue || '');
+    sheet.getRange('A8').setValue('Training Provider:');
+    setTemplateValue('C8:I8', training.TrainingProvider || training.Provider || training.Trainer || '');
+    sheet.getRange('A10').setValue('Reasons for Training:');
+    setTemplateValue('A11:I12', training.Objectives || training.Reason || '');
+
+    sheet.getRange('A42').setValue('REQUEST BY:').setFontWeight('bold');
+    sheet.getRange('C42').setValue('VERIFIED BY (HOD):').setFontWeight('bold');
+    sheet.getRange('D42').setValue('APPROVED BY (C-Suite):').setFontWeight('bold');
+    sheet.getRange('F42').setValue('APPROVED BY (HOHR):').setFontWeight('bold');
+    sheet.getRange('H42').setValue('HR DEPT (Arina):').setFontWeight('bold');
+
+    if (requesterSigData) {
+      const empNo    = requesterSigData.employeeNo || requesterSigData.EmployeeNo || requesterSigData.EmployeeID || requesterSigData.ID || '';
+      const empName  = requesterSigData.name || requesterSigData.EmployeeName || requesterSigData.Name || '';
+      const position = requesterSigData.position || requesterSigData.JobPosition || requesterSigData.Position || requesterSigData.JobTitle || 'Requester';
+      const sigDate  = requesterSigData.date || requesterSigData.Date || formatDate(new Date());
+
+      const reqSigText = `${empNo}, ${empName}, ${position}, ${sigDate}`;
+      sheet.getRange('A43').setValue(reqSigText);
+      sheet.getRange('A44').setValue(`Status: Submitted`);
+      sheet.getRange('A45').setValue(`Emp No: ${empNo} | Name: ${empName} | Position: ${position} | Date: ${sigDate}`);
     }
 
-    sheet.getRange('C7').setFormula(`="${duration} day" & IF(${duration}>1, "s", "") & "${hours}"`);
-    sheet.getRange('F7').setValue(training.Venue || '');
-    sheet.getRange('C8').setValue(training.Trainer || '');
-    sheet.getRange('A11').setValue(training.Objectives || '');
     SpreadsheetApp.flush();
-
     return { fileId: copiedFile.getId(), fileUrl: copiedFile.getUrl(), fileName: fileName };
   } catch (e) {
     Logger.log('createTrainingRequisitionForm error: ' + e.message);
-    return { message: 'Requisition form skipped: ' + e.message };
+    return { message: 'Requisition form creation failed: ' + e.message };
   }
 }
 
-/** Keeps the participant grid on the requisition form in sync with enrolled training participants and attendance. */
+/**
+ * Updates signature blocks on AP-HRD-F01-01 form.
+ */
+function updateTrainingRequisitionSignatures(trainingId, step, sigData, targetFormId) {
+  try {
+    SpreadsheetApp.flush();
+    const trainingSheet = getSheet(SHEET_NAMES.trainings);
+    if (!trainingSheet) return;
+    const headers = ensureTrainingSheetColumns(trainingSheet);
+    const row = findRowById(trainingSheet, trainingId);
+    if (row === -1) return;
+
+    let formId = targetFormId || '';
+    if (!formId) {
+      const formCol = headers.indexOf('RequisitionFormFileID') + 1;
+      formId = formCol ? trainingSheet.getRange(row, formCol).getValue() : '';
+    }
+    if (!formId) return;
+
+    const ss = SpreadsheetApp.openById(formId);
+    const sheet = ss.getSheetByName('Training Form') || ss.getSheets()[0];
+
+    const empNo    = sigData.employeeNo || sigData.EmployeeNo || sigData.EmployeeID || sigData.ID || '';
+    const empName  = sigData.name || sigData.EmployeeName || sigData.Name || '';
+    const position = sigData.position || sigData.JobPosition || sigData.Position || sigData.JobTitle || '';
+    const sigDate  = sigData.date || sigData.Date || sigData.Timestamp || formatDate(new Date());
+    const status   = sigData.status || sigData.RequestStatus || sigData.ApprovalStatus || '';
+
+    const reqSigText = `${empNo}, ${empName}, ${position}, ${sigDate}`;
+    const appSigText = `${status}, ${empNo}, ${empName}, ${position}, ${sigDate}`;
+
+    if (step === 'request') {
+      try { sheet.getRange('A43:B43').merge(); } catch(mErr) {}
+      try { sheet.getRange('A44:B44').merge(); } catch(mErr) {}
+      try { sheet.getRange('A45:B45').merge(); } catch(mErr) {}
+      sheet.getRange('A43').setValue(reqSigText);
+      sheet.getRange('A44').setValue(`Status: Submitted`);
+      sheet.getRange('A45').setValue(`Emp No: ${empNo} | Name: ${empName} | Position: ${position} | Date: ${sigDate}`);
+    } else if (step === 'HOD' || step === 'Head of Department') {
+      sheet.getRange('C43').setValue(appSigText);
+      sheet.getRange('C44').setValue(`Status: ${status}`);
+      sheet.getRange('C45').setValue(`HOD: ${empName} (${empNo}) | ${position} | Date: ${sigDate}`);
+    } else if (step === 'Csuite' || step === 'C-Suite') {
+      try { sheet.getRange('D43:E43').merge(); } catch(mErr) {}
+      try { sheet.getRange('D44:E44').merge(); } catch(mErr) {}
+      try { sheet.getRange('D45:E45').merge(); } catch(mErr) {}
+      sheet.getRange('D43').setValue(appSigText);
+      sheet.getRange('D44').setValue(`Status: ${status}`);
+      sheet.getRange('D45').setValue(`C-Suite: ${empName} (${empNo}) | ${position} | Date: ${sigDate}`);
+    } else if (step === 'HOHR' || step === 'Head of HR') {
+      try { sheet.getRange('F43:G43').merge(); } catch(mErr) {}
+      try { sheet.getRange('F44:G44').merge(); } catch(mErr) {}
+      try { sheet.getRange('F45:G45').merge(); } catch(mErr) {}
+      sheet.getRange('F43').setValue(appSigText);
+      sheet.getRange('F44').setValue(`Status: ${status}`);
+      sheet.getRange('F45').setValue(`HOHR: ${empName} (${empNo}) | ${position} | Date: ${sigDate}`);
+    } else if (step === 'HR' || step === 'Arina' || step === 'HR Department') {
+      try { sheet.getRange('H43:I43').merge(); } catch(mErr) {}
+      try { sheet.getRange('H44:I44').merge(); } catch(mErr) {}
+      try { sheet.getRange('H45:I45').merge(); } catch(mErr) {}
+      sheet.getRange('H43').setValue(appSigText);
+      sheet.getRange('H44').setValue(`Status: ${status}`);
+      sheet.getRange('H45').setValue(`HR: ${empName} (${empNo}) | ${position} | Date: ${sigDate}`);
+    }
+
+    // Auto-check: If step is NOT 'request' but cell A43 is empty, ensure requester signature is populated too
+    if (step !== 'request') {
+      const currentReqVal = sheet.getRange('A43').getValue();
+      if (!currentReqVal || String(currentReqVal).trim() === '') {
+        const reqIdCol = headers.indexOf('RequestedBy') + 1;
+        const reqNameCol = headers.indexOf('RequestedByName') + 1;
+        const createdDateCol = headers.indexOf('CreatedDate') + 1;
+        const reqId = reqIdCol > 0 ? trainingSheet.getRange(row, reqIdCol).getValue() : '';
+        const reqName = reqNameCol > 0 ? trainingSheet.getRange(row, reqNameCol).getValue() : '';
+        const reqDate = (createdDateCol > 0 ? trainingSheet.getRange(row, createdDateCol).getValue() : '') || sigDate;
+        let reqPos = 'Requester';
+        if (reqId && getSheet(SHEET_NAMES.employees)) {
+          const emps = sheetToJson(getSheet(SHEET_NAMES.employees));
+          const m = emps.find(e => String(e.ID || e.EmployeeID).toLowerCase() === String(reqId).toLowerCase());
+          if (m) reqPos = m.Position || m.JobTitle || m.PositionTitle || 'Requester';
+        }
+        if (reqId || reqName) {
+          const rText = `${reqId}, ${reqName}, ${reqPos}, ${reqDate}`;
+          try { sheet.getRange('A43:B43').merge(); } catch(mErr) {}
+          try { sheet.getRange('A44:B44').merge(); } catch(mErr) {}
+          try { sheet.getRange('A45:B45').merge(); } catch(mErr) {}
+          sheet.getRange('A43').setValue(rText);
+          sheet.getRange('A44').setValue(`Status: Submitted`);
+          sheet.getRange('A45').setValue(`Emp No: ${reqId} | Name: ${reqName} | Position: ${reqPos} | Date: ${reqDate}`);
+        }
+      }
+    }
+
+    SpreadsheetApp.flush();
+  } catch (e) {
+    Logger.log('updateTrainingRequisitionSignatures error: ' + e.message);
+  }
+}
+
+/** Keeps participant grid on requisition form in sync. */
 function syncTrainingRequisitionParticipants(trainingId) {
   try {
     const trainingSheet = getSheet(SHEET_NAMES.trainings);
@@ -246,7 +372,6 @@ function syncTrainingRequisitionParticipants(trainingId) {
     const formId = formColumn ? trainingSheet.getRange(trainingRow, formColumn).getValue() : '';
     if (!formId) return;
 
-    // Combine participants from TrainingParticipants tab & Attendance tab in per-training sheet
     const ss = getTrainingDataSpreadsheet(trainingId);
     const tpSheet = ss ? ss.getSheetByName('TrainingParticipants') : null;
     const tpRows  = tpSheet ? sheetToJson(tpSheet) : [];
@@ -283,54 +408,32 @@ function syncTrainingRequisitionParticipants(trainingId) {
       }
     });
 
-    const employeeRows = sheetToJson(getSheet(SHEET_NAMES.employees));
-    const employees = {};
-    employeeRows.forEach(row => { employees[row.ID] = row; });
+    const resolved = canonicalizeTrainingParticipants(uniqueParticipants);
+    if (resolved.rejected.length > 0) {
+      Logger.log('Skipped participant rows not found in Employees for ' + trainingId + ': ' + resolved.rejected.join(', '));
+    }
 
     const formSpreadsheet = SpreadsheetApp.openById(formId);
     const sheet = formSpreadsheet.getSheetByName('Training Form') || formSpreadsheet.getSheets()[0];
-    const rowCount = 25; // Rows 15-39 in the supplied AP-HRD-F01-00 template.
-    sheet.getRangeList(['A15:A39', 'C15:C39', 'D15:D39', 'E15:E39', 'G15:G39']).clearContent();
+    const rowCount = 25;
+    sheet.getRange('A15:I39').clearContent();
 
-    uniqueParticipants.slice(0, rowCount).forEach((participant, index) => {
-      const employee = employees[participant.EmployeeID] || {};
-      const row = 15 + index;
-      sheet.getRange(`A${row}`).setValue(participant.EmployeeID || '');
-      sheet.getRange(`C${row}`).setValue(participant.EmployeeName || employee.Name || '');
-      sheet.getRange(`D${row}`).setValue(participant.Department || employee.Department || '');
-      sheet.getRange(`E${row}`).setValue(employee.NRIC || '');
-      sheet.getRange(`G${row}`).setValue(participant.Position || employee.Position || employee.JobTitle || employee.PositionTitle || '');
+    resolved.participants.slice(0, rowCount).forEach((participant, index) => {
+      const r = 15 + index;
+      sheet.getRange(`A${r}`).setValue(participant.ID);
+      sheet.getRange(`C${r}`).setValue(participant.Name);
+      sheet.getRange(`D${r}`).setValue(participant.Department);
+      sheet.getRange(`H${r}`).setValue(participant.Position);
     });
 
-    trainingSheet.getRange(trainingRow, 15).setValue(uniqueParticipants.length);
+    trainingSheet.getRange(trainingRow, 15).setValue(resolved.participants.length);
     SpreadsheetApp.flush();
   } catch (e) {
     Logger.log('syncTrainingRequisitionParticipants error: ' + e.message);
   }
 }
 
-// ─── Template Data Population Utilities ───────────────────────────────────────
-
-/**
- * Copies a Google Sheet template file and populates placeholder tags (e.g., {{TRAINING_NAME}}) 
- * or writes cell mappings and data rows according to your Job Training Form layout.
- *
- * @param {string} templateFileId - The Drive File ID of your master form template
- * @param {Folder} targetFolder - Drive Folder to place the populated file
- * @param {string} newFileName - Desired name for the generated file
- * @param {Object} replacements - Key-value dictionary of placeholders to replace, e.g. { "{{TRAINING_NAME}}": "Safety Induction" }
- * @param {Array<Array>} tableData - Optional 2D array of rows to populate into the template's data table starting at startRow
- * @param {number} startRow - 1-based row index to start appending table data (default 10)
- * @return {Object} Information about the generated file (fileId, fileUrl)
- */
-
-
-/**
- * Appends a new attendance record row to the training's dedicated Drive Attendance Sheet.
- */
-/**
- * Appends a new attendance record row to the training's dedicated single Drive spreadsheet (Attendance tab).
- */
+/** Appends attendance log. */
 function syncAttendanceToTrainingDriveSheet(trainingId, recordRow) {
   try {
     const tSheet = getSheet(SHEET_NAMES.trainings);
@@ -338,7 +441,7 @@ function syncAttendanceToTrainingDriveSheet(trainingId, recordRow) {
     if (row === -1) return;
 
     const tData = tSheet.getRange(row, 1, 1, 27).getValues()[0];
-    const folderId = tData[15]; // Column P = FolderID
+    const folderId = tData[15];
     const code     = tData[1] || trainingId;
 
     if (!folderId) return;
@@ -355,9 +458,7 @@ function syncAttendanceToTrainingDriveSheet(trainingId, recordRow) {
   }
 }
 
-/**
- * Appends a new training evaluation record row to the training's dedicated single Drive spreadsheet (TrainingEval tab).
- */
+/** Appends evaluation log. */
 function syncEvaluationToTrainingDriveSheet(trainingId, recordRow) {
   try {
     const tSheet = getSheet(SHEET_NAMES.trainings);
@@ -365,7 +466,7 @@ function syncEvaluationToTrainingDriveSheet(trainingId, recordRow) {
     if (row === -1) return;
 
     const tData = tSheet.getRange(row, 1, 1, 27).getValues()[0];
-    const folderId = tData[15]; // Column P = FolderID
+    const folderId = tData[15];
     const code     = tData[1] || trainingId;
 
     if (!folderId) return;
@@ -382,9 +483,7 @@ function syncEvaluationToTrainingDriveSheet(trainingId, recordRow) {
   }
 }
 
-/**
- * Appends a new 6-month post evaluation record row to the training's dedicated single Drive spreadsheet (PostEval tab).
- */
+/** Appends post eval log. */
 function syncPostEvalToTrainingDriveSheet(trainingId, recordRow) {
   try {
     const tSheet = getSheet(SHEET_NAMES.trainings);
@@ -392,7 +491,7 @@ function syncPostEvalToTrainingDriveSheet(trainingId, recordRow) {
     if (row === -1) return;
 
     const tData = tSheet.getRange(row, 1, 1, 27).getValues()[0];
-    const folderId = tData[15]; // Column P = FolderID
+    const folderId = tData[15];
     const code     = tData[1] || trainingId;
 
     if (!folderId) return;
@@ -409,9 +508,7 @@ function syncPostEvalToTrainingDriveSheet(trainingId, recordRow) {
   }
 }
 
-/**
- * Appends a new training session row to the training's dedicated single Drive spreadsheet (TrainingSessions tab).
- */
+/** Appends session log. */
 function syncSessionToTrainingDriveSheet(trainingId, recordRow) {
   try {
     const tSheet = getSheet(SHEET_NAMES.trainings);
@@ -419,7 +516,7 @@ function syncSessionToTrainingDriveSheet(trainingId, recordRow) {
     if (row === -1) return;
 
     const tData = tSheet.getRange(row, 1, 1, 27).getValues()[0];
-    const folderId = tData[15]; // Column P = FolderID
+    const folderId = tData[15];
     const code     = tData[1] || trainingId;
 
     if (!folderId) return;
@@ -436,49 +533,111 @@ function syncSessionToTrainingDriveSheet(trainingId, recordRow) {
   }
 }
 
-/**
- * Syncs the full list of enrolled training participants to the training's dedicated single Drive spreadsheet (TrainingParticipants tab).
- */
-function syncParticipantsToTrainingDriveSheet(trainingId) {
+/** Syncs enrolled training participants to per-training sheet. */
+function syncParticipantsToTrainingDriveSheet(trainingId, directParticipantsList) {
   try {
     const tSheet = getSheet(SHEET_NAMES.trainings);
     const row = findRowById(tSheet, trainingId);
     if (row === -1) return;
 
     const tData = tSheet.getRange(row, 1, 1, 27).getValues()[0];
-    const folderId = tData[15]; // Column P = FolderID
+    const folderId = tData[15];
     const code     = tData[1] || trainingId;
 
     if (!folderId) return;
 
-    const tpSheet = getSheet(SHEET_NAMES.trainingParticipants);
-    const tpRows = tpSheet ? sheetToJson(tpSheet).filter(r => String(r.TrainingID) === String(trainingId)) : [];
+    let participantsToSync = [];
+
+    if (Array.isArray(directParticipantsList) && directParticipantsList.length > 0) {
+      participantsToSync = directParticipantsList.map(p => ({
+        ID: p.ID || p.EmployeeID || generateId('TP'),
+        TrainingID: trainingId,
+        EmployeeID: p.EmployeeID || p.ID || p.EmployeeNo || '',
+        EmployeeName: p.EmployeeName || p.Name || '',
+        Department: p.Department || p.CostCentre || '',
+        Position: p.Position || p.JobTitle || p.PositionTitle || '',
+        AddedAt: p.AddedAt || now()
+      }));
+    } else {
+      const tpSheet = getSheet(SHEET_NAMES.trainingParticipants);
+      if (tpSheet && tpSheet.getLastRow() > 1) {
+        const tpValues = tpSheet.getDataRange().getValues();
+        const tpHeaders = tpValues[0].map(h => String(h).trim());
+        const tIdIdx = tpHeaders.indexOf('TrainingID');
+        const empIdIdx = tpHeaders.indexOf('EmployeeID');
+        const empNameIdx = tpHeaders.indexOf('EmployeeName');
+        const deptIdx = tpHeaders.indexOf('Department');
+        const posIdx = tpHeaders.indexOf('Position');
+        const addedIdx = tpHeaders.indexOf('AddedAt');
+        const idIdx = tpHeaders.indexOf('ID');
+
+        for (let i = 1; i < tpValues.length; i++) {
+          const r = tpValues[i];
+          const rTrainId = String(tIdIdx >= 0 ? r[tIdIdx] : r[1]).trim();
+          if (rTrainId === String(trainingId).trim()) {
+            participantsToSync.push({
+              ID: idIdx >= 0 ? r[idIdx] : r[0],
+              TrainingID: trainingId,
+              EmployeeID: empIdIdx >= 0 ? r[empIdIdx] : r[2],
+              EmployeeName: empNameIdx >= 0 ? r[empNameIdx] : r[3],
+              Department: deptIdx >= 0 ? r[deptIdx] : r[4],
+              Position: posIdx >= 0 ? r[posIdx] : r[5],
+              AddedAt: addedIdx >= 0 ? r[addedIdx] : r[6]
+            });
+          }
+        }
+      }
+    }
+
+    // Training Data must contain canonical Employee-sheet details even when
+    // the source is an older copied participant record.
+    const resolution = canonicalizeTrainingParticipants(participantsToSync);
+    if (resolution.rejected.length > 0) {
+      Logger.log('Skipped Training Data participant rows not found in Employees for ' + trainingId + ': ' + resolution.rejected.join(', '));
+    }
+    participantsToSync = resolution.participants.map(p => ({
+      ID: generateId('TP'), TrainingID: trainingId, EmployeeID: p.ID,
+      EmployeeName: p.Name, Department: p.Department, Position: p.Position, AddedAt: now()
+    }));
 
     const folder = DriveApp.getFolderById(folderId);
-    const headers = ['ID', 'TrainingID', 'EmployeeID', 'EmployeeName', 'Department', 'Position', 'AddedAt'];
+    const headersList = ['ID', 'TrainingID', 'EmployeeID', 'EmployeeName', 'Department', 'Position', 'AddedAt'];
     const file = getOrCreateSingleTrainingSheet(folder, code);
+
+    const trainingHeaders = ensureTrainingSheetColumns(tSheet);
+    const participantSheetIdColumn = trainingHeaders.indexOf('ParticipantsSheetID') + 1;
+    if (participantSheetIdColumn > 0) tSheet.getRange(row, participantSheetIdColumn).setValue(file.getId());
 
     const ss = SpreadsheetApp.openById(file.getId());
     let sheet = ss.getSheetByName('TrainingParticipants') || ss.getActiveSheet();
 
     if (sheet.getLastRow() > 1) {
-      sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).clearContent();
+      sheet.getRange(2, 1, sheet.getLastRow() - 1, headersList.length).clearContent();
     }
 
-    if (tpRows.length > 0) {
-      const dataToAppend = tpRows.map(p => [
+    if (participantsToSync.length > 0) {
+      const dataToAppend = participantsToSync.map(p => [
         p.ID || generateId('TP'),
         trainingId,
-        p.EmployeeID || '',
+        p.EmployeeID || p.ID || '',
         p.EmployeeName || p.Name || '',
-        p.Department || '',
+        p.Department || p.CostCentre || '',
         p.Position || p.JobTitle || '',
         p.AddedAt || now()
       ]);
-      sheet.getRange(2, 1, dataToAppend.length, headers.length).setValues(dataToAppend);
+      sheet.getRange(2, 1, dataToAppend.length, headersList.length).setValues(dataToAppend);
     }
     SpreadsheetApp.flush();
+
+    if (typeof _sheetDataCache !== 'undefined') {
+      _sheetDataCache = {};
+    }
   } catch (e) {
     Logger.log('syncParticipantsToTrainingDriveSheet error: ' + e.message);
   }
+}
+
+function testDrivePermissions() {
+  const root = getOrCreateRootFolder();
+  Logger.log('Root folder ID: ' + (root ? root.getId() : 'None'));
 }

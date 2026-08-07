@@ -45,8 +45,27 @@ function validateAttendance(sessionId, employeeNo) {
     if (status === 'Inactive') {
       return { valid: false, message: 'This training session is currently inactive.', session: session };
     }
-    if (status === 'Scheduled' || status === 'Draft') {
-      return { valid: false, message: 'This training session has not started yet.', session: session };
+    // 2b. Check Parent Training Approval Status
+    if (session.TrainingID) {
+      try {
+        const tSheet = getSheet(SHEET_NAMES.trainings);
+        if (tSheet) {
+          const trainings = sheetToJson(tSheet);
+          const parentT = trainings.find(t => String(t.ID || '').trim() === String(session.TrainingID).trim());
+          if (parentT) {
+            const appStatus = String(parentT.ApprovalStatus || '').trim().toLowerCase();
+            if (appStatus && appStatus !== 'approved' && appStatus !== 'auto-approved') {
+              return {
+                valid: false,
+                message: `Attendance is locked. Training programme approval status is '${parentT.ApprovalStatus}'. Approval from HOD / C-Suite / HOHR is required first.`,
+                session: session
+              };
+            }
+          }
+        }
+      } catch (e) {
+        Logger.log('Parent training approval check error: ' + e.message);
+      }
     }
 
     // 3. Check Session Date & Time Expiry if SessionDate / EndTime are provided

@@ -213,7 +213,10 @@
     const selFilter = document.getElementById('filter-training');
     const selModal  = document.getElementById('s-training-id');
 
-    const opts = allTrainings.map(t => `<option value="${t.ID}">[${t.Code || t.ID}] ${t.Name}</option>`).join('');
+    const opts = allTrainings.map(t => {
+      const app = t.ApprovalStatus || 'Approved';
+      return `<option value="${t.ID}">[${t.Code || t.ID}] ${t.Name} (${app})</option>`;
+    }).join('');
     selFilter.innerHTML = '<option value="">All Training Programmes</option>' + opts;
     selModal.innerHTML  = '<option value="">— Select Training —</option>' + opts;
   }
@@ -235,8 +238,25 @@
 
       document.getElementById('session-count').textContent = `Showing ${filtered.length} session(s)`;
 
+      let warningBannerHtml = '';
+      if (selectedTrainingId) {
+        const selT = allTrainings.find(t => String(t.ID) === String(selectedTrainingId));
+        if (selT && !isTrainingApproved(selT)) {
+          const appStr = selT.ApprovalStatus || 'Pending Approval';
+          warningBannerHtml = `
+            <div class="col-12 mb-3">
+              <div class="alert-th alert-warning" style="display:flex;align-items:center;gap:12px;background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:12px 16px;border-radius:10px">
+                <span class="icon filled" style="color:#D97706;font-size:22px">lock</span>
+                <div>
+                  <strong>Approval Required (${appStr}):</strong> Creating QR sessions for this training is locked until approved by <strong>${getApprovalRoleText(appStr)}</strong>.
+                </div>
+              </div>
+            </div>`;
+        }
+      }
+
       if (!filtered.length) {
-        grid.innerHTML = `
+        grid.innerHTML = warningBannerHtml + `
           <div class="col-12">
             <div class="empty-state card-th text-center p-5">
               <span class="icon" style="font-size:48px;color:#94A3B8">qr_code</span>
@@ -250,7 +270,7 @@
         return;
       }
 
-      grid.innerHTML = filtered.map(s => renderSessionCard(s)).join('');
+      grid.innerHTML = warningBannerHtml + filtered.map(s => renderSessionCard(s)).join('');
     } catch(e) {
       grid.innerHTML = `<div class="col-12 text-center text-danger p-4">Error loading sessions: ${e.message}</div>`;
     }
@@ -347,6 +367,12 @@
   function openCreateSessionModal() {
     const preTrainingId = document.getElementById('filter-training').value;
     if (preTrainingId) {
+      const selT = allTrainings.find(t => String(t.ID) === String(preTrainingId));
+      if (selT && !isTrainingApproved(selT)) {
+        const appStr = selT.ApprovalStatus || 'Pending Approval';
+        showToast(`Cannot create session: Training programme approval status is '${appStr}'. Approval from ${getApprovalRoleText(appStr)} is required first.`, 'error');
+        return;
+      }
       document.getElementById('s-training-id').value = preTrainingId;
     }
     const today = new Date().toISOString().split('T')[0];
@@ -368,6 +394,13 @@
 
     if (!data.TrainingID) { showToast('Please select a Training Programme.', 'error'); return; }
     if (!data.SessionName) { showToast('Please enter a Session Name.', 'error'); return; }
+
+    const selT = allTrainings.find(t => String(t.ID) === String(data.TrainingID));
+    if (selT && !isTrainingApproved(selT)) {
+      const appStr = selT.ApprovalStatus || 'Pending Approval';
+      showToast(`Cannot create session: Training programme approval status is '${appStr}'. Approval from ${getApprovalRoleText(appStr)} is required first.`, 'error');
+      return;
+    }
 
     setBtnLoading(btn, true, 'Saving...');
     try {

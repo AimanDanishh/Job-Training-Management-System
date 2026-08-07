@@ -49,7 +49,7 @@ function initDefaultScriptProperties() {
     'EVALUATION_TEMPLATE_ID':  '',
     'CERTIFICATE_TEMPLATE_ID': '',
     'REPORT_TEMPLATE_ID':      '',
-    // Google Sheets master copy of AP-HRD-F01-00. Every new programme gets a populated copy.
+    // Google Sheets master copy of AP-HRD-F01-01. Every new programme gets a populated copy.
     'TRAINING_REQUISITION_TEMPLATE_ID': '',
     // Company logo Drive link or public image URL to embed in center of session QR codes
     'COMPANY_LOGO_URL':        '',
@@ -218,7 +218,7 @@ function initSheetHeaders(sheet, name) {
                        'FolderID', 'ParticipantsSheetID', 'SessionsSheetID', 'AttendanceSheetID',
                        'EvaluationSheetID', 'PostSheetID', 'RequisitionFormFileID',
                        'CreatedDate', 'UpdatedDate', 'CourseFee',
-                       'ApprovalStatus', 'RequestedBy', 'RequestedDate', 'ApprovedBy', 'ApprovedCostCentre', 'ApprovedAt', 'ApprovalRemarks', 'RescheduledDate'],
+                       'ApprovalStatus', 'RequestedBy', 'RequestedByName', 'RequestedByEmail', 'RequestedDate', 'ApprovedBy', 'ApprovedCostCentre', 'ApprovedAt', 'ApprovalRemarks', 'RescheduledDate'],
     TrainingSessions: ['SessionID', 'TrainingID', 'SessionName', 'SessionDate', 'StartTime', 'EndTime', 'AttendanceURL', 'QRCodeURL', 'QRStatus', 'CreatedDate'],
     Attendance:       ['AttendanceID', 'SessionID', 'TrainingID', 'EmployeeNo', 'EmployeeName',
                        'Department', 'ScanTime', 'Status', 'TrainingCode', 'Day', 'Date', 'Hours',
@@ -253,6 +253,7 @@ function seedInitialSheetData(sheet, name) {
 
 /** Adds fields introduced after the original training sheet was deployed. */
 function ensureTrainingSheetColumns(sheet) {
+  if (!sheet) return [];
   const requiredHeaders = [
     'ID', 'Code', 'Name', 'Category', 'Trainer', 'Venue', 'StartDate',
     'EndDate', 'Duration', 'TotalHours', 'Department', 'Objectives',
@@ -260,12 +261,14 @@ function ensureTrainingSheetColumns(sheet) {
     'FolderID', 'ParticipantsSheetID', 'SessionsSheetID', 'AttendanceSheetID',
     'EvaluationSheetID', 'PostSheetID', 'RequisitionFormFileID',
     'CreatedDate', 'UpdatedDate', 'CourseFee',
-    'ApprovalStatus', 'RequestedBy', 'RequestedDate', 'ApprovedBy', 'ApprovedCostCentre', 'ApprovedAt', 'ApprovalRemarks', 'RescheduledDate'
+    'ApprovalStatus', 'RequestedBy', 'RequestedByName', 'RequestedByEmail', 'RequestedDate', 'ApprovedBy', 'ApprovedCostCentre', 'ApprovedAt', 'ApprovalRemarks', 'RescheduledDate'
   ];
-  const headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
+  const lastCol = Math.max(sheet.getLastColumn(), 1);
+  const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h).trim());
   requiredHeaders.forEach(header => {
     if (headers.indexOf(header) === -1) {
-      sheet.getRange(1, sheet.getLastColumn() + 1).setValue(header)
+      const nextCol = sheet.getLastColumn() + 1;
+      sheet.getRange(1, nextCol).setValue(header)
         .setFontWeight('bold').setBackground('#2563EB').setFontColor('#FFFFFF');
       headers.push(header);
     }
@@ -397,6 +400,56 @@ function normalizeEmployeeHeader(header) {
   if (['phone', 'mobile', 'contact', 'contactnumber', 'telefon'].includes(h)) return 'Phone';
   if (['status', 'employmentstatus', 'employmenttype', 'stat'].includes(h)) return 'Status';
   return header;
+}
+
+/** Authoritative Employee-sheet directory used for every participant write. */
+function getOfficialEmployeeDirectory() {
+  const byId = {};
+  const byName = {};
+  const sheet = getSheet(SHEET_NAMES.employees);
+  const rows = sheet ? sheetToJson(sheet) : [];
+
+  rows.forEach(row => {
+    const id = String(row.ID || row.EmployeeID || row.EmployeeNo || row.EmpID || row.StaffID || row['Employee ID'] || row['Employee No'] || row['Staff ID'] || '').trim();
+    const name = String(row.Name || row.EmployeeName || row['Employee Name'] || row['Staff Name'] || '').trim();
+    if (!id) return;
+    const employee = {
+      ID: id,
+      Name: name,
+      Department: String(row.CostCentre || row['Cost Centre'] || row.Department || row.Dept || '').trim(),
+      Position: String(row.PositionTitle || row['Position Title'] || row.Position || row.JobTitle || row['Job Title'] || '').trim(),
+      Email: String(row.Email || row['Email Address'] || '').trim()
+    };
+    byId[id.toLowerCase()] = employee;
+    if (name) {
+      const nameKey = name.toLowerCase();
+      byName[nameKey] = Object.prototype.hasOwnProperty.call(byName, nameKey) ? null : employee;
+    }
+  });
+  return { byId: byId, byName: byName };
+}
+
+function canonicalizeTrainingParticipants(participants) {
+  const directory = getOfficialEmployeeDirectory();
+  const resolved = [];
+  const rejected = [];
+  const seen = {};
+
+  (Array.isArray(participants) ? participants : []).forEach(participant => {
+    const rawId = String(participant.ID || participant.EmployeeID || participant.EmployeeNo || participant.EmpID || participant['Employee ID'] || participant['Employee No'] || '').trim();
+    const rawName = String(participant.Name || participant.EmployeeName || participant['Employee Name'] || '').trim();
+    const employee = (rawId && directory.byId[rawId.toLowerCase()]) || (rawName && directory.byName[rawName.toLowerCase()]);
+    if (!employee) {
+      rejected.push(rawId || rawName || 'blank participant');
+      return;
+    }
+    const key = employee.ID.toLowerCase();
+    if (!seen[key]) {
+      seen[key] = true;
+      resolved.push(employee);
+    }
+  });
+  return { participants: resolved, rejected: rejected };
 }
 
 let _sheetDataCache = {};

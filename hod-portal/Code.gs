@@ -88,12 +88,53 @@ function getRequisitionDetails(trainingId) {
       });
     }
 
-    // Fetch Participants for this training
-    const ss = getTrainingDataSpreadsheet(training.ID);
-    const partSheet = ss ? ss.getSheetByName('TrainingParticipants') : null;
+    // Fetch Participants for this training using 3-level fallback
     let participants = [];
-    if (partSheet) {
-      participants = sheetToJson(partSheet);
+
+    // Level 1: Dedicated single Drive spreadsheet (TrainingParticipants tab)
+    try {
+      const ss = getTrainingDataSpreadsheet(training.ID);
+      const partSheet = ss ? ss.getSheetByName('TrainingParticipants') : null;
+      if (partSheet) {
+        participants = sheetToJson(partSheet);
+      }
+    } catch(e1) {}
+
+    // Level 2: Master database TrainingParticipants sheet tab
+    if (!participants || participants.length === 0) {
+      try {
+        const masterTpSheet = getSheet('TrainingParticipants');
+        if (masterTpSheet) {
+          const allTp = sheetToJson(masterTpSheet);
+          participants = allTp.filter(r => String(r.TrainingID || r.TrainingId || '').trim() === String(training.ID).trim());
+        }
+      } catch(e2) {}
+    }
+
+    // Level 3: Extract from AP-HRD-F01-01 Training Requisition Form Google Sheet (rows 15-39)
+    if (!participants || participants.length === 0) {
+      try {
+        const formFileId = training.RequisitionFormFileID;
+        if (formFileId) {
+          const formSs = SpreadsheetApp.openById(formFileId);
+          const formSheet = formSs.getSheetByName('Training Form') || formSs.getSheets()[0];
+          const rows = formSheet.getRange('A15:I39').getValues();
+          rows.forEach(r => {
+            const empId = String(r[0] || '').trim(); // Col A (Employee No: A-B)
+            const name  = String(r[2] || '').trim(); // Col C (Name: C)
+            const dept  = String(r[3] || '').trim(); // Col D (Department: D-G)
+            const pos   = String(r[7] || '').trim(); // Col H (Job Title: H-I)
+            if (empId || name) {
+              participants.push({
+                EmployeeID: empId,
+                EmployeeName: name,
+                Department: dept,
+                Position: pos
+              });
+            }
+          });
+        }
+      } catch(e3) {}
     }
 
     // Requester employee info lookup
@@ -115,11 +156,15 @@ function getRequisitionDetails(trainingId) {
       }
     }
 
+    // Re-resolve real HOD profile matching this requester from "For IT" -> "Employees" -> "HOD email"
+    const resolvedAuth = validateHODAccess(requester.ID || requester.Name);
+    const hodProfile = (resolvedAuth && resolvedAuth.valid) ? resolvedAuth.hod : auth.hod;
+
     return ok({
       training: training,
       participants: participants,
       requester: requester,
-      hod: auth.hod
+      hod: hodProfile
     });
   } catch (e) {
     return err('Failed to load requisition details: ' + e.message);
@@ -135,17 +180,19 @@ function submitHODDecision(data) {
       return err('Training ID and decision are required.');
     }
 
-    const auth = validateHODAccess();
-    if (!auth.valid) return err(auth.message);
-
+    const cleanId = String(data.trainingId).trim();
     const tSheet = getSheet('Trainings');
     if (!tSheet) return err('Trainings sheet unavailable.');
 
-    const cleanId = String(data.trainingId).trim();
     const row = findRowById(tSheet, cleanId);
     if (row === -1) return err(`Training request (${cleanId}) not found in database.`);
 
     const headers = tSheet.getDataRange().getValues()[0].map(h => String(h).trim());
+    const reqByVal = tSheet.getRange(row, headers.indexOf('RequestedBy') + 1).getValue();
+
+    const auth = validateHODAccess(reqByVal || cleanId);
+    if (!auth.valid) return err(auth.message);
+
     const timestamp = formatDateTime(new Date());
 
     const updateCol = (colName, val) => {
@@ -162,9 +209,14 @@ function submitHODDecision(data) {
     const remarks = data.remarks || '';
     const rescheduledDate = data.rescheduledDate || '';
 
+    const currentAppStatus = String(tSheet.getRange(row, headers.indexOf('ApprovalStatus') + 1).getValue() || 'Pending HOD Approval');
+
     let nextApprovalStatus = validDecision;
+    let approvalStep = 'HOD';
+    if (currentAppStatus.includes('C-Suite')) approvalStep = 'Csuite';
+    else if (currentAppStatus.includes('HOHR')) approvalStep = 'HOHR';
+
     if (validDecision === 'Approved') {
-      const currentAppStatus = String(tSheet.getRange(row, headers.indexOf('ApprovalStatus') + 1).getValue() || '');
       if (currentAppStatus.includes('C-Suite')) {
         nextApprovalStatus = 'Pending HOHR Approval';
       } else if (currentAppStatus.includes('HOHR')) {
@@ -195,6 +247,27 @@ function submitHODDecision(data) {
 
     updateCol('UpdatedDate', timestamp);
     SpreadsheetApp.flush();
+
+    // Automatically update AP-HRD-F01-01 Training Requisition Form Google Sheet digital approval signature
+    try {
+      let hodPosition = auth.hod ? (auth.hod.Position || auth.hod.JobTitle || auth.hod.PositionTitle || '') : '';
+      if (!hodPosition && getSheet('Employees')) {
+        const emps = sheetToJson(getSheet('Employees'));
+        const empMatch = emps.find(e => String(e.ID).toLowerCase() === String(hodId).toLowerCase());
+        if (empMatch) hodPosition = empMatch.Position || empMatch.JobTitle || empMatch.PositionTitle || '';
+      }
+      if (!hodPosition) hodPosition = approvalStep === 'Csuite' ? 'C-Suite Executive' : (approvalStep === 'HOHR' ? 'Head of HR' : 'Head of Department');
+
+      updateTrainingRequisitionSignatures(cleanId, approvalStep, {
+        status: nextApprovalStatus,
+        employeeNo: hodId,
+        name: hodName,
+        position: hodPosition,
+        date: timestamp
+      });
+    } catch(sigErr) {
+      Logger.log('Signature update error in submitApprovalDecision: ' + sigErr.message);
+    }
 
     // Send email notifications
     try {

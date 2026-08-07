@@ -40,6 +40,19 @@ function getAppUrl() {
 }
 
 /**
+ * API: Get current logged-in Google account email
+ */
+function getLoggedInUserEmail() {
+  try {
+    const activeEmail = Session.getActiveUser().getEmail();
+    const effectiveEmail = Session.getEffectiveUser().getEmail();
+    return ok(activeEmail || effectiveEmail || '');
+  } catch (e) {
+    return ok('');
+  }
+}
+
+/**
  * API: Get real Cost Centres from EMPLOYEE_SPREADSHEET_ID
  */
 function getCostCentres() {
@@ -79,15 +92,8 @@ function getCostCentres() {
  */
 function getParticipantsList() {
   try {
-    const empSheet = getSheet('Employees');
-    if (!empSheet) return ok([]);
-    const rows = sheetToJson(empSheet);
-    const emps = rows.map(r => ({
-      ID: r.ID || r.EmployeeID || r.EmployeeNo || '',
-      Name: r.Name || r.EmployeeName || '',
-      Department: r.Department || r.CostCentre || '',
-      Position: r.Position || r.JobTitle || r.PositionTitle || ''
-    })).filter(e => e.ID || e.Name);
+    const directory = getOfficialEmployeeDirectory();
+    const emps = Object.keys(directory.byId).map(key => directory.byId[key]);
     return ok(emps);
   } catch (e) {
     return err('Failed to load participants: ' + e.message);
@@ -183,7 +189,6 @@ function submitEmployeeRequisition(data) {
         const hodRows = sheetToJson(hodSheet);
         let matchedHod = null;
 
-        // A. Match assigned HOD name from "For IT" tab
         if (assignedHodName) {
           const cleanAssigned = assignedHodName.toLowerCase();
           matchedHod = hodRows.find(h => {
@@ -192,7 +197,6 @@ function submitEmployeeRequisition(data) {
           });
         }
 
-        // B. Fallback: Match requester ID / Name directly in HOD email tab
         if (!matchedHod) {
           matchedHod = hodRows.find(h => {
             const hEmpId = String(h.EmployeeID || h.ID || '').toLowerCase().trim();
@@ -201,7 +205,6 @@ function submitEmployeeRequisition(data) {
           });
         }
 
-        // C. Fallback: Match by Cost Centre code / Department
         if (!matchedHod && empDept) {
           const deptCodeMatch = empDept.match(/\d+/);
           const deptCode = deptCodeMatch ? deptCodeMatch[0] : '';
@@ -218,8 +221,8 @@ function submitEmployeeRequisition(data) {
         }
 
         if (matchedHod) {
-          hodName = matchedHod.HODName || matchedHod.HodName || matchedHod.HOD || assignedHodName || '';
-          hodEmail = matchedHod.HODEmail || matchedHod.HodEmail || matchedHod.Email || matchedHod['HOD Email'] || '';
+          hodName = matchedHod.HOD || matchedHod.HODName || matchedHod.HodName || matchedHod.Name || matchedHod['HOD Name'] || assignedHodName || '';
+          hodEmail = matchedHod.Email || matchedHod.HODEmail || matchedHod.HodEmail || matchedHod['HOD Email'] || matchedHod['Email'] || '';
           csuiteName = matchedHod.CsuiteName || matchedHod.CSuiteName || matchedHod.Csuite || '';
           csuiteEmail = matchedHod.CsuiteEmail || matchedHod.CSuiteEmail || '';
           hohrName = matchedHod.HohrName || matchedHod.HOHRName || matchedHod.HOHR || '';
@@ -277,36 +280,172 @@ function submitEmployeeRequisition(data) {
 
     const objectivesVal = (data.Objectives || data.Reason || '') + (brochureUrl ? `\n[Brochure File: ${brochureUrl}]` : '');
 
+    // Resolve every selection against the Employee sheet before it is stored,
+    // written to Training Data, or placed on the requisition form.
+    const requestedParticipants = Array.isArray(data.ParticipantList) ? data.ParticipantList : (Array.isArray(data.participants) ? data.participants : []);
+    const participantResolution = canonicalizeTrainingParticipants(requestedParticipants);
+    if (participantResolution.rejected.length > 0) {
+      return err('The following participant(s) do not match an Employee-sheet record: ' + participantResolution.rejected.join(', '));
+    }
+    const participantsList = participantResolution.participants;
+
+    // Create Google Drive Workspace and Training Requisition Form (AP-HRD-F01-01)
+    let workspace = { folderId: '', folderUrl: '', partSheetId: '', sessionSheetId: '', attendanceSheetId: '', evaluationSheetId: '', postSheetId: '' };
+    let reqForm = { fileId: '', fileUrl: '' };
+    const requesterSigData = {
+      employeeNo: emp.ID || data.EmployeeID,
+      name: emp.Name || data.EmployeeName || 'Requester',
+      position: emp.Position || emp.JobTitle || emp.JobPosition || 'Requester',
+      date: timeNow
+    };
+
+    try {
+      workspace = createTrainingWorkspace(code, data.TrainingName);
+      reqForm = createTrainingRequisitionForm(code, {
+        Name: data.TrainingName,
+        CourseFee: data.CourseFee,
+        StartDate: data.StartDate,
+        EndDate: data.EndDate || data.StartDate,
+        Duration: data.Duration || 1,
+        TotalHours: data.TotalHours || 8,
+        Venue: data.Venue,
+        Trainer: data.Trainer,
+        TrainingProvider: data.TrainingProvider,
+        Objectives: objectivesVal,
+        ParticipantList: participantsList
+      }, workspace.folderId, requesterSigData);
+    } catch(wErr) {
+      Logger.log('Workspace / Form creation error: ' + wErr.message);
+    }
+
     const rowData = [
-      id,
-      code,
-      data.TrainingName,
-      data.Category || 'General',
-      data.Trainer || 'TBD',
-      data.Venue || 'TBD',
-      data.StartDate,
-      data.EndDate || data.StartDate,
-      data.Duration || 1,
-      data.TotalHours || 8,
-      emp.Department || data.Department || 'N/A',
-      objectivesVal,
-      'Draft',
-      'Created',
-      data.TotalPax || 0,
-      approvedByVal,
-      approvedCostCentreVal,
-      approvedAtVal,
-      approvalRemarksVal,
-      currentApprovalStatus,
-      emp.ID || data.EmployeeID,
-      timeNow,
-      timeNow,
-      timeNow,
-      data.CourseFee || '0.00'
+      id,                                // Col 1 (A): ID
+      code,                              // Col 2 (B): Code
+      data.TrainingName,                 // Col 3 (C): Name
+      data.Category || 'General',        // Col 4 (D): Category
+      data.Trainer || 'TBD',             // Col 5 (E): Trainer
+      data.Venue || 'TBD',               // Col 6 (F): Venue
+      data.StartDate,                    // Col 7 (G): StartDate
+      data.EndDate || data.StartDate,    // Col 8 (H): EndDate
+      data.Duration || 1,                // Col 9 (I): Duration
+      data.TotalHours || 8,              // Col 10 (J): TotalHours
+      emp.Department || data.Department || 'N/A', // Col 11 (K): Department
+      objectivesVal,                     // Col 12 (L): Objectives
+      'Draft',                           // Col 13 (M): Status
+      'Created',                         // Col 14 (N): Stage
+      data.TotalPax || participantsList.length || 0, // Col 15 (O): Participants
+      workspace.folderId || '',          // Col 16 (P): FolderID
+      workspace.partSheetId || '',       // Col 17 (Q): ParticipantsSheetID
+      workspace.sessionSheetId || '',    // Col 18 (R): SessionsSheetID
+      workspace.attendanceSheetId || '', // Col 19 (S): AttendanceSheetID
+      workspace.evaluationSheetId || '', // Col 20 (T): EvaluationSheetID
+      workspace.postSheetId || '',       // Col 21 (U): PostSheetID
+      reqForm.fileId || '',              // Col 22 (V): RequisitionFormFileID
+      timeNow,                           // Col 23 (W): CreatedDate
+      timeNow,                           // Col 24 (X): UpdatedDate
+      data.CourseFee || '0.00'           // Col 25 (Y): CourseFee
     ];
 
     sheet.appendRow(rowData);
     SpreadsheetApp.flush();
+
+    ensureTrainingSheetColumns(sheet);
+
+    const lastRow = sheet.getLastRow();
+    const headers = sheet.getDataRange().getValues()[0].map(h => String(h).trim());
+    const setCol = (name, val) => {
+      const idx = headers.indexOf(name) + 1;
+      if (idx > 0) sheet.getRange(lastRow, idx).setValue(val);
+    };
+
+    setCol('ApprovalStatus', currentApprovalStatus);
+    setCol('ApprovedBy', approvedByVal);
+    setCol('ApprovedCostCentre', approvedCostCentreVal);
+    setCol('ApprovedAt', approvedAtVal);
+    setCol('ApprovalRemarks', approvalRemarksVal);
+    setCol('RequestedBy', emp.ID || data.EmployeeID);
+    setCol('RequestedByName', emp.Name || data.EmployeeName || '');
+    setCol('RequestedByEmail', empEmail);
+    setCol('RequestedDate', timeNow);
+    setCol('FolderID', workspace.folderId || '');
+    setCol('ParticipantsSheetID', workspace.partSheetId || '');
+    setCol('SessionsSheetID', workspace.sessionSheetId || '');
+    setCol('AttendanceSheetID', workspace.attendanceSheetId || '');
+    setCol('EvaluationSheetID', workspace.evaluationSheetId || '');
+    setCol('PostSheetID', workspace.postSheetId || '');
+    setCol('RequisitionFormFileID', reqForm.fileId || '');
+
+    SpreadsheetApp.flush();
+
+    if (participantsList.length > 0) {
+      try {
+        const tpMasterSheet = getSheet('TrainingParticipants');
+        if (tpMasterSheet) {
+          const tpRows = participantsList.map(p => [
+            generateId('TP'),
+            id,
+            p.ID || p.EmployeeID || p.EmployeeNo || '',
+            p.Name || p.EmployeeName || '',
+            p.Department || p.CostCentre || emp.Department || '',
+            p.Position || p.JobTitle || '',
+            timeNow
+          ]);
+          tpMasterSheet.getRange(tpMasterSheet.getLastRow() + 1, 1, tpRows.length, 7).setValues(tpRows);
+        }
+      } catch(pErr) {
+        Logger.log('Error saving participants in submitEmployeeRequisition: ' + pErr.message);
+      }
+      try {
+        syncParticipantsToTrainingDriveSheet(id, participantsList);
+      } catch(sErr) {
+        Logger.log('Error syncing participants to training drive sheet: ' + sErr.message);
+      }
+    }
+
+    if (reqForm && reqForm.fileId) {
+      try {
+        updateTrainingRequisitionSignatures(id, 'request', requesterSigData, reqForm.fileId);
+        syncTrainingRequisitionParticipants(id);
+      } catch(syncErr) {
+        Logger.log('sync/sig error in submitEmployeeRequisition: ' + syncErr.message);
+      }
+
+      if (isHodBypassed) {
+        try {
+          updateTrainingRequisitionSignatures(id, 'HOD', {
+            status: currentApprovalStatus,
+            employeeNo: emp.ID || data.EmployeeID,
+            name: emp.Name || 'HOD',
+            position: emp.Position || 'HOD',
+            date: timeNow
+          }, reqForm.fileId);
+        } catch(sigErr) {}
+      }
+
+      if (isCsuiteBypassed) {
+        try {
+          updateTrainingRequisitionSignatures(id, 'Csuite', {
+            status: currentApprovalStatus,
+            employeeNo: emp.ID || data.EmployeeID,
+            name: emp.Name || 'C-Suite',
+            position: emp.Position || 'C-Suite',
+            date: timeNow
+          }, reqForm.fileId);
+        } catch(sigErr) {}
+      }
+
+      if (isHohrBypassed) {
+        try {
+          updateTrainingRequisitionSignatures(id, 'HOHR', {
+            status: currentApprovalStatus,
+            employeeNo: emp.ID || data.EmployeeID,
+            name: emp.Name || 'Head of HR',
+            position: emp.Position || 'Head of HR',
+            date: timeNow
+          }, reqForm.fileId);
+        } catch(sigErr) {}
+      }
+    }
 
     // Create Gmail Draft ONLY (Send function removed as requested)
     let draftStatus = 'Not created';
@@ -320,7 +459,7 @@ function submitEmployeeRequisition(data) {
       else if (currentApprovalStatus === 'Approved') recipientEmail = 'arina.ismail@apollofood.com.my';
 
       const subject = `[TrainHub DRAFT] Training Requisition ${currentApprovalStatus} - ${data.TrainingName}`;
-      const body = `Dear Approver / Manager,\n\nA new Training Requisition Form (AP-HRD-F01-00) has been submitted:\n\n` +
+      const body = `Dear Approver / Manager,\n\nA new Training Requisition Form (AP-HRD-F01-01) has been submitted:\n\n` +
         `Requester: ${emp.Name || data.EmployeeID} (${emp.Department || 'N/A'})\n` +
         `Employee ID: ${emp.ID || data.EmployeeID}\n` +
         `Assigned HOD: ${hodName || 'N/A'} (${hodEmail || recipientEmail || 'N/A'})\n` +
@@ -362,7 +501,7 @@ function submitEmployeeRequisition(data) {
     }
 
     return ok({
-      message: `Training Requisition Form (AP-HRD-F01-00) submitted! Status: ${currentApprovalStatus}. HOD: ${hodName || 'Assigned HOD'}. ${draftStatus}`,
+      message: `Training Requisition Form (AP-HRD-F01-01) submitted! Status: ${currentApprovalStatus}. HOD: ${hodName || 'Assigned HOD'}. ${draftStatus}`,
       trainingId: id,
       trainingCode: code,
       approvalStatus: currentApprovalStatus,

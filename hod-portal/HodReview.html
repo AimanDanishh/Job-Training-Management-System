@@ -217,7 +217,7 @@
     }
 
     function renderRequisition(data) {
-      currentHOD = data.hod || { Name: 'HOD Manager', ID: 'HOD-1001', CostCentre: 'Management' };
+      currentHOD = data.hod || { Name: 'HOD Approver', ID: '', CostCentre: '' };
 
       // Header HOD profile
       document.getElementById('badgeHodName').innerText = `${currentHOD.Name} (${currentHOD.CostCentre})`;
