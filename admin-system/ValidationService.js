@@ -71,7 +71,9 @@ function validateAttendance(sessionId, employeeNo) {
     // 3. Check Session Date & Time Expiry if SessionDate / EndTime are provided
     if (session.SessionDate) {
       const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
-      const sessionDateStr = session.SessionDate.split('T')[0];
+      const sessionDateStr = (session.SessionDate instanceof Date)
+        ? Utilities.formatDate(session.SessionDate, Session.getScriptTimeZone(), 'yyyy-MM-dd')
+        : String(session.SessionDate).split('T')[0];
 
       // Optional strict date check if past session date
       if (sessionDateStr < todayStr && status !== 'Active') {

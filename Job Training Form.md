@@ -231,6 +231,7 @@ Overall UI
 
 
 **JOB TRAINING REQUISITION FORM**
+
 1. Training Title: C5 until I5
 
 2\. Course Fee: C6 until E6
@@ -268,6 +269,38 @@ Overall UI
 18\. HR Department (Arina): H, I 42 until 45
 
 
+
+10/8/2026
+
+**TO DO (HOD portal):** 
+
+1. Auto email for HOD portal
+2. Link real HOD details to HOD portal
+3. Approve or Reject or Return (with remarks) option only
+4. If status == Reject or Return, email the requester to notify the status
+5. If status == Approve, email the requester the status and email the next approval, for example (C-Suite), then after C-Suite approval, HOHR approval
+6. For now just save all the email to draft (development mode)
+7. In the signature part in the Training Requisition Form, the approval skip the Head of Department signature and directly to C-Suite, please fix it and fill the imformation correctly: Status: Employee No: Name: Job Position: Date:
+
+
+
+1. What if there is many requester, can HOD see all reqeust under their supervision (the employee under them only)
+2. When log in using their email, retrieve the HOD/employee information from the database and display the employee/HOD information, i dont want anything like this: 
+3. HOD Employee ID
+4. EMP-IT.INTERN
+5. HOD Name
+6. It Intern
+7. HOD Cost Centre
+8. All Departments / Cost Centre
+
+
+
+**Improvement:**
+1. If the number participant > 24, add new form and add the remaining participant
+
+2\. Just notify the HR Department (arina) via email but auto sign it in the Training Requisition Form when she open the training in admin system
+
+3\. 
 
 
 

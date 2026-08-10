@@ -1,150 +1,434 @@
 /**
- * ValidationService.gs — HOD Authentication & Security Validation
- */
-
-/**
  * Resolves the real HOD Employee ID, Name, Cost Centre, Position, and Email 
- * by cross-referencing "For IT", "Employees", and "HOD email" tabs in EMPLOYEE_SPREADSHEET_ID.
+ * using the "HOD email" tab schema:
+ * Header: Employee No | HOD | Cost Centre | Position Title | Email
+ * 
+ * Returns null if userEmail is not matched in the "HOD email" directory.
  */
 function resolveRealHODProfile(userEmail, requesterIdOrName) {
   let userEmailClean = String(userEmail || '').trim().toLowerCase();
-  let userPrefix = userEmailClean ? userEmailClean.split('@')[0] : '';
+  if (!userEmailClean) return null;
 
   let realHodName = '';
   let realHodId = '';
   let realCostCentre = '';
   let realPosition = '';
+  let csuiteName = '';
+  let csuiteEmail = '';
+  let hohrName = '';
+  let hohrEmail = '';
 
   const getVal = (rowObj, nameList) => {
     if (!rowObj) return '';
     const keys = Object.keys(rowObj);
     for (let n of nameList) {
       const matchKey = keys.find(k => k.toLowerCase().replace(/[^a-z0-9]/g, '') === n.toLowerCase().replace(/[^a-z0-9]/g, ''));
-      if (matchKey && rowObj[matchKey]) return String(rowObj[matchKey]).trim();
+      if (matchKey && rowObj[matchKey] !== undefined && rowObj[matchKey] !== null) {
+        return String(rowObj[matchKey]).trim();
+      }
     }
     return '';
   };
 
-  // 1. Search in "For IT" tab using requester info or logged-in user email
-  try {
-    const itSheet = getSheet('For IT');
-    if (itSheet) {
-      const itRows = sheetToJson(itSheet);
-      
-      let matchedIt = null;
-      if (requesterIdOrName) {
-        const cleanReq = String(requesterIdOrName).trim().toLowerCase();
-        matchedIt = itRows.find(r => {
-          const rId = getVal(r, ['ID', 'EmployeeID', 'EmployeeNo', 'Employee ID', 'Employee No']).toLowerCase();
-          const rName = getVal(r, ['Name', 'EmployeeName', 'Employee Name']).toLowerCase();
-          return (rId && rId === cleanReq) || (rName && (rName.includes(cleanReq) || cleanReq.includes(rName)));
-        });
-      }
+  const emailAliases = ['Email', 'EmailAddress', 'HODEmail', 'HOD Email', 'Email Address', 'HOD Email Address', 'E-Mail', 'Mail'];
+  const idAliases = ['Employee No', 'EmployeeNo', 'EmployeeID', 'ID', 'HODID', 'Employee ID', 'Staff ID'];
+  const nameAliases = ['HOD', 'HODName', 'HodName', 'Name', 'HOD Name', 'Employee Name'];
 
-      if (!matchedIt && userEmailClean) {
-        matchedIt = itRows.find(r => {
-          const keys = Object.keys(r);
-          for (let k of keys) {
-            const val = String(r[k] || '').trim().toLowerCase();
-            if (val && (val === userEmailClean || val === userPrefix)) return true;
+  // STEP 1: Direct lookup in "HOD email", "Csuite email", and "HOHR email" directory tabs
+  try {
+    const targetSheets = ['HOD email', 'Csuite email', 'C-Suite email', 'HOHR email'];
+    let matchedHod = null;
+    let sourceTabName = '';
+
+    for (let tabName of targetSheets) {
+      const sheet = getSheet(tabName);
+      if (sheet) {
+        const rows = sheetToJson(sheet);
+        matchedHod = rows.find(h => {
+          const emailVal = getVal(h, emailAliases).toLowerCase().trim();
+          const idVal = getVal(h, idAliases).toLowerCase().trim();
+          const nameVal = getVal(h, nameAliases).toLowerCase().trim();
+
+          if (emailVal) {
+            if (emailVal === userEmailClean) return true;
+            if (emailVal.includes(userEmailClean) || userEmailClean.includes(emailVal)) return true;
           }
+          if (idVal && idVal === userEmailClean) return true;
+          if (nameVal && nameVal === userEmailClean) return true;
           return false;
         });
-      }
 
-      if (matchedIt) {
-        realHodName = getVal(matchedIt, ['HOD', 'HODName', 'HodName', 'Manager', 'ReportTo', 'HOD Name']);
-        realHodId = getVal(matchedIt, ['HODID', 'HOD ID', 'HODNo', 'HOD No', 'ID']);
-        realCostCentre = getVal(matchedIt, ['Department', 'CostCentre', 'Cost Centre', 'CostCenter']);
-      }
-    }
-  } catch (e) {
-    Logger.log('For IT lookup error in resolveRealHODProfile: ' + e.message);
-  }
-
-  // 2. Search / Enrich in "Employees" tab
-  try {
-    const empSheet = getSheet('Employees');
-    if (empSheet) {
-      const empRows = sheetToJson(empSheet);
-      
-      const matchedEmp = empRows.find(e => {
-        const eEmail = getVal(e, ['Email', 'EmailAddress', 'Email Address']).toLowerCase();
-        const eId = getVal(e, ['ID', 'EmployeeID', 'EmployeeNo']).toLowerCase();
-        const eName = getVal(e, ['Name', 'EmployeeName']).toLowerCase();
-
-        if (userEmailClean && eEmail && eEmail === userEmailClean) return true;
-        if (realHodId && eId && eId === realHodId.toLowerCase()) return true;
-        if (realHodName && eName && (eName.includes(realHodName.toLowerCase()) || realHodName.toLowerCase().includes(eName))) return true;
-        if (userPrefix && eName && userPrefix.length > 2 && (eName.includes(userPrefix) || userPrefix.includes(eName))) return true;
-        return false;
-      });
-
-      if (matchedEmp) {
-        if (!realHodId) realHodId = getVal(matchedEmp, ['ID', 'EmployeeID', 'EmployeeNo']);
-        if (!realHodName) realHodName = getVal(matchedEmp, ['Name', 'EmployeeName']);
-        if (!realCostCentre) realCostCentre = getVal(matchedEmp, ['Department', 'CostCentre', 'Cost Centre']);
-        realPosition = getVal(matchedEmp, ['Position', 'JobTitle', 'Position Title', 'Title']);
-      }
-    }
-  } catch (e) {
-    Logger.log('Employees lookup error in resolveRealHODProfile: ' + e.message);
-  }
-
-  // 3. Search / Enrich in "HOD email" tab
-  try {
-    const hodSheet = getSheet('HOD email');
-    if (hodSheet) {
-      const hodRows = sheetToJson(hodSheet);
-      const matchedHod = hodRows.find(h => {
-        const keys = Object.keys(h);
-        for (let k of keys) {
-          const val = String(h[k] || '').trim().toLowerCase();
-          if (val && (val === userEmailClean || (realHodName && val === realHodName.toLowerCase()))) return true;
+        if (matchedHod) {
+          sourceTabName = tabName;
+          break;
         }
-        return false;
-      });
-
-      if (matchedHod) {
-        if (!realHodName) realHodName = getVal(matchedHod, ['HOD', 'HODName', 'HodName', 'Name']);
-        if (!realCostCentre) realCostCentre = getVal(matchedHod, ['Department', 'CostCentre', 'Cost Centre']);
-        if (!realHodId) realHodId = getVal(matchedHod, ['HODID', 'ID', 'EmployeeID']);
       }
     }
+
+    if (!matchedHod) {
+      // Fallback: Check if email matches any employee in Employees tab
+      const empSheet = getSheet('Employees');
+      if (empSheet) {
+        const empRows = sheetToJson(empSheet);
+        const matchedEmp = empRows.find(e => {
+          const eEmail = getVal(e, emailAliases).toLowerCase().trim();
+          const eId = getVal(e, idAliases).toLowerCase().trim();
+          return (eEmail && eEmail === userEmailClean) || (eId && eId === userEmailClean);
+        });
+        if (matchedEmp) {
+          const empName = getVal(matchedEmp, nameAliases).toLowerCase().trim();
+          for (let tabName of targetSheets) {
+            const sheet = getSheet(tabName);
+            if (sheet) {
+              const rows = sheetToJson(sheet);
+              matchedHod = rows.find(h => {
+                const hName = getVal(h, nameAliases).toLowerCase().trim();
+                return hName && (hName === empName || hName.includes(empName) || empName.includes(hName));
+              });
+              if (matchedHod) break;
+            }
+          }
+        }
+      }
+    }
+
+    if (!matchedHod) {
+      return null; // Match failed: Not an authorized HOD/C-Suite/HOHR credential
+    }
+
+    realHodId = getVal(matchedHod, idAliases);
+    realHodName = getVal(matchedHod, nameAliases);
+    realCostCentre = getVal(matchedHod, ['Cost Centre', 'CostCentre', 'Department']);
+    realPosition = getVal(matchedHod, ['Position Title', 'PositionTitle', 'Position', 'JobTitle']);
+
+    // Attempt resolving Csuite and HOHR emails from dedicated tabs if missing
+    const csProfile = getCSuiteEmailProfile();
+    csuiteName = getVal(matchedHod, ['CsuiteName', 'CSuiteName']) || csProfile.Name;
+    csuiteEmail = getVal(matchedHod, ['CsuiteEmail', 'CSuiteEmail']) || csProfile.Email;
+
+    const hrProfile = getHOHREmailProfile();
+    hohrName = getVal(matchedHod, ['HohrName', 'HOHRName']) || hrProfile.Name;
+    hohrEmail = getVal(matchedHod, ['HohrEmail', 'HOHREmail']) || hrProfile.Email;
+
   } catch (e) {
-    Logger.log('HOD email lookup error in resolveRealHODProfile: ' + e.message);
+    Logger.log('Error in resolveRealHODProfile: ' + e.message);
+    return null;
   }
 
-  // Fallbacks if any fields are missing
-  if (!userEmailClean) userEmailClean = 'hod@apollofood.com.my';
-  if (!userPrefix) userPrefix = userEmailClean.split('@')[0];
+  // STEP 2: Secondary enrichment from "For IT" tab if any field is missing
+  if (!realHodId || !realCostCentre) {
+    try {
+      const itSheet = getSheet('For IT');
+      if (itSheet && realHodName) {
+        const itRows = sheetToJson(itSheet);
+        const cleanHodName = realHodName.toLowerCase().trim();
 
-  if (!realHodId) realHodId = `EMP-${userPrefix.toUpperCase()}`;
-  if (!realHodName) {
-    realHodName = userPrefix
-      .split(/[\._\-]/)
-      .filter(Boolean)
-      .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-      .join(' ') || userEmailClean;
+        const matchedIt = itRows.find(r => {
+          const itHodName = getVal(r, ['HOD', 'HODName', 'HodName', 'Name']).toLowerCase().trim();
+          return itHodName && (itHodName === cleanHodName || itHodName.includes(cleanHodName) || cleanHodName.includes(itHodName));
+        });
+
+        if (matchedIt) {
+          if (!realHodId) realHodId = getVal(matchedIt, ['Employee No', 'EmployeeNo', 'EmployeeID', 'ID']);
+          if (!realCostCentre) realCostCentre = getVal(matchedIt, ['Cost Centre', 'CostCentre', 'Department']);
+          if (!realPosition) realPosition = getVal(matchedIt, ['Position Title', 'PositionTitle', 'Position']);
+        }
+      }
+    } catch (e) {
+      Logger.log('Step 2 (For IT fallback) error: ' + e.message);
+    }
   }
-  if (!realCostCentre) realCostCentre = 'All Departments / Cost Centres';
-  if (!realPosition) realPosition = 'Head of Department / Manager';
+
+  // STEP 3: Tertiary enrichment from "Employees" tab
+  if (!realHodId || !realPosition) {
+    try {
+      const empSheet = getSheet('Employees');
+      if (empSheet) {
+        const empRows = sheetToJson(empSheet);
+        const cleanHodName = (realHodName || '').toLowerCase().trim();
+        const cleanHodId = (realHodId || '').toLowerCase().trim();
+
+        const matchedEmp = empRows.find(e => {
+          const eId = getVal(e, ['Employee No', 'ID', 'EmployeeID', 'EmployeeNo']).toLowerCase().trim();
+          const eName = getVal(e, ['Name', 'EmployeeName']).toLowerCase().trim();
+          const eEmail = getVal(e, ['Email', 'EmailAddress']).toLowerCase().trim();
+
+          if (userEmailClean && eEmail && eEmail === userEmailClean) return true;
+          if (cleanHodId && eId && eId === cleanHodId) return true;
+          if (cleanHodName && eName && (eName === cleanHodName || eName.includes(cleanHodName))) return true;
+          return false;
+        });
+
+        if (matchedEmp) {
+          if (!realHodId) realHodId = getVal(matchedEmp, ['Employee No', 'ID', 'EmployeeID', 'EmployeeNo']);
+          if (!realHodName) realHodName = getVal(matchedEmp, ['Name', 'EmployeeName']);
+          if (!realCostCentre) realCostCentre = getVal(matchedEmp, ['Cost Centre', 'Department', 'CostCentre']);
+          if (!realPosition) realPosition = getVal(matchedEmp, ['Position Title', 'Position', 'JobTitle']);
+        }
+      }
+    } catch (e) {
+      Logger.log('Step 3 (Employees enrichment) error: ' + e.message);
+    }
+  }
+
 
   return {
-    ID: realHodId,
-    Name: realHodName,
-    CostCentre: realCostCentre,
-    Position: realPosition,
-    Email: userEmailClean
+    ID: realHodId || 'N/A',
+    Name: realHodName || 'Head of Department',
+    CostCentre: realCostCentre || 'Cost Centre',
+    Position: realPosition || 'Head of Department',
+    Email: userEmailClean || '',
+    CsuiteName: csuiteName,
+    CsuiteEmail: csuiteEmail,
+    HohrName: hohrName,
+    HohrEmail: hohrEmail
   };
 }
 
-function getActiveHODProfile(requesterIdOrName) {
-  let userEmail = '';
+
+/**
+ * Resolves the specific C-Suite Executive assigned to a requester according to their row in "For IT" tab.
+ * Table Header in "For IT": Employee No | Name | Cost Centre | Position Title | HOD | Csuite | HOHR | Email
+ */
+function resolveCSuiteProfileForRequester(requesterCostCentre, requesterIdOrName) {
+  let cleanDept = String(requesterCostCentre || '').toLowerCase().trim();
+  let cleanReqId = String(requesterIdOrName || '').toLowerCase().trim();
+  
+  const emailAliases = ['Email', 'EmailAddress', 'HODEmail', 'HOD Email', 'Email Address'];
+  const nameAliases = ['HOD', 'HODName', 'HodName', 'Name', 'HOD Name', 'Csuite', 'CsuiteName', 'C-Suite'];
+  const csAliases = ['Csuite', 'C-Suite', 'C Suite', 'CsuiteName', 'CSuiteName', 'CSuite', 'CsuiteExecutive'];
+  const csEmailAliases = ['CsuiteEmail', 'CSuiteEmail', 'Csuite Email', 'C-Suite Email', 'C Suite Email'];
+  const deptAliases = ['Cost Centre', 'CostCentre', 'Department', 'Dept'];
+  const idAliases = ['Employee No', 'EmployeeNo', 'EmployeeID', 'ID'];
+
+  const getVal = (rowObj, nameList) => {
+    if (!rowObj) return '';
+    const keys = Object.keys(rowObj);
+    for (let n of nameList) {
+      const matchKey = keys.find(k => k.toLowerCase().replace(/[^a-z0-9]/g, '') === n.toLowerCase().replace(/[^a-z0-9]/g, ''));
+      if (matchKey && rowObj[matchKey] !== undefined && rowObj[matchKey] !== null) {
+        return String(rowObj[matchKey]).trim();
+      }
+    }
+    return '';
+  };
+
+  let targetCsuiteName = '';
+  let targetCsuiteEmail = '';
+
+  // STEP 1: Refer to the "For IT" tab according to the employee's row
   try {
-    userEmail = Session.getActiveUser().getEmail() || '';
+    const itSheet = getSheet('For IT');
+    if (itSheet && cleanReqId) {
+      const itRows = sheetToJson(itSheet);
+      const empRow = itRows.find(r => {
+        const rId = getVal(r, idAliases).toLowerCase().trim();
+        const rName = getVal(r, ['Name', 'EmployeeName']).toLowerCase().trim();
+        const rEmail = getVal(r, emailAliases).toLowerCase().trim();
+        return (rId && rId === cleanReqId) || (rName && (rName === cleanReqId || rName.includes(cleanReqId))) || (rEmail && rEmail === cleanReqId);
+      });
+
+      if (empRow) {
+        targetCsuiteName = getVal(empRow, csAliases);
+        targetCsuiteEmail = getVal(empRow, csEmailAliases);
+        if (!cleanDept) cleanDept = getVal(empRow, deptAliases).toLowerCase().trim();
+      }
+    }
   } catch (e) {
-    userEmail = '';
+    Logger.log('resolveCSuiteProfileForRequester IT tab lookup error: ' + e.message);
+  }
+
+  // STEP 2: Match resolved C-Suite name or department against "Csuite email" directory tab
+  try {
+    const csSheet = getSheet('Csuite email') || getSheet('C-Suite email');
+    if (csSheet) {
+      const csRows = sheetToJson(csSheet);
+      if (csRows.length > 0) {
+        let matchedCs = null;
+
+        // Match by C-Suite name / email resolved from "For IT" tab
+        if (targetCsuiteName || targetCsuiteEmail) {
+          const cleanCsName = targetCsuiteName.toLowerCase().trim();
+          const cleanCsEmail = targetCsuiteEmail.toLowerCase().trim();
+          matchedCs = csRows.find(r => {
+            const rowEmail = getVal(r, emailAliases).toLowerCase().trim();
+            const rowName = getVal(r, nameAliases).toLowerCase().trim();
+            return (cleanCsEmail && rowEmail && rowEmail === cleanCsEmail) ||
+                   (cleanCsName && rowName && (rowName === cleanCsName || rowName.includes(cleanCsName) || cleanCsName.includes(rowName)));
+          });
+        }
+
+        // Match by Department / Cost Centre if name match failed
+        if (!matchedCs && cleanDept) {
+          matchedCs = csRows.find(r => {
+            const rowDept = getVal(r, deptAliases).toLowerCase().trim();
+            return rowDept && (rowDept === cleanDept || rowDept.includes(cleanDept) || cleanDept.includes(rowDept));
+          });
+        }
+
+        // Fallback to first row
+        if (!matchedCs) matchedCs = csRows[0];
+
+        return {
+          ID: getVal(matchedCs, idAliases) || 'CSUITE',
+          Name: getVal(matchedCs, nameAliases) || targetCsuiteName || 'C-Suite Executive',
+          CostCentre: getVal(matchedCs, deptAliases) || requesterCostCentre,
+          Position: getVal(matchedCs, ['Position Title', 'PositionTitle', 'Position']) || 'C-Suite Executive',
+          Email: getVal(matchedCs, emailAliases) || targetCsuiteEmail
+        };
+      }
+    }
+  } catch(e) {
+    Logger.log('resolveCSuiteProfileForRequester directory lookup error: ' + e.message);
+  }
+
+  return {
+    ID: 'CSUITE',
+    Name: targetCsuiteName || 'C-Suite Executive',
+    CostCentre: requesterCostCentre || '',
+    Position: 'C-Suite Executive',
+    Email: targetCsuiteEmail || ''
+  };
+}
+
+
+/**
+ * Reads C-Suite profile from "Csuite email" tab (default fallback)
+ */
+function getCSuiteEmailProfile(costCentre) {
+  return resolveCSuiteProfileForRequester(costCentre);
+}
+
+
+/**
+ * Reads HOHR profile from "HOHR email" tab
+ */
+function getHOHREmailProfile() {
+  const emailAliases = ['Email', 'EmailAddress', 'HODEmail', 'HOD Email', 'Email Address'];
+  const nameAliases = ['HOD', 'HODName', 'HodName', 'Name', 'HOD Name'];
+
+  const getVal = (rowObj, nameList) => {
+    if (!rowObj) return '';
+    const keys = Object.keys(rowObj);
+    for (let n of nameList) {
+      const matchKey = keys.find(k => k.toLowerCase().replace(/[^a-z0-9]/g, '') === n.toLowerCase().replace(/[^a-z0-9]/g, ''));
+      if (matchKey && rowObj[matchKey] !== undefined && rowObj[matchKey] !== null) {
+        return String(rowObj[matchKey]).trim();
+      }
+    }
+    return '';
+  };
+
+  try {
+    const hrSheet = getSheet('HOHR email') || getSheet('HOHR Email');
+    if (hrSheet) {
+      const rows = sheetToJson(hrSheet);
+      if (rows.length > 0) {
+        const row = rows[0];
+        return {
+          ID: getVal(row, ['Employee No', 'EmployeeNo', 'EmployeeID', 'ID']),
+          Name: getVal(row, nameAliases) || 'Head of HR',
+          CostCentre: getVal(row, ['Cost Centre', 'CostCentre', 'Department']),
+          Position: getVal(row, ['Position Title', 'PositionTitle', 'Position']),
+          Email: getVal(row, emailAliases)
+        };
+      }
+    }
+  } catch(e) {
+    Logger.log('getHOHREmailProfile error: ' + e.message);
+  }
+  return { ID: '', Name: 'Head of HR', CostCentre: '', Position: 'Head of HR', Email: 'hohr@apollofood.com.my' };
+}
+
+/**
+ * Returns all real HOD, C-Suite, and HOHR profiles from directory tabs
+ */
+function getAllRealHODProfiles() {
+  const hods = [];
+  const getVal = (rowObj, nameList) => {
+    if (!rowObj) return '';
+    const keys = Object.keys(rowObj);
+    for (let n of nameList) {
+      const matchKey = keys.find(k => k.toLowerCase().replace(/[^a-z0-9]/g, '') === n.toLowerCase().replace(/[^a-z0-9]/g, ''));
+      if (matchKey && rowObj[matchKey] !== undefined && rowObj[matchKey] !== null) {
+        return String(rowObj[matchKey]).trim();
+      }
+    }
+    return '';
+  };
+
+  const targetTabs = ['HOD email', 'Csuite email', 'C-Suite email', 'HOHR email'];
+
+  try {
+    targetTabs.forEach(tabName => {
+      const sheet = getSheet(tabName);
+      if (sheet) {
+        const rows = sheetToJson(sheet);
+        rows.forEach(h => {
+          const id = getVal(h, ['Employee No', 'EmployeeNo', 'EmployeeID', 'ID']);
+          const name = getVal(h, ['HOD', 'HODName', 'HodName', 'Name']);
+          const dept = getVal(h, ['Cost Centre', 'CostCentre', 'Department']);
+          const pos = getVal(h, ['Position Title', 'PositionTitle', 'Position', 'JobTitle']);
+          const email = getVal(h, ['Email', 'EmailAddress', 'HODEmail']);
+
+          if (name && !hods.some(x => x.Name.toLowerCase() === name.toLowerCase() && x.Email.toLowerCase() === email.toLowerCase())) {
+            hods.push({
+              ID: id || 'N/A',
+              Name: name,
+              CostCentre: dept || 'Cost Centre',
+              Position: pos || 'Manager',
+              Email: email || '',
+              CsuiteName: getVal(h, ['CsuiteName', 'CSuiteName']),
+              CsuiteEmail: getVal(h, ['CsuiteEmail', 'CSuiteEmail']),
+              HohrName: getVal(h, ['HohrName', 'HOHRName']),
+              HohrEmail: getVal(h, ['HohrEmail', 'HOHREmail'])
+            });
+          }
+        });
+      }
+    });
+  } catch (e) {
+    Logger.log('getAllRealHODProfiles error: ' + e.message);
+  }
+
+  return hods;
+}
+
+/**
+ * Retrieves all registered HOD/C-Suite/HOHR emails for login selection
+ */
+function getAllHODEmails() {
+  try {
+    const hods = getAllRealHODProfiles();
+    return hods.map(h => ({
+      name: h.Name,
+      email: h.Email,
+      dept: h.CostCentre
+    })).filter(x => x.email !== '');
+  } catch (e) {
+    return [];
+  }
+}
+
+
+
+function getActiveHODProfile(providedEmail, requesterIdOrName) {
+  let userEmail = String(providedEmail || '').trim();
+  
+  if (!userEmail) {
+    try {
+      userEmail = Session.getActiveUser().getEmail() || '';
+    } catch (e) {
+      userEmail = '';
+    }
+  }
+
+  if (!userEmail) {
+    return {
+      valid: false,
+      email: '',
+      message: 'No email address detected. Please sign in with your registered HOD email.'
+    };
   }
 
   const allowedDomain = getConfigProperty('ALLOWED_DOMAIN', '');
@@ -153,13 +437,32 @@ function getActiveHODProfile(requesterIdOrName) {
     if (domain.toLowerCase() !== allowedDomain.toLowerCase()) {
       return {
         valid: false,
+        email: userEmail,
         message: `Access denied. Only company email accounts (@${allowedDomain}) can access the HOD Portal.`
       };
     }
   }
 
-  // Resolve real HOD Employee ID, Name, Cost Centre, Position via "For IT" -> "Employees" -> "HOD email"
+  // Resolve real HOD profile strictly via HOD email schema
   const realHod = resolveRealHODProfile(userEmail, requesterIdOrName);
+
+  if (!realHod) {
+    const hodSheet = getSheet('HOD email');
+    if (!hodSheet) {
+      return {
+        valid: false,
+        email: userEmail,
+        message: `Database Error: Could not locate the 'HOD email' tab in the connected Google Spreadsheet. Please verify the tab name.`
+      };
+    }
+    const allHODs = getAllHODEmails();
+    const emailList = allHODs.map(x => x.email).filter(Boolean);
+    return {
+      valid: false,
+      email: userEmail,
+      message: `Access Denied: The email address (${userEmail}) is not registered in the HOD email directory. ${emailList.length > 0 ? 'Registered emails: ' + emailList.join(', ') : 'No emails found in HOD email tab.'}`
+    };
+  }
 
   return {
     valid: true,
@@ -168,10 +471,13 @@ function getActiveHODProfile(requesterIdOrName) {
   };
 }
 
-function validateHODAccess(requesterIdOrName) {
-  const profile = getActiveHODProfile(requesterIdOrName);
+
+
+function validateHODAccess(userEmail, requesterIdOrName) {
+  const profile = getActiveHODProfile(userEmail, requesterIdOrName);
   if (!profile.valid) {
     return profile;
   }
-  return { valid: true, hod: profile.hod };
+  return { valid: true, email: profile.email, hod: profile.hod };
 }
+

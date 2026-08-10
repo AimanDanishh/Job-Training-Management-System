@@ -15,7 +15,7 @@ function generateAttendanceURL(sessionId) {
   if (!baseUrl) {
     baseUrl = 'https://script.google.com/macros/s/CURRENT_DEPLOYMENT_ID/exec';
   }
-  const cleanBase = baseUrl.split('?')[0];
+  const cleanBase = String(baseUrl || '').split('?')[0];
   return `${cleanBase}?page=attendance&session=${encodeURIComponent(sessionId)}`;
 }
 
@@ -141,7 +141,7 @@ function getEvaluationQRCodes(trainingId) {
     if (!baseUrl) {
       baseUrl = 'https://script.google.com/macros/s/CURRENT_DEPLOYMENT_ID/exec';
     }
-    const cleanBase = baseUrl.split('?')[0];
+    const cleanBase = String(baseUrl || '').split('?')[0];
 
     const evalUrl = `${cleanBase}?page=evaluation&id=${encodeURIComponent(trainingId)}`;
     const postUrl = `${cleanBase}?page=post&id=${encodeURIComponent(trainingId)}`;

@@ -415,7 +415,9 @@ function getOfficialEmployeeDirectory() {
     if (!id) return;
     const employee = {
       ID: id,
+      EmployeeID: id,
       Name: name,
+      EmployeeName: name,
       Department: String(row.CostCentre || row['Cost Centre'] || row.Department || row.Dept || '').trim(),
       Position: String(row.PositionTitle || row['Position Title'] || row.Position || row.JobTitle || row['Job Title'] || '').trim(),
       Email: String(row.Email || row['Email Address'] || '').trim()
@@ -452,12 +454,12 @@ function canonicalizeTrainingParticipants(participants) {
   return { participants: resolved, rejected: rejected };
 }
 
-let _sheetDataCache = {};
+var _sheetDataCache = {};
+
 function sheetToJson(sheet) {
   if (!sheet) return [];
-  const sheetName = sheet.getName();
-  if (_sheetDataCache[sheetName]) return _sheetDataCache[sheetName];
 
+  const sheetName = (sheet && typeof sheet.getName === 'function') ? sheet.getName() : '';
   const lastRow = sheet.getLastRow();
   const lastCol = sheet.getLastColumn();
   if (lastRow < 2 || lastCol < 1) return [];
@@ -487,7 +489,9 @@ function sheetToJson(sheet) {
     rows.push(obj);
   }
 
-  _sheetDataCache[sheetName] = rows;
+  if (sheetName) {
+    _sheetDataCache[sheetName] = rows;
+  }
   return rows;
 }
 
@@ -508,6 +512,48 @@ function formatDate(date) {
   return Utilities.formatDate(d, Session.getScriptTimeZone(), 'dd MMM yyyy');
 }
 
+/**
+ * Returns current date formatted as dd/MM/yyyy in project script timezone.
+ */
+function getFormattedCurrentDate(date) {
+  const d = date ? new Date(date) : new Date();
+  if (isNaN(d.getTime())) return formatDate(date);
+  return Utilities.formatDate(d, Session.getScriptTimeZone(), 'dd/MM/yyyy');
+}
+
+/**
+ * Reusable employee lookup function by Employee No / ID.
+ * Searches the existing Employees sheet in EMPLOYEE_SPREADSHEET_ID.
+ * Matches Employee No exactly (case-insensitive, trimmed).
+ * Returns employee details object or null if not found.
+ */
+function getEmployeeById(employeeNo) {
+  if (!employeeNo || String(employeeNo).trim() === '') return null;
+  const cleanId = String(employeeNo).trim().toLowerCase();
+
+  const empSheet = getSheet(SHEET_NAMES.employees);
+  if (!empSheet) return null;
+
+  const rows = sheetToJson(empSheet);
+  const emp = rows.find(r => {
+    const idVal = String(
+      r.ID || r.EmployeeID || r.EmployeeNo || r.EmpID || r.StaffID || 
+      r['Employee ID'] || r['Employee No'] || r['Staff ID'] || ''
+    ).trim().toLowerCase();
+    return idVal === cleanId;
+  });
+
+  if (!emp) return null;
+
+  return {
+    ID: String(emp.ID || emp.EmployeeID || emp.EmployeeNo || String(employeeNo).trim()).trim(),
+    Name: String(emp.Name || emp.EmployeeName || emp['Employee Name'] || emp['Staff Name'] || '').trim(),
+    Department: String(emp.Department || emp.CostCentre || emp['Cost Centre'] || 'N/A').trim(),
+    Position: String(emp.Position || emp.JobTitle || emp.PositionTitle || emp['Position Title'] || emp['Job Title'] || 'Staff').trim(),
+    Email: String(emp.Email || emp['Email Address'] || '').trim()
+  };
+}
+
 function now() {
   return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd MMM yyyy HH:mm');
 }
@@ -521,16 +567,10 @@ function err(message) {
   return JSON.stringify({ success: false, message: message });
 }
 
-// ─── Setup (run once) ───────────────────────────────────────────────────────────
-/**
- * Run setupSheets() once from the Apps Script editor to initialise all sheets
- * and auto-create single-sheet formula-equipped Drive workspaces for all training programmes.
- */
 function setupSheets() {
   getSheet(SHEET_NAMES.trainings);
   getSheet(SHEET_NAMES.employees);
 
-  // Ensure Master Database Spreadsheet (SPREADSHEET_ID) contains ONLY the Trainings tab (and Employees tab if stored in master SS)
   try {
     const masterSS = getSpreadsheet();
     if (masterSS) {
@@ -547,7 +587,6 @@ function setupSheets() {
     }
   } catch(e) {}
 
-  // Sync per-training Google Drive workspaces and single sheet tabs
   try {
     const tSheet = getSheet(SHEET_NAMES.trainings);
     if (tSheet && tSheet.getLastRow() > 1) {

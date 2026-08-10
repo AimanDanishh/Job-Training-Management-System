@@ -133,6 +133,18 @@
         </select>
       </div>
       <div class="col-md-6">
+        <label class="label-th">Lifecycle Stage</label>
+        <select id="t-stage" class="input-th">
+          <option value="Created">Created</option>
+          <option value="Participants Imported">Participants Imported</option>
+          <option value="Attendance In Progress">Attendance In Progress</option>
+          <option value="Training Completed">Training Completed</option>
+          <option value="Evaluation Completed">Evaluation Completed</option>
+          <option value="Waiting for 3-Month Review">Waiting for 3-Month Review</option>
+          <option value="Programme Closed">Programme Closed</option>
+        </select>
+      </div>
+      <div class="col-md-6">
         <label class="label-th">Approval Status <span style="font-size:10.5px;color:#64748B">(Automated)</span></label>
         <select id="t-app-status" class="input-th" disabled style="background:#F8FAFC;cursor:not-allowed">
           <option value="Approved">Approved</option>
@@ -537,7 +549,8 @@
     document.getElementById('t-duration').value = t.Duration  || 1;
     document.getElementById('t-hours').value    = t.TotalHours|| 8;
     document.getElementById('t-status').value   = t.Status    || 'Draft';
-    document.getElementById('t-stage').value    = t.Stage     || 'Created';
+    const stageEl = document.getElementById('t-stage');
+    if (stageEl) stageEl.value = t.Stage || 'Created';
     const appSelect = document.getElementById('t-app-status');
     if (appSelect) appSelect.value = t.ApprovalStatus || 'Approved';
     document.getElementById('t-obj').value      = t.Objectives|| '';
@@ -570,7 +583,7 @@
       TotalHours: document.getElementById('t-hours').value || 8,
       Status:     document.getElementById('t-status').value,
       ApprovalStatus: appStatusVal,
-      Stage:      document.getElementById('t-stage').value,
+      Stage:      document.getElementById('t-stage') ? document.getElementById('t-stage').value : 'Created',
       Objectives: document.getElementById('t-obj').value.trim(),
       Participants: 0
     };
@@ -642,9 +655,10 @@
       <button class="btn-th btn-secondary" onclick="editTraining('${t.ID}')"><span class="icon sm">edit</span>Edit</button>
     `;
 
-    const baseUrl = (window.__PUBLIC_PORTAL_URL__ && window.__PUBLIC_PORTAL_URL__.trim())
-      ? window.__PUBLIC_PORTAL_URL__.trim().split('?')[0]
-      : window.location.href.split('?')[0];
+    const portalUrlStr = typeof window.__PUBLIC_PORTAL_URL__ === 'string' ? window.__PUBLIC_PORTAL_URL__.trim() : '';
+    const baseUrl = portalUrlStr
+      ? portalUrlStr.split('?')[0]
+      : String(window.location.href || '').split('?')[0];
 
     const content = document.getElementById('detail-full-content');
     content.innerHTML = `
@@ -864,30 +878,32 @@
                 <th>Employee Name</th>
                 <th>Department / Cost Centre</th>
                 <th>Position</th>
-                <th>Enrolled Date</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              ${participants.length ? participants.map((p, idx) => `
+              ${participants.length ? participants.map((p, idx) => {
+                const empId = p.EmployeeID || p.ID || p.EmployeeNo || '—';
+                const empName = p.EmployeeName || p.Name || empId;
+                return `
                 <tr>
-                  <td style="font-family:monospace;font-size:11.5px;font-weight:700;color:#2563EB">${p.EmployeeID}</td>
+                  <td style="font-family:monospace;font-size:11.5px;font-weight:700;color:#2563EB">${empId}</td>
                   <td>
                     <div style="display:flex;align-items:center;gap:8px">
-                      ${avatar(p.EmployeeName, 26, idx)}
-                      <span style="font-weight:600;font-size:13px;color:#1E293B">${p.EmployeeName}</span>
+                      ${avatar(empName, 26, idx)}
+                      <span style="font-weight:600;font-size:13px;color:#1E293B">${empName}</span>
                     </div>
                   </td>
                   <td style="font-size:12px;color:#64748B">${p.Department || '—'}</td>
                   <td style="font-size:12px;color:#64748B">${p.Position || '—'}</td>
-                  <td style="font-size:11.5px;color:#94A3B8">${p.AddedAt || '—'}</td>
                   <td>
-                    <button class="btn-th btn-danger btn-xs" onclick="removeParticipantInFullView('${t.ID}', '${p.EmployeeID}')" title="Remove participant"><span class="icon sm">delete</span></button>
+                    <button class="btn-th btn-danger btn-xs" onclick="removeParticipantInFullView('${t.ID}', '${empId}')" title="Remove participant"><span class="icon sm">delete</span></button>
                   </td>
                 </tr>
-              `).join('') : `
+              `;
+              }).join('') : `
                 <tr>
-                  <td colspan="6" style="text-align:center;color:#94A3B8;padding:40px">
+                  <td colspan="5" style="text-align:center;color:#94A3B8;padding:40px">
                     <span class="icon lg" style="display:block;margin-bottom:8px;color:#CBD5E1">group_off</span>
                     No participants enrolled in this training programme yet.<br>
                     <button class="btn-th btn-primary btn-sm mt-3" onclick="openParticipantManager('${t.ID}')"><span class="icon sm">person_add</span>Add Participants Now</button>
@@ -973,7 +989,7 @@
     document.getElementById('qr-modal-title').textContent = `Training QR Codes — ${t.Code}`;
     document.getElementById('qr-modal-sub').textContent = t.Name;
 
-    const currentBaseUrl = window.location.href.split('?')[0];
+    const currentBaseUrl = String(window.location.href || '').split('?')[0];
 
     const attUrl = `${currentBaseUrl}?page=attendance&id=${encodeURIComponent(t.ID)}`;
     const evalUrl = `${currentBaseUrl}?page=evaluation&id=${encodeURIComponent(t.ID)}`;
@@ -1079,11 +1095,11 @@
       } catch(e) {}
     }
 
-    const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    const lines = String(raw || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
     const parsedEntries = [];
 
     lines.forEach(line => {
-      const parts = line.split(/[\t,]/).map(p => p.trim()).filter(Boolean);
+      const parts = String(line || '').split(/[\t,]/).map(p => p.trim()).filter(Boolean);
       if (parts.length > 0) {
         const empId = parts[0];
         const dbEmp = allMasterEmployees.find(e => String(e.ID || e.EmployeeID || '').trim().toLowerCase() === String(empId).trim().toLowerCase());
@@ -1130,16 +1146,20 @@
         el.innerHTML = '<div class="p-4 text-center" style="color:#94A3B8">No participants enrolled yet. Click "Add Participants" to select employees.</div>';
         return;
       }
-      el.innerHTML = list.map((p, idx) => `
+      el.innerHTML = list.map((p, idx) => {
+        const empId = p.EmployeeID || p.ID || p.EmployeeNo || '—';
+        const empName = p.EmployeeName || p.Name || empId;
+        return `
         <div style="display:flex;align-items:center;gap:12px;padding:9px 14px;border-bottom:1px solid #F1F5F9;background:${idx%2===0?'#fff':'#FAFAFA'}">
-          <span style="font-family:monospace;font-size:11px;font-weight:700;color:#2563EB;background:#EFF6FF;padding:2px 6px;border-radius:4px">${p.EmployeeID}</span>
+          <span style="font-family:monospace;font-size:11px;font-weight:700;color:#2563EB;background:#EFF6FF;padding:2px 6px;border-radius:4px">${empId}</span>
           <div style="flex:1;min-width:0">
-            <strong style="font-size:13px;color:#1E293B">${p.EmployeeName}</strong>
+            <strong style="font-size:13px;color:#1E293B">${empName}</strong>
             <span style="font-size:11.5px;color:#64748B;margin-left:8px">${p.Department || ''} ${p.Position ? '· ' + p.Position : ''}</span>
           </div>
-          <button class="btn-th btn-danger btn-xs" onclick="removeParticipantFromTraining('${p.EmployeeID}')" title="Remove participant"><span class="icon sm">delete</span></button>
+          <button class="btn-th btn-danger btn-xs" onclick="removeParticipantFromTraining('${empId}')" title="Remove participant"><span class="icon sm">delete</span></button>
         </div>
-      `).join('');
+      `;
+      }).join('');
     } catch(e) {
       showToast(e.message, 'error');
     }
@@ -1287,7 +1307,8 @@
     document.getElementById('t-duration').value = 1;
     document.getElementById('t-hours').value    = 8;
     document.getElementById('t-status').value   = 'Draft';
-    document.getElementById('t-stage').value    = 'Created';
+    const stageEl = document.getElementById('t-stage');
+    if (stageEl) stageEl.value = 'Created';
     document.getElementById('t-modal-title').textContent = 'New Training Programme';
   }
 

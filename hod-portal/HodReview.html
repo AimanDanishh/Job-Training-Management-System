@@ -22,6 +22,65 @@
       </div>
     </header>
 
+    <!-- Supervision Requisition Queue Selector Bar -->
+    <div style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:16px;margin-bottom:20px;display:flex;flex-direction:column;gap:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+        <div style="font-weight:600;color:#60a5fa;display:flex;align-items:center;gap:8px;">
+          <span>📋</span> <span id="queueBadgeTitle">Supervision Queue</span>
+          <span class="badge badge-pending" id="queueCountBadge">Loading...</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:12px;color:var(--text-secondary);" id="hodAuthenticatedEmailLabel">Auth: Checking...</span>
+          <button onclick="promptChangeEmail()" style="background:#334155;color:#94a3b8;border:none;border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer;">Switch Email</button>
+        </div>
+      </div>
+      <div>
+        <label style="font-size:12px;color:var(--text-muted);margin-bottom:4px;display:block;">Select Pending Training Requisition under your Supervision to Review:</label>
+        <select id="supervisionQueueSelect" class="form-control" style="width:100%;font-weight:600;background:#0f172a;border-color:#3b82f6;color:#f8fafc;" onchange="loadRequisitionBySelection(this.value)">
+          <option value="">Loading supervised requisitions queue...</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Access Denied Card (Shown if email is unauthorized) -->
+    <div class="card" id="accessDeniedCard" style="display:none;border-top:4px solid var(--danger);text-align:center;padding:40px 20px;">
+      <div style="font-size:56px;margin-bottom:12px;">🔒</div>
+      <h2 style="color:var(--danger);margin-bottom:12px;" id="deniedCardTitle">Access Denied — Non Accessible Website</h2>
+      <p style="color:var(--text-secondary);max-width:520px;margin:0 auto 24px;line-height:1.6;" id="deniedCardMsg">
+        The email address you provided is not registered as an authorized Head of Department (HOD) in the company directory.
+      </p>
+      <div style="background:#0f172a;border:1px solid #334155;border-radius:12px;padding:20px;max-width:460px;margin:0 auto 20px;text-align:left;">
+        <label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:6px;">Sign In with Registered HOD Email:</label>
+        <div style="display:flex;gap:8px;">
+          <input type="email" id="deniedEmailInput" class="form-control" placeholder="e.g. hod@apollofood.com.my" style="flex:1;">
+          <button class="btn btn-approve" onclick="submitAuthEmail('deniedEmailInput')">Sign In</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sign In Card (Shown if no email is set) -->
+    <div class="card" id="loginPromptCard" style="display:none;border-top:4px solid var(--primary);text-align:center;padding:40px 20px;">
+      <div style="font-size:56px;margin-bottom:12px;">🔑</div>
+      <h2 style="color:var(--primary);margin-bottom:12px;">HOD Portal Authentication</h2>
+      <p style="color:var(--text-secondary);max-width:520px;margin:0 auto 24px;line-height:1.6;">
+        Please select or enter your registered Head of Department (HOD) email address to access your supervised training requisitions queue.
+      </p>
+      <div style="background:#0f172a;border:1px solid #334155;border-radius:12px;padding:20px;max-width:460px;margin:0 auto;text-align:left;">
+        <label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:6px;">Select Registered HOD Profile / Email:</label>
+        <select id="loginHodSelect" class="form-control" style="margin-bottom:14px;" onchange="onLoginHodSelectChange(this.value)">
+          <option value="">-- Loading HOD Email Directory... --</option>
+        </select>
+        
+        <label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:6px;">Or Enter Registered Email Address:</label>
+        <div style="display:flex;gap:8px;">
+          <input type="email" id="loginEmailInput" class="form-control" placeholder="e.g. hod@apollofood.com.my" style="flex:1;">
+          <button class="btn btn-approve" onclick="submitAuthEmail('loginEmailInput')">Access Portal</button>
+        </div>
+      </div>
+    </div>
+
+
+
     <!-- Training Request Card (Scroll down to review) -->
     <div class="card" id="reqCard">
       <div class="card-header">
@@ -151,16 +210,10 @@
         </div>
       </div>
 
-      <!-- Reschedule Date (Shown when Reschedule is selected) -->
-      <div id="rescheduleGroup" style="display:none;margin-bottom:16px;">
-        <label class="data-label" style="color:var(--warning);">Proposed New Date for Rescheduling</label>
-        <input type="date" id="rescheduledDateInput" class="form-control" style="border-color:var(--warning);">
-      </div>
-
       <!-- HOD Remarks / Justification -->
       <div style="margin-bottom:16px;">
-        <label class="data-label">HOD Remarks / Comments / Justification</label>
-        <textarea id="hodRemarksInput" class="form-control" rows="3" placeholder="Enter remarks or approval notes..."></textarea>
+        <label class="data-label">HOD Remarks / Comments / Justification <span style="font-size:12px;color:var(--text-muted);">(Required for Reject & Return)</span></label>
+        <textarea id="hodRemarksInput" class="form-control" rows="3" placeholder="Enter remarks, comments, or justification..."></textarea>
       </div>
 
       <!-- Digital Stamp Container -->
@@ -169,7 +222,7 @@
         <div class="digital-stamp-details" id="stampDetails">--</div>
       </div>
 
-      <!-- Decision Action Buttons -->
+      <!-- Decision Action Buttons: Approve / Reject / Return (with remarks) ONLY -->
       <div class="action-buttons" id="actionButtonsContainer">
         <button class="btn btn-approve" onclick="handleDecision('Approved')">
           <span>✅</span> Approve Request
@@ -177,11 +230,8 @@
         <button class="btn btn-reject" onclick="handleDecision('Rejected')">
           <span>❌</span> Reject Request
         </button>
-        <button class="btn btn-postpone" onclick="handleDecision('Postponed')">
-          <span>⏸️</span> Postpone
-        </button>
-        <button class="btn btn-reschedule" onclick="toggleRescheduleMode()">
-          <span>📅</span> Reschedule
+        <button class="btn btn-postpone" style="background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%);color:#fff;" onclick="handleDecision('Returned')">
+          <span>↩️</span> Return with Remarks
         </button>
       </div>
     </div>
@@ -191,30 +241,118 @@
 
   <script>
     let currentTrainingId = '<?= params.id || params.req || "" ?>';
-    let currentHOD = null;
-
-    window.addEventListener('DOMContentLoaded', () => {
-      loadData();
+    let userEmail = '<?= params.email || "" ?>';
+    let currentHOD = null;    window.addEventListener('DOMContentLoaded', () => {
+      initUserEmail();
     });
 
-    function loadData() {
-      showLoading('Loading Requisition Request...');
+    function initUserEmail() {
+      if (userEmail && userEmail.trim()) {
+        sessionStorage.setItem('hod_user_email', userEmail.trim());
+      } else {
+        userEmail = sessionStorage.getItem('hod_user_email') || '';
+      }
+      
+      // Attempt automatic load (will check Session.getActiveUser().getEmail() on server)
+      loadData();
+    }
+
+    function showLoginPrompt() {
+      document.getElementById('reqCard').style.display = 'none';
+      document.getElementById('approvalSection').style.display = 'none';
+      document.getElementById('accessDeniedCard').style.display = 'none';
+      document.getElementById('loginPromptCard').style.display = 'block';
+
+      // Load registered HOD emails from sheet to populate login select dropdown
+      google.script.run
+        .withSuccessHandler(res => {
+          const select = document.getElementById('loginHodSelect');
+          if (res && res.length > 0) {
+            select.innerHTML = '<option value="">-- Select your registered HOD email --</option>' +
+              res.map(h => `<option value="${h.email}">${h.name} (${h.dept}) — ${h.email}</option>`).join('');
+          } else {
+            select.innerHTML = '<option value="">No HOD emails loaded. Enter email below.</option>';
+          }
+        })
+        .withFailureHandler(() => {})
+        .getAllHODEmails();
+    }
+
+    function onLoginHodSelectChange(selectedEmail) {
+      if (selectedEmail) {
+        document.getElementById('loginEmailInput').value = selectedEmail;
+      }
+    }
+
+    function submitAuthEmail(inputId) {
+      const input = document.getElementById(inputId);
+      const email = input ? input.value.trim() : '';
+      if (!email) {
+        alert('Please select or enter a valid email address.');
+        return;
+      }
+      userEmail = email;
+      sessionStorage.setItem('hod_user_email', userEmail);
+      document.getElementById('hodAuthenticatedEmailLabel').innerText = `Auth: ${userEmail}`;
+      document.getElementById('loginPromptCard').style.display = 'none';
+      document.getElementById('accessDeniedCard').style.display = 'none';
+      loadData();
+    }
+
+    function promptChangeEmail() {
+      showLoginPrompt();
+    }
+
+    function showAccessDeniedScreen(message) {
+      document.getElementById('reqCard').style.display = 'none';
+      document.getElementById('approvalSection').style.display = 'none';
+      document.getElementById('loginPromptCard').style.display = 'none';
+      const deniedCard = document.getElementById('accessDeniedCard');
+      deniedCard.style.display = 'block';
+      document.getElementById('deniedCardMsg').innerText = message || `The email address (${userEmail || 'unknown'}) is not registered as an authorized Head of Department. Access denied.`;
+    }
+
+    function loadData(trainingIdOverride) {
+      const targetId = trainingIdOverride || currentTrainingId;
+
+      showLoading('Authenticating HOD Session & Loading Supervision Queue...');
       google.script.run
         .withSuccessHandler(resStr => {
           hideLoading();
           const res = JSON.parse(resStr);
           if (!res.success) {
-            showAlert(res.message, true);
+            if (!userEmail) {
+              showLoginPrompt();
+            } else {
+              showAccessDeniedScreen(res.message);
+            }
             return;
           }
+
+          // Automatically capture authenticated user email from server response
+          if (res.data && res.data.hod && res.data.hod.Email) {
+            userEmail = res.data.hod.Email;
+            sessionStorage.setItem('hod_user_email', userEmail);
+            document.getElementById('hodAuthenticatedEmailLabel').innerText = `Auth: ${userEmail}`;
+          }
+
+          document.getElementById('accessDeniedCard').style.display = 'none';
+          document.getElementById('loginPromptCard').style.display = 'none';
+          document.getElementById('reqCard').style.display = 'block';
           renderRequisition(res.data);
         })
         .withFailureHandler(err => {
           hideLoading();
-          showAlert('Failed to connect to server: ' + err.message, true);
+          if (!userEmail) {
+            showLoginPrompt();
+          } else {
+            showAlert('Failed to connect to server: ' + err.message, true);
+          }
         })
-        .getRequisitionDetails(currentTrainingId);
+        .getRequisitionDetails(targetId, userEmail);
     }
+
+
 
     function renderRequisition(data) {
       currentHOD = data.hod || { Name: 'HOD Approver', ID: '', CostCentre: '' };
@@ -225,12 +363,36 @@
       document.getElementById('hodNameDisplay').innerText = currentHOD.Name;
       document.getElementById('hodCostCentreDisplay').innerText = currentHOD.CostCentre;
 
+      // Render Supervision Queue Dropdown
+      const queueSelect = document.getElementById('supervisionQueueSelect');
+      cachedSupervisedQueue = data.supervisedRequisitions || [];
+      document.getElementById('queueCountBadge').innerText = `${cachedSupervisedQueue.length} Request(s)`;
+
+      if (cachedSupervisedQueue.length === 0) {
+        queueSelect.innerHTML = '<option value="">No pending requisitions found under your supervision</option>';
+      } else {
+        queueSelect.innerHTML = cachedSupervisedQueue.map(q => {
+          const reqCode = q.Code || q.ID;
+          const reqName = q.Name || 'Training Request';
+          const reqUser = q.RequestedByName || q.RequestedBy || 'Employee';
+          const reqDept = q.Department || 'Dept';
+          const reqStatus = q.ApprovalStatus || q.Status || 'Pending';
+          const isSelected = data.training && String(q.ID).toLowerCase() === String(data.training.ID).toLowerCase();
+
+          return `<option value="${q.ID}" ${isSelected ? 'selected' : ''}>
+            [${reqCode}] ${reqName} — Requester: ${reqUser} (${reqDept}) [${reqStatus}]
+          </option>`;
+        }).join('');
+      }
+
       const t = data.training;
       if (!t) {
         document.getElementById('reqTitle').innerText = 'No Pending Requisitions';
         document.getElementById('reqCode').innerText = 'There are currently no training requisitions pending your managerial approval.';
         document.getElementById('approvalSection').style.display = 'none';
         return;
+      } else {
+        document.getElementById('approvalSection').style.display = 'block';
       }
 
       const req = data.requester || { Name: 'N/A', ID: 'N/A', Department: 'N/A', Email: 'N/A' };
@@ -278,40 +440,35 @@
       // If already stamped, show digital stamp box
       if (t.ApprovedAt && t.ApprovedBy) {
         showDigitalStamp(t.ApprovalStatus || 'Approved', t.ApprovedBy, t.ApprovedCostCentre, t.ApprovedAt, t.ApprovalRemarks);
+      } else {
+        document.getElementById('digitalStampBox').style.display = 'none';
       }
+    }
+
+    function loadRequisitionBySelection(selectedTrainingId) {
+      if (!selectedTrainingId) return;
+      currentTrainingId = selectedTrainingId;
+      loadData(selectedTrainingId);
     }
 
     function renderStatusBadge(status) {
       const container = document.getElementById('statusBadgeContainer');
       const st = String(status).toUpperCase();
       let badgeHtml = '';
-      if (st.includes('APPROV')) {
-        badgeHtml = '<span class="badge badge-approved">APPROVED BY HOD</span>';
+      if (st === 'APPROVED') {
+        badgeHtml = '<span class="badge badge-approved">FULLY APPROVED</span>';
+      } else if (st.includes('C-SUITE')) {
+        badgeHtml = '<span class="badge badge-pending" style="background:#8b5cf6;">PENDING C-SUITE APPROVAL</span>';
+      } else if (st.includes('HOHR')) {
+        badgeHtml = '<span class="badge badge-pending" style="background:#ec4899;">PENDING HOHR APPROVAL</span>';
       } else if (st.includes('REJECT')) {
-        badgeHtml = '<span class="badge badge-rejected">REJECTED BY HOD</span>';
-      } else if (st.includes('POSTPON')) {
-        badgeHtml = '<span class="badge badge-postponed">POSTPONED</span>';
-      } else if (st.includes('RESCHED')) {
-        badgeHtml = '<span class="badge badge-postponed">RESCHEDULED</span>';
+        badgeHtml = '<span class="badge badge-rejected">REJECTED</span>';
+      } else if (st.includes('RETURN')) {
+        badgeHtml = '<span class="badge badge-postponed">RETURNED WITH REMARKS</span>';
       } else {
         badgeHtml = '<span class="badge badge-pending">PENDING HOD APPROVAL</span>';
       }
       container.innerHTML = badgeHtml;
-    }
-
-    function toggleRescheduleMode() {
-      const group = document.getElementById('rescheduleGroup');
-      if (group.style.display === 'none') {
-        group.style.display = 'block';
-        alert('Please select the proposed new date above and click Reschedule again to confirm.');
-      } else {
-        const newDate = document.getElementById('rescheduledDateInput').value;
-        if (!newDate) {
-          alert('Please select a valid new date for rescheduling.');
-          return;
-        }
-        handleDecision('Rescheduled');
-      }
     }
 
     function handleDecision(decision) {
@@ -321,19 +478,24 @@
       }
 
       const remarks = document.getElementById('hodRemarksInput').value.trim();
-      const rescheduledDate = document.getElementById('rescheduledDateInput').value;
+
+      if ((decision === 'Rejected' || decision === 'Returned') && !remarks) {
+        alert(`Remarks are mandatory when choosing to ${decision} a requisition request. Please provide remarks/justification.`);
+        document.getElementById('hodRemarksInput').focus();
+        return;
+      }
 
       if (!confirm(`Are you sure you want to mark this Training Requisition as ${decision.toUpperCase()}?`)) {
         return;
       }
 
-      showLoading(`Stamping ${decision.toUpperCase()} decision & sending email...`);
+      showLoading(`Processing ${decision.toUpperCase()} decision & creating draft emails...`);
 
       const payload = {
         trainingId: currentTrainingId,
         decision: decision,
         remarks: remarks,
-        rescheduledDate: rescheduledDate,
+        userEmail: userEmail,
         hodId: currentHOD ? currentHOD.ID : '',
         hodName: currentHOD ? currentHOD.Name : '',
         hodCostCentre: currentHOD ? currentHOD.CostCentre : ''
@@ -348,8 +510,8 @@
             return;
           }
           showAlert(res.data.message, false);
-          renderStatusBadge(decision);
-          showDigitalStamp(decision, `${res.data.approvedBy} (${currentHOD.ID})`, currentHOD.CostCentre, res.data.timestamp, remarks);
+          renderStatusBadge(res.data.decision);
+          showDigitalStamp(res.data.decision, `${res.data.approvedBy} (${currentHOD.ID})`, currentHOD.CostCentre, res.data.timestamp, remarks);
         })
         .withFailureHandler(err => {
           hideLoading();
@@ -368,11 +530,21 @@
       else if (decision === 'Rejected') stTitle.style.color = 'var(--danger)';
       else stTitle.style.color = 'var(--warning)';
 
+      let cleanBy = by;
+      let cleanCc = costCentre;
+      if (cleanBy && (cleanBy.includes('IT.INTERN') || cleanBy.includes('It Intern') || cleanBy.includes('EMP-HOD001') || cleanBy.includes('Head of Department'))) {
+        cleanBy = currentHOD ? `${currentHOD.Name} (${currentHOD.ID})` : by;
+      }
+      if (!cleanCc || cleanCc.includes('All Departments')) {
+        cleanCc = currentHOD ? currentHOD.CostCentre : costCentre;
+      }
+
       document.getElementById('stampDetails').innerHTML = `
-        <strong>Manager:</strong> ${by} | <strong>Cost Centre:</strong> ${costCentre}<br>
+        <strong>Manager:</strong> ${cleanBy} | <strong>Cost Centre:</strong> ${cleanCc}<br>
         <strong>Timestamp:</strong> ${timestamp} ${remarks ? '<br><strong>Remarks:</strong> ' + remarks : ''}
       `;
     }
   </script>
 </body>
 </html>
+

@@ -27,6 +27,19 @@ function getTrainingById(id) {
     const rows = autoUpdateTrainingLifecycleStages();
     const t = rows.find(r => r.ID === id);
     if (!t) return err('Training not found.');
+
+    // Auto-sign HR Department (Arina) acknowledgment in Training Requisition Form on opening
+    try {
+      acknowledgeHRRequisition(id, {
+        employeeNo: '1012',
+        name: 'Arina Ismail',
+        position: 'HR Department',
+        status: 'Acknowledged'
+      });
+    } catch(hrErr) {
+      Logger.log('Auto HR sign error in getTrainingById: ' + hrErr.message);
+    }
+
     return ok(t);
   } catch (e) {
     return err(e.message);
@@ -49,6 +62,14 @@ function autoUpdateTrainingLifecycleStages() {
 
     rows.forEach(t => {
       let isUpdated = false;
+      const partCount = Number(t.Participants || 0);
+
+      // Auto-advance Created -> Participants Imported if participants are attached/requested
+      if (partCount > 0 && (!t.Stage || t.Stage === 'Created')) {
+        t.Stage = 'Participants Imported';
+        isUpdated = true;
+      }
+
       const startDateStr = t.StartDate;
       const endDateStr   = t.EndDate || t.StartDate;
 
@@ -106,7 +127,7 @@ function autoUpdateTrainingLifecycleStages() {
           }
 
           if (t.isThreeMonthsReached) {
-            if (['Training Completed', 'Evaluation Completed'].includes(t.Stage)) {
+            if (['Created', 'Participants Imported', 'Attendance In Progress', 'Training Completed', 'Evaluation Completed'].includes(t.Stage)) {
               t.Stage = 'Waiting for 3-Month Review';
               isUpdated = true;
             }
@@ -207,6 +228,8 @@ function addTraining(data) {
     const workspace = createTrainingWorkspace(code, data.Name);
     const requisitionForm = createTrainingRequisitionForm(code, data, workspace.folderId, requesterSigData);
 
+    const participantsList = Array.isArray(data.ParticipantList) ? data.ParticipantList : (Array.isArray(data.participants) ? data.participants : []);
+
     sheet.appendRow([
       id,
       code,
@@ -221,8 +244,8 @@ function addTraining(data) {
       data.Department  || '',
       data.Objectives  || '',
       data.Status      || 'Draft',
-      data.Stage       || 'Created',
-      data.Participants|| 0,
+      data.Stage       || (participantsList.length > 0 ? 'Participants Imported' : 'Created'),
+      data.Participants|| participantsList.length,
       workspace.folderId          || '',
       workspace.partSheetId       || '',
       workspace.sessionSheetId    || '',
@@ -257,7 +280,6 @@ function addTraining(data) {
       } catch(e) {}
     }
 
-    const participantsList = Array.isArray(data.ParticipantList) ? data.ParticipantList : (Array.isArray(data.participants) ? data.participants : []);
     if (participantsList.length > 0) {
       try {
         addTrainingParticipants(id, participantsList);
@@ -331,10 +353,55 @@ function updateTraining(data) {
     const appStatusCol = headers.indexOf('ApprovalStatus') + 1;
     if (appStatusCol && data.ApprovalStatus !== undefined) {
       sheet.getRange(row, appStatusCol).setValue(data.ApprovalStatus);
+      if (data.RequisitionStep || data.HREmployeeNo || data.HRName) {
+        try {
+          updateTrainingRequisitionSignatures(data.ID, data.RequisitionStep || 'HR', {
+            status: data.ApprovalStatus,
+            employeeNo: data.EmployeeNo || data.HREmployeeNo || '',
+            name: data.HRName || data.EmployeeName || 'Arina Ismail',
+            position: data.HRPosition || 'HR Department',
+            date: now()
+          });
+        } catch(sigErr) {
+          Logger.log('Signature update error in updateTraining: ' + sigErr.message);
+        }
+      }
     }
     return ok({ message: 'Training updated successfully.' });
   } catch (e) {
     return err('Failed to update training: ' + e.message);
+  }
+}
+
+/**
+ * Explicit HR Department Acknowledgment for a Training Requisition Form
+ */
+function acknowledgeHRRequisition(trainingId, hrData) {
+  try {
+    if (!trainingId) return err('Training ID is required.');
+    const sheet = getSheet(SHEET_NAMES.trainings);
+    const headers = ensureTrainingSheetColumns(sheet);
+    const row = findRowById(sheet, trainingId);
+    if (row === -1) return err('Training not found.');
+
+    const data = hrData || {};
+    const empNo = data.employeeNo || data.EmployeeNo || data.ID || '1012';
+    const empName = data.name || data.Name || data.EmployeeName || 'Arina Ismail';
+    const position = data.position || data.Position || data.JobPosition || 'HR Department';
+    const status = data.status || data.ApprovalStatus || 'Acknowledged';
+    const timeStamp = getFormattedCurrentDate(data.date || new Date());
+
+    updateTrainingRequisitionSignatures(trainingId, 'HR Department', {
+      status: status,
+      employeeNo: empNo,
+      name: empName,
+      position: position,
+      date: timeStamp
+    });
+
+    return ok({ message: `Requisition form acknowledged by HR Department (${empName}).` });
+  } catch (e) {
+    return err('Failed to record HR acknowledgment: ' + e.message);
   }
 }
 
@@ -491,6 +558,19 @@ function addTrainingParticipants(trainingId, participants) {
     }
 
     try { syncTrainingRequisitionParticipants(trainingId); } catch(e) {}
+
+    try {
+      const tSheet = getSheet(SHEET_NAMES.trainings);
+      if (tSheet) {
+        const tRows = sheetToJson(tSheet);
+        const parentT = tRows.find(r => r.ID === trainingId);
+        if (parentT && (!parentT.Stage || parentT.Stage === 'Created')) {
+          updateTrainingStage(trainingId, 'Participants Imported');
+        }
+      }
+    } catch(sErr) {
+      Logger.log('Auto update stage error in addTrainingParticipants: ' + sErr.message);
+    }
 
     return ok({ message: `Added ${addedCount} participants successfully.`, count: totalCount });
   } catch (e) {

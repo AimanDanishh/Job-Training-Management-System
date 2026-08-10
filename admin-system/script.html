@@ -141,7 +141,7 @@ let _cachedBaseUrl = null;
 function navTo(page, params) {
   const navigate = (base) => {
     if (!base) return;
-    const cleanBase = base.split('?')[0];
+    const cleanBase = String(base || '').split('?')[0];
     let url = cleanBase + '?page=' + page;
     if (params) Object.entries(params).forEach(([k,v]) => url += '&' + k + '=' + encodeURIComponent(v));
     try {
@@ -155,7 +155,7 @@ function navTo(page, params) {
     navigate(_cachedBaseUrl);
     return;
   }
-  const currentUrl = window.location.href.split('?')[0];
+  const currentUrl = String(window.location.href || '').split('?')[0];
   if (currentUrl && currentUrl.includes('/exec')) {
     _cachedBaseUrl = currentUrl;
     navigate(currentUrl);
@@ -238,7 +238,10 @@ function stageBadge(stage, isSixMonthsReached) {
   if (stage === 'Waiting for 3-Month Review' || stage === 'Waiting for 6-Month Review' || isSixMonthsReached) {
     return `<span class="badge-th badge-yellow" style="white-space:nowrap;background:#FFFBEB;color:#D97706;border:1px solid #FCD34D">⏰ 3-Month Review Due</span>`;
   }
-  return `<span class="badge-th badge-blue" style="white-space:nowrap">${stage}</span>`;
+  if (stage === 'Programme Closed') {
+    return `<span class="badge-th badge-green" style="white-space:nowrap;background:#ECFDF5;color:#059669;border:1px solid #A7F3D0">Verified Closed</span>`;
+  }
+  return `<span class="badge-th badge-blue" style="white-space:nowrap">${stage || 'Created'}</span>`;
 }
 
 // ─── Lifecycle Timeline ──────────────────────────────────────────────────────
@@ -252,9 +255,14 @@ const LIFECYCLE_STAGES = [
   { id: 'closed',       label: 'Programme\nClosed',          icon: 'verified' }
 ];
 const STAGE_INDEX = {
-  'Created': 0, 'Participants Imported': 1, 'Attendance In Progress': 2,
-  'Training Completed': 3, 'Evaluation Completed': 4,
-  'Waiting for 3-Month Review': 5, 'Programme Closed': 6
+  'Created': 0,
+  'Participants Imported': 1,
+  'Attendance In Progress': 2,
+  'Training Completed': 3,
+  'Evaluation Completed': 4,
+  'Waiting for 3-Month Review': 5,
+  'Waiting for 6-Month Review': 5,
+  'Programme Closed': 6
 };
 
 function renderLifecycle(currentStage) {
@@ -279,7 +287,8 @@ function progressBar(pct, color = '#2563EB', height = 7) {
 // ─── Avatar ────────────────────────────────────────────────────────────────────
 const AVATAR_COLORS = ['#2563EB','#7C3AED','#0891B2','#059669','#D97706','#DC2626','#DB2777'];
 function avatar(name, size = 30, index = 0) {
-  const initials = name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+  const safeName = String(name || '').trim();
+  const initials = safeName ? safeName.split(/\s+/).map(w => w[0]).join('').slice(0,2).toUpperCase() : '?';
   const bg = AVATAR_COLORS[index % AVATAR_COLORS.length];
   return `<div class="avatar" style="width:${size}px;height:${size}px;background:${bg};font-size:${size*0.38}px">${initials}</div>`;
 }

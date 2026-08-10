@@ -130,7 +130,7 @@
     const dept = document.getElementById('dept-filter').value;
     const stat = document.getElementById('status-filter').value;
     const f = allEmployees.filter(e =>
-      (!q || e.Name.toLowerCase().includes(q) || e.ID.toLowerCase().includes(q) || (e.Position||'').toLowerCase().includes(q)) &&
+      (!q || String(e.Name||'').toLowerCase().includes(q) || String(e.ID||'').toLowerCase().includes(q) || String(e.Position||'').toLowerCase().includes(q)) &&
       (!dept || e.Department === dept) &&
       (!stat || e.Status === stat)
     );

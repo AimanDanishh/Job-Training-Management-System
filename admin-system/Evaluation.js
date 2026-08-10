@@ -63,6 +63,9 @@ function saveTrainingEvaluation(data) {
     ];
     sheet.appendRow(evalRow);
 
+    // Auto-advance lifecycle stage when evaluation is submitted
+    tryAdvanceToEvaluationCompleted(data.TrainingID);
+
     return ok({ message: 'Training evaluation submitted. Average score: ' + avg });
   } catch (e) {
     return err('Failed to save evaluation: ' + e.message);
@@ -145,8 +148,12 @@ function savePostEvaluation(data) {
     ];
     sheet.appendRow(postRow);
 
-    // Auto-advance training stage if all post-evals are done
-    tryAdvanceToEvaluationCompleted(data.TrainingID);
+    // Auto-advance training stage to Programme Closed when post-eval is submitted
+    try {
+      updateTrainingStage(data.TrainingID, 'Programme Closed');
+    } catch (e) {
+      Logger.log('Post-eval stage update error: ' + e.message);
+    }
 
     return ok({ message: 'Post-training evaluation submitted successfully.' });
   } catch (e) {
@@ -194,7 +201,7 @@ function tryAdvanceToEvaluationCompleted(trainingId) {
     const eSheet = ss ? ss.getSheetByName('TrainingEval') : null;
     const evalCount = eSheet ? sheetToJson(eSheet).length : 0;
 
-    if (evalCount >= Number(t.Participants) && t.Stage === 'Training Completed') {
+    if (evalCount > 0 && ['Created', 'Participants Imported', 'Attendance In Progress', 'Training Completed'].includes(t.Stage)) {
       updateTrainingStage(trainingId, 'Evaluation Completed');
     }
   } catch (e) {

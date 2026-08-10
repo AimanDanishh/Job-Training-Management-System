@@ -216,11 +216,7 @@ function createTrainingRequisitionForm(code, training, targetFolderId, requester
     const endDate = formatDate(training.EndDate);
     const duration = Number(training.Duration) || 1;
     const hours = training.TotalHours ? ` (${training.TotalHours} hours)` : '';
-
-    sheet.getRange('A1:I1').merge().setValue('APOLLO FOOD INDUSTRIES (M) SDN BHD').setFontWeight('bold').setFontSize(14).setHorizontalAlignment('center');
-    sheet.getRange('A2:I2').merge().setValue('TRAINING REQUISITION FORM (AP-HRD-F01-01)').setFontWeight('bold').setFontSize(12).setHorizontalAlignment('center');
-
-    const setTemplateValue = (area, value) => sheet.getRange(area.split(':')[0]).setValue(value == null ? '' : value);
+    const setTemplateValue = (area, value) => sheet.getRange(String(area || '').split(':')[0]).setValue(value == null ? '' : value);
     sheet.getRange('A5').setValue('Training Title:');
     setTemplateValue('C5:I5', training.Name || training.TrainingName || '');
     sheet.getRange('A6').setValue('Course Fee (RM):');
@@ -236,22 +232,24 @@ function createTrainingRequisitionForm(code, training, targetFolderId, requester
     sheet.getRange('A10').setValue('Reasons for Training:');
     setTemplateValue('A11:I12', training.Objectives || training.Reason || '');
 
-    sheet.getRange('A42').setValue('REQUEST BY:').setFontWeight('bold');
-    sheet.getRange('C42').setValue('VERIFIED BY (HOD):').setFontWeight('bold');
-    sheet.getRange('D42').setValue('APPROVED BY (C-Suite):').setFontWeight('bold');
-    sheet.getRange('F42').setValue('APPROVED BY (HOHR):').setFontWeight('bold');
-    sheet.getRange('H42').setValue('HR DEPT (Arina):').setFontWeight('bold');
-
     if (requesterSigData) {
       const empNo    = requesterSigData.employeeNo || requesterSigData.EmployeeNo || requesterSigData.EmployeeID || requesterSigData.ID || '';
       const empName  = requesterSigData.name || requesterSigData.EmployeeName || requesterSigData.Name || '';
       const position = requesterSigData.position || requesterSigData.JobPosition || requesterSigData.Position || requesterSigData.JobTitle || 'Requester';
-      const sigDate  = requesterSigData.date || requesterSigData.Date || formatDate(new Date());
+      const sigDate  = getFormattedCurrentDate(requesterSigData.date || requesterSigData.Date);
 
-      const reqSigText = `${empNo}, ${empName}, ${position}, ${sigDate}`;
-      sheet.getRange('A43').setValue(reqSigText);
-      sheet.getRange('A44').setValue(`Status: Submitted`);
-      sheet.getRange('A45').setValue(`Emp No: ${empNo} | Name: ${empName} | Position: ${position} | Date: ${sigDate}`);
+      const formatPrefixed = (prefix, val) => val ? (String(val).toUpperCase().startsWith(prefix.toUpperCase()) ? String(val) : `${prefix} ${String(val).trim()}`) : prefix;
+
+      sheet.getRange('A42').setValue(formatPrefixed('EMPLOYEE NO:', empNo));
+      sheet.getRange('A43').setValue(formatPrefixed('NAME:', empName));
+      sheet.getRange('A45').setValue(formatPrefixed('JOB POSITION:', position));
+      sheet.getRange('A46').setValue(formatPrefixed('DATE:', sigDate));
+
+      sheet.getRange('B42').setValue(empNo);
+      sheet.getRange('B43').setValue(empName);
+      sheet.getRange('B44').setValue(empName);
+      sheet.getRange('B45').setValue(position);
+      sheet.getRange('B46').setValue(sigDate);
     }
 
     SpreadsheetApp.flush();
@@ -281,55 +279,98 @@ function updateTrainingRequisitionSignatures(trainingId, step, sigData, targetFo
     }
     if (!formId) return;
 
-    const ss = SpreadsheetApp.openById(formId);
-    const sheet = ss.getSheetByName('Training Form') || ss.getSheets()[0];
+    const primaryFile = DriveApp.getFileById(formId);
+    const targetFolder = primaryFile.getParents().hasNext() ? primaryFile.getParents().next() : null;
+    const filesToUpdate = [primaryFile];
+
+    if (targetFolder) {
+      const folderFiles = targetFolder.getFiles();
+      while (folderFiles.hasNext()) {
+        const f = folderFiles.next();
+        if (f.getId() !== formId && f.getName().includes('Training Requisition Form')) {
+          filesToUpdate.push(f);
+        }
+      }
+    }
+
+    filesToUpdate.forEach(file => {
+      try {
+        const ss = SpreadsheetApp.openById(file.getId());
+        const sheet = ss.getSheetByName('Training Form') || ss.getSheets()[0];
 
     const empNo    = sigData.employeeNo || sigData.EmployeeNo || sigData.EmployeeID || sigData.ID || '';
     const empName  = sigData.name || sigData.EmployeeName || sigData.Name || '';
     const position = sigData.position || sigData.JobPosition || sigData.Position || sigData.JobTitle || '';
-    const sigDate  = sigData.date || sigData.Date || sigData.Timestamp || formatDate(new Date());
+    const sigDate  = getFormattedCurrentDate(sigData.date || sigData.Date || sigData.Timestamp);
     const status   = sigData.status || sigData.RequestStatus || sigData.ApprovalStatus || '';
 
-    const reqSigText = `${empNo}, ${empName}, ${position}, ${sigDate}`;
-    const appSigText = `${status}, ${empNo}, ${empName}, ${position}, ${sigDate}`;
+    const formatSingleColCell = (prefix, val) => {
+      if (!val) return prefix;
+      const sVal = String(val).trim();
+      if (sVal.toUpperCase().startsWith(prefix.toUpperCase())) return sVal;
+      return `${prefix} ${sVal}`;
+    };
 
-    if (step === 'request') {
-      try { sheet.getRange('A43:B43').merge(); } catch(mErr) {}
-      try { sheet.getRange('A44:B44').merge(); } catch(mErr) {}
-      try { sheet.getRange('A45:B45').merge(); } catch(mErr) {}
-      sheet.getRange('A43').setValue(reqSigText);
-      sheet.getRange('A44').setValue(`Status: Submitted`);
-      sheet.getRange('A45').setValue(`Emp No: ${empNo} | Name: ${empName} | Position: ${position} | Date: ${sigDate}`);
-    } else if (step === 'HOD' || step === 'Head of Department') {
-      sheet.getRange('C43').setValue(appSigText);
-      sheet.getRange('C44').setValue(`Status: ${status}`);
-      sheet.getRange('C45').setValue(`HOD: ${empName} (${empNo}) | ${position} | Date: ${sigDate}`);
-    } else if (step === 'Csuite' || step === 'C-Suite') {
-      try { sheet.getRange('D43:E43').merge(); } catch(mErr) {}
-      try { sheet.getRange('D44:E44').merge(); } catch(mErr) {}
-      try { sheet.getRange('D45:E45').merge(); } catch(mErr) {}
-      sheet.getRange('D43').setValue(appSigText);
-      sheet.getRange('D44').setValue(`Status: ${status}`);
-      sheet.getRange('D45').setValue(`C-Suite: ${empName} (${empNo}) | ${position} | Date: ${sigDate}`);
-    } else if (step === 'HOHR' || step === 'Head of HR') {
-      try { sheet.getRange('F43:G43').merge(); } catch(mErr) {}
-      try { sheet.getRange('F44:G44').merge(); } catch(mErr) {}
-      try { sheet.getRange('F45:G45').merge(); } catch(mErr) {}
-      sheet.getRange('F43').setValue(appSigText);
-      sheet.getRange('F44').setValue(`Status: ${status}`);
-      sheet.getRange('F45').setValue(`HOHR: ${empName} (${empNo}) | ${position} | Date: ${sigDate}`);
-    } else if (step === 'HR' || step === 'Arina' || step === 'HR Department') {
-      try { sheet.getRange('H43:I43').merge(); } catch(mErr) {}
-      try { sheet.getRange('H44:I44').merge(); } catch(mErr) {}
-      try { sheet.getRange('H45:I45').merge(); } catch(mErr) {}
-      sheet.getRange('H43').setValue(appSigText);
-      sheet.getRange('H44').setValue(`Status: ${status}`);
-      sheet.getRange('H45').setValue(`HR: ${empName} (${empNo}) | ${position} | Date: ${sigDate}`);
+    const stepNorm = String(step || '').trim().toLowerCase();
+
+    if (stepNorm === 'request' || stepNorm === 'requested by') {
+      sheet.getRange('A42').setValue(formatSingleColCell('EMPLOYEE NO:', empNo));
+      sheet.getRange('A43').setValue(formatSingleColCell('NAME:', empName));
+      sheet.getRange('A45').setValue(formatSingleColCell('JOB POSITION:', position));
+      sheet.getRange('A46').setValue(formatSingleColCell('DATE:', sigDate));
+
+      sheet.getRange('B42').setValue(empNo);
+      sheet.getRange('B43').setValue(empName);
+      sheet.getRange('B44').setValue(empName);
+      sheet.getRange('B45').setValue(position);
+      sheet.getRange('B46').setValue(sigDate);
+    } else if (stepNorm === 'hod' || stepNorm === 'head of department' || stepNorm === 'verified by head of department') {
+      sheet.getRange('C42').setValue(formatSingleColCell('STATUS:', status || 'Verified'));
+      sheet.getRange('C43').setValue(formatSingleColCell('EMPLOYEE NO:', empNo));
+      sheet.getRange('C44').setValue(formatSingleColCell('NAME:', empName));
+      sheet.getRange('C45').setValue(formatSingleColCell('JOB POSITION:', position));
+      sheet.getRange('C46').setValue(formatSingleColCell('DATE:', sigDate));
+    } else if (stepNorm === 'csuite' || stepNorm === 'c-suite' || stepNorm === 'approved by c-suite') {
+      sheet.getRange('D42').setValue(formatSingleColCell('STATUS:', status || 'Approved'));
+      sheet.getRange('D43').setValue(formatSingleColCell('EMPLOYEE NO:', empNo));
+      sheet.getRange('D44').setValue(formatSingleColCell('NAME:', empName));
+      sheet.getRange('D45').setValue(formatSingleColCell('JOB POSITION:', position));
+      sheet.getRange('D46').setValue(formatSingleColCell('DATE:', sigDate));
+
+      sheet.getRange('E42').setValue(status || 'Approved');
+      sheet.getRange('E43').setValue(empNo);
+      sheet.getRange('E44').setValue(empName);
+      sheet.getRange('E45').setValue(position);
+      sheet.getRange('E46').setValue(sigDate);
+    } else if (stepNorm === 'hohr' || stepNorm === 'head of hr' || stepNorm === 'approved by hohr') {
+      sheet.getRange('F42').setValue(formatSingleColCell('STATUS:', status || 'Approved'));
+      sheet.getRange('F43').setValue(formatSingleColCell('EMPLOYEE NO:', empNo));
+      sheet.getRange('F44').setValue(formatSingleColCell('NAME:', empName));
+      sheet.getRange('F45').setValue(formatSingleColCell('JOB POSITION:', position));
+      sheet.getRange('F46').setValue(formatSingleColCell('DATE:', sigDate));
+
+      sheet.getRange('G42').setValue(status || 'Approved');
+      sheet.getRange('G43').setValue(empNo);
+      sheet.getRange('G44').setValue(empName);
+      sheet.getRange('G45').setValue(position);
+      sheet.getRange('G46').setValue(sigDate);
+    } else if (stepNorm === 'hr' || stepNorm === 'arina' || stepNorm === 'hr department' || stepNorm === 'acknowledged by hr department') {
+      sheet.getRange('H42').setValue(formatSingleColCell('STATUS:', status || 'Acknowledged'));
+      sheet.getRange('H43').setValue(formatSingleColCell('EMPLOYEE NO:', empNo));
+      sheet.getRange('H44').setValue(formatSingleColCell('NAME:', empName));
+      sheet.getRange('H45').setValue(formatSingleColCell('JOB POSITION:', position));
+      sheet.getRange('H46').setValue(formatSingleColCell('DATE:', sigDate));
+
+      sheet.getRange('I42').setValue(status || 'Acknowledged');
+      sheet.getRange('I43').setValue(empNo);
+      sheet.getRange('I44').setValue(empName);
+      sheet.getRange('I45').setValue(position);
+      sheet.getRange('I46').setValue(sigDate);
     }
 
-    // Auto-check: If step is NOT 'request' but cell A43 is empty, ensure requester signature is populated too
-    if (step !== 'request') {
-      const currentReqVal = sheet.getRange('A43').getValue();
+    // Auto-check: If step is NOT 'request' but cell B42 is empty, ensure requester signature is populated too
+    if (stepNorm !== 'request' && stepNorm !== 'requested by') {
+      const currentReqVal = sheet.getRange('B42').getValue();
       if (!currentReqVal || String(currentReqVal).trim() === '') {
         const reqIdCol = headers.indexOf('RequestedBy') + 1;
         const reqNameCol = headers.indexOf('RequestedByName') + 1;
@@ -344,16 +385,18 @@ function updateTrainingRequisitionSignatures(trainingId, step, sigData, targetFo
           if (m) reqPos = m.Position || m.JobTitle || m.PositionTitle || 'Requester';
         }
         if (reqId || reqName) {
-          const rText = `${reqId}, ${reqName}, ${reqPos}, ${reqDate}`;
-          try { sheet.getRange('A43:B43').merge(); } catch(mErr) {}
-          try { sheet.getRange('A44:B44').merge(); } catch(mErr) {}
-          try { sheet.getRange('A45:B45').merge(); } catch(mErr) {}
-          sheet.getRange('A43').setValue(rText);
-          sheet.getRange('A44').setValue(`Status: Submitted`);
-          sheet.getRange('A45').setValue(`Emp No: ${reqId} | Name: ${reqName} | Position: ${reqPos} | Date: ${reqDate}`);
+          sheet.getRange('B42').setValue(reqId);
+          sheet.getRange('B43').setValue(reqName);
+          sheet.getRange('B45').setValue(reqPos);
+          sheet.getRange('B46').setValue(getFormattedCurrentDate(reqDate));
         }
       }
     }
+
+      } catch(fErr) {
+        Logger.log('Signature update error on file ' + file.getName() + ': ' + fErr.message);
+      }
+    });
 
     SpreadsheetApp.flush();
   } catch (e) {
@@ -409,24 +452,72 @@ function syncTrainingRequisitionParticipants(trainingId) {
     });
 
     const resolved = canonicalizeTrainingParticipants(uniqueParticipants);
+    const participants = resolved.participants;
     if (resolved.rejected.length > 0) {
       Logger.log('Skipped participant rows not found in Employees for ' + trainingId + ': ' + resolved.rejected.join(', '));
     }
 
-    const formSpreadsheet = SpreadsheetApp.openById(formId);
-    const sheet = formSpreadsheet.getSheetByName('Training Form') || formSpreadsheet.getSheets()[0];
-    const rowCount = 25;
-    sheet.getRange('A15:I39').clearContent();
+    const primaryFormFile = DriveApp.getFileById(formId);
+    const targetFolder = primaryFormFile.getParents().hasNext() ? primaryFormFile.getParents().next() : null;
+    const trainingCode = trainingSheet.getRange(trainingRow, 2).getValue() || 'TRN';
 
-    resolved.participants.slice(0, rowCount).forEach((participant, index) => {
-      const r = 15 + index;
-      sheet.getRange(`A${r}`).setValue(participant.ID);
-      sheet.getRange(`C${r}`).setValue(participant.Name);
-      sheet.getRange(`D${r}`).setValue(participant.Department);
-      sheet.getRange(`H${r}`).setValue(participant.Position);
-    });
+    const CHUNK_SIZE = 24;
+    const totalChunks = Math.ceil(participants.length / CHUNK_SIZE) || 1;
 
-    trainingSheet.getRange(trainingRow, 15).setValue(resolved.participants.length);
+    for (let c = 0; c < totalChunks; c++) {
+      const chunk = participants.slice(c * CHUNK_SIZE, (c + 1) * CHUNK_SIZE);
+      let chunkFile = null;
+
+      if (c === 0) {
+        chunkFile = primaryFormFile;
+      } else {
+        const partName = `${trainingCode} Training Requisition Form (Part ${c + 1})`;
+        if (targetFolder) {
+          const files = targetFolder.getFilesByName(partName);
+          if (files.hasNext()) {
+            chunkFile = files.next();
+          } else {
+            chunkFile = primaryFormFile.makeCopy(partName, targetFolder);
+          }
+        }
+      }
+
+      if (chunkFile) {
+        const formSpreadsheet = SpreadsheetApp.openById(chunkFile.getId());
+        const sheet = formSpreadsheet.getSheetByName('Training Form') || formSpreadsheet.getSheets()[0];
+        sheet.getRange('A15:I39').clearContent();
+
+        chunk.forEach((participant, index) => {
+          const r = 15 + index;
+          sheet.getRange(`A${r}`).setValue(participant.ID);
+          sheet.getRange(`C${r}`).setValue(participant.Name);
+          sheet.getRange(`D${r}`).setValue(participant.Department);
+          sheet.getRange(`H${r}`).setValue(participant.Position);
+        });
+
+        SpreadsheetApp.flush();
+      }
+    }
+
+    // Trash obsolete part files if total participants dropped
+    if (targetFolder) {
+      const folderFiles = targetFolder.getFiles();
+      while (folderFiles.hasNext()) {
+        const f = folderFiles.next();
+        const fname = f.getName();
+        if (fname.startsWith(`${trainingCode} Training Requisition Form (Part `)) {
+          const match = fname.match(/\(Part (\d+)\)$/);
+          if (match) {
+            const pNum = parseInt(match[1], 10);
+            if (pNum > totalChunks) {
+              f.setTrashed(true);
+            }
+          }
+        }
+      }
+    }
+
+    trainingSheet.getRange(trainingRow, 15).setValue(participants.length);
     SpreadsheetApp.flush();
   } catch (e) {
     Logger.log('syncTrainingRequisitionParticipants error: ' + e.message);

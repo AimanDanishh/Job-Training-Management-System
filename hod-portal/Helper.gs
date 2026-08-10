@@ -47,23 +47,31 @@ function getEmployeeSpreadsheet() {
 }
 
 function getSheet(name) {
-  const isEmpSheet = ['employees', 'cost centre', 'costcentre', 'hod email', 'hodemail', 'for it', 'forit', 'for_it'].includes(String(name).toLowerCase().trim());
-  const ss = isEmpSheet ? getEmployeeSpreadsheet() : getSpreadsheet();
-  if (!ss) return null;
-  let sheet = ss.getSheetByName(name);
-  if (!sheet) {
-    const allSheets = ss.getSheets();
-    const targetClean = String(name).toLowerCase().replace(/[^a-z0-9]/g, '');
-    sheet = allSheets.find(s => s.getName().toLowerCase().replace(/[^a-z0-9]/g, '') === targetClean);
-  }
-  return sheet;
+  const isEmpSheet = ['employees', 'cost centre', 'costcentre', 'hod email', 'hodemail', 'csuite email', 'csuiteemail', 'c-suite email', 'hohr email', 'hohremail', 'for it', 'forit', 'for_it'].includes(String(name).toLowerCase().trim());
+  const primarySs = isEmpSheet ? getEmployeeSpreadsheet() : getSpreadsheet();
+
+  const secondarySs = isEmpSheet ? getSpreadsheet() : getEmployeeSpreadsheet();
+
+  const findInSs = (ssObj) => {
+    if (!ssObj) return null;
+    let sheet = ssObj.getSheetByName(name);
+    if (!sheet) {
+      const allSheets = ssObj.getSheets();
+      const targetClean = String(name).toLowerCase().replace(/[^a-z0-9]/g, '');
+      sheet = allSheets.find(s => s.getName().toLowerCase().replace(/[^a-z0-9]/g, '') === targetClean);
+    }
+    return sheet;
+  };
+
+  let found = findInSs(primarySs);
+  if (!found) found = findInSs(secondarySs);
+  return found;
 }
+
 
 let _sheetDataCache = {};
 function sheetToJson(sheet) {
   if (!sheet) return [];
-  const sheetName = sheet.getName();
-  if (_sheetDataCache[sheetName]) return _sheetDataCache[sheetName];
 
   const lastRow = sheet.getLastRow();
   const lastCol = sheet.getLastColumn();
@@ -89,7 +97,6 @@ function sheetToJson(sheet) {
     rows.push(obj);
   }
 
-  _sheetDataCache[sheetName] = rows;
   return rows;
 }
 
@@ -107,6 +114,48 @@ function formatDate(date) {
   const d = new Date(date);
   if (isNaN(d.getTime())) return String(date);
   return Utilities.formatDate(d, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+}
+
+/**
+ * Returns current date formatted as dd/MM/yyyy in project script timezone.
+ */
+function getFormattedCurrentDate(date) {
+  const d = date ? new Date(date) : new Date();
+  if (isNaN(d.getTime())) return formatDate(date);
+  return Utilities.formatDate(d, Session.getScriptTimeZone(), 'dd/MM/yyyy');
+}
+
+/**
+ * Reusable employee lookup function by Employee No / ID.
+ * Searches the existing Employees sheet in EMPLOYEE_SPREADSHEET_ID.
+ * Matches Employee No exactly (case-insensitive, trimmed).
+ * Returns employee details object or null if not found.
+ */
+function getEmployeeById(employeeNo) {
+  if (!employeeNo || String(employeeNo).trim() === '') return null;
+  const cleanId = String(employeeNo).trim().toLowerCase();
+
+  const empSheet = getSheet('Employees');
+  if (!empSheet) return null;
+
+  const rows = sheetToJson(empSheet);
+  const emp = rows.find(r => {
+    const idVal = String(
+      r.ID || r.EmployeeID || r.EmployeeNo || r.EmpID || r.StaffID || 
+      r['Employee ID'] || r['Employee No'] || r['Staff ID'] || ''
+    ).trim().toLowerCase();
+    return idVal === cleanId;
+  });
+
+  if (!emp) return null;
+
+  return {
+    ID: String(emp.ID || emp.EmployeeID || emp.EmployeeNo || String(employeeNo).trim()).trim(),
+    Name: String(emp.Name || emp.EmployeeName || emp['Employee Name'] || emp['Staff Name'] || '').trim(),
+    Department: String(emp.Department || emp.CostCentre || emp['Cost Centre'] || 'N/A').trim(),
+    Position: String(emp.Position || emp.JobTitle || emp.PositionTitle || emp['Position Title'] || emp['Job Title'] || 'Staff').trim(),
+    Email: String(emp.Email || emp['Email Address'] || '').trim()
+  };
 }
 
 function formatDateTime(date) {
@@ -294,49 +343,76 @@ function updateTrainingRequisitionSignatures(trainingId, step, sigData, targetFo
     const empNo    = sigData.employeeNo || sigData.EmployeeNo || sigData.EmployeeID || sigData.ID || '';
     const empName  = sigData.name || sigData.EmployeeName || sigData.Name || '';
     const position = sigData.position || sigData.JobPosition || sigData.Position || sigData.JobTitle || '';
-    const sigDate  = sigData.date || sigData.Date || sigData.Timestamp || formatDate(new Date());
+    const sigDate  = getFormattedCurrentDate(sigData.date || sigData.Date || sigData.Timestamp);
     const status   = sigData.status || sigData.RequestStatus || sigData.ApprovalStatus || '';
 
-    const reqSigText = `${empNo}, ${empName}, ${position}, ${sigDate}`;
-    const appSigText = `${status}, ${empNo}, ${empName}, ${position}, ${sigDate}`;
+    const formatSingleColCell = (prefix, val) => {
+      if (!val) return prefix;
+      const sVal = String(val).trim();
+      if (sVal.toUpperCase().startsWith(prefix.toUpperCase())) return sVal;
+      return `${prefix} ${sVal}`;
+    };
 
-    if (step === 'request') {
-      try { sheet.getRange('A43:B43').merge(); } catch(mErr) {}
-      try { sheet.getRange('A44:B44').merge(); } catch(mErr) {}
-      try { sheet.getRange('A45:B45').merge(); } catch(mErr) {}
-      sheet.getRange('A43').setValue(reqSigText);
-      sheet.getRange('A44').setValue(`Status: Submitted`);
-      sheet.getRange('A45').setValue(`Emp No: ${empNo} | Name: ${empName} | Position: ${position} | Date: ${sigDate}`);
-    } else if (step === 'HOD' || step === 'Head of Department') {
-      sheet.getRange('C43').setValue(appSigText);
-      sheet.getRange('C44').setValue(`Status: ${status}`);
-      sheet.getRange('C45').setValue(`HOD: ${empName} (${empNo}) | ${position} | Date: ${sigDate}`);
-    } else if (step === 'Csuite' || step === 'C-Suite') {
-      try { sheet.getRange('D43:E43').merge(); } catch(mErr) {}
-      try { sheet.getRange('D44:E44').merge(); } catch(mErr) {}
-      try { sheet.getRange('D45:E45').merge(); } catch(mErr) {}
-      sheet.getRange('D43').setValue(appSigText);
-      sheet.getRange('D44').setValue(`Status: ${status}`);
-      sheet.getRange('D45').setValue(`C-Suite: ${empName} (${empNo}) | ${position} | Date: ${sigDate}`);
-    } else if (step === 'HOHR' || step === 'Head of HR') {
-      try { sheet.getRange('F43:G43').merge(); } catch(mErr) {}
-      try { sheet.getRange('F44:G44').merge(); } catch(mErr) {}
-      try { sheet.getRange('F45:G45').merge(); } catch(mErr) {}
-      sheet.getRange('F43').setValue(appSigText);
-      sheet.getRange('F44').setValue(`Status: ${status}`);
-      sheet.getRange('F45').setValue(`HOHR: ${empName} (${empNo}) | ${position} | Date: ${sigDate}`);
-    } else if (step === 'HR' || step === 'Arina' || step === 'HR Department') {
-      try { sheet.getRange('H43:I43').merge(); } catch(mErr) {}
-      try { sheet.getRange('H44:I44').merge(); } catch(mErr) {}
-      try { sheet.getRange('H45:I45').merge(); } catch(mErr) {}
-      sheet.getRange('H43').setValue(appSigText);
-      sheet.getRange('H44').setValue(`Status: ${status}`);
-      sheet.getRange('H45').setValue(`HR: ${empName} (${empNo}) | ${position} | Date: ${sigDate}`);
+    const stepNorm = String(step || '').trim().toLowerCase();
+
+    if (stepNorm === 'request' || stepNorm === 'requested by') {
+      sheet.getRange('A42').setValue(formatSingleColCell('EMPLOYEE NO:', empNo));
+      sheet.getRange('A43').setValue(formatSingleColCell('NAME:', empName));
+      sheet.getRange('A45').setValue(formatSingleColCell('JOB POSITION:', position));
+      sheet.getRange('A46').setValue(formatSingleColCell('DATE:', sigDate));
+
+      sheet.getRange('B42').setValue(empNo);
+      sheet.getRange('B43').setValue(empName);
+      sheet.getRange('B44').setValue(empName);
+      sheet.getRange('B45').setValue(position);
+      sheet.getRange('B46').setValue(sigDate);
+    } else if (stepNorm === 'hod' || stepNorm === 'head of department' || stepNorm === 'verified by head of department') {
+      sheet.getRange('C42').setValue(formatSingleColCell('STATUS:', status || 'Verified'));
+      sheet.getRange('C43').setValue(formatSingleColCell('EMPLOYEE NO:', empNo));
+      sheet.getRange('C44').setValue(formatSingleColCell('NAME:', empName));
+      sheet.getRange('C45').setValue(formatSingleColCell('JOB POSITION:', position));
+      sheet.getRange('C46').setValue(formatSingleColCell('DATE:', sigDate));
+    } else if (stepNorm === 'csuite' || stepNorm === 'c-suite' || stepNorm === 'approved by c-suite') {
+      sheet.getRange('D42').setValue(formatSingleColCell('STATUS:', status || 'Approved'));
+      sheet.getRange('D43').setValue(formatSingleColCell('EMPLOYEE NO:', empNo));
+      sheet.getRange('D44').setValue(formatSingleColCell('NAME:', empName));
+      sheet.getRange('D45').setValue(formatSingleColCell('JOB POSITION:', position));
+      sheet.getRange('D46').setValue(formatSingleColCell('DATE:', sigDate));
+
+      sheet.getRange('E42').setValue(status || 'Approved');
+      sheet.getRange('E43').setValue(empNo);
+      sheet.getRange('E44').setValue(empName);
+      sheet.getRange('E45').setValue(position);
+      sheet.getRange('E46').setValue(sigDate);
+    } else if (stepNorm === 'hohr' || stepNorm === 'head of hr' || stepNorm === 'approved by hohr') {
+      sheet.getRange('F42').setValue(formatSingleColCell('STATUS:', status || 'Approved'));
+      sheet.getRange('F43').setValue(formatSingleColCell('EMPLOYEE NO:', empNo));
+      sheet.getRange('F44').setValue(formatSingleColCell('NAME:', empName));
+      sheet.getRange('F45').setValue(formatSingleColCell('JOB POSITION:', position));
+      sheet.getRange('F46').setValue(formatSingleColCell('DATE:', sigDate));
+
+      sheet.getRange('G42').setValue(status || 'Approved');
+      sheet.getRange('G43').setValue(empNo);
+      sheet.getRange('G44').setValue(empName);
+      sheet.getRange('G45').setValue(position);
+      sheet.getRange('G46').setValue(sigDate);
+    } else if (stepNorm === 'hr' || stepNorm === 'arina' || stepNorm === 'hr department' || stepNorm === 'acknowledged by hr department') {
+      sheet.getRange('H42').setValue(formatSingleColCell('STATUS:', status || 'Acknowledged'));
+      sheet.getRange('H43').setValue(formatSingleColCell('EMPLOYEE NO:', empNo));
+      sheet.getRange('H44').setValue(formatSingleColCell('NAME:', empName));
+      sheet.getRange('H45').setValue(formatSingleColCell('JOB POSITION:', position));
+      sheet.getRange('H46').setValue(formatSingleColCell('DATE:', sigDate));
+
+      sheet.getRange('I42').setValue(status || 'Acknowledged');
+      sheet.getRange('I43').setValue(empNo);
+      sheet.getRange('I44').setValue(empName);
+      sheet.getRange('I45').setValue(position);
+      sheet.getRange('I46').setValue(sigDate);
     }
 
-    // Auto-check: If step is NOT 'request' but cell A43 is empty, ensure requester signature is populated too
-    if (step !== 'request') {
-      const currentReqVal = sheet.getRange('A43').getValue();
+    // Auto-check: If step is NOT 'request' but cell B42 is empty, ensure requester signature is populated too
+    if (stepNorm !== 'request' && stepNorm !== 'requested by') {
+      const currentReqVal = sheet.getRange('B42').getValue();
       if (!currentReqVal || String(currentReqVal).trim() === '') {
         const reqIdCol = headers.indexOf('RequestedBy') + 1;
         const reqNameCol = headers.indexOf('RequestedByName') + 1;
@@ -351,13 +427,10 @@ function updateTrainingRequisitionSignatures(trainingId, step, sigData, targetFo
           if (m) reqPos = m.Position || m.JobTitle || m.PositionTitle || 'Requester';
         }
         if (reqId || reqName) {
-          const rText = `${reqId}, ${reqName}, ${reqPos}, ${reqDate}`;
-          try { sheet.getRange('A43:B43').merge(); } catch(mErr) {}
-          try { sheet.getRange('A44:B44').merge(); } catch(mErr) {}
-          try { sheet.getRange('A45:B45').merge(); } catch(mErr) {}
-          sheet.getRange('A43').setValue(rText);
-          sheet.getRange('A44').setValue(`Status: Submitted`);
-          sheet.getRange('A45').setValue(`Emp No: ${reqId} | Name: ${reqName} | Position: ${reqPos} | Date: ${reqDate}`);
+          sheet.getRange('B42').setValue(reqId);
+          sheet.getRange('B43').setValue(reqName);
+          sheet.getRange('B45').setValue(reqPos);
+          sheet.getRange('B46').setValue(getFormattedCurrentDate(reqDate));
         }
       }
     }

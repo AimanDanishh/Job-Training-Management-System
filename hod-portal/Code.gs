@@ -4,6 +4,7 @@
 
 function doGet(e) {
   const pageParam = (e && e.parameter && e.parameter.page) ? String(e.parameter.page).toLowerCase().trim() : 'review';
+  const emailParam = (e && e.parameter && e.parameter.email) ? String(e.parameter.email).trim() : '';
 
   const pageMap = {
     'review':   'HodReview',
@@ -14,6 +15,32 @@ function doGet(e) {
 
   const templateName = pageMap[pageParam] || 'HodReview';
   const appTitle = getConfigProperty('APP_TITLE', 'TrainHub — HOD Management Portal');
+
+  // Determine user email from parameter or Session (never use getEffectiveUser)
+  let activeEmail = emailParam;
+  if (!activeEmail) {
+    try {
+      activeEmail = Session.getActiveUser().getEmail() || '';
+    } catch (err) { activeEmail = ''; }
+  }
+
+  // If explicit email is passed in URL or Google account session, validate authorization
+  if (activeEmail) {
+    const auth = validateHODAccess(activeEmail);
+    if (!auth.valid) {
+      try {
+        const errTemplate = HtmlService.createTemplateFromFile('Error');
+        errTemplate.params = { 
+          title: 'Access Denied — Non Accessible Website',
+          message: auth.message || `Access Denied: The email address (${activeEmail}) is not authorized to access the HOD Portal.`
+        };
+        return errTemplate.evaluate()
+          .setTitle('Access Denied — TrainHub HOD Portal')
+          .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+      } catch (err) {}
+    }
+  }
+
 
   try {
     const template = HtmlService.createTemplateFromFile(templateName);
@@ -50,32 +77,69 @@ function getAppUrl() {
   }
 }
 
+/**
+ * API: Verify if user email is authorized in HOD email directory
+ */
+function verifyHODEmail(userEmail) {
+  try {
+    const auth = validateHODAccess(userEmail);
+    if (!auth.valid) {
+      return err(auth.message);
+    }
+    return ok({
+      email: auth.email,
+      hod: auth.hod
+    });
+  } catch (e) {
+    return err('Verification error: ' + e.message);
+  }
+}
 
 /**
- * API: Fetch complete Training Requisition details for HOD Review
+ * API: Fetch complete Training Requisition details and Supervision Queue for HOD Review
  */
-function getRequisitionDetails(trainingId) {
+function getRequisitionDetails(trainingId, userEmail) {
   try {
-    const auth = validateHODAccess();
+    const auth = validateHODAccess(userEmail);
     if (!auth.valid) return err(auth.message);
+
+    const hodProfile = auth.hod;
 
     const tSheet = getSheet('Trainings');
     if (!tSheet) return err('Trainings sheet unavailable.');
 
     const trainings = sheetToJson(tSheet);
-    let training = null;
+    
+    // Get all requisitions strictly under this HOD's supervision / assigned employees
+    const supervisedRequisitions = getHODSupervisedRequisitions(hodProfile);
 
+    let training = null;
     if (trainingId) {
       const cleanId = String(trainingId).trim().toLowerCase();
-      training = trainings.find(t =>
+      training = supervisedRequisitions.find(t =>
         String(t.ID || '').toLowerCase() === cleanId ||
         String(t.Code || '').toLowerCase() === cleanId
       );
+      if (!training) {
+        // Search in master trainings if not directly in supervised queue, but verify it belongs to HOD
+        const masterMatch = trainings.find(t =>
+          String(t.ID || '').toLowerCase() === cleanId ||
+          String(t.Code || '').toLowerCase() === cleanId
+        );
+        if (masterMatch) {
+          const checkQueue = getHODSupervisedRequisitions(hodProfile);
+          if (checkQueue.some(x => String(x.ID).toLowerCase() === String(masterMatch.ID).toLowerCase())) {
+            training = masterMatch;
+          }
+        }
+      }
     }
 
-    // Fallback: Default to most recent pending or first training
-    if (!training && trainings.length > 0) {
-      training = trainings.find(t => String(t.ApprovalStatus || t.Status || '').toLowerCase().includes('pending')) || trainings[0];
+    // Default to first pending training in HOD's supervision queue
+    if (!training) {
+      if (supervisedRequisitions.length > 0) {
+        training = supervisedRequisitions.find(t => String(t.ApprovalStatus || t.Status || '').toLowerCase().includes('pending')) || supervisedRequisitions[0];
+      }
     }
 
     if (!training) {
@@ -83,8 +147,9 @@ function getRequisitionDetails(trainingId) {
         training: null,
         participants: [],
         requester: null,
-        hod: auth.hod,
-        message: 'No pending training requisitions found.'
+        hod: hodProfile,
+        supervisedRequisitions: [],
+        message: 'No pending training requisitions found under your supervision.'
       });
     }
 
@@ -120,10 +185,10 @@ function getRequisitionDetails(trainingId) {
           const formSheet = formSs.getSheetByName('Training Form') || formSs.getSheets()[0];
           const rows = formSheet.getRange('A15:I39').getValues();
           rows.forEach(r => {
-            const empId = String(r[0] || '').trim(); // Col A (Employee No: A-B)
-            const name  = String(r[2] || '').trim(); // Col C (Name: C)
-            const dept  = String(r[3] || '').trim(); // Col D (Department: D-G)
-            const pos   = String(r[7] || '').trim(); // Col H (Job Title: H-I)
+            const empId = String(r[0] || '').trim();
+            const name  = String(r[2] || '').trim();
+            const dept  = String(r[3] || '').trim();
+            const pos   = String(r[7] || '').trim();
             if (empId || name) {
               participants.push({
                 EmployeeID: empId,
@@ -146,25 +211,35 @@ function getRequisitionDetails(trainingId) {
     };
 
     const empSheet = getSheet('Employees');
-    if (empSheet && requester.ID !== 'N/A') {
+    if (empSheet) {
       const emps = sheetToJson(empSheet);
-      const matched = emps.find(e => String(e.ID || '').toLowerCase() === String(requester.ID).toLowerCase() || String(e.Email || '').toLowerCase() === String(requester.Email).toLowerCase());
+      const matched = emps.find(e => {
+        const eId = String(e['Employee No'] || e.EmployeeNo || e.ID || e.EmployeeID || '').toLowerCase().trim();
+        const eEmail = String(e.Email || e.EmailAddress || '').toLowerCase().trim();
+        return (eId && eId === String(requester.ID).toLowerCase()) || (eEmail && eEmail === String(requester.Email).toLowerCase());
+      });
       if (matched) {
-        requester.Name = matched.Name || requester.Name;
-        requester.Department = matched.Department || requester.Department;
-        requester.Email = matched.Email || requester.Email;
+        requester.ID = String(matched['Employee No'] || matched.EmployeeNo || matched.ID || requester.ID).trim();
+        requester.Name = String(matched.Name || matched.EmployeeName || matched['HOD'] || requester.Name).trim();
+        requester.Department = String(matched['Cost Centre'] || matched.Department || requester.Department).trim();
+        requester.Email = String(matched.Email || requester.Email).trim();
       }
     }
 
-    // Re-resolve real HOD profile matching this requester from "For IT" -> "Employees" -> "HOD email"
-    const resolvedAuth = validateHODAccess(requester.ID || requester.Name);
-    const hodProfile = (resolvedAuth && resolvedAuth.valid) ? resolvedAuth.hod : auth.hod;
+    // Cleanse legacy stamp data if training has old dummy text
+    if (training.ApprovedBy && (training.ApprovedBy.includes('IT.INTERN') || training.ApprovedBy.includes('It Intern') || training.ApprovedBy.includes('EMP-HOD001') || training.ApprovedBy.includes('Head of Department'))) {
+      training.ApprovedBy = `${hodProfile.Name} (${hodProfile.ID})`;
+    }
+    if (!training.ApprovedCostCentre || training.ApprovedCostCentre.includes('All Departments')) {
+      training.ApprovedCostCentre = hodProfile.CostCentre;
+    }
 
     return ok({
       training: training,
       participants: participants,
       requester: requester,
-      hod: hodProfile
+      hod: hodProfile,
+      supervisedRequisitions: supervisedRequisitions
     });
   } catch (e) {
     return err('Failed to load requisition details: ' + e.message);
@@ -172,7 +247,106 @@ function getRequisitionDetails(trainingId) {
 }
 
 /**
+ * Helper: Retrieve all requisitions strictly under a specific HOD's supervision.
+ */
+function getHODSupervisedRequisitions(hodProfile) {
+  try {
+    const tSheet = getSheet('Trainings');
+    if (!tSheet) return [];
+    const trainings = sheetToJson(tSheet);
+    if (!trainings || trainings.length === 0) return [];
+
+    const hodNameClean = String(hodProfile ? hodProfile.Name : '').toLowerCase().trim();
+    const hodIdClean = String(hodProfile ? hodProfile.ID : '').toLowerCase().trim();
+    const hodCcClean = String(hodProfile ? hodProfile.CostCentre : '').toLowerCase().trim();
+    const hodEmailClean = String(hodProfile ? hodProfile.Email : '').toLowerCase().trim();
+
+    // 1. Build supervised employee set from "For IT" sheet
+    const supervisedEmpSet = new Set();
+    try {
+      const itSheet = getSheet('For IT');
+      if (itSheet) {
+        const itRows = sheetToJson(itSheet);
+        itRows.forEach(r => {
+          const empId = String(r['Employee No'] || r.EmployeeNo || r.ID || r.EmployeeID || r['Employee ID'] || '').toLowerCase().trim();
+          const empName = String(r.Name || r.EmployeeName || r['Employee Name'] || '').toLowerCase().trim();
+          const assignedHod = String(r.HOD || r.HODName || r.HodName || r.Manager || r.ReportTo || r['HOD Name'] || '').toLowerCase().trim();
+
+          if (assignedHod && (
+            (hodNameClean && (assignedHod.includes(hodNameClean) || hodNameClean.includes(assignedHod))) ||
+            (hodIdClean && assignedHod.includes(hodIdClean)) ||
+            (hodEmailClean && assignedHod.includes(hodEmailClean))
+          )) {
+            if (empId) supervisedEmpSet.add(empId);
+            if (empName) supervisedEmpSet.add(empName);
+          }
+        });
+      }
+    } catch(e) {}
+
+    // 2. Build supervised employee set from "Employees" sheet
+    try {
+      const empSheet = getSheet('Employees');
+      if (empSheet) {
+        const empRows = sheetToJson(empSheet);
+        empRows.forEach(e => {
+          const empId = String(e['Employee No'] || e.EmployeeNo || e.ID || e.EmployeeID || '').toLowerCase().trim();
+          const empName = String(e.Name || e.EmployeeName || e['Employee Name'] || '').toLowerCase().trim();
+          const assignedHod = String(e.HOD || e.HODName || e.HodName || e.Manager || e.ReportTo || '').toLowerCase().trim();
+          const empDept = String(e.Department || e.CostCentre || e['Cost Centre'] || '').toLowerCase().trim();
+
+          if (assignedHod && (
+            (hodNameClean && (assignedHod.includes(hodNameClean) || hodNameClean.includes(assignedHod))) ||
+            (hodIdClean && assignedHod.includes(hodIdClean)) ||
+            (hodEmailClean && assignedHod.includes(hodEmailClean))
+          )) {
+            if (empId) supervisedEmpSet.add(empId);
+            if (empName) supervisedEmpSet.add(empName);
+          } else if (hodCcClean && empDept && (empDept.includes(hodCcClean) || hodCcClean.includes(empDept))) {
+            if (empId) supervisedEmpSet.add(empId);
+            if (empName) supervisedEmpSet.add(empName);
+          }
+        });
+      }
+    } catch(e) {}
+
+    // 3. Filter trainings under supervision ONLY
+    return trainings.filter(t => {
+      const reqId = String(t.RequestedBy || t.EmployeeID || '').toLowerCase().trim();
+      const reqName = String(t.RequestedByName || '').toLowerCase().trim();
+      const tDept = String(t.Department || '').toLowerCase().trim();
+      const appStatus = String(t.ApprovalStatus || t.Status || '').toLowerCase();
+
+      // Direct Supervision via assigned employee match
+      if (reqId && supervisedEmpSet.has(reqId)) return true;
+      if (reqName && supervisedEmpSet.has(reqName)) return true;
+
+      // Matching Cost Centre / Department
+      if (hodCcClean && tDept) {
+        const deptCodeMatch = tDept.match(/\d+/);
+        const hodCodeMatch = hodCcClean.match(/\d+/);
+        if (deptCodeMatch && hodCodeMatch && deptCodeMatch[0] === hodCodeMatch[0]) return true;
+        if (tDept.includes(hodCcClean) || hodCcClean.includes(tDept)) return true;
+      }
+
+      // Multi-stage pending approvals (C-Suite / HOHR)
+      if (appStatus.includes('c-suite') && (hodProfile.Position || '').toLowerCase().includes('c-suite')) return true;
+      if (appStatus.includes('hohr') && (hodProfile.Position || '').toLowerCase().includes('hr')) return true;
+
+      return false; // Strict: do NOT return unassigned requisitions
+    });
+  } catch(e) {
+    Logger.log('getHODSupervisedRequisitions error: ' + e.message);
+    return [];
+  }
+}
+
+
+/**
  * API: Submit HOD Decision (Approve / Reject / Postpone / Reschedule)
+ */
+/**
+ * API: Submit HOD Decision (Approve / Reject / Return)
  */
 function submitHODDecision(data) {
   try {
@@ -181,6 +355,10 @@ function submitHODDecision(data) {
     }
 
     const cleanId = String(data.trainingId).trim();
+    const userEmail = data.userEmail || data.email || '';
+    const auth = validateHODAccess(userEmail);
+    if (!auth.valid) return err(auth.message);
+
     const tSheet = getSheet('Trainings');
     if (!tSheet) return err('Trainings sheet unavailable.');
 
@@ -188,10 +366,6 @@ function submitHODDecision(data) {
     if (row === -1) return err(`Training request (${cleanId}) not found in database.`);
 
     const headers = tSheet.getDataRange().getValues()[0].map(h => String(h).trim());
-    const reqByVal = tSheet.getRange(row, headers.indexOf('RequestedBy') + 1).getValue();
-
-    const auth = validateHODAccess(reqByVal || cleanId);
-    if (!auth.valid) return err(auth.message);
 
     const timestamp = formatDateTime(new Date());
 
@@ -202,12 +376,51 @@ function submitHODDecision(data) {
       }
     };
 
-    const validDecision = String(data.decision).trim(); // Approved, Rejected, Postponed, Rescheduled
-    const hodId = data.hodId || auth.hod.ID;
-    const hodName = data.hodName || auth.hod.Name;
-    const hodCostCentre = data.hodCostCentre || auth.hod.CostCentre;
+    let rawDecision = String(data.decision).trim();
+    let validDecision = 'Approved';
+    if (rawDecision.toLowerCase().includes('reject')) validDecision = 'Rejected';
+    else if (rawDecision.toLowerCase().includes('return')) validDecision = 'Returned';
+    else validDecision = 'Approved';
+
+    const hodId = data.hodId || (auth.hod ? auth.hod.ID : 'HOD-UNKNOWN');
+    const hodName = data.hodName || (auth.hod ? auth.hod.Name : 'HOD Approver');
+    const hodCostCentre = data.hodCostCentre || (auth.hod ? auth.hod.CostCentre : 'Cost Centre');
     const remarks = data.remarks || '';
-    const rescheduledDate = data.rescheduledDate || '';
+
+    // Fetch requester and assigned approvers from employee database & directory tabs
+    const trainingsList = sheetToJson(tSheet);
+    const currentT = trainingsList.find(t => String(t.ID || '').toLowerCase() === cleanId.toLowerCase()) || {};
+
+    const requesterId = currentT.RequestedBy || currentT['Requested By'] || '';
+    const requesterName = currentT.RequestedByName || currentT['Requested By Name'] || requesterId || 'Employee Requester';
+    const requesterCostCentre = currentT.CostCentre || currentT.Department || hodCostCentre;
+
+
+    const csProfile = resolveCSuiteProfileForRequester(requesterCostCentre, requesterId || requesterName);
+    const csuiteName = csProfile ? csProfile.Name : (auth.hod.CsuiteName || '');
+    const csuiteId = csProfile ? csProfile.ID : '';
+
+    const hrProfile = getHOHREmailProfile();
+    const hohrName = hrProfile ? hrProfile.Name : (auth.hod.HohrName || '');
+    const hohrId = hrProfile ? hrProfile.ID : '';
+
+    // Identity comparison helper (matches by ID or Name)
+    const isSamePerson = (n1, id1, n2, id2) => {
+      const clean1 = String(n1 || '').toLowerCase().trim();
+      const clean2 = String(n2 || '').toLowerCase().trim();
+      const cleanId1 = String(id1 || '').toLowerCase().trim();
+      const cleanId2 = String(id2 || '').toLowerCase().trim();
+      if (!clean1 && !cleanId1) return false;
+      if (!clean2 && !cleanId2) return false;
+      if (cleanId1 && cleanId2 && cleanId1 === cleanId2) return true;
+      if (clean1 && clean2 && (clean1 === clean2 || clean1.includes(clean2) || clean2.includes(clean1))) return true;
+      return false;
+    };
+
+    const reqIsHod = isSamePerson(requesterName, requesterId, hodName, hodId);
+    const hodIsCsuite = isSamePerson(hodName, hodId, csuiteName, csuiteId);
+    const csuiteIsHohr = isSamePerson(csuiteName, csuiteId, hohrName, hohrId);
+    const hodIsHohr = isSamePerson(hodName, hodId, hohrName, hohrId);
 
     const currentAppStatus = String(tSheet.getRange(row, headers.indexOf('ApprovalStatus') + 1).getValue() || 'Pending HOD Approval');
 
@@ -216,117 +429,289 @@ function submitHODDecision(data) {
     if (currentAppStatus.includes('C-Suite')) approvalStep = 'Csuite';
     else if (currentAppStatus.includes('HOHR')) approvalStep = 'HOHR';
 
+    let autoVerifiedRemarks = '';
+
     if (validDecision === 'Approved') {
-      if (currentAppStatus.includes('C-Suite')) {
-        nextApprovalStatus = 'Pending HOHR Approval';
-      } else if (currentAppStatus.includes('HOHR')) {
+      if (approvalStep === 'HOD') {
+        if (hodIsCsuite && (csuiteIsHohr || hodIsHohr)) {
+          // Rule 3: HOD == C-Suite == HOHR -> Directly verify all 3 levels -> Fully Approved!
+          nextApprovalStatus = 'Approved';
+          autoVerifiedRemarks = ' (Auto-verified: HOD, C-Suite, and HOHR are the same approver)';
+        } else if (hodIsCsuite) {
+          // Rule 2: HOD == C-Suite -> Directly verify both (HOD & C-Suite) -> Pending HOHR Approval!
+          nextApprovalStatus = 'Pending HOHR Approval';
+          autoVerifiedRemarks = ' (Auto-verified: HOD and C-Suite are the same approver)';
+        } else {
+          // Standard: HOD Approved -> Pending C-Suite Approval
+          nextApprovalStatus = 'Pending C-Suite Approval';
+        }
+      } else if (approvalStep === 'Csuite') {
+        if (csuiteIsHohr || hodIsHohr) {
+          // Rule 3 (part): C-Suite == HOHR -> Directly verify both C-Suite & HOHR -> Fully Approved!
+          nextApprovalStatus = 'Approved';
+          autoVerifiedRemarks = ' (Auto-verified: C-Suite and HOHR are the same approver)';
+        } else {
+          nextApprovalStatus = 'Pending HOHR Approval';
+        }
+      } else if (approvalStep === 'HOHR') {
         nextApprovalStatus = 'Approved';
-      } else {
-        nextApprovalStatus = 'Pending C-Suite Approval';
       }
+    } else if (validDecision === 'Rejected') {
+      nextApprovalStatus = 'Rejected';
+    } else if (validDecision === 'Returned') {
+      nextApprovalStatus = 'Returned';
     }
+
+    const fullRemarks = (remarks || '') + autoVerifiedRemarks;
 
     updateCol('ApprovalStatus', nextApprovalStatus);
     updateCol('ApprovedBy', `${hodName} (${hodId})`);
     updateCol('ApprovedCostCentre', hodCostCentre);
     updateCol('ApprovedAt', timestamp);
-    updateCol('ApprovalRemarks', remarks);
-    if (rescheduledDate) updateCol('RescheduledDate', rescheduledDate);
+    updateCol('ApprovalRemarks', fullRemarks.trim());
 
-    // Update Status & Stage if fully Approved or Rejected/Postponed
-    if (nextApprovalStatus === 'Approved' || validDecision === 'Approved') {
+    // Update Status & Stage based on decision
+    if (nextApprovalStatus === 'Approved') {
       updateCol('Status', 'Upcoming');
       updateCol('Stage', 'Created');
     } else if (validDecision === 'Rejected') {
       updateCol('Status', 'Cancelled');
       updateCol('Stage', 'Programme Closed');
-    } else if (validDecision === 'Postponed' || validDecision === 'Rescheduled') {
-      updateCol('Status', 'Postponed');
-      updateCol('Stage', 'Created');
+    } else if (validDecision === 'Returned') {
+      updateCol('Status', 'Returned');
+      updateCol('Stage', 'Requisition Draft');
     }
 
     updateCol('UpdatedDate', timestamp);
     SpreadsheetApp.flush();
 
-    // Automatically update AP-HRD-F01-01 Training Requisition Form Google Sheet digital approval signature
-    try {
-      let hodPosition = auth.hod ? (auth.hod.Position || auth.hod.JobTitle || auth.hod.PositionTitle || '') : '';
-      if (!hodPosition && getSheet('Employees')) {
-        const emps = sheetToJson(getSheet('Employees'));
-        const empMatch = emps.find(e => String(e.ID).toLowerCase() === String(hodId).toLowerCase());
-        if (empMatch) hodPosition = empMatch.Position || empMatch.JobTitle || empMatch.PositionTitle || '';
-      }
-      if (!hodPosition) hodPosition = approvalStep === 'Csuite' ? 'C-Suite Executive' : (approvalStep === 'HOHR' ? 'Head of HR' : 'Head of Department');
+    // Automatically update AP-HRD-F01-01 Training Requisition Form Google Sheet digital approval signatures
+    let hodPosition = auth.hod ? (auth.hod.Position || auth.hod.JobTitle || auth.hod.PositionTitle || '') : '';
+    if (!hodPosition && getSheet('Employees')) {
+      const emps = sheetToJson(getSheet('Employees'));
+      const empMatch = emps.find(e => String(e.ID).toLowerCase() === String(hodId).toLowerCase());
+      if (empMatch) hodPosition = empMatch.Position || empMatch.JobTitle || empMatch.PositionTitle || '';
+    }
+    if (!hodPosition) {
+      hodPosition = approvalStep === 'Csuite' ? 'C-Suite Executive' : (approvalStep === 'HOHR' ? 'Head of HR' : 'Head of Department');
+    }
 
+    try {
+      // Stamp HOD signature
       updateTrainingRequisitionSignatures(cleanId, approvalStep, {
-        status: nextApprovalStatus,
+        status: (validDecision === 'Approved' ? (approvalStep === 'HOD' ? 'Verified' : 'Approved') : validDecision),
         employeeNo: hodId,
         name: hodName,
         position: hodPosition,
         date: timestamp
       });
-    } catch(sigErr) {
-      Logger.log('Signature update error in submitApprovalDecision: ' + sigErr.message);
-    }
 
-    // Send email notifications
-    try {
-      const trainings = sheetToJson(tSheet);
-      const currentT = trainings.find(t => String(t.ID) === cleanId);
-      let requesterEmail = currentT ? (currentT.RequestedByEmail || currentT.Email || '') : '';
-      const requesterId = currentT ? (currentT.RequestedBy || '') : '';
-
-      if (!requesterEmail && requesterId && getSheet('Employees')) {
-        const emps = sheetToJson(getSheet('Employees'));
-        const empMatch = emps.find(e => String(e.ID).toLowerCase() === String(requesterId).toLowerCase());
-        if (empMatch) requesterEmail = empMatch.Email || '';
+      // If HOD == C-Suite, also stamp C-Suite signature automatically
+      if (validDecision === 'Approved' && hodIsCsuite && approvalStep === 'HOD') {
+        updateTrainingRequisitionSignatures(cleanId, 'Csuite', {
+          status: 'Approved',
+          employeeNo: csuiteId || hodId,
+          name: csuiteName || hodName,
+          position: csProfile ? csProfile.Position : 'C-Suite Executive',
+          date: timestamp
+        });
       }
 
-      if (requesterEmail) {
-        const subject = `[TrainHub DRAFT] Training Requisition Request ${nextApprovalStatus.toUpperCase()} - ${currentT.Name || cleanId}`;
-        const body = `Dear Requester,\n\nYour Training Requisition Request for "${currentT.Name || cleanId}" (${currentT.Code || cleanId}) has been updated:\n\n` +
-          `Decision Status: ${nextApprovalStatus.toUpperCase()}\n` +
-          `Reviewed By: ${hodName} (${hodId})\n` +
-          `Cost Centre: ${hodCostCentre}\n` +
-          `Timestamp: ${timestamp}\n` +
-          (rescheduledDate ? `Rescheduled Date: ${rescheduledDate}\n` : '') +
-          (remarks ? `Remarks: ${remarks}\n` : '') +
-          `\nThank you,\nTrainHub Training Management System`;
+      // If HOD == C-Suite == HOHR or C-Suite == HOHR, also stamp HOHR signature automatically
+      if (validDecision === 'Approved' && (hodIsHohr || csuiteIsHohr) && nextApprovalStatus === 'Approved') {
+        updateTrainingRequisitionSignatures(cleanId, 'HOHR', {
+          status: 'Approved',
+          employeeNo: hohrId || hodId,
+          name: hohrName || hodName,
+          position: hrProfile ? hrProfile.Position : 'Head of HR',
+          date: timestamp
+        });
+      }
+    } catch(sigErr) {
+      Logger.log('Signature update error in submitHODDecision: ' + sigErr.message);
+    }
 
-        try {
-          GmailApp.createDraft(requesterEmail, subject, body);
-        } catch (draftErr) {
-          Logger.log('Draft error: ' + draftErr.message);
+
+    // Send email notifications via Gmail Drafts (development mode)
+    let draftLog = [];
+    try {
+      const trainings = sheetToJson(tSheet);
+      const currentT = trainings.find(t =>
+        String(t.ID || '').toLowerCase() === cleanId.toLowerCase() ||
+        String(t.Code || '').toLowerCase() === cleanId.toLowerCase()
+      ) || {};
+      const trainingName = currentT.Name || currentT.TrainingTitle || cleanId;
+      const trainingCode = currentT.Code || currentT.ID || cleanId;
+
+      let requesterEmail = currentT.RequestedByEmail || currentT['Requested By Email'] || currentT.Email || currentT['Email Address'] || currentT.UserEmail || '';
+      const requesterId = currentT.RequestedBy || currentT['Requested By'] || currentT.EmployeeID || currentT['Employee ID'] || '';
+      let requesterName = currentT.RequestedByName || currentT['Requested By Name'] || currentT.Trainer || requesterId || 'Employee Requester';
+
+      if (!requesterEmail && getSheet('Employees')) {
+        const emps = sheetToJson(getSheet('Employees'));
+        const cleanReqId = String(requesterId).toLowerCase().trim();
+        const cleanReqName = String(requesterName).toLowerCase().trim();
+
+        const empMatch = emps.find(e => {
+          const eId = String(e['Employee No'] || e.EmployeeNo || e.ID || e.EmployeeID || e['Employee ID'] || '').toLowerCase().trim();
+          const eName = String(e.Name || e.EmployeeName || e['Employee Name'] || '').toLowerCase().trim();
+          return (cleanReqId && eId === cleanReqId) || (cleanReqName && eName === cleanReqName);
+        });
+
+        if (empMatch) {
+          requesterEmail = String(empMatch.Email || empMatch.EmailAddress || empMatch['Email Address'] || '').trim();
+          if (!requesterName || requesterName === requesterId) {
+            requesterName = String(empMatch.Name || empMatch.EmployeeName || empMatch['Employee Name'] || requesterName).trim();
+          }
         }
       }
 
-      // If final stage reached, draft notification for Arina
-      if (nextApprovalStatus === 'Approved') {
-        const arinaSubject = `[TrainHub DRAFT] Training Requisition Approved & Ready - ${currentT.Name || cleanId}`;
-        const arinaBody = `Dear Arina,\n\nThe following Training Requisition has received all required approvals (HOD, C-Suite, HOHR):\n\n` +
-          `Training Name: ${currentT.Name || cleanId} (${currentT.Code || cleanId})\n` +
-          `Approved By: ${hodName} (${hodId})\n` +
-          `Cost Centre: ${hodCostCentre}\n` +
-          `Date Approved: ${timestamp}\n\n` +
-          `The Admin System can now proceed with session creation and attendance tracking.\n\n` +
+      // Robust Fallback: If requester email is still empty, fallback to HOD's email or active user email
+      if (!requesterEmail) {
+        requesterEmail = auth.hod.Email || Session.getActiveUser().getEmail() || 'requester@apollofood.com.my';
+      }
+
+      const hodPortalUrl = getConfigProperty('HOD_PORTAL_URL', '');
+      const reviewUrl = hodPortalUrl ? `${hodPortalUrl}?page=review&id=${cleanId}` : getAppUrl();
+
+      // IF REJECTED OR RETURNED: Email the requester only
+      if (validDecision === 'Rejected' || validDecision === 'Returned') {
+        const reqSubject = `[TrainHub] Training Requisition Request ${validDecision.toUpperCase()} - ${trainingName}`;
+        const reqBody = `Dear ${requesterName},\n\n` +
+          `Your Training Requisition Request for "${trainingName}" (${trainingCode}) has been ${validDecision.toUpperCase()}.\n\n` +
+          `Decision Status: ${validDecision.toUpperCase()}\n` +
+          `Reviewed By: ${hodName} (${hodId})\n` +
+          `Position: ${hodPosition}\n` +
+          `Department / Cost Centre: ${hodCostCentre}\n` +
+          `Timestamp: ${timestamp}\n` +
+          `Remarks / Reason: ${remarks || 'No remarks provided.'}\n\n` +
+          (validDecision === 'Returned'
+            ? 'Please review the remarks above, make the necessary amendments, and re-submit your requisition.\n\n'
+            : 'This requisition request has been closed.\n\n') +
           `Thank you,\nTrainHub Training Management System`;
 
-        try {
-          GmailApp.createDraft('arina.ismail@apollofood.com.my', arinaSubject, arinaBody);
-        } catch (draftErr) {
-          Logger.log('Draft error: ' + draftErr.message);
+        sendOrDraftEmail(requesterEmail, reqSubject, reqBody, 'requester', draftLog);
+      }
+
+      // IF APPROVED: Email requester status AND email the next approver (or Arina if final)
+      else if (validDecision === 'Approved') {
+        // Step 1: HOD Approved -> Pending C-Suite Approval
+        if (nextApprovalStatus === 'Pending C-Suite Approval') {
+          // Notification to Requester
+          const reqSubject = `[TrainHub] Training Requisition Approved by HOD - Pending C-Suite Approval - ${trainingName}`;
+          const reqBody = `Dear ${requesterName},\n\n` +
+            `Your Training Requisition Request for "${trainingName}" (${trainingCode}) has been APPROVED by your Head of Department (${hodName}) and is now submitted for C-Suite approval.\n\n` +
+            `Decision Status: PENDING C-SUITE APPROVAL\n` +
+            `HOD Approver: ${hodName} (${hodId})\n` +
+            `Department / Cost Centre: ${hodCostCentre}\n` +
+            `Timestamp: ${timestamp}\n` +
+            `HOD Remarks: ${remarks || 'Approved by HOD.'}\n\n` +
+            `Thank you,\nTrainHub Training Management System`;
+
+          sendOrDraftEmail(requesterEmail, reqSubject, reqBody, 'requester', draftLog);
+
+          // Resolve the requester's specific C-Suite Executive based on requester's Cost Centre / Department
+          const requesterCostCentre = currentT.CostCentre || currentT.Department || currentT['Cost Centre'] || currentT['CostCentre'] || hodCostCentre;
+          const csProfile = resolveCSuiteProfileForRequester(requesterCostCentre, requesterId);
+          const csuiteEmail = csProfile.Email || auth.hod.CsuiteEmail || getConfigProperty('CSUITE_EMAIL', '') || auth.hod.Email;
+          const csuiteName = csProfile.Name || auth.hod.CsuiteName || 'C-Suite Executive';
+
+          const csSubject = `[TrainHub] Action Required: Training Requisition Pending C-Suite Approval - ${trainingName}`;
+          const csBody = `Dear ${csuiteName},\n\n` +
+            `A Training Requisition Request for "${trainingName}" (${trainingCode}) submitted by ${requesterName} (${requesterId}) has been APPROVED by Head of Department (${hodName}) and requires your managerial approval.\n\n` +
+            `Training Name: ${trainingName}\n` +
+            `Requester: ${requesterName} (${requesterId})\n` +
+            `Requester Department / Cost Centre: ${requesterCostCentre}\n` +
+            `HOD Approved By: ${hodName} (${hodId})\n` +
+            `Date Approved: ${timestamp}\n` +
+            `HOD Remarks: ${remarks || 'Approved by HOD.'}\n\n` +
+            `Please review and issue your digital approval in the TrainHub HOD Portal:\n${reviewUrl}\n\n` +
+            `Thank you,\nTrainHub Training Management System`;
+
+          sendOrDraftEmail(csuiteEmail, csSubject, csBody, `C-Suite [${csuiteName}]`, draftLog);
+        }
+
+        // Step 2: C-Suite Approved -> Pending HOHR Approval
+        else if (nextApprovalStatus === 'Pending HOHR Approval') {
+          // Notification to Requester
+          const reqSubject = `[TrainHub] Training Requisition Approved by C-Suite - Pending HOHR Approval - ${trainingName}`;
+          const reqBody = `Dear ${requesterName},\n\n` +
+            `Your Training Requisition Request for "${trainingName}" (${trainingCode}) has been APPROVED by C-Suite Executive (${hodName}) and is now submitted for Head of HR approval.\n\n` +
+            `Decision Status: PENDING HOHR APPROVAL\n` +
+            `C-Suite Approver: ${hodName} (${hodId})\n` +
+            `Department / Cost Centre: ${hodCostCentre}\n` +
+            `Timestamp: ${timestamp}\n` +
+            `Remarks: ${remarks || 'Approved by C-Suite.'}\n\n` +
+            `Thank you,\nTrainHub Training Management System`;
+
+          sendOrDraftEmail(requesterEmail, reqSubject, reqBody, 'requester', draftLog);
+
+          // HOHR is identical for ALL employees across the organization
+          const hrProfile = getHOHREmailProfile();
+          const hohrEmail = hrProfile.Email || auth.hod.HohrEmail || getConfigProperty('HOHR_EMAIL', '') || 'hohr@apollofood.com.my';
+          const hohrName = hrProfile.Name || auth.hod.HohrName || 'Head of HR';
+
+          const hrSubject = `[TrainHub] Action Required: Training Requisition Pending HOHR Approval - ${trainingName}`;
+          const hrBody = `Dear ${hohrName},\n\n` +
+            `A Training Requisition Request for "${trainingName}" (${trainingCode}) has received C-Suite approval and now requires final Head of HR approval.\n\n` +
+            `Training Name: ${trainingName}\n` +
+            `Requester: ${requesterName} (${requesterId})\n` +
+            `C-Suite Approver: ${hodName} (${hodId})\n` +
+            `Department / Cost Centre: ${hodCostCentre}\n` +
+            `Date Approved: ${timestamp}\n` +
+            `Remarks: ${remarks || 'Approved by C-Suite.'}\n\n` +
+            `Please review and issue your digital approval in the TrainHub HOD Portal:\n${reviewUrl}\n\n` +
+            `Thank you,\nTrainHub Training Management System`;
+
+          sendOrDraftEmail(hohrEmail, hrSubject, hrBody, `HOHR [${hohrName}]`, draftLog);
+        }
+
+
+        // Step 3: HOHR Approved -> Fully Approved
+        else if (nextApprovalStatus === 'Approved') {
+          // Notification to Requester
+          const reqSubject = `[TrainHub] Training Requisition Fully Approved! - ${trainingName}`;
+          const reqBody = `Dear ${requesterName},\n\n` +
+            `Great news! Your Training Requisition Request for "${trainingName}" (${trainingCode}) has received ALL required managerial approvals (HOD, C-Suite, and Head of HR).\n\n` +
+            `Decision Status: APPROVED\n` +
+            `Final Approver (HOHR): ${hodName} (${hodId})\n` +
+            `Department / Cost Centre: ${hodCostCentre}\n` +
+            `Timestamp: ${timestamp}\n` +
+            `Remarks: ${remarks || 'Fully Approved.'}\n\n` +
+            `The HR Training Administrator will now schedule training sessions and generate attendance links.\n\n` +
+            `Thank you,\nTrainHub Training Management System`;
+
+          sendOrDraftEmail(requesterEmail, reqSubject, reqBody, 'requester', draftLog);
+
+          // Notification to Arina (HR Admin)
+          const arinaSubject = `[TrainHub] Training Requisition Fully Approved & Ready for Session Setup - ${trainingName}`;
+          const arinaBody = `Dear Arina,\n\n` +
+            `The following Training Requisition has received all required approvals (HOD, C-Suite, HOHR):\n\n` +
+            `Training Name: ${trainingName} (${trainingCode})\n` +
+            `Requester: ${requesterName} (${requesterId})\n` +
+            `HOHR Approved By: ${hodName} (${hodId})\n` +
+            `Cost Centre: ${hodCostCentre}\n` +
+            `Date Approved: ${timestamp}\n\n` +
+            `The Admin System can now proceed with session creation, QR code generation, and participant attendance tracking.\n\n` +
+            `Thank you,\nTrainHub Training Management System`;
+
+          sendOrDraftEmail('arina.ismail@apollofood.com.my', arinaSubject, arinaBody, 'Arina (HR Admin)', draftLog);
         }
       }
     } catch (mailErr) {
       Logger.log('Notification mail error: ' + mailErr.message);
+      draftLog.push(`General mail engine error: ${mailErr.message}`);
     }
+
+    const logSummary = draftLog.length > 0 ? ` (${draftLog.join('; ')})` : '';
 
     return ok({
       trainingId: cleanId,
       decision: nextApprovalStatus,
       approvedBy: hodName,
       timestamp: timestamp,
-      message: `Training requisition request marked as ${nextApprovalStatus.toUpperCase()}.`
+      draftLog: draftLog,
+      message: `Training requisition request marked as ${nextApprovalStatus.toUpperCase()}.${logSummary}`
     });
   } catch (e) {
     return err('Failed to process HOD decision: ' + e.message);
@@ -334,14 +719,40 @@ function submitHODDecision(data) {
 }
 
 /**
+ * Helper function to create a Gmail Draft strictly (Drafts Only)
+ */
+function sendOrDraftEmail(recipient, subject, body, logPrefix, draftLog) {
+  if (!recipient) return;
+  try {
+    GmailApp.createDraft(recipient, subject, body);
+    if (draftLog) draftLog.push(`Draft created for ${logPrefix} (${recipient})`);
+  } catch (dErr) {
+    Logger.log('GmailApp createDraft error: ' + dErr.message);
+    if (draftLog) draftLog.push(`Draft error for ${logPrefix} (${recipient}): ${dErr.message}`);
+  }
+}
+
+/**
+ * Run this function ONCE in Apps Script Editor to grant Gmail Draft permissions
+ */
+function authorizeGmailDrafts() {
+  const user = Session.getActiveUser().getEmail() || Session.getEffectiveUser().getEmail() || 'admin@apollofood.com.my';
+  const draft = GmailApp.createDraft(user, '[TrainHub Draft Test]', 'Gmail Draft permission verified successfully.');
+  Logger.log('Gmail Draft authorized successfully. Draft ID: ' + draft.getId());
+  return 'Gmail Draft permissions authorized successfully! Draft ID: ' + draft.getId();
+}
+
+
+
+/**
  * API: Fetch participants pending 3-Month Post Evaluation for a training under this HOD
  */
-function getPendingPostEvalParticipants(trainingId, hodCostCentre) {
+function getPendingPostEvalParticipants(trainingId, userEmail) {
   try {
-    const auth = validateHODAccess();
+    const auth = validateHODAccess(userEmail);
     if (!auth.valid) return err(auth.message);
 
-    const targetHodCostCentre = hodCostCentre || auth.hod.CostCentre;
+    const targetHodCostCentre = auth.hod.CostCentre;
 
     const tSheet = getSheet('Trainings');
     if (!tSheet) return err('Trainings sheet unavailable.');
@@ -374,11 +785,6 @@ function getPendingPostEvalParticipants(trainingId, hodCostCentre) {
       const hodCc = String(targetHodCostCentre).toLowerCase();
       return dept.includes(hodCc) || hodCc.includes(dept) || targetHodCostCentre === 'ALL';
     });
-
-    // If filter yields none, fallback to all participants for this training
-    if (hodParticipants.length === 0) {
-      hodParticipants = allParticipants;
-    }
 
     // Check which participants have already been evaluated in PostEval sheet
     const postSheet = ss ? ss.getSheetByName('PostEval') : null;
@@ -414,7 +820,8 @@ function submitHODPostEval(data) {
       return err('Training ID and Employee ID are required.');
     }
 
-    const auth = validateHODAccess();
+    const userEmail = data.userEmail || data.email || '';
+    const auth = validateHODAccess(userEmail);
     if (!auth.valid) return err(auth.message);
 
     const cleanTId = String(data.trainingId).trim();
@@ -465,8 +872,9 @@ function submitHODPostEval(data) {
     SpreadsheetApp.flush();
 
     // Return updated pending list for this HOD
-    return getPendingPostEvalParticipants(cleanTId, auth.hod.CostCentre);
+    return getPendingPostEvalParticipants(cleanTId, auth.hod.Email || userEmail);
   } catch (e) {
     return err('Failed to submit post evaluation: ' + e.message);
   }
 }
+

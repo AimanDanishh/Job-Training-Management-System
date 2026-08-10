@@ -124,14 +124,37 @@
 
   <script>
     let currentTrainingId = '<?= params.id || params.trn || "" ?>';
+    let userEmail = '<?= params.email || "" ?>';
     let currentHOD = null;
     let pendingParticipants = [];
 
     window.addEventListener('DOMContentLoaded', () => {
+      initUserEmail();
       loadPostEvalData();
     });
 
+    function initUserEmail() {
+      if (userEmail && userEmail.trim()) {
+        sessionStorage.setItem('hod_user_email', userEmail.trim());
+      } else {
+        userEmail = sessionStorage.getItem('hod_user_email') || '';
+      }
+      
+      if (!userEmail) {
+        userEmail = prompt('Please enter your registered HOD email address to access Post Evaluation:') || '';
+        if (userEmail && userEmail.trim()) {
+          userEmail = userEmail.trim();
+          sessionStorage.setItem('hod_user_email', userEmail);
+        }
+      }
+    }
+
     function loadPostEvalData() {
+      if (!userEmail) {
+        alert('No registered HOD email address provided. Access denied.');
+        return;
+      }
+
       showLoading('Loading Post Evaluation Data...');
       google.script.run
         .withSuccessHandler(resStr => {
@@ -147,7 +170,7 @@
           hideLoading();
           showAlert('Failed to connect to server: ' + err.message, true);
         })
-        .getPendingPostEvalParticipants(currentTrainingId);
+        .getPendingPostEvalParticipants(currentTrainingId, userEmail);
     }
 
     function renderPostEval(data) {
@@ -219,6 +242,7 @@
       const payload = {
         trainingId: currentTrainingId,
         employeeId: empId,
+        userEmail: userEmail,
         competencyBefore: document.getElementById('qCompetencyBefore').value,
         competencyAfter: document.getElementById('qCompetencyAfter').value,
         improvement: document.getElementById('qImprovement').value,
@@ -247,3 +271,4 @@
   </script>
 </body>
 </html>
+

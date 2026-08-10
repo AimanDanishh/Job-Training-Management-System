@@ -109,7 +109,7 @@ function getEmployeeDetails(employeeId) {
     if (!empCheck.valid) return err(empCheck.message);
 
     const emp = empCheck.employee;
-    const requestDate = formatDate(new Date());
+    const requestDate = getFormattedCurrentDate();
 
     return ok({
       ID: emp.ID || employeeId,
@@ -182,25 +182,35 @@ function submitEmployeeRequisition(data) {
       Logger.log('For IT lookup error: ' + itErr.message);
     }
 
-    // Step 2: Compare assigned HOD in "HOD email" tab
+    // Step 2: Compare assigned HOD in "HOD email" tab (Header: Employee No | HOD | Cost Centre | Position Title | Email)
     try {
       const hodSheet = getSheet('HOD email');
       if (hodSheet) {
         const hodRows = sheetToJson(hodSheet);
         let matchedHod = null;
 
+        const getVal = (rowObj, nameList) => {
+          if (!rowObj) return '';
+          const keys = Object.keys(rowObj);
+          for (let n of nameList) {
+            const matchKey = keys.find(k => k.toLowerCase().replace(/[^a-z0-9]/g, '') === n.toLowerCase().replace(/[^a-z0-9]/g, ''));
+            if (matchKey && rowObj[matchKey] !== undefined && rowObj[matchKey] !== null) return String(rowObj[matchKey]).trim();
+          }
+          return '';
+        };
+
         if (assignedHodName) {
           const cleanAssigned = assignedHodName.toLowerCase();
           matchedHod = hodRows.find(h => {
-            const hName = String(h.HODName || h.HodName || h.HOD || h.Name || h['HOD Name'] || '').toLowerCase().trim();
+            const hName = getVal(h, ['HOD', 'HODName', 'HodName', 'Name']).toLowerCase();
             return hName && (hName.includes(cleanAssigned) || cleanAssigned.includes(hName));
           });
         }
 
         if (!matchedHod) {
           matchedHod = hodRows.find(h => {
-            const hEmpId = String(h.EmployeeID || h.ID || '').toLowerCase().trim();
-            const hEmpName = String(h.EmployeeName || h.Name || '').toLowerCase().trim();
+            const hEmpId = getVal(h, ['Employee No', 'EmployeeNo', 'EmployeeID', 'ID']).toLowerCase();
+            const hEmpName = getVal(h, ['HOD', 'HODName', 'HodName', 'Name']).toLowerCase();
             return (hEmpId && hEmpId === requesterId) || (hEmpName && hEmpName === requesterName);
           });
         }
@@ -209,7 +219,7 @@ function submitEmployeeRequisition(data) {
           const deptCodeMatch = empDept.match(/\d+/);
           const deptCode = deptCodeMatch ? deptCodeMatch[0] : '';
           matchedHod = hodRows.find(h => {
-            const hDept = String(h.Department || h.CostCentre || '').toLowerCase().trim();
+            const hDept = getVal(h, ['Cost Centre', 'CostCentre', 'Department']).toLowerCase();
             const hCodeMatch = hDept.match(/\d+/);
             if (deptCode && hCodeMatch && deptCode === hCodeMatch[0]) return true;
             return hDept && (empDept.includes(hDept) || hDept.includes(empDept));
@@ -221,12 +231,12 @@ function submitEmployeeRequisition(data) {
         }
 
         if (matchedHod) {
-          hodName = matchedHod.HOD || matchedHod.HODName || matchedHod.HodName || matchedHod.Name || matchedHod['HOD Name'] || assignedHodName || '';
-          hodEmail = matchedHod.Email || matchedHod.HODEmail || matchedHod.HodEmail || matchedHod['HOD Email'] || matchedHod['Email'] || '';
-          csuiteName = matchedHod.CsuiteName || matchedHod.CSuiteName || matchedHod.Csuite || '';
-          csuiteEmail = matchedHod.CsuiteEmail || matchedHod.CSuiteEmail || '';
-          hohrName = matchedHod.HohrName || matchedHod.HOHRName || matchedHod.HOHR || '';
-          hohrEmail = matchedHod.HohrEmail || matchedHod.HOHREmail || '';
+          hodName = getVal(matchedHod, ['HOD', 'HODName', 'HodName', 'Name']) || assignedHodName || '';
+          hodEmail = getVal(matchedHod, ['Email', 'EmailAddress', 'HODEmail']) || '';
+          csuiteName = getVal(matchedHod, ['CsuiteName', 'CSuiteName', 'Csuite']) || '';
+          csuiteEmail = getVal(matchedHod, ['CsuiteEmail', 'CSuiteEmail']) || '';
+          hohrName = getVal(matchedHod, ['HohrName', 'HOHRName', 'HOHR']) || '';
+          hohrEmail = getVal(matchedHod, ['HohrEmail', 'HOHREmail']) || '';
         }
       }
     } catch(e) {
@@ -293,10 +303,10 @@ function submitEmployeeRequisition(data) {
     let workspace = { folderId: '', folderUrl: '', partSheetId: '', sessionSheetId: '', attendanceSheetId: '', evaluationSheetId: '', postSheetId: '' };
     let reqForm = { fileId: '', fileUrl: '' };
     const requesterSigData = {
-      employeeNo: emp.ID || data.EmployeeID,
-      name: emp.Name || data.EmployeeName || 'Requester',
-      position: emp.Position || emp.JobTitle || emp.JobPosition || 'Requester',
-      date: timeNow
+      employeeNo: emp.ID || data.EmployeeID || data.EmployeeNo || '',
+      name: emp.Name || data.EmployeeName || data.Name || 'Requester',
+      position: emp.Position || emp.JobTitle || emp.PositionTitle || data.JobPosition || data.Position || data.JobTitle || 'Requester',
+      date: getFormattedCurrentDate()
     };
 
     try {

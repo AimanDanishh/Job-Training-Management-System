@@ -3,17 +3,98 @@
 <head>
   <base target="_top">
   <meta charset="utf-8">
-  <title>Error — TrainHub HOD Portal</title>
+  <title>Access Denied — TrainHub HOD Portal</title>
   <?!= include('style'); ?>
+  <style>
+    .denied-card {
+      max-width: 540px;
+      margin: 80px auto;
+      text-align: center;
+      padding: 40px 32px;
+      background: #1e293b;
+      border: 1px solid #ef4444;
+      border-radius: 16px;
+      box-shadow: 0 20px 25px -5px rgba(239, 68, 68, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+    }
+    .lock-icon {
+      font-size: 64px;
+      margin-bottom: 20px;
+      display: inline-block;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+    .denied-title {
+      font-size: 24px;
+      font-weight: 700;
+      color: #ef4444;
+      margin-bottom: 12px;
+    }
+    .denied-desc {
+      color: #94a3b8;
+      font-size: 14px;
+      line-height: 1.6;
+      margin-bottom: 28px;
+    }
+    .auth-box {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 24px;
+      text-align: left;
+    }
+    .auth-label {
+      font-size: 12px;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+      display: block;
+    }
+  </style>
 </head>
 <body>
-  <div class="container" style="max-width:500px;margin-top:60px;text-align:center;">
-    <div class="card" style="border-top:4px solid var(--danger);">
-      <div style="font-size:56px;margin-bottom:16px;">⚠️</div>
-      <h2 style="color:var(--danger);margin-bottom:12px;">Access Error or Invalid Request</h2>
-      <p style="color:var(--text-secondary);margin-bottom:24px;"><?= params.message || 'An unauthorized action or system error occurred.' ?></p>
-      <a href="<?= getAppUrl() ?>" style="display:inline-block;padding:10px 20px;background:var(--primary);color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">Return to HOD Portal</a>
+  <div class="container">
+    <div class="denied-card">
+      <div class="lock-icon">🔒</div>
+      <h2 class="denied-title"><?= params.title || 'Access Denied — Non Accessible Website' ?></h2>
+      <p class="denied-desc">
+        <?= params.message || 'The user email address accessing this portal is not registered as an authorized Head of Department (HOD).' ?>
+      </p>
+
+      <div class="auth-box">
+        <span class="auth-label">Security Protocol Notice</span>
+        <div style="font-size:13px;color:#cbd5e1;line-height:1.5;">
+          Access to the <strong>TrainHub HOD Management Portal</strong> is restricted exclusively to authorized Head of Department email accounts listed in the company directory (<strong>HOD email</strong> database tab).
+        </div>
+      </div>
+
+      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+        <button onclick="promptEmailLogin()" class="btn btn-approve" style="padding:12px 24px;">
+          <span>🔑</span> Try Registered HOD Email
+        </button>
+        <a href="<?= getAppUrl() ?>" class="btn" style="background:#334155;color:#f8fafc;padding:12px 24px;text-decoration:none;border-radius:8px;font-size:14px;display:inline-flex;align-items:center;gap:6px;">
+          <span>🔄</span> Refresh Portal
+        </a>
+      </div>
     </div>
   </div>
+
+  <script>
+    function promptEmailLogin() {
+      const email = prompt('Enter your registered Head of Department (HOD) email address:');
+      if (email && email.trim()) {
+        const cleanEmail = email.trim().toLowerCase();
+        const baseUrl = '<?= getAppUrl() ?>';
+        const page = '<?= params.page || "review" ?>';
+        const targetUrl = baseUrl + (baseUrl.includes('?') ? '&' : '?') + 'page=' + page + '&email=' + encodeURIComponent(cleanEmail);
+        window.top.location.href = targetUrl;
+      }
+    }
+  </script>
 </body>
 </html>

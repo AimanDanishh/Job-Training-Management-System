@@ -331,7 +331,7 @@
   }
 
   function generateClientAttendanceURL(sessionId) {
-    const currentUrl = window.location.href.split('?')[0];
+    const currentUrl = String(window.location.href || '').split('?')[0];
     return `${currentUrl}?page=attendance&session=${encodeURIComponent(sessionId)}`;
   }
 
