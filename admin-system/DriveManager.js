@@ -31,6 +31,51 @@ function getOrCreateRootFolder() {
 }
 
 /**
+ * Gets or creates the dedicated "Reports" directory in Google Drive.
+ * Automatically respects the root folder defined in project settings (ROOT_FOLDER_ID / TRAINING_FOLDER_ID / DRIVE_ROOT_FOLDER_ID).
+ * Creates the "Reports" subfolder directly inside your configured project root folder.
+ */
+function getOrCreateReportsFolder() {
+  // 1. Check if an explicit REPORTS_FOLDER_ID is set in Script Properties
+  const configuredReportsId = getConfigProperty('REPORTS_FOLDER_ID', '');
+  if (configuredReportsId) {
+    try {
+      return DriveApp.getFolderById(configuredReportsId);
+    } catch (e) {
+      Logger.log('Could not open REPORTS_FOLDER_ID (' + configuredReportsId + '): ' + e.message);
+    }
+  }
+
+  // 2. Fetch the project root folder defined in Script Properties
+  let parentFolder;
+  const rootFolderId = getConfigProperty('ROOT_FOLDER_ID', '') || getConfigProperty('TRAINING_FOLDER_ID', '') || getConfigProperty('DRIVE_ROOT_FOLDER_ID', '');
+
+  if (rootFolderId) {
+    try {
+      parentFolder = DriveApp.getFolderById(rootFolderId);
+    } catch (e) {
+      Logger.log('Could not open project root folder (' + rootFolderId + '): ' + e.message);
+    }
+  }
+
+  // Fallback to getOrCreateRootFolder() or root drive if no specific ID matched
+  if (!parentFolder) {
+    try {
+      parentFolder = getOrCreateRootFolder();
+    } catch(e) {
+      parentFolder = DriveApp.getRootFolder();
+    }
+  }
+
+  // 3. Find or create the "Reports" folder inside the project root folder
+  let repFolderIter = parentFolder.getFoldersByName('Reports');
+  let repFolder = repFolderIter.hasNext() ? repFolderIter.next() : parentFolder.createFolder('Reports');
+
+  return repFolder;
+}
+
+
+/**
  * Automatically creates a dedicated Google Drive workspace for a training programme.
  * Creates per-training sheets directly in the training folder (1 folder per training).
  * 
@@ -232,12 +277,7 @@ function createTrainingRequisitionForm(code, training, targetFolderId, requester
     sheet.getRange('A10').setValue('Reasons for Training:');
     setTemplateValue('A11:I12', training.Objectives || training.Reason || '');
 
-    // Ensure template sign headers in Row 40 remain intact
-    sheet.getRange('A40').setValue('REQUEST BY');
-    sheet.getRange('C40').setValue('VERIFIED BY HEAD OF DEPARTMENT');
-    sheet.getRange('D40').setValue('APPROVED BY C-SUITE');
-    sheet.getRange('F40').setValue('APPROVED BY HOHR');
-    sheet.getRange('H40').setValue('ACKNOWLEDGED BY HR DEPARTMENT');
+    // Preserve original template header rows 39 and 40 (columns A to I) completely untouched
 
     if (requesterSigData) {
       const empNo    = requesterSigData.employeeNo || requesterSigData.EmployeeNo || requesterSigData.EmployeeID || requesterSigData.ID || '';
@@ -305,12 +345,7 @@ function updateTrainingRequisitionSignatures(trainingId, step, sigData, targetFo
         const ss = SpreadsheetApp.openById(file.getId());
         const sheet = ss.getSheetByName('Training Form') || ss.getSheets()[0];
 
-        // Ensure template sign headers in Row 40 remain intact
-        sheet.getRange('A40').setValue('REQUEST BY');
-        sheet.getRange('C40').setValue('VERIFIED BY HEAD OF DEPARTMENT');
-        sheet.getRange('D40').setValue('APPROVED BY C-SUITE');
-        sheet.getRange('F40').setValue('APPROVED BY HOHR');
-        sheet.getRange('H40').setValue('ACKNOWLEDGED BY HR DEPARTMENT');
+        // Do not modify or delete template rows 39-40 (columns A to I)
 
     const empNo    = sigData.employeeNo || sigData.EmployeeNo || sigData.EmployeeID || sigData.ID || '';
     const empName  = sigData.name || sigData.EmployeeName || sigData.Name || '';

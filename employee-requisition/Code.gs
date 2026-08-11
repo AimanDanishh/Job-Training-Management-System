@@ -648,7 +648,7 @@ function submitEmployeeRequisition(data) {
       else if (currentApprovalStatus === 'Pending HOHR Approval' && hohrEmail) recipientEmail = hohrEmail;
       else if (currentApprovalStatus === 'Approved') recipientEmail = 'arina.ismail@apollofood.com.my';
 
-      const subject = `[TrainHub DRAFT] ${isEditing ? 'RESUBMITTED' : 'NEW'} Training Requisition ${currentApprovalStatus} - ${data.TrainingName}`;
+      const subject = `Training Requisition — ${data.TrainingName} | ${id}`;
       const body = `Dear Approver / Manager,\n\nA Training Requisition Form (AP-HRD-F01-01) has been ${isEditing ? 'RESUBMITTED following updates by the employee' : 'submitted'}:\n\n` +
         `Requester: ${emp.Name || data.EmployeeID} (${emp.Department || 'N/A'})\n` +
         `Employee ID: ${emp.ID || data.EmployeeID}\n` +
@@ -663,9 +663,31 @@ function submitEmployeeRequisition(data) {
         `\nPlease review the request details:\n${reviewUrl}\n\n` +
         `Thank you,\nTrainHub Training Management System`;
 
+      const proposedDateStr = (data.EndDate && data.EndDate !== data.StartDate)
+        ? `${formatDateForEmail(data.StartDate)} – ${formatDateForEmail(data.EndDate)}`
+        : formatDateForEmail(data.StartDate);
+
+      const htmlBody = buildTrainingRequisitionEmailHtml({
+        requestId: id,
+        trainingTitle: data.TrainingName,
+        requesterName: emp.Name || data.EmployeeID,
+        employeeId: emp.ID || data.EmployeeID,
+        department: emp.Department || data.Department || 'N/A',
+        category: data.Category || 'General',
+        proposedDate: proposedDateStr,
+        duration: formatDurationForEmail(data.Duration || 1, data.TotalHours || 8),
+        estimatedFee: formatFeeForEmail(data.CourseFee),
+        status: currentApprovalStatus,
+        reviewUrl: reviewUrl,
+        badgeText: 'ACTION REQUIRED',
+        headlineText: 'Training Requisition Requires Your Review',
+        greetingText: 'Dear Approver / Manager,',
+        introText: `A new training requisition has been ${isEditing ? 'resubmitted following updates by the employee' : 'submitted'} and is currently awaiting your review and approval.`
+      });
+
       if (recipientEmail) {
         try {
-          const draft = GmailApp.createDraft(recipientEmail, subject, body);
+          const draft = GmailApp.createDraft(recipientEmail, subject, body, { htmlBody: htmlBody });
           if (draft && draft.getId()) {
             draftStatus = `Draft created successfully (ID: ${draft.getId()}) for ${recipientEmail}`;
             Logger.log(draftStatus);

@@ -623,11 +623,18 @@ function submitHODDecision(data) {
       const hodPortalUrl = getConfigProperty('HOD_PORTAL_URL', '');
       const reviewUrl = hodPortalUrl ? `${hodPortalUrl}?page=review&id=${cleanId}` : getAppUrl();
 
+      const proposedDateStr = (currentT.EndDate && currentT.EndDate !== currentT.StartDate)
+        ? `${formatDateForEmail(currentT.StartDate)} – ${formatDateForEmail(currentT.EndDate)}`
+        : formatDateForEmail(currentT.StartDate);
+      const durationStr = formatDurationForEmail(currentT.Duration || 1, currentT.TotalHours || 8);
+      const feeStr = formatFeeForEmail(currentT.CourseFee);
+      const categoryStr = currentT.Category || 'General';
+
       // IF REJECTED OR RETURNED: Email the requester only
       if (validDecision === 'Rejected' || validDecision === 'Returned') {
-        const reqSubject = `[TrainHub] Training Requisition Request ${validDecision.toUpperCase()} - ${trainingName}`;
+        const reqSubject = `Training Requisition — ${trainingName} | ${cleanId}`;
         const reqBody = `Dear ${requesterName},\n\n` +
-          `Your Training Requisition Request for "${trainingName}" (${trainingCode}) has been ${validDecision.toUpperCase()}.\n\n` +
+          `Your Training Requisition Request for "${trainingName}" (${cleanId}) has been ${validDecision.toUpperCase()}.\n\n` +
           `Decision Status: ${validDecision.toUpperCase()}\n` +
           `Reviewed By: ${hodName} (${hodId})\n` +
           `Position: ${hodPosition}\n` +
@@ -639,35 +646,39 @@ function submitHODDecision(data) {
             : 'This requisition request has been closed.\n\n') +
           `Thank you,\nTrainHub Training Management System`;
 
-        sendOrDraftEmail(requesterEmail, reqSubject, reqBody, 'requester', draftLog);
+        const reqHtml = buildTrainingRequisitionEmailHtml({
+          requestId: cleanId,
+          trainingTitle: trainingName,
+          requesterName: requesterName,
+          employeeId: requesterId,
+          department: requesterCostCentre,
+          category: categoryStr,
+          proposedDate: proposedDateStr,
+          duration: durationStr,
+          estimatedFee: feeStr,
+          status: validDecision,
+          reviewUrl: validDecision === 'Returned' ? reviewUrl : '',
+          badgeText: validDecision.toUpperCase(),
+          headlineText: `Training Requisition ${validDecision}`,
+          greetingText: `Dear ${requesterName},`,
+          introText: `Your Training Requisition Request for "${trainingName}" (${cleanId}) has been ${validDecision.toLowerCase()} by ${hodName}.${remarks ? ' Remarks: ' + remarks : ''}`
+        });
+
+        sendOrDraftEmail(requesterEmail, reqSubject, reqBody, 'requester', draftLog, reqHtml);
       }
 
-      // IF APPROVED: Email requester status AND email the next approver (or Arina if final)
+      // IF APPROVED: Email the next approver (or Requester + Arina if final complete approval)
       else if (validDecision === 'Approved') {
-        // Step 1: HOD Approved -> Pending C-Suite Approval
+        // Step 1: HOD Approved -> Pending C-Suite Approval (Only notify C-Suite Executive)
         if (nextApprovalStatus === 'Pending C-Suite Approval') {
-          // Notification to Requester
-          const reqSubject = `[TrainHub] Training Requisition Approved by HOD - Pending C-Suite Approval - ${trainingName}`;
-          const reqBody = `Dear ${requesterName},\n\n` +
-            `Your Training Requisition Request for "${trainingName}" (${trainingCode}) has been APPROVED by your Head of Department (${hodName}) and is now submitted for C-Suite approval.\n\n` +
-            `Decision Status: PENDING C-SUITE APPROVAL\n` +
-            `HOD Approver: ${hodName} (${hodId})\n` +
-            `Department / Cost Centre: ${hodCostCentre}\n` +
-            `Timestamp: ${timestamp}\n` +
-            `HOD Remarks: ${remarks || 'Approved by HOD.'}\n\n` +
-            `Thank you,\nTrainHub Training Management System`;
-
-          sendOrDraftEmail(requesterEmail, reqSubject, reqBody, 'requester', draftLog);
-
-          // Resolve the requester's specific C-Suite Executive based on requester's Cost Centre / Department
           const requesterCostCentre = currentT.CostCentre || currentT.Department || currentT['Cost Centre'] || currentT['CostCentre'] || hodCostCentre;
           const csProfile = resolveCSuiteProfileForRequester(requesterCostCentre, requesterId);
           const csuiteEmail = csProfile.Email || auth.hod.CsuiteEmail || getConfigProperty('CSUITE_EMAIL', '') || auth.hod.Email;
           const csuiteName = csProfile.Name || auth.hod.CsuiteName || 'C-Suite Executive';
 
-          const csSubject = `[TrainHub] Action Required: Training Requisition Pending C-Suite Approval - ${trainingName}`;
+          const csSubject = `Training Requisition — ${trainingName} | ${cleanId}`;
           const csBody = `Dear ${csuiteName},\n\n` +
-            `A Training Requisition Request for "${trainingName}" (${trainingCode}) submitted by ${requesterName} (${requesterId}) has been APPROVED by Head of Department (${hodName}) and requires your managerial approval.\n\n` +
+            `A Training Requisition Request for "${trainingName}" (${cleanId}) submitted by ${requesterName} (${requesterId}) has been APPROVED by Head of Department (${hodName}) and requires your managerial approval.\n\n` +
             `Training Name: ${trainingName}\n` +
             `Requester: ${requesterName} (${requesterId})\n` +
             `Requester Department / Cost Centre: ${requesterCostCentre}\n` +
@@ -677,32 +688,36 @@ function submitHODDecision(data) {
             `Please review and issue your digital approval in the TrainHub HOD Portal:\n${reviewUrl}\n\n` +
             `Thank you,\nTrainHub Training Management System`;
 
-          sendOrDraftEmail(csuiteEmail, csSubject, csBody, `C-Suite [${csuiteName}]`, draftLog);
+          const csHtml = buildTrainingRequisitionEmailHtml({
+            requestId: cleanId,
+            trainingTitle: trainingName,
+            requesterName: requesterName,
+            employeeId: requesterId,
+            department: requesterCostCentre,
+            category: categoryStr,
+            proposedDate: proposedDateStr,
+            duration: durationStr,
+            estimatedFee: feeStr,
+            status: 'Pending C-Suite Approval',
+            reviewUrl: reviewUrl,
+            badgeText: 'ACTION REQUIRED',
+            headlineText: 'Training Requisition Requires Your Review',
+            greetingText: `Dear ${csuiteName},`,
+            introText: `A Training Requisition Request for "${trainingName}" (${cleanId}) submitted by ${requesterName} (${requesterId}) has been APPROVED by Head of Department (${hodName}) and is currently awaiting your review and approval.`
+          });
+
+          sendOrDraftEmail(csuiteEmail, csSubject, csBody, `C-Suite [${csuiteName}]`, draftLog, csHtml);
         }
 
-        // Step 2: C-Suite Approved -> Pending HOHR Approval
+        // Step 2: C-Suite Approved -> Pending HOHR Approval (Only notify Head of HR)
         else if (nextApprovalStatus === 'Pending HOHR Approval') {
-          // Notification to Requester
-          const reqSubject = `[TrainHub] Training Requisition Approved by C-Suite - Pending HOHR Approval - ${trainingName}`;
-          const reqBody = `Dear ${requesterName},\n\n` +
-            `Your Training Requisition Request for "${trainingName}" (${trainingCode}) has been APPROVED by C-Suite Executive (${hodName}) and is now submitted for Head of HR approval.\n\n` +
-            `Decision Status: PENDING HOHR APPROVAL\n` +
-            `C-Suite Approver: ${hodName} (${hodId})\n` +
-            `Department / Cost Centre: ${hodCostCentre}\n` +
-            `Timestamp: ${timestamp}\n` +
-            `Remarks: ${remarks || 'Approved by C-Suite.'}\n\n` +
-            `Thank you,\nTrainHub Training Management System`;
-
-          sendOrDraftEmail(requesterEmail, reqSubject, reqBody, 'requester', draftLog);
-
-          // HOHR is identical for ALL employees across the organization
           const hrProfile = getHOHREmailProfile();
           const hohrEmail = hrProfile.Email || auth.hod.HohrEmail || getConfigProperty('HOHR_EMAIL', '') || 'hohr@apollofood.com.my';
           const hohrName = hrProfile.Name || auth.hod.HohrName || 'Head of HR';
 
-          const hrSubject = `[TrainHub] Action Required: Training Requisition Pending HOHR Approval - ${trainingName}`;
+          const hrSubject = `Training Requisition — ${trainingName} | ${cleanId}`;
           const hrBody = `Dear ${hohrName},\n\n` +
-            `A Training Requisition Request for "${trainingName}" (${trainingCode}) has received C-Suite approval and now requires final Head of HR approval.\n\n` +
+            `A Training Requisition Request for "${trainingName}" (${cleanId}) has received C-Suite approval and now requires final Head of HR approval.\n\n` +
             `Training Name: ${trainingName}\n` +
             `Requester: ${requesterName} (${requesterId})\n` +
             `C-Suite Approver: ${hodName} (${hodId})\n` +
@@ -712,16 +727,33 @@ function submitHODDecision(data) {
             `Please review and issue your digital approval in the TrainHub HOD Portal:\n${reviewUrl}\n\n` +
             `Thank you,\nTrainHub Training Management System`;
 
-          sendOrDraftEmail(hohrEmail, hrSubject, hrBody, `HOHR [${hohrName}]`, draftLog);
+          const hrHtml = buildTrainingRequisitionEmailHtml({
+            requestId: cleanId,
+            trainingTitle: trainingName,
+            requesterName: requesterName,
+            employeeId: requesterId,
+            department: requesterCostCentre,
+            category: categoryStr,
+            proposedDate: proposedDateStr,
+            duration: durationStr,
+            estimatedFee: feeStr,
+            status: 'Pending HOHR Approval',
+            reviewUrl: reviewUrl,
+            badgeText: 'ACTION REQUIRED',
+            headlineText: 'Training Requisition Requires Your Review',
+            greetingText: `Dear ${hohrName},`,
+            introText: `A Training Requisition Request for "${trainingName}" (${cleanId}) submitted by ${requesterName} (${requesterId}) has received C-Suite approval and is currently awaiting your final Head of HR approval.`
+          });
+
+          sendOrDraftEmail(hohrEmail, hrSubject, hrBody, `HOHR [${hohrName}]`, draftLog, hrHtml);
         }
 
-
-        // Step 3: HOHR Approved -> Fully Approved
+        // Step 3: HOHR Approved -> Fully Approved (Complete Approval: Notify Requester + Arina)
         else if (nextApprovalStatus === 'Approved') {
-          // Notification to Requester
-          const reqSubject = `[TrainHub] Training Requisition Fully Approved! - ${trainingName}`;
+          // Complete Approval Notification to Requester
+          const reqSubject = `Training Requisition — ${trainingName} | ${cleanId}`;
           const reqBody = `Dear ${requesterName},\n\n` +
-            `Great news! Your Training Requisition Request for "${trainingName}" (${trainingCode}) has received ALL required managerial approvals (HOD, C-Suite, and Head of HR).\n\n` +
+            `Great news! Your Training Requisition Request for "${trainingName}" (${cleanId}) has received ALL required managerial approvals (HOD, C-Suite, and Head of HR).\n\n` +
             `Decision Status: APPROVED\n` +
             `Final Approver (HOHR): ${hodName} (${hodId})\n` +
             `Department / Cost Centre: ${hodCostCentre}\n` +
@@ -730,13 +762,31 @@ function submitHODDecision(data) {
             `The HR Training Administrator will now schedule training sessions and generate attendance links.\n\n` +
             `Thank you,\nTrainHub Training Management System`;
 
-          sendOrDraftEmail(requesterEmail, reqSubject, reqBody, 'requester', draftLog);
+          const reqHtml = buildTrainingRequisitionEmailHtml({
+            requestId: cleanId,
+            trainingTitle: trainingName,
+            requesterName: requesterName,
+            employeeId: requesterId,
+            department: requesterCostCentre,
+            category: categoryStr,
+            proposedDate: proposedDateStr,
+            duration: durationStr,
+            estimatedFee: feeStr,
+            status: 'Approved',
+            reviewUrl: '',
+            badgeText: 'APPROVED',
+            headlineText: 'Training Requisition Fully Approved!',
+            greetingText: `Dear ${requesterName},`,
+            introText: `Great news! Your Training Requisition Request for "${trainingName}" (${cleanId}) has received ALL required managerial approvals (HOD, C-Suite, and Head of HR).`
+          });
+
+          sendOrDraftEmail(requesterEmail, reqSubject, reqBody, 'requester', draftLog, reqHtml);
 
           // Notification to Arina (HR Admin)
-          const arinaSubject = `[TrainHub] Training Requisition Fully Approved & Ready for Session Setup - ${trainingName}`;
+          const arinaSubject = `Training Requisition — ${trainingName} | ${cleanId}`;
           const arinaBody = `Dear Arina,\n\n` +
             `The following Training Requisition has received all required approvals (HOD, C-Suite, HOHR):\n\n` +
-            `Training Name: ${trainingName} (${trainingCode})\n` +
+            `Training Name: ${trainingName} (${cleanId})\n` +
             `Requester: ${requesterName} (${requesterId})\n` +
             `HOHR Approved By: ${hodName} (${hodId})\n` +
             `Cost Centre: ${hodCostCentre}\n` +
@@ -744,7 +794,25 @@ function submitHODDecision(data) {
             `The Admin System can now proceed with session creation, QR code generation, and participant attendance tracking.\n\n` +
             `Thank you,\nTrainHub Training Management System`;
 
-          sendOrDraftEmail('arina.ismail@apollofood.com.my', arinaSubject, arinaBody, 'Arina (HR Admin)', draftLog);
+          const arinaHtml = buildTrainingRequisitionEmailHtml({
+            requestId: cleanId,
+            trainingTitle: trainingName,
+            requesterName: requesterName,
+            employeeId: requesterId,
+            department: requesterCostCentre,
+            category: categoryStr,
+            proposedDate: proposedDateStr,
+            duration: durationStr,
+            estimatedFee: feeStr,
+            status: 'Approved',
+            reviewUrl: '',
+            badgeText: 'ACTION REQUIRED',
+            headlineText: 'Training Requisition Fully Approved & Ready for Session Setup',
+            greetingText: 'Dear Arina,',
+            introText: `The Training Requisition for "${trainingName}" (${cleanId}) submitted by ${requesterName} (${requesterId}) has received all required approvals (HOD, C-Suite, HOHR) and is ready for session setup.`
+          });
+
+          sendOrDraftEmail('arina.ismail@apollofood.com.my', arinaSubject, arinaBody, 'Arina (HR Admin)', draftLog, arinaHtml);
         }
       }
     } catch (mailErr) {
@@ -770,10 +838,12 @@ function submitHODDecision(data) {
 /**
  * Helper function to create a Gmail Draft strictly (Drafts Only)
  */
-function sendOrDraftEmail(recipient, subject, body, logPrefix, draftLog) {
+function sendOrDraftEmail(recipient, subject, body, logPrefix, draftLog, htmlBody) {
   if (!recipient) return;
   try {
-    GmailApp.createDraft(recipient, subject, body);
+    const options = {};
+    if (htmlBody) options.htmlBody = htmlBody;
+    GmailApp.createDraft(recipient, subject, body, options);
     if (draftLog) draftLog.push(`Draft created for ${logPrefix} (${recipient})`);
   } catch (dErr) {
     Logger.log('GmailApp createDraft error: ' + dErr.message);

@@ -656,12 +656,7 @@ function createTrainingRequisitionForm(code, training, targetFolderId, requester
       }
     }
 
-    // Ensure template sign headers in Row 40 remain intact
-    sheet.getRange('A40').setValue('REQUEST BY');
-    sheet.getRange('C40').setValue('VERIFIED BY HEAD OF DEPARTMENT');
-    sheet.getRange('D40').setValue('APPROVED BY C-SUITE');
-    sheet.getRange('F40').setValue('APPROVED BY HOHR');
-    sheet.getRange('H40').setValue('ACKNOWLEDGED BY HR DEPARTMENT');
+    // Preserve original template header rows 39 and 40 (columns A to I) completely untouched
 
     if (requesterSigData) {
       const empNo    = requesterSigData.employeeNo || requesterSigData.EmployeeNo || requesterSigData.EmployeeID || requesterSigData.ID || '';
@@ -714,12 +709,7 @@ function updateTrainingRequisitionSignatures(trainingId, step, sigData, targetFo
     const ss = SpreadsheetApp.openById(formId);
     const sheet = ss.getSheetByName('Training Form') || ss.getSheets()[0];
 
-    // Ensure template sign headers in Row 40 remain intact
-    sheet.getRange('A40').setValue('REQUEST BY');
-    sheet.getRange('C40').setValue('VERIFIED BY HEAD OF DEPARTMENT');
-    sheet.getRange('D40').setValue('APPROVED BY C-SUITE');
-    sheet.getRange('F40').setValue('APPROVED BY HOHR');
-    sheet.getRange('H40').setValue('ACKNOWLEDGED BY HR DEPARTMENT');
+    // Do not modify or delete template rows 39-40 (columns A to I)
 
     const empNo    = sigData.employeeNo || sigData.EmployeeNo || sigData.EmployeeID || sigData.ID || '';
     const empName  = sigData.name || sigData.EmployeeName || sigData.Name || '';
@@ -977,4 +967,268 @@ function resetRequisitionFormApprovals(formId) {
   } catch(e) {
     Logger.log('resetRequisitionFormApprovals error: ' + e.message);
   }
+}
+
+/**
+ * Utility: Format dates cleanly for corporate email template (e.g. "7 August 2026")
+ */
+function formatDateForEmail(dateVal) {
+  if (!dateVal) return '';
+  try {
+    let d;
+    if (dateVal instanceof Date) {
+      d = dateVal;
+    } else {
+      const str = String(dateVal).trim();
+      if (str.includes('/')) {
+        const parts = str.split('/');
+        if (parts.length === 3) {
+          d = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+        }
+      }
+      if (!d || isNaN(d.getTime())) {
+        d = new Date(str);
+      }
+    }
+    if (isNaN(d.getTime())) return String(dateVal);
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+  } catch (e) {
+    return String(dateVal);
+  }
+}
+
+/**
+ * Utility: Format course fee for corporate email template (e.g. "RM 2,000.00")
+ */
+function formatFeeForEmail(feeVal) {
+  if (feeVal === undefined || feeVal === null || String(feeVal).trim() === '') return 'RM 0.00';
+  let str = String(feeVal).replace(/RM/gi, '').trim();
+  let num = parseFloat(str.replace(/,/g, ''));
+  if (isNaN(num)) return String(feeVal).startsWith('RM') ? String(feeVal) : `RM ${feeVal}`;
+  return 'RM ' + num.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/**
+ * Utility: Format duration for corporate email template (e.g. "1 day · 0.5 hours")
+ */
+function formatDurationForEmail(durationVal, hoursVal) {
+  const d = durationVal || 1;
+  const h = hoursVal !== undefined && hoursVal !== null ? hoursVal : (d * 8);
+  return `${d} day${d > 1 ? 's' : ''} · ${h} hour${h > 1 ? 's' : ''}`;
+}
+
+/**
+ * Generates a modern corporate HTML email for Training Requisition approval workflow.
+ *
+ * @param {Object} params
+ * @param {string} params.requestId - Request ID (e.g. TRN-7190)
+ * @param {string} params.trainingTitle - Training Name
+ * @param {string} params.requesterName - Requester Name
+ * @param {string} params.employeeId - Employee ID
+ * @param {string} params.department - Department / Cost Centre
+ * @param {string} params.category - Training Category
+ * @param {string} params.proposedDate - Proposed Date(s)
+ * @param {string} params.duration - Duration text
+ * @param {string} params.estimatedFee - Formatted fee text
+ * @param {string} params.status - Current status text
+ * @param {string} params.reviewUrl - Direct review link
+ * @param {string} [params.badgeText] - Badge label (default: ACTION REQUIRED)
+ * @param {string} [params.headlineText] - Email main headline
+ * @param {string} [params.greetingText] - Greeting text
+ * @param {string} [params.introText] - Short intro description
+ * @returns {string} Fully styled HTML string for email body
+ */
+function buildTrainingRequisitionEmailHtml(params) {
+  const requestId = params.requestId || 'TRN-0000';
+  const trainingTitle = params.trainingTitle || 'Training Request';
+  const requesterName = params.requesterName || 'Employee Requester';
+  const employeeId = params.employeeId || 'N/A';
+  const department = params.department || 'N/A';
+  const category = params.category || 'General';
+  const proposedDate = params.proposedDate || 'N/A';
+  const duration = params.duration || '1 day';
+  const estimatedFee = params.estimatedFee || 'RM 0.00';
+  const status = params.status || 'Pending HOD Approval';
+  const reviewUrl = params.reviewUrl || '';
+  
+  const badgeText = params.badgeText || 'ACTION REQUIRED';
+  const headlineText = params.headlineText || 'Training Requisition Requires Your Review';
+  const greetingText = params.greetingText || 'Dear Approver / Manager,';
+  const introText = params.introText || 'A new training requisition has been submitted and is currently awaiting your review and approval.';
+
+  // Status background & border colors depending on status
+  let statusBg = '#FFFBEB';
+  let statusBorder = '#F59E0B';
+  let statusText = '#78350F';
+  let badgeBg = '#FEF3C7';
+  let badgeBorder = '#FCD34D';
+  let badgeColor = '#92400E';
+
+  const statusLower = String(status).toLowerCase();
+  if (statusLower.includes('approved')) {
+    statusBg = '#ECFDF5';
+    statusBorder = '#10B981';
+    statusText = '#065F46';
+    badgeBg = '#D1FAE5';
+    badgeBorder = '#6EE7B7';
+    badgeColor = '#065F46';
+  } else if (statusLower.includes('reject')) {
+    statusBg = '#FEF2F2';
+    statusBorder = '#EF4444';
+    statusText = '#991B1B';
+    badgeBg = '#FEE2E2';
+    badgeBorder = '#FCA5A5';
+    badgeColor = '#991B1B';
+  } else if (statusLower.includes('return')) {
+    statusBg = '#EFF6FF';
+    statusBorder = '#3B82F6';
+    statusText = '#1E40AF';
+    badgeBg = '#DBEAFE';
+    badgeBorder = '#93C5FD';
+    badgeColor = '#1E40AF';
+  }
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Training Requisition</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #EEF1F5; font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; -webkit-font-smoothing: antialiased; -webkit-text-size-adjust: none; width: 100% !important;">
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #EEF1F5; table-layout: fixed; padding: 20px 0;">
+        <tr>
+            <td align="center" style="padding: 10px;">
+                <!-- Main Email Card -->
+                <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 680px; background-color: #FFFFFF; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); border: 1px solid #E3E7EC;">
+                    
+                    <!-- Header -->
+                    <tr>
+                        <td style="background-color: #17365D; padding: 28px 32px; text-align: left;">
+                            <div style="font-size: 26px; font-weight: 800; color: #FFFFFF; letter-spacing: 1.5px; line-height: 1.2; text-transform: uppercase; margin: 0;">TRAINHUB</div>
+                            <div style="font-size: 11px; font-weight: 600; color: rgba(255, 255, 255, 0.75); letter-spacing: 2px; text-transform: uppercase; margin-top: 4px;">Training Management System</div>
+                        </td>
+                    </tr>
+
+                    <!-- Body Content -->
+                    <tr>
+                        <td style="padding: 32px 32px 24px 32px;">
+                            
+                            <!-- Badge -->
+                            <div style="margin-bottom: 16px;">
+                                <span style="display: inline-block; background-color: ${badgeBg}; color: ${badgeColor}; border: 1px solid ${badgeBorder}; border-radius: 12px; padding: 4px 12px; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;">${badgeText}</span>
+                            </div>
+
+                            <!-- Title Headline -->
+                            <h1 style="color: #101828; font-size: 20px; font-weight: 700; margin: 0 0 16px 0; line-height: 1.3;">${headlineText}</h1>
+
+                            <!-- Intro Text -->
+                            <p style="color: #475467; font-size: 14px; line-height: 1.6; margin: 0 0 8px 0;">${greetingText}</p>
+                            <p style="color: #475467; font-size: 14px; line-height: 1.6; margin: 0 0 24px 0;">${introText}</p>
+
+                            <!-- Requisition Card -->
+                            <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #FFFFFF; border: 1px solid #E3E7EC; border-radius: 8px; border-collapse: separate; margin-bottom: 20px;">
+                                <tr>
+                                    <td style="padding: 24px;">
+                                        <!-- Header Label -->
+                                        <div style="color: #667085; font-size: 11px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 8px;">TRAINING REQUISITION</div>
+                                        
+                                        <!-- Main Prominent Training Title -->
+                                        <div style="color: #17365D; font-size: 20px; font-weight: 700; line-height: 1.3; margin-bottom: 4px;">${trainingTitle}</div>
+                                        
+                                        <!-- Request ID -->
+                                        <div style="color: #667085; font-size: 13px; font-weight: 500; margin-bottom: 20px;">Request ID: ${requestId}</div>
+
+                                        <!-- Divider line -->
+                                        <div style="border-bottom: 1px solid #E3E7EC; margin-bottom: 20px;"></div>
+
+                                        <!-- Details Table -->
+                                        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                                            <tr>
+                                                <td style="color: #667085; font-size: 13px; font-weight: 600; width: 140px; padding: 6px 12px 6px 0; vertical-align: top;">Requester</td>
+                                                <td style="color: #101828; font-size: 14px; font-weight: 500; padding: 6px 0; vertical-align: top;">${requesterName}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #667085; font-size: 13px; font-weight: 600; padding: 6px 12px 6px 0; vertical-align: top;">Employee ID</td>
+                                                <td style="color: #101828; font-size: 14px; font-weight: 500; padding: 6px 0; vertical-align: top;">${employeeId}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #667085; font-size: 13px; font-weight: 600; padding: 6px 12px 6px 0; vertical-align: top;">Department</td>
+                                                <td style="color: #101828; font-size: 14px; font-weight: 500; padding: 6px 0; vertical-align: top;">${department}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #667085; font-size: 13px; font-weight: 600; padding: 6px 12px 6px 0; vertical-align: top;">Category</td>
+                                                <td style="color: #101828; font-size: 14px; font-weight: 500; padding: 6px 0; vertical-align: top;">${category}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #667085; font-size: 13px; font-weight: 600; padding: 6px 12px 6px 0; vertical-align: top;">Proposed Date</td>
+                                                <td style="color: #101828; font-size: 14px; font-weight: 500; padding: 6px 0; vertical-align: top;">${proposedDate}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #667085; font-size: 13px; font-weight: 600; padding: 6px 12px 6px 0; vertical-align: top;">Duration</td>
+                                                <td style="color: #101828; font-size: 14px; font-weight: 500; padding: 6px 0; vertical-align: top;">${duration}</td>
+                                            </tr>
+                                        </table>
+
+                                        <!-- Estimated Training Fee Card -->
+                                        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #F8FAFC; border: 1px solid #E3E7EC; border-radius: 6px; border-collapse: separate; margin-top: 20px;">
+                                            <tr>
+                                                <td style="padding: 16px 20px;">
+                                                    <div style="color: #667085; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 4px;">ESTIMATED TRAINING FEE</div>
+                                                    <div style="color: #17365D; font-size: 22px; font-weight: 800;">${estimatedFee}</div>
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Current Status Section -->
+                            <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: ${statusBg}; border-left: 4px solid ${statusBorder}; border-top: 1px solid #E3E7EC; border-right: 1px solid #E3E7EC; border-bottom: 1px solid #E3E7EC; border-radius: 0 6px 6px 0; border-collapse: separate; margin-bottom: 28px;">
+                                <tr>
+                                    <td style="padding: 14px 18px;">
+                                        <div style="color: ${statusText}; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 4px;">CURRENT STATUS</div>
+                                        <div style="color: ${statusText}; font-size: 16px; font-weight: 700;">${status}</div>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Review Button (if reviewUrl provided) -->
+                            ${reviewUrl ? `
+                            <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto 16px auto;">
+                                <tr>
+                                    <td align="center" style="border-radius: 6px; background-color: #17365D;">
+                                        <a href="${reviewUrl}" target="_blank" style="display: inline-block; padding: 14px 32px; font-family: Arial, sans-serif; font-size: 14px; font-weight: 700; color: #FFFFFF; text-decoration: none; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.5px;">REVIEW TRAINING REQUEST</a>
+                                    </td>
+                                </tr>
+                            </table>
+                            ` : ''}
+
+                            <!-- Instruction Text -->
+                            <p style="color: #667085; font-size: 12px; text-align: center; margin: 12px 0 0 0; line-height: 1.5;">
+                                Review the request details and take the appropriate action through the TrainHub Training Management System.
+                            </p>
+
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #F8FAFC; border-top: 1px solid #E3E7EC; padding: 24px 32px; text-align: center;">
+                            <div style="font-size: 13px; font-weight: 700; color: #475467; margin-bottom: 6px;">TrainHub Training Management System</div>
+                            <div style="font-size: 12px; color: #98A2B3; line-height: 1.5;">
+                                This is an automated notification from the Training Management System.<br>
+                                Please do not reply directly to this email.
+                            </div>
+                        </td>
+                    </tr>
+
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>`;
 }

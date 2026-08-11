@@ -409,4 +409,18 @@ No | Training Title | Training Category | TNA Source | Training Mode | Training 
 3. Admin login (no option to change email)
 4. HOD portal (remove profile switcher), lock status after submit
 5. Participant UI: employee ID only
+6. Only allow view \& fill attendance and evaluation, after training got full approval only
+
+
+
+**Annual Training Plan:**
+1. TNA Source: Training Requisition Form
+
+2\. Training Mode: In-house or Public
+
+3\. Position: Name list (hyperlink)
+
+4\. Date format: 01st Jan 2026
+
+5\. Training status: Completed, On planning, On going, Pending
 
