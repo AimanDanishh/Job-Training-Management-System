@@ -4,7 +4,51 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <?!= include('style') ?>
-  <title>TrainHub — Reports</title>
+  <title>TrainHub — Reports & Annual Training Plan</title>
+  <style>
+    .filter-card {
+      background: #ffffff;
+      border: 1px solid #CBD5E1;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(15,23,42,0.04);
+    }
+    .report-table-wrapper {
+      overflow-x: auto;
+      border: 1px solid #CBD5E1;
+      border-radius: 10px;
+      background: #ffffff;
+      margin-top: 16px;
+    }
+    .table-report {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+    }
+    .table-report th {
+      background: #2563EB;
+      color: #ffffff;
+      font-weight: 700;
+      padding: 10px 12px;
+      border: 1px solid #1D4ED8;
+      text-align: center;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+    .table-report td {
+      padding: 9px 12px;
+      border: 1px solid #E2E8F0;
+      color: #1E293B;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+    .table-report tbody tr:nth-child(even) {
+      background: #F8FAFC;
+    }
+    .table-report tbody tr:hover {
+      background: #EFF6FF;
+    }
+  </style>
 </head>
 <body>
 <div class="app-shell">
@@ -13,60 +57,124 @@
 
   <div class="main-area">
     <header class="topbar">
-      <div style="flex:1"><h1 class="topbar-title">Reports</h1><p class="topbar-sub">Generate and export training analytics</p></div>
+      <div style="flex:1">
+        <h1 class="topbar-title">Reports & Annual Training Plan</h1>
+        <p class="topbar-sub">Filter training analytics, generate compliance reports, and export All-in-One Master Workbooks</p>
+      </div>
     </header>
 
     <main class="page-content">
-      <!-- Training selector -->
-      <div class="card-th mb-4">
-        <div class="row g-3 align-items-end">
-          <div class="col-md-6">
-            <label class="label-th">Select Training Programme</label>
-            <select id="sel-rep-t" class="input-th">
-              <option value="">— Select a training —</option>
+      <!-- Global Filter Card (Select filters first, then generate export) -->
+      <div class="filter-card mb-4">
+        <div style="font-size:14px; font-weight:700; color:#1E293B; margin-bottom:14px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px">
+          <div style="display:flex; align-items:center; gap:6px">
+            <span class="icon filled sm" style="color:#2563EB">filter_alt</span> Report & Export Filter Selection
+          </div>
+          <button class="btn-th" style="background:#7C3AED; color:#fff; border:none; font-size:12px; font-weight:700" onclick="exportMasterWorkbookDirect()">
+            <span class="icon sm">folder_zip</span> Export All-in-One Master Workbook (5 Tabs)
+          </button>
+        </div>
+
+        <div class="row g-3">
+          <!-- Report Requirement Selection -->
+          <div class="col-md-5">
+            <label class="label-th">Select Report Type <span class="required">*</span></label>
+            <select id="filter-report-type" class="input-th" onchange="onReportTypeChange()">
+              <option value="master">★ ALL-IN-ONE Master Workbook (All 5 Reports in 1 Sheet)</option>
+              <option value="hours">1. Training Hours (by year) (Cost Centre vs Month)</option>
+              <option value="cost">2. Training Cost (by year)</option>
+              <option value="title">3. Training Title Report</option>
+              <option value="employee">4. Employee Training Report</option>
+              <option value="atp">5. Annual Training Plan (ATP)</option>
+              <option value="single">6. Single Programme Detailed Summary</option>
             </select>
           </div>
+
+          <!-- Filter by Year -->
+          <div class="col-md-2">
+            <label class="label-th">Filter by Year</label>
+            <select id="filter-year" class="input-th">
+              <option value="2026" selected>2026</option>
+              <option value="2025">2025</option>
+              <option value="2027">2027</option>
+              <option value="All">All Years</option>
+            </select>
+          </div>
+
+          <!-- Filter by Month -->
+          <div class="col-md-2">
+            <label class="label-th">Filter by Month</label>
+            <select id="filter-month" class="input-th">
+              <option value="All">All Months (Jan — Dec)</option>
+              <option value="01">01 — January</option>
+              <option value="02">02 — February</option>
+              <option value="03">03 — March</option>
+              <option value="04">04 — April</option>
+              <option value="05">05 — May</option>
+              <option value="06">06 — June</option>
+              <option value="07">07 — July</option>
+              <option value="08">08 — August</option>
+              <option value="09">09 — September</option>
+              <option value="10">10 — October</option>
+              <option value="11">11 — November</option>
+              <option value="12">12 — December</option>
+            </select>
+          </div>
+
+          <!-- Filter by Cost Centre / Department -->
           <div class="col-md-3">
-            <button class="btn-th btn-primary" style="width:100%" onclick="loadReport()"><span class="icon sm">bar_chart</span>Generate Report</button>
+            <label class="label-th">Filter by Cost Centre / Dept</label>
+            <select id="filter-dept" class="input-th">
+              <option value="">All Cost Centres / Departments</option>
+            </select>
+          </div>
+
+          <!-- Filter by Training Title (Dropdown) -->
+          <div class="col-md-6" id="title-filter-container">
+            <label class="label-th">Filter by Training Title</label>
+            <select id="filter-training-title" class="input-th">
+              <option value="">All Training Titles</option>
+            </select>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="col-md-6 d-flex align-items-end gap-2">
+            <button class="btn-th btn-primary" style="flex:1" onclick="generateSelectedReport()">
+              <span class="icon sm">bar_chart</span> Generate Report
+            </button>
+            <button class="btn-th" style="background:#059669; color:#fff; border:none; flex:1" id="btn-export-excel" onclick="exportExcelCurrentReport()">
+              <span class="icon sm">table_chart</span> Export to Excel / Sheets
+            </button>
+            <button class="btn-th btn-secondary" onclick="exportPdfCurrentReport()" title="Export PDF">
+              <span class="icon sm">picture_as_pdf</span> PDF
+            </button>
           </div>
         </div>
       </div>
 
-      <!-- Report sections (shown after load) -->
-      <div id="report-content" style="display:none">
-        <!-- Programme header -->
-        <div class="card-th mb-4" id="rep-header"></div>
-
-        <!-- KPI stats -->
-        <div class="row g-3 mb-4" id="rep-stats"></div>
-
-        <!-- Attendance summary by day -->
-        <div class="card-th card-th-p0 mb-4">
-          <div class="card-header-row">
-            <span style="font-size:14px;font-weight:700">Attendance by Day</span>
-            <button class="btn-th btn-secondary btn-sm" onclick="exportSheet()"><span class="icon sm">download</span>Export to Sheet</button>
+      <!-- Report Output Display Container -->
+      <div id="report-output-card" class="card-th" style="display:none">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px" id="report-output-header">
+          <div>
+            <h3 style="font-size:16px; font-weight:800; color:#1E293B; margin:0 0 2px" id="report-output-title">Report Title</h3>
+            <p style="font-size:12px; color:#64748B; margin:0" id="report-output-sub">Generated report preview</p>
           </div>
-          <div style="overflow-x:auto">
-            <table class="table-th" id="rep-att-table">
-              <thead><tr><th>Day</th><th>Date</th><th>Total</th><th>Present</th><th>Absent</th><th>Late</th><th>Attendance %</th></tr></thead>
-              <tbody id="rep-att-tbody"></tbody>
-            </table>
+          <div style="display:flex; gap:8px">
+            <button class="btn-th btn-sm" style="background:#059669; color:#fff; border:none" onclick="exportExcelCurrentReport()">
+              <span class="icon sm">download</span> Download Excel (.xlsx)
+            </button>
           </div>
         </div>
 
-        <!-- Evaluation summary -->
-        <div class="card-th mb-4" id="rep-eval-summary"></div>
-
-        <!-- Export actions -->
-        <div class="card-th">
-          <div class="section-label">Export Options</div>
-          <div class="row g-3" id="export-cards"></div>
+        <div id="report-table-container" class="report-table-wrapper">
+          <div class="p-4 text-center" style="color:#94A3B8">Generating report preview...</div>
         </div>
       </div>
 
-      <div id="report-loading" style="display:none;text-align:center;padding:48px;color:#94A3B8">
-        <div class="spinner" style="margin:0 auto 12px;width:32px;height:32px;border-color:rgba(37,99,235,0.2);border-top-color:#2563EB"></div>
-        Generating report...
+      <!-- Loading Indicator -->
+      <div id="report-loading" style="display:none; text-align:center; padding:48px; color:#94A3B8">
+        <div class="spinner" style="margin:0 auto 12px; width:32px; height:32px; border-color:rgba(37,99,235,0.2); border-top-color:#2563EB"></div>
+        Processing report & preparing data...
       </div>
     </main>
   </div>
@@ -76,187 +184,545 @@
 <script>window.__TRAINHUB_PAGE__ = '<?!= currentPage ?>';</script>
 <?!= include('script') ?>
 <script>
-  let currentReportId = null;
+  let masterTrainingsList = [];
+  let masterCostCentresList = [];
+  let activeReportType = 'master';
 
   document.addEventListener('DOMContentLoaded', async () => {
     try {
-      const trainings = await callServer('getTrainings');
-      const sel = document.getElementById('sel-rep-t');
-      trainings.forEach(t => {
-        const o = document.createElement('option');
-        o.value = t.ID; o.textContent = `[${t.Code}] ${t.Name}`;
-        sel.appendChild(o);
-      });
-      const pid = getQueryParam('id');
-      if (pid) { sel.value = pid; loadReport(); }
-    } catch(e) { showToast(e.message, 'error'); }
+      const [trainings, depts] = await Promise.all([
+        callServer('getTrainings'),
+        callServer('getCostCentres').catch(() => [])
+      ]);
+
+      masterTrainingsList = Array.isArray(trainings) ? trainings : [];
+      masterCostCentresList = Array.isArray(depts) ? depts : [];
+
+      // Populate Training Title dropdown
+      const selTitle = document.getElementById('filter-training-title');
+      if (selTitle) {
+        selTitle.innerHTML = '<option value="">All Training Titles</option>' +
+          masterTrainingsList.map(t => `<option value="${t.Name}">[${t.Code}] ${t.Name}</option>`).join('');
+      }
+
+      // Populate Cost Centre dropdown
+      const selDept = document.getElementById('filter-dept');
+      if (selDept) {
+        selDept.innerHTML = '<option value="">All Cost Centres / Departments</option>' +
+          masterCostCentresList.map(d => `<option value="${d}">${d}</option>`).join('');
+      }
+
+      // Read URL query parameter for page deep-linking
+      const qpReport = getQueryParam('type');
+      const qpId     = getQueryParam('id');
+
+      if (qpReport) {
+        document.getElementById('filter-report-type').value = qpReport;
+      } else if (qpId) {
+        document.getElementById('filter-report-type').value = 'single';
+        document.getElementById('filter-training-title').value = qpId;
+      }
+
+      onReportTypeChange();
+      generateSelectedReport();
+
+    } catch(e) {
+      showToast('Error initializing report filter options: ' + e.message, 'error');
+    }
   });
 
-  async function loadReport() {
-    const id = document.getElementById('sel-rep-t').value;
-    if (!id) { showToast('Please select a training.', 'error'); return; }
-    currentReportId = id;
+  function onReportTypeChange() {
+    activeReportType = document.getElementById('filter-report-type').value;
+    const titleContainer = document.getElementById('title-filter-container');
 
-    document.getElementById('report-content').style.display = 'none';
-    document.getElementById('report-loading').style.display = '';
-
-    try {
-      const report = await callServer('generateReport', id);
-      renderReport(report);
-    } catch(e) {
-      showToast('Failed to generate report: ' + e.message, 'error');
-    } finally {
-      document.getElementById('report-loading').style.display = 'none';
+    if (activeReportType === 'single') {
+      if (titleContainer) titleContainer.style.display = 'block';
+    } else {
+      if (titleContainer) titleContainer.style.display = 'block';
     }
   }
 
-  function renderReport(report) {
-    const t   = report.training;
-    const att = report.attendance;
-    const ev  = report.evaluation;
-
-    const reqUrl = report.requisitionFormUrl || (t.RequisitionFormFileID ? `https://docs.google.com/spreadsheets/d/${t.RequisitionFormFileID}/edit` : '');
-
-    // Header
-    document.getElementById('rep-header').innerHTML = `
-      <div style="display:flex;gap:16px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap">
-        <div>
-          <span style="font-size:10.5px;font-family:monospace;color:#94A3B8;background:#F8FAFC;padding:2px 7px;border-radius:4px;border:1px solid #E2E8F0">${t.Code}</span>
-          <h2 style="font-size:20px;font-weight:800;color:#1E293B;margin:8px 0 6px;letter-spacing:-0.02em">${t.Name}</h2>
-          <div style="display:flex;gap:14px;flex-wrap:wrap">
-            ${[['person',t.Trainer],['location_on',t.Venue||'—'],['calendar_today',t.StartDate+' — '+(t.EndDate||'?')],['schedule',t.Duration+' days · '+t.TotalHours+' hours']].map(([ic,tx])=>
-              `<span style="display:flex;align-items:center;gap:4px;font-size:12px;color:#64748B"><span class="icon sm" style="color:#94A3B8">${ic}</span>${tx}</span>`
-            ).join('')}
-          </div>
-        </div>
-        <div style="text-align:right;flex-shrink:0">
-          <div style="font-size:11px;color:#94A3B8">Generated</div>
-          <div style="font-size:12px;color:#64748B;margin-bottom:6px">${report.generatedAt}</div>
-          ${statusBadge(t.Status)}
-        </div>
-      </div>
-
-      ${reqUrl ? `
-        <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:12px 16px;margin-top:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
-          <div>
-            <div style="font-size:13px;font-weight:700;color:#1D4ED8;display:flex;align-items:center;gap:6px">
-              <span class="icon sm">description</span> Training Requisition Form (Google Sheets)
-            </div>
-            <div style="font-size:11.5px;color:#3B82F6">Official programme requisition form auto-synced with participant data</div>
-          </div>
-          <a class="btn-th btn-primary btn-sm" style="text-decoration:none" href="${reqUrl}" target="_blank">
-            <span class="icon sm">open_in_new</span> Open Requisition Form
-          </a>
-        </div>
-      ` : ''}
-
-      <div style="background:#F8FAFC;border-radius:10px;padding:12px 16px;margin-top:16px">
-        <div class="section-label" style="margin-bottom:8px">Lifecycle Stage</div>
-        ${renderLifecycle(t.Stage||'Created')}
-      </div>
-    `;
-
-    // KPI stats
-    const attSum = att.summary || {};
-    const evalSum = ev.summary || {};
-    document.getElementById('rep-stats').innerHTML = [
-      { label:'Attendance Rate',    value:(attSum.pct||0)+'%',        color:'#22C55E', icon:'fact_check' },
-      { label:'Present Records',    value:attSum.present||0,          color:'#2563EB', icon:'how_to_reg' },
-      { label:'Absent Records',     value:attSum.absent||0,           color:'#EF4444', icon:'person_off' },
-      { label:'Evaluations Received',value:evalSum.evalCompleted||0,  color:'#8B5CF6', icon:'rate_review' },
-      { label:'Average Eval Score', value:evalSum.avgScore?evalSum.avgScore+'/5':'N/A', color:'#F59E0B', icon:'star' },
-    ].map(s => `
-      <div class="col-6 col-md-4 col-lg">
-        <div class="stat-card">
-          <span class="icon filled md" style="color:${s.color};margin-bottom:6px;display:block">${s.icon}</span>
-          <div class="stat-value" style="color:${s.color}">${s.value}</div>
-          <div class="stat-label">${s.label}</div>
-        </div>
-      </div>
-    `).join('');
-
-    // Attendance by day table
-    const days = att.days || [];
-    document.getElementById('rep-att-tbody').innerHTML = days.length
-      ? days.map(d => {
-          const records = d.records || [];
-          const present = records.filter(r => r.Status === 'Present').length;
-          const absent  = records.filter(r => r.Status === 'Absent').length;
-          const late    = records.filter(r => r.Status === 'Late').length;
-          const pct     = records.length ? Math.round(present / records.length * 100) : 0;
-          return `<tr>
-            <td style="font-weight:700">Day ${d.day}</td>
-            <td style="font-size:12px;color:#64748B">${d.date}</td>
-            <td style="font-size:13px;font-weight:500">${records.length}</td>
-            <td style="color:#22C55E;font-weight:600">${present}</td>
-            <td style="color:#EF4444;font-weight:600">${absent}</td>
-            <td style="color:#F59E0B;font-weight:600">${late}</td>
-            <td>
-              <div style="display:flex;align-items:center;gap:8px;min-width:120px">
-                ${progressBar(pct, pct>=90?'#22C55E':pct>=70?'#F59E0B':'#EF4444', 6)}
-                <span style="font-size:12px;font-weight:700;color:#1E293B;min-width:34px">${pct}%</span>
-              </div>
-            </td>
-          </tr>`;
-        }).join('')
-      : '<tr><td colspan="7" style="text-align:center;color:#94A3B8;padding:24px">No attendance data</td></tr>';
-
-    // Eval summary
-    document.getElementById('rep-eval-summary').innerHTML = `
-      <h4 style="font-size:14px;font-weight:700;color:#1E293B;margin:0 0 16px">Evaluation Summary</h4>
-      <div class="row g-3">
-        <div class="col-md-4">
-          <div style="background:#F0FDF4;border-radius:10px;padding:14px;text-align:center">
-            <div style="font-size:28px;font-weight:800;color:#22C55E">${evalSum.evalCompleted||0}</div>
-            <div style="font-size:12px;color:#64748B">Evaluations Completed</div>
-          </div>
-        </div>
-        <div class="col-md-4">
-          <div style="background:#F5F3FF;border-radius:10px;padding:14px;text-align:center">
-            <div style="font-size:28px;font-weight:800;color:#8B5CF6">${evalSum.avgScore||'—'}</div>
-            <div style="font-size:12px;color:#64748B">Average Score (out of 5)</div>
-          </div>
-        </div>
-        <div class="col-md-4">
-          <div style="background:#ECFEFF;border-radius:10px;padding:14px;text-align:center">
-            <div style="font-size:28px;font-weight:800;color:#0891B2">${evalSum.postCompleted||0}</div>
-            <div style="font-size:12px;color:#64748B">Post-Eval Completed</div>
-          </div>
-        </div>
-      </div>
-    `;
-
-    // Export cards
-    document.getElementById('export-cards').innerHTML = [
-      { title:'Export as PDF (.pdf)',              desc:'Generate and download complete formatted PDF summary report', icon:'picture_as_pdf', color:'#EF4444', action:'exportPdfFormat()' },
-      { title:'Export as Excel (.xlsx)',            desc:'Export full programme, attendance & evaluation data to Excel',  icon:'table_chart',    color:'#22C55E', action:'exportExcelFormat()' },
-      { title:'Training Evaluation Summary',       desc:'View aggregated evaluation responses',                         icon:'rate_review',    color:'#8B5CF6', action:'navTo("evaluation",{id:"'+id+'"})' },
-      { title:'Post Training Evaluation Summary',  desc:'View 6-month supervisor evaluation results',                  icon:'timeline',       color:'#F59E0B', action:'navTo("evaluation",{id:"'+id+'"})' },
-    ].map(r => `
-      <div class="col-md-6">
-        <div style="display:flex;gap:12px;align-items:flex-start;padding:14px;background:#F8FAFC;border-radius:10px;border:1px solid #F1F5F9;cursor:pointer;transition:background 0.12s"
-             onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='#F8FAFC'"
-             onclick="${r.action}">
-          <div style="width:36px;height:36px;border-radius:9px;background:${r.color}15;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <span class="icon" style="color:${r.color}">${r.icon}</span>
-          </div>
-          <div style="flex:1">
-            <div style="font-size:13px;font-weight:600;color:#1E293B;margin-bottom:2px">${r.title}</div>
-            <div style="font-size:11.5px;color:#94A3B8">${r.desc}</div>
-          </div>
-          <span class="icon sm" style="color:#94A3B8;flex-shrink:0">arrow_forward</span>
-        </div>
-      </div>
-    `).join('');
-
-    document.getElementById('report-content').style.display = '';
+  function getActiveFilters() {
+    return {
+      year:       document.getElementById('filter-year').value,
+      month:      document.getElementById('filter-month').value,
+      costCentre: document.getElementById('filter-dept').value,
+      title:      document.getElementById('filter-training-title').value
+    };
   }
 
-  async function exportPdfFormat() {
-    if (!currentReportId) { showToast('Select a training first.', 'error'); return; }
+  async function generateSelectedReport() {
+    activeReportType = document.getElementById('filter-report-type').value;
+    const filters = getActiveFilters();
+
+    const outputCard = document.getElementById('report-output-card');
+    const loadingEl  = document.getElementById('report-loading');
+    const tableContainer = document.getElementById('report-table-container');
+
+    if (outputCard) outputCard.style.display = 'none';
+    if (loadingEl)  loadingEl.style.display = 'block';
+
+    try {
+      if (activeReportType === 'single') {
+        const selTitle = filters.title;
+        let matchedT = masterTrainingsList.find(t => t.Name === selTitle || t.ID === selTitle || t.Code === selTitle);
+        if (!matchedT && masterTrainingsList.length > 0) matchedT = masterTrainingsList[0];
+
+        if (!matchedT) {
+          showToast('No training programme selected.', 'error');
+          return;
+        }
+
+        const reportData = await callServer('generateReport', matchedT.ID);
+        renderSingleProgrammeReport(reportData);
+      } else if (activeReportType === 'master') {
+        renderMasterReportPreview(filters);
+      } else {
+        const res = await callServer('getFilteredReportData', activeReportType, filters);
+        renderCustomReportTable(activeReportType, res, filters);
+      }
+      if (outputCard) outputCard.style.display = 'block';
+    } catch(e) {
+      showToast('Failed to generate report: ' + e.message, 'error');
+    } finally {
+      if (loadingEl) loadingEl.style.display = 'none';
+    }
+  }
+
+  async function renderMasterReportPreview(filters) {
+    const titleEl = document.getElementById('report-output-title');
+    const subEl   = document.getElementById('report-output-sub');
+    const tableContainer = document.getElementById('report-table-container');
+
+    const year = filters.year || '2026';
+    titleEl.textContent = `★ ALL-IN-ONE Master Training Report Workbook (${year})`;
+    subEl.textContent   = `Master workbook combining 5 distinct report tabs: Training Hours, Training Cost, Training Title, Employee, and Annual Training Plan (ATP)`;
+
+    const [hoursRes, costRes, titleRes, empRes, atpRes] = await Promise.all([
+      callServer('getFilteredReportData', 'hours', filters).catch(() => ({ rows: [] })),
+      callServer('getFilteredReportData', 'cost', filters).catch(() => ({ rows: [] })),
+      callServer('getFilteredReportData', 'title', filters).catch(() => ({ rows: [] })),
+      callServer('getFilteredReportData', 'employee', filters).catch(() => ({ rows: [] })),
+      callServer('getFilteredReportData', 'atp', filters).catch(() => ({ rows: [] }))
+    ]);
+
+    tableContainer.innerHTML = `
+      <div style="padding:20px; background:#F8FAFC">
+        <div style="background:#EFF6FF; border:1px solid #BFDBFE; border-radius:10px; padding:16px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px">
+          <div>
+            <div style="font-size:15px; font-weight:800; color:#1D4ED8; display:flex; align-items:center; gap:8px">
+              <span class="icon filled sm" style="color:#2563EB">library_books</span> Multi-Tab Master Report Package Ready
+            </div>
+            <div style="font-size:12px; color:#1E40AF; margin-top:2px">
+              All 5 reports generated and formatted into individual sheets in one single master workbook file.
+            </div>
+          </div>
+          <button class="btn-th" style="background:#7C3AED; color:#fff; border:none; font-weight:700; padding:10px 20px" onclick="exportMasterWorkbookDirect()">
+            <span class="icon sm">download</span> Download Master Workbook (.xlsx)
+          </button>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-md-4">
+            <div class="card-th" style="border-top:4px solid #2563EB">
+              <div style="font-size:12px; font-weight:700; color:#2563EB; text-transform:uppercase">Tab 1: Training Hours</div>
+              <div style="font-size:18px; font-weight:800; color:#1E293B; margin:4px 0">${(hoursRes.rows || []).length} Cost Centres</div>
+              <div style="font-size:11.5px; color:#64748B">Cost Centre vs Month matrix for ${year}</div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card-th" style="border-top:4px solid #16A34A">
+              <div style="font-size:12px; font-weight:700; color:#16A34A; text-transform:uppercase">Tab 2: Training Cost</div>
+              <div style="font-size:18px; font-weight:800; color:#1E293B; margin:4px 0">${(costRes.rows || []).length} Programmes</div>
+              <div style="font-size:11.5px; color:#64748B">Formatted cost breakdown & HRDF grant columns</div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card-th" style="border-top:4px solid #0891B2">
+              <div style="font-size:12px; font-weight:700; color:#0891B2; text-transform:uppercase">Tab 3: Training Title</div>
+              <div style="font-size:18px; font-weight:800; color:#1E293B; margin:4px 0">${(titleRes.rows || []).length} Enrolled Entries</div>
+              <div style="font-size:11.5px; color:#64748B">Employee details, dates, type & trainer</div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card-th" style="border-top:4px solid #D97706">
+              <div style="font-size:12px; font-weight:700; color:#D97706; text-transform:uppercase">Tab 4: Employee Report</div>
+              <div style="font-size:18px; font-weight:800; color:#1E293B; margin:4px 0">${(empRes.rows || []).length} Employees</div>
+              <div style="font-size:11.5px; color:#64748B">Total trainings attended & cumulative hours</div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card-th" style="border-top:4px solid #7C3AED">
+              <div style="font-size:12px; font-weight:700; color:#7C3AED; text-transform:uppercase">Tab 5: Annual Training Plan (ATP)</div>
+              <div style="font-size:18px; font-weight:800; color:#1E293B; margin:4px 0">${(atpRes.rows || []).length} Plan Entries</div>
+              <div style="font-size:11.5px; color:#64748B">Full annual plan matrix with planned/actual dates & pax</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:20px">
+          <h4 style="font-size:14px; font-weight:700; color:#1E293B; margin-bottom:10px">Preview: Tab 1 — Training Hours (Cost Centre vs Month)</h4>
+          ${buildHoursReportHtml(hoursRes, year)}
+        </div>
+      </div>
+    `;
+  }
+
+  // ─── Render Single Custom Report Table ───────────────────────────────────────
+  function renderCustomReportTable(type, data, filters) {
+    const titleEl = document.getElementById('report-output-title');
+    const subEl   = document.getElementById('report-output-sub');
+    const tableContainer = document.getElementById('report-table-container');
+
+    const year = filters.year || '2026';
+
+    if (type === 'hours') {
+      titleEl.textContent = `1. Training Hours Report (${year}) — Cost Centre vs Month`;
+      subEl.textContent   = `Training hours breakdown per month across all Cost Centres / Departments for ${year}`;
+      tableContainer.innerHTML = buildHoursReportHtml(data, year);
+    } else if (type === 'cost') {
+      titleEl.textContent = `2. Training Cost Report (${year})`;
+      subEl.textContent   = `Training cost breakdown by Training Title, Dates, and Pax for ${year}`;
+      tableContainer.innerHTML = buildCostReportHtml(data, year);
+    } else if (type === 'title') {
+      titleEl.textContent = `3. Training Title Report`;
+      subEl.textContent   = `Participant list & training session details by Training Title`;
+      tableContainer.innerHTML = buildTitleReportHtml(data);
+    } else if (type === 'employee') {
+      titleEl.textContent = `4. Employee Training Report`;
+      subEl.textContent   = `Employee training attendance & total hours summary`;
+      tableContainer.innerHTML = buildEmployeeReportHtml(data);
+    } else if (type === 'atp') {
+      titleEl.textContent = `Annual Training Plan (ATP) (${year})`;
+      subEl.textContent   = `Master Annual Training Plan matrix including planned & actual dates, duration, pax, and category`;
+      tableContainer.innerHTML = buildAtpReportHtml(data);
+    }
+  }
+
+  // ─── 1. Training Hours HTML Builder ──────────────────────────────────────────
+  function buildHoursReportHtml(data, year) {
+    const monthHeaders = data.monthHeaders || ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map(m => `${m}-${year.slice(-2)}`);
+    const rows = data.rows || [];
+
+    return `
+      <table class="table-report">
+        <thead>
+          <tr>
+            <th rowspan="2" style="min-width:180px">Cost Centre/Month</th>
+            <th colspan="12">Training Hours</th>
+            <th rowspan="2" style="min-width:100px">Total ${year}</th>
+            <th rowspan="2" style="min-width:140px">Total Training Hours ${year}</th>
+          </tr>
+          <tr>
+            ${monthHeaders.map(m => `<th>${m}</th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.length ? rows.map(r => `
+            <tr>
+              <td style="font-weight:700; color:#1E293B; background:#F8FAFC">${r.costCentre}</td>
+              ${(r.months || []).map(h => `<td style="text-align:center">${h > 0 ? `<strong>${h}</strong>` : '0'}</td>`).join('')}
+              <td style="text-align:center; font-weight:800; color:#2563EB; background:#EFF6FF">${r.totalYear} hrs</td>
+              <td style="text-align:center; font-weight:800; color:#059669; background:#ECFDF5">${r.totalHours} hrs</td>
+            </tr>
+          `).join('') : '<tr><td colspan="15" style="text-align:center; padding:24px; color:#94A3B8">No training hours data recorded for selected filters.</td></tr>'}
+        </tbody>
+      </table>
+    `;
+  }
+
+  // ─── 2. Training Cost HTML Builder ───────────────────────────────────────────
+  function buildCostReportHtml(data, year) {
+    const rows = data.rows || [];
+
+    return `
+      <table class="table-report">
+        <thead>
+          <tr>
+            <th rowspan="2" style="min-width:200px">Training Title</th>
+            <th rowspan="2">Training Date (From)</th>
+            <th rowspan="2">Training Date (To)</th>
+            <th rowspan="2">Total Participant</th>
+            <th colspan="8">Training Cost (RM)</th>
+            <th rowspan="2">Total Cost ${year}</th>
+            <th rowspan="2">Total HRDF Grant (RM)</th>
+          </tr>
+          <tr>
+            <th>Training Fees</th>
+            <th>Meal</th>
+            <th>Subsistance Allowance</th>
+            <th>Hotel Fees</th>
+            <th>Mileage Claim</th>
+            <th>Taxi Fees</th>
+            <th>Toll Fees</th>
+            <th>Flight</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.length ? rows.map(r => `
+            <tr>
+              <td style="font-weight:700; color:#1E293B">${r.trainingTitle}</td>
+              <td style="text-align:center">${r.dateFrom}</td>
+              <td style="text-align:center">${r.dateTo}</td>
+              <td style="text-align:center; font-weight:700; color:#2563EB">${r.totalParticipant} pax</td>
+              <td style="text-align:center; color:#94A3B8">—</td>
+              <td style="text-align:center; color:#94A3B8">—</td>
+              <td style="text-align:center; color:#94A3B8">—</td>
+              <td style="text-align:center; color:#94A3B8">—</td>
+              <td style="text-align:center; color:#94A3B8">—</td>
+              <td style="text-align:center; color:#94A3B8">—</td>
+              <td style="text-align:center; color:#94A3B8">—</td>
+              <td style="text-align:center; color:#94A3B8">—</td>
+              <td style="text-align:center; font-weight:700; color:#16A34A">RM ${r.totalCost || '0.00'}</td>
+              <td style="text-align:center; color:#94A3B8">—</td>
+            </tr>
+          `).join('') : '<tr><td colspan="14" style="text-align:center; padding:24px; color:#94A3B8">No cost records found for selected filters.</td></tr>'}
+        </tbody>
+      </table>
+    `;
+  }
+
+  // ─── 3. Training Title Report HTML Builder ───────────────────────────────────
+  function buildTitleReportHtml(data) {
+    const rows = data.rows || [];
+
+    return `
+      <table class="table-report">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Emp. No</th>
+            <th>Training Title</th>
+            <th>(EE)/Cost Centre Description</th>
+            <th>Training Type</th>
+            <th>Date (From)</th>
+            <th>Date (Until)</th>
+            <th>Month</th>
+            <th>Total Hours</th>
+            <th>Trainer</th>
+            <th>Training Provide</th>
+            <th>Expiry Date (if applicable)</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.length ? rows.map(r => `
+            <tr>
+              <td style="font-weight:700; color:#1E293B">${r.name}</td>
+              <td style="font-family:monospace; font-weight:700; color:#2563EB">${r.empNo}</td>
+              <td style="font-weight:600">${r.trainingTitle}</td>
+              <td>${r.costCentreDesc}</td>
+              <td><span class="badge-th badge-blue">${r.trainingType}</span></td>
+              <td style="text-align:center">${r.dateFrom}</td>
+              <td style="text-align:center">${r.dateUntil}</td>
+              <td style="text-align:center">${r.month}</td>
+              <td style="text-align:center; font-weight:700">${r.totalHours} hrs</td>
+              <td>${r.trainer}</td>
+              <td>${r.trainingProvider}</td>
+              <td style="text-align:center; color:#94A3B8">${r.expiryDate}</td>
+            </tr>
+          `).join('') : '<tr><td colspan="12" style="text-align:center; padding:24px; color:#94A3B8">No records found.</td></tr>'}
+        </tbody>
+      </table>
+    `;
+  }
+
+  // ─── 4. Employee Report HTML Builder ─────────────────────────────────────────
+  function buildEmployeeReportHtml(data) {
+    const rows = data.rows || [];
+
+    return `
+      <table class="table-report">
+        <thead>
+          <tr>
+            <th>No</th>
+            <th>Emp. No</th>
+            <th>Employee Name</th>
+            <th>Cost Centre / Department</th>
+            <th>Position</th>
+            <th>Total Trainings</th>
+            <th>Total Hours Completed</th>
+            <th>Attended Trainings</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.length ? rows.map(r => `
+            <tr>
+              <td style="text-align:center; font-weight:700">${r.no}</td>
+              <td style="font-family:monospace; font-weight:700; color:#2563EB">${r.empNo}</td>
+              <td style="font-weight:700; color:#1E293B">${r.name}</td>
+              <td>${r.costCentre}</td>
+              <td>${r.position}</td>
+              <td style="text-align:center; font-weight:700; color:#2563EB">${r.totalTrainings}</td>
+              <td style="text-align:center; font-weight:800; color:#059669">${r.totalHours} hrs</td>
+              <td style="font-size:11.5px; color:#64748B">${r.attendedList.join(', ') || '—'}</td>
+              <td>${statusBadge(r.status)}</td>
+            </tr>
+          `).join('') : '<tr><td colspan="9" style="text-align:center; padding:24px; color:#94A3B8">No employee records found.</td></tr>'}
+        </tbody>
+      </table>
+    `;
+  }
+
+  // ─── 5. ATP Report HTML Builder ──────────────────────────────────────────────
+  function buildAtpReportHtml(data) {
+    const rows = data.rows || [];
+
+    return `
+      <table class="table-report">
+        <thead>
+          <tr>
+            <th>No</th>
+            <th>Training Title</th>
+            <th>Training Category</th>
+            <th>TNA Source</th>
+            <th>Training Mode</th>
+            <th>Training Duration (hrs)</th>
+            <th>Trainer</th>
+            <th>Department</th>
+            <th>Position / Employee No</th>
+            <th>Total Pax</th>
+            <th>Planned Date</th>
+            <th>Actual Date (From)</th>
+            <th>Actual Date (To)</th>
+            <th>Training Status</th>
+            <th>Remarks</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.length ? rows.map(r => `
+            <tr>
+              <td style="text-align:center; font-weight:700">${r.no}</td>
+              <td style="font-weight:700; color:#1E293B">${r.trainingTitle}</td>
+              <td><span class="badge-th badge-purple">${r.trainingCategory}</span></td>
+              <td>${r.tnaSource}</td>
+              <td>${r.trainingMode}</td>
+              <td style="text-align:center; font-weight:700; color:#2563EB">${r.durationHours} hrs</td>
+              <td>${r.trainer}</td>
+              <td>${r.department}</td>
+              <td>${r.positionEmpNo}</td>
+              <td style="text-align:center; font-weight:700">${r.totalPax} pax</td>
+              <td style="text-align:center">${r.plannedDate}</td>
+              <td style="text-align:center">${r.actualDateFrom}</td>
+              <td style="text-align:center">${r.actualDateTo}</td>
+              <td>${statusBadge(r.trainingStatus)}</td>
+              <td style="font-size:11.5px; color:#64748B">${r.remarks}</td>
+            </tr>
+          `).join('') : '<tr><td colspan="15" style="text-align:center; padding:24px; color:#94A3B8">No Annual Training Plan entries found for selected filters.</td></tr>'}
+        </tbody>
+      </table>
+    `;
+  }
+
+  // ─── Single Programme Report Renderer ────────────────────────────────────────
+  function renderSingleProgrammeReport(report) {
+    const titleEl = document.getElementById('report-output-title');
+    const subEl   = document.getElementById('report-output-sub');
+    const tableContainer = document.getElementById('report-table-container');
+
+    const t = report.training;
+    titleEl.textContent = `6. Single Programme Report — [${t.Code}] ${t.Name}`;
+    subEl.textContent   = `Full detail summary for ${t.Name} generated on ${report.generatedAt}`;
+
+    const att = report.attendance || {};
+    const days = att.days || [];
+
+    tableContainer.innerHTML = `
+      <div style="padding:16px">
+        <div class="row g-3 mb-4">
+          <div class="col-md-3"><div class="stat-card"><div class="stat-value" style="color:#2563EB">${t.Category}</div><div class="stat-label">Category</div></div></div>
+          <div class="col-md-3"><div class="stat-card"><div class="stat-value" style="color:#16A34A">${t.Trainer}</div><div class="stat-label">Trainer</div></div></div>
+          <div class="col-md-3"><div class="stat-card"><div class="stat-value" style="color:#D97706">${t.Participants || 0} pax</div><div class="stat-label">Enrolled Pax</div></div></div>
+          <div class="col-md-3"><div class="stat-card"><div class="stat-value" style="color:#7C3AED">RM ${t.CourseFee || '0.00'}</div><div class="stat-label">Course Fee</div></div></div>
+        </div>
+
+        <h4 style="font-size:14px; font-weight:700; color:#1E293B; margin-bottom:10px">Attendance Breakdown by Day</h4>
+        <table class="table-report mb-4">
+          <thead>
+            <tr><th>Day</th><th>Date</th><th>Total Records</th><th>Present</th><th>Absent</th><th>Late</th><th>Rate (%)</th></tr>
+          </thead>
+          <tbody>
+            ${days.length ? days.map(d => {
+              const recs = d.records || [];
+              const pres = recs.filter(r => r.Status === 'Present').length;
+              const abs  = recs.filter(r => r.Status === 'Absent').length;
+              const late = recs.filter(r => r.Status === 'Late').length;
+              const pct  = recs.length ? Math.round(pres / recs.length * 100) : 0;
+              return `<tr>
+                <td style="font-weight:700">Day ${d.day}</td>
+                <td>${d.date}</td>
+                <td>${recs.length}</td>
+                <td style="color:#16A34A; font-weight:bold">${pres}</td>
+                <td style="color:#DC2626; font-weight:bold">${abs}</td>
+                <td style="color:#D97706">${late}</td>
+                <td><strong>${pct}%</strong></td>
+              </tr>`;
+            }).join('') : '<tr><td colspan="7" style="text-align:center; padding:16px; color:#94A3B8">No attendance records registered.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  // ─── Export Actions ─────────────────────────────────────────────────────────
+  async function exportExcelCurrentReport() {
+    activeReportType = document.getElementById('filter-report-type').value;
+    const filters = getActiveFilters();
+
+    showToast('Exporting to Excel spreadsheet...', 'info');
+
+    try {
+      if (activeReportType === 'single') {
+        const selTitle = filters.title;
+        let matchedT = masterTrainingsList.find(t => t.Name === selTitle || t.ID === selTitle || t.Code === selTitle);
+        if (!matchedT && masterTrainingsList.length > 0) matchedT = masterTrainingsList[0];
+        if (!matchedT) return;
+
+        const res = await callServer('exportReportExcel', matchedT.ID);
+        if (res && (res.downloadUrl || res.sheetUrl)) {
+          window.open(res.downloadUrl || res.sheetUrl, '_blank');
+          showToast('Excel report ready! Opening spreadsheet...', 'success');
+        }
+      } else {
+        const res = await callServer('exportFilteredReportExcel', activeReportType, filters);
+        if (res && (res.downloadUrl || res.sheetUrl)) {
+          window.open(res.downloadUrl || res.sheetUrl, '_blank');
+          showToast(res.message || 'Excel file generated! Downloading .xlsx / opening sheet...', 'success');
+        }
+      }
+    } catch(e) {
+      showToast('Export failed: ' + e.message, 'error');
+    }
+  }
+
+  async function exportMasterWorkbookDirect() {
+    const filters = getActiveFilters();
+    showToast('Generating Master All-in-One Report Workbook (All 5 Tabs)...', 'info');
+
+    try {
+      const res = await callServer('exportAllInOneMasterReportExcel', filters);
+      if (res && (res.downloadUrl || res.sheetUrl)) {
+        window.open(res.downloadUrl || res.sheetUrl, '_blank');
+        showToast('Master 5-Tab Workbook ready! Opening in Google Sheets...', 'success');
+      }
+    } catch(e) {
+      showToast('Master export failed: ' + e.message, 'error');
+    }
+  }
+
+  async function exportPdfCurrentReport() {
+    const filters = getActiveFilters();
+    const selTitle = filters.title;
+    let matchedT = masterTrainingsList.find(t => t.Name === selTitle || t.ID === selTitle || t.Code === selTitle);
+    if (!matchedT && masterTrainingsList.length > 0) matchedT = masterTrainingsList[0];
+    if (!matchedT) {
+      showToast('Please select a training title for PDF generation.', 'error');
+      return;
+    }
+
     showToast('Generating PDF report...', 'info');
     try {
-      const res = await callServer('exportReportPdf', currentReportId);
+      const res = await callServer('exportReportPdf', matchedT.ID);
       if (res && res.dataUri) {
         const link = document.createElement('a');
         link.href = res.dataUri;
@@ -264,24 +730,14 @@
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        showToast('PDF Report downloaded successfully!', 'success');
+        showToast('PDF downloaded successfully!', 'success');
       } else if (res && res.pdfUrl) {
         window.open(res.pdfUrl, '_blank');
-        showToast('PDF Report created in Google Drive!', 'success');
+        showToast('PDF created in Google Drive!', 'success');
       }
-    } catch(e) { showToast(e.message, 'error'); }
-  }
-
-  async function exportExcelFormat() {
-    if (!currentReportId) { showToast('Select a training first.', 'error'); return; }
-    showToast('Generating Excel report...', 'info');
-    try {
-      const res = await callServer('exportReportExcel', currentReportId);
-      if (res && (res.sheetUrl || res.downloadUrl)) {
-        window.open(res.sheetUrl || res.downloadUrl, '_blank');
-        showToast('Excel report generated! <a href="' + (res.downloadUrl || res.sheetUrl) + '" target="_blank" style="color:white;text-decoration:underline">Open / Download XLSX</a>', 'success');
-      }
-    } catch(e) { showToast(e.message, 'error'); }
+    } catch(e) {
+      showToast('PDF export error: ' + e.message, 'error');
+    }
   }
 </script>
 </body>

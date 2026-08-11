@@ -83,6 +83,74 @@
             <div class="stat-label">Pending 3-Mo Review</div>
           </div>
         </div>
+        <!-- Multi-Tier Training Approval Status Pipeline Card -->
+      <div class="card-th mb-4" style="background:#F8FAFC; border:1px solid #CBD5E1">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px">
+          <div>
+            <div style="font-size:14px; font-weight:700; color:#1E293B; display:flex; align-items:center; gap:6px">
+              <span class="icon filled sm" style="color:#2563EB">verified</span> Training Requisition Approval Pipeline Status
+            </div>
+            <div style="font-size:11.5px; color:#64748B">Real-time multi-tier approval tracking (HOD ➔ C-Suite ➔ HOHR ➔ Arina Acknowledgment)</div>
+          </div>
+          <button class="btn-th btn-secondary btn-sm" onclick="navTo('training')">
+            <span class="icon sm">filter_alt</span> View Approval Queue
+          </button>
+        </div>
+
+        <div class="row g-3">
+          <!-- HOD Approval -->
+          <div class="col-6 col-md-3">
+            <div style="background:#fff; border:1px solid #FEF3C7; border-left:4px solid #D97706; border-radius:10px; padding:12px; cursor:pointer"
+                 onclick="navTo('training')">
+              <div style="display:flex; justify-content:space-between; align-items:center">
+                <span style="font-size:11.5px; font-weight:600; color:#92400E">Needs HOD Approval</span>
+                <span class="icon sm" style="color:#D97706">hourglass_empty</span>
+              </div>
+              <div style="font-size:22px; font-weight:800; color:#D97706; margin-top:4px" id="app-hod-count">0</div>
+              <div style="font-size:10.5px; color:#B45309">Awaiting Department HOD</div>
+            </div>
+          </div>
+
+          <!-- C-Suite Approval -->
+          <div class="col-6 col-md-3">
+            <div style="background:#fff; border:1px solid #FFEDD5; border-left:4px solid #EA580C; border-radius:10px; padding:12px; cursor:pointer"
+                 onclick="navTo('training')">
+              <div style="display:flex; justify-content:space-between; align-items:center">
+                <span style="font-size:11.5px; font-weight:600; color:#9A3412">Needs C-Suite</span>
+                <span class="icon sm" style="color:#EA580C">gavel</span>
+              </div>
+              <div style="font-size:22px; font-weight:800; color:#EA580C; margin-top:4px" id="app-csuite-count">0</div>
+              <div style="font-size:10.5px; color:#C2410C">Awaiting Executive Approval</div>
+            </div>
+          </div>
+
+          <!-- HOHR Approval -->
+          <div class="col-6 col-md-3">
+            <div style="background:#fff; border:1px solid #FDE68A; border-left:4px solid #B45309; border-radius:10px; padding:12px; cursor:pointer"
+                 onclick="navTo('training')">
+              <div style="display:flex; justify-content:space-between; align-items:center">
+                <span style="font-size:11.5px; font-weight:600; color:#78350F">Needs HOHR</span>
+                <span class="icon sm" style="color:#B45309">badge</span>
+              </div>
+              <div style="font-size:22px; font-weight:800; color:#B45309; margin-top:4px" id="app-hohr-count">0</div>
+              <div style="font-size:10.5px; color:#92400E">Awaiting Head of HR</div>
+            </div>
+          </div>
+
+          <!-- Fully Approved -->
+          <div class="col-6 col-md-3">
+            <div style="background:#fff; border:1px solid #BBF7D0; border-left:4px solid #16A34A; border-radius:10px; padding:12px; cursor:pointer"
+                 onclick="navTo('training')">
+              <div style="display:flex; justify-content:space-between; align-items:center">
+                <span style="font-size:11.5px; font-weight:600; color:#166534">Fully Approved</span>
+                <span class="icon sm" style="color:#16A34A">check_circle</span>
+              </div>
+              <div style="font-size:22px; font-weight:800; color:#16A34A; margin-top:4px" id="app-approved-count">0</div>
+              <div style="font-size:10.5px; color:#15803D">Unlocked for Session / QR</div>
+            </div>
+          </div>
+        </div>
+      </div>
       </div>
 
       <!-- 3-Month Post Training Evaluation Alert Banner -->
@@ -167,6 +235,7 @@
         callServer('getTrainings')
       ]);
       const s = data.summary || {};
+      const app = data.approval || {};
       const tList = Array.isArray(trainings) ? trainings : [];
 
       document.getElementById('kpi-total').textContent     = s.total      || tList.length || 0;
@@ -175,6 +244,12 @@
       document.getElementById('kpi-completed').textContent = s.completed  || 0;
       document.getElementById('kpi-eval').textContent      = s.pendingEval|| 0;
       document.getElementById('kpi-post').textContent      = s.pendingPost|| 0;
+
+      // Approval status pipeline counts
+      document.getElementById('app-hod-count').textContent      = app.pendingHod || 0;
+      document.getElementById('app-csuite-count').textContent   = app.pendingCsuite || 0;
+      document.getElementById('app-hohr-count').textContent     = app.pendingHohr || 0;
+      document.getElementById('app-approved-count').textContent = app.approved || 0;
 
       // 3-Month Post Evaluation Notification Banner Check
       const threeMonthTrainings = tList.filter(t => t.isThreeMonthsReached || t.Stage === 'Waiting for 3-Month Review');
@@ -216,9 +291,10 @@
           <div style="font-size:13px;font-weight:700;color:#1E293B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.Name}</div>
           <div style="font-size:11.5px;color:#64748B;margin-top:2px">${p.Code} · ${p.StartDate} — ${p.EndDate||'TBD'}</div>
         </div>
-        <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
+        <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;flex-wrap:wrap">
           <span style="font-size:11.5px;font-weight:600;color:#64748B">${p.Participants || 0} pax</span>
           ${statusBadge(p.Status)}
+          ${approvalStatusBadge(p.ApprovalStatus || 'Approved')}
         </div>
       </div>
     `).join('');

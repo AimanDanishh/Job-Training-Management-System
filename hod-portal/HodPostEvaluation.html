@@ -3,7 +3,7 @@
 <head>
   <base target="_top">
   <meta charset="utf-8">
-  <title>TrainHub — HOD 3-Month Post Evaluation</title>
+  <title>TrainHub — 3-Month Post Evaluation Portal (HOD, C-Suite, HOHR)</title>
   <?!= include('style'); ?>
 </head>
 <body>
@@ -13,12 +13,12 @@
       <div class="brand-logo">
         <div class="brand-icon">E</div>
         <div>
-          <div class="brand-title">TrainHub HOD Post Evaluation</div>
-          <div class="brand-subtitle">3-Month Post-Training Employee Performance Review</div>
+          <div class="brand-title">TrainHub Post Evaluation Portal</div>
+          <div class="brand-subtitle">3-Month Post-Training Performance Review (HOD, C-Suite, HOHR)</div>
         </div>
       </div>
       <div class="hod-badge" id="hodProfileBadge">
-        <span>👤</span> <span id="badgeHodName">Loading HOD Profile...</span>
+        <span>👤</span> <span id="badgeHodName">Loading Approver Profile...</span>
       </div>
     </header>
 
@@ -32,6 +32,14 @@
         <div>
           <span class="badge badge-approved" id="evalCountBadge">0 PENDING EVALUATIONS</span>
         </div>
+      </div>
+
+      <!-- Select Training Programme box -->
+      <div style="margin-bottom:16px;">
+        <label class="data-label" style="font-size:13px;color:#60a5fa;">Select Training Programme to Evaluate</label>
+        <select id="postEvalTrainingSelect" class="form-control" onchange="onPostEvalTrainingSelectChange(this.value)" style="font-size:15px;padding:12px;background:#0f172a;color:#f8fafc;border-color:#3b82f6;">
+          <option value="">-- Loading available training programmes... --</option>
+        </select>
       </div>
 
       <!-- Pending Participants under HOD selection box -->
@@ -149,7 +157,19 @@
       }
     }
 
-    function loadPostEvalData() {
+    function getObjId(obj) {
+      if (!obj) return '';
+      return String(obj.ID || obj.Code || obj.TrainingID || obj['Training ID'] || obj.RequisitionID || obj['Requisition ID'] || '').trim();
+    }
+
+    function onPostEvalTrainingSelectChange(selectedId) {
+      if (!selectedId) return;
+      currentTrainingId = selectedId;
+      loadPostEvalData(selectedId);
+    }
+
+    function loadPostEvalData(trainingIdOverride) {
+      const targetId = trainingIdOverride || currentTrainingId;
       if (!userEmail) {
         alert('No registered HOD email address provided. Access denied.');
         return;
@@ -170,13 +190,29 @@
           hideLoading();
           showAlert('Failed to connect to server: ' + err.message, true);
         })
-        .getPendingPostEvalParticipants(currentTrainingId, userEmail);
+        .getPendingPostEvalParticipants(targetId, userEmail);
     }
 
     function renderPostEval(data) {
       currentHOD = data.hod;
       const t = data.training;
-      currentTrainingId = t.ID;
+      currentTrainingId = getObjId(t);
+
+      // Render Training Selector Dropdown
+      const trnSelect = document.getElementById('postEvalTrainingSelect');
+      const trnList = data.postEvalTrainings || [];
+      if (trnList.length > 0 && trnSelect) {
+        trnSelect.innerHTML = trnList.map(item => {
+          const tid = getObjId(item);
+          const tcode = item.Code || item.TrainingCode || item['Training Code'] || tid;
+          const tname = item.Name || item.TrainingName || item['Training Name'] || 'Training';
+          const isSelected = currentTrainingId && tid && String(tid).toLowerCase() === String(currentTrainingId).toLowerCase();
+          return `<option value="${tid}" ${isSelected ? 'selected' : ''}>[${tcode}] ${tname}</option>`;
+        }).join('');
+        if (currentTrainingId) {
+          trnSelect.value = currentTrainingId;
+        }
+      }
 
       document.getElementById('badgeHodName').innerText = `${currentHOD.Name} (${currentHOD.CostCentre})`;
       document.getElementById('evalTrainingTitle').innerText = t.Name || 'Training Programme';

@@ -272,7 +272,7 @@ Overall UI
 
 10/8/2026
 
-**TO DO (HOD portal):** 
+**TO DO (HOD portal):**
 
 1. Auto email for HOD portal
 2. Link real HOD details to HOD portal
@@ -280,12 +280,12 @@ Overall UI
 4. If status == Reject or Return, email the requester to notify the status
 5. If status == Approve, email the requester the status and email the next approval, for example (C-Suite), then after C-Suite approval, HOHR approval
 6. For now just save all the email to draft (development mode)
-7. In the signature part in the Training Requisition Form, the approval skip the Head of Department signature and directly to C-Suite, please fix it and fill the imformation correctly: Status: Employee No: Name: Job Position: Date:
+7. In the signature part in the Training Requisition Form, the approval skip the Head of Department signature and directly to C-Suite, please fix it and fill the information correctly: Status: Employee No: Name: Job Position: Date:
 
 
 
-1. What if there is many requester, can HOD see all reqeust under their supervision (the employee under them only)
-2. When log in using their email, retrieve the HOD/employee information from the database and display the employee/HOD information, i dont want anything like this: 
+1. What if there is many requester, can HOD see all request under their supervision (the employee under them only)
+2. When log in using their email, retrieve the HOD/employee information from the database and display the employee/HOD information, i dont want anything like this:
 3. HOD Employee ID
 4. EMP-IT.INTERN
 5. HOD Name
@@ -296,11 +296,117 @@ Overall UI
 
 
 **Improvement:**
+
 1. If the number participant > 24, add new form and add the remaining participant
 
 2\. Just notify the HR Department (arina) via email but auto sign it in the Training Requisition Form when she open the training in admin system
 
-3\. 
 
 
+**11/8/2026**
+
+**Improvement (Admin System):**
+1. Admin Dashboard: add training status (HOD approval, Csuite, HOHR)
+
+2\. Report
+
+3\. Annual Training Plan
+
+4\. Have filter selection first, for example (by Training Title, by month, by year), then generate the excel/sheets (export)
+
+
+
+**Report Requirement:**
+1. Training Hours (by year) (Cost Centre vs Month)
+
+Header:
+
+A1-A2: (Cost Centre/Month)
+
+B-M: row 1 (Training Hours); row 2 (Jan-26, Feb-26, ...)
+
+N1-N2: Total 2026
+
+O1-O2: Total Training Hours 2026
+
+
+
+2\. Training Cost (by year) (leave the cost empty, header \& Tranining Title, Date, Total Participant, Training Cost only)
+
+Header:
+
+A1-A2: Training Title
+
+B1-B2: Training Date (From)
+
+C1-C2: Training Date (To)
+
+D1-D2: "Total Participant"
+
+E1-L1:  Training Cost (RM)
+
+E2:  Training Fees 
+
+F2:  Meal
+
+G2:  Subsistance Allowance
+
+H2:  Hotel Fees
+
+I2:  Mileage Claim
+
+J2:  Taxi Fees
+
+K2:  Toll Fees
+
+L2:  Flight
+
+M1-M2:  Total  Cost 2026
+
+N1-N2:  Total HRDF Grant (RM)
+
+
+
+3\. Training Title
+Header:
+
+Name | Emp. No | Training Title | (EE)/Cost Centre Description | Training Type | Date (From) | Date (Until) | Month | Total Hours | Trainer | Training Provide | Expiry Date (if applicable)
+
+
+
+4\. Employee
+
+5\. Filter by month
+
+
+
+**Annual Training Plan Requirement:**
+
+1. Header:
+
+No | Training Title | Training Category | TNA Source | Training Mode | Training Duration (hrs) | Trainer | Department | Position / Employee No | Total Pax | Planned Date | Actual Date (From) | Actual Date (To) | Training Status | Remarks
+
+
+
+**Improvement (Email):**
+
+1. Create image to inform user (plain text not nice)
+2. Approval status for HOD, Csuite and HOHR does not need to inform requester, just inform if Reject, Return or complete approval only
+
+
+
+**Improvement (Training Request Form)**
+
+1. Edit Training (if the training request is return by HOD, Csuite, HOHR)
+2. Employee can see previous training request that they have submit (according to their employee ID)
+
+
+
+**Cleanup (for Deployment)**
+
+1. Deploy using it@apollofood.com.my
+2. overall UI enhancement
+3. Admin login (no option to change email)
+4. HOD portal (remove profile switcher), lock status after submit
+5. Participant UI: employee ID only
 

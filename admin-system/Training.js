@@ -28,12 +28,18 @@ function getTrainingById(id) {
     const t = rows.find(r => r.ID === id);
     if (!t) return err('Training not found.');
 
-    // Auto-sign HR Department (Arina) acknowledgment in Training Requisition Form on opening
+    // Auto-sign HR Department acknowledgment in Training Requisition Form using opening admin's info
     try {
+      let activeEmail = '';
+      try {
+        activeEmail = Session.getActiveUser().getEmail();
+      } catch (e) {}
+      
+      const hrProfile = getHrProfileByEmail(activeEmail);
       acknowledgeHRRequisition(id, {
-        employeeNo: '1012',
-        name: 'Arina Ismail',
-        position: 'HR Department',
+        employeeNo: hrProfile.employeeNo,
+        name: hrProfile.name,
+        position: hrProfile.position,
         status: 'Acknowledged'
       });
     } catch(hrErr) {
@@ -358,7 +364,7 @@ function updateTraining(data) {
           updateTrainingRequisitionSignatures(data.ID, data.RequisitionStep || 'HR', {
             status: data.ApprovalStatus,
             employeeNo: data.EmployeeNo || data.HREmployeeNo || '',
-            name: data.HRName || data.EmployeeName || 'Arina Ismail',
+            name: data.HRName || data.EmployeeName || 'HR Department',
             position: data.HRPosition || 'HR Department',
             date: now()
           });
@@ -384,9 +390,26 @@ function acknowledgeHRRequisition(trainingId, hrData) {
     const row = findRowById(sheet, trainingId);
     if (row === -1) return err('Training not found.');
 
-    const data = hrData || {};
-    const empNo = data.employeeNo || data.EmployeeNo || data.ID || '1012';
-    const empName = data.name || data.Name || data.EmployeeName || 'Arina Ismail';
+    let data = hrData || {};
+
+    // If missing explicit name/employeeNo or using hardcoded defaults, resolve from active user profile
+    if (!data.name || !data.employeeNo || data.name === 'Arina Ismail' || data.employeeNo === '1012') {
+      let activeEmail = '';
+      try {
+        activeEmail = Session.getActiveUser().getEmail();
+      } catch (e) {}
+      const resolvedProfile = getHrProfileByEmail(activeEmail);
+      data = {
+        employeeNo: data.employeeNo && data.employeeNo !== '1012' ? data.employeeNo : resolvedProfile.employeeNo,
+        name: data.name && data.name !== 'Arina Ismail' ? data.name : resolvedProfile.name,
+        position: data.position || resolvedProfile.position,
+        status: data.status || 'Acknowledged',
+        date: data.date || new Date()
+      };
+    }
+
+    const empNo = data.employeeNo || data.EmployeeNo || data.ID || 'HR-001';
+    const empName = data.name || data.Name || data.EmployeeName || 'HR Department';
     const position = data.position || data.Position || data.JobPosition || 'HR Department';
     const status = data.status || data.ApprovalStatus || 'Acknowledged';
     const timeStamp = getFormattedCurrentDate(data.date || new Date());

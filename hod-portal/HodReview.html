@@ -3,7 +3,7 @@
 <head>
   <base target="_top">
   <meta charset="utf-8">
-  <title>TrainHub — HOD Training Requisition Review</title>
+  <title>TrainHub — Managerial & Executive Approval Portal (HOD, C-Suite, HOHR)</title>
   <?!= include('style'); ?>
 </head>
 <body>
@@ -13,12 +13,12 @@
       <div class="brand-logo">
         <div class="brand-icon">T</div>
         <div>
-          <div class="brand-title">TrainHub HOD Portal</div>
-          <div class="brand-subtitle">Training Requisition Review & Managerial Approval</div>
+          <div class="brand-title">TrainHub Review & Approval Portal</div>
+          <div class="brand-subtitle">Training Requisition Review & Digital Stamp (HOD, C-Suite, HOHR)</div>
         </div>
       </div>
       <div class="hod-badge" id="hodProfileBadge">
-        <span>👤</span> <span id="badgeHodName">Loading HOD Profile...</span>
+        <span>👤</span> <span id="badgeHodName">Loading Approver Profile...</span>
       </div>
     </header>
 
@@ -26,7 +26,7 @@
     <div style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:16px;margin-bottom:20px;display:flex;flex-direction:column;gap:10px;">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
         <div style="font-weight:600;color:#60a5fa;display:flex;align-items:center;gap:8px;">
-          <span>📋</span> <span id="queueBadgeTitle">Supervision Queue</span>
+          <span>📋</span> <span id="queueBadgeTitle">Supervision & Approval Queue</span>
           <span class="badge badge-pending" id="queueCountBadge">Loading...</span>
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
@@ -35,9 +35,9 @@
         </div>
       </div>
       <div>
-        <label style="font-size:12px;color:var(--text-muted);margin-bottom:4px;display:block;">Select Pending Training Requisition under your Supervision to Review:</label>
+        <label style="font-size:12px;color:var(--text-muted);margin-bottom:4px;display:block;">Select Pending Training Requisition to Review:</label>
         <select id="supervisionQueueSelect" class="form-control" style="width:100%;font-weight:600;background:#0f172a;border-color:#3b82f6;color:#f8fafc;" onchange="loadRequisitionBySelection(this.value)">
-          <option value="">Loading supervised requisitions queue...</option>
+          <option value="">Loading approval requisitions queue...</option>
         </select>
       </div>
     </div>
@@ -45,14 +45,14 @@
     <!-- Access Denied Card (Shown if email is unauthorized) -->
     <div class="card" id="accessDeniedCard" style="display:none;border-top:4px solid var(--danger);text-align:center;padding:40px 20px;">
       <div style="font-size:56px;margin-bottom:12px;">🔒</div>
-      <h2 style="color:var(--danger);margin-bottom:12px;" id="deniedCardTitle">Access Denied — Non Accessible Website</h2>
+      <h2 style="color:var(--danger);margin-bottom:12px;" id="deniedCardTitle">Access Denied — Unauthorized Account</h2>
       <p style="color:var(--text-secondary);max-width:520px;margin:0 auto 24px;line-height:1.6;" id="deniedCardMsg">
-        The email address you provided is not registered as an authorized Head of Department (HOD) in the company directory.
+        The email address you provided is not registered as an authorized Head of Department (HOD), C-Suite Executive, or Head of HR (HOHR) in the directory.
       </p>
       <div style="background:#0f172a;border:1px solid #334155;border-radius:12px;padding:20px;max-width:460px;margin:0 auto 20px;text-align:left;">
-        <label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:6px;">Sign In with Registered HOD Email:</label>
+        <label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:6px;">Sign In with Registered Approver Email (HOD / C-Suite / HOHR):</label>
         <div style="display:flex;gap:8px;">
-          <input type="email" id="deniedEmailInput" class="form-control" placeholder="e.g. hod@apollofood.com.my" style="flex:1;">
+          <input type="email" id="deniedEmailInput" class="form-control" placeholder="e.g. csuite@apollofood.com.my" style="flex:1;">
           <button class="btn btn-approve" onclick="submitAuthEmail('deniedEmailInput')">Sign In</button>
         </div>
       </div>
@@ -61,19 +61,19 @@
     <!-- Sign In Card (Shown if no email is set) -->
     <div class="card" id="loginPromptCard" style="display:none;border-top:4px solid var(--primary);text-align:center;padding:40px 20px;">
       <div style="font-size:56px;margin-bottom:12px;">🔑</div>
-      <h2 style="color:var(--primary);margin-bottom:12px;">HOD Portal Authentication</h2>
+      <h2 style="color:var(--primary);margin-bottom:12px;">HOD, C-Suite & HOHR Portal Authentication</h2>
       <p style="color:var(--text-secondary);max-width:520px;margin:0 auto 24px;line-height:1.6;">
-        Please select or enter your registered Head of Department (HOD) email address to access your supervised training requisitions queue.
+        Please select or enter your registered Head of Department (HOD), C-Suite Executive, or Head of HR (HOHR) email address to access your pending approval queue.
       </p>
       <div style="background:#0f172a;border:1px solid #334155;border-radius:12px;padding:20px;max-width:460px;margin:0 auto;text-align:left;">
-        <label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:6px;">Select Registered HOD Profile / Email:</label>
+        <label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:6px;">Select Registered Approver Profile / Email:</label>
         <select id="loginHodSelect" class="form-control" style="margin-bottom:14px;" onchange="onLoginHodSelectChange(this.value)">
-          <option value="">-- Loading HOD Email Directory... --</option>
+          <option value="">-- Loading Approver Directory... --</option>
         </select>
         
         <label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:6px;">Or Enter Registered Email Address:</label>
         <div style="display:flex;gap:8px;">
-          <input type="email" id="loginEmailInput" class="form-control" placeholder="e.g. hod@apollofood.com.my" style="flex:1;">
+          <input type="email" id="loginEmailInput" class="form-control" placeholder="e.g. csuite@apollofood.com.my" style="flex:1;">
           <button class="btn btn-approve" onclick="submitAuthEmail('loginEmailInput')">Access Portal</button>
         </div>
       </div>
@@ -89,7 +89,7 @@
           <div style="font-size:13px;color:var(--text-secondary);" id="reqCode">Please wait while data is loaded</div>
         </div>
         <div id="statusBadgeContainer">
-          <span class="badge badge-pending">PENDING HOD REVIEW</span>
+          <span class="badge badge-pending">PENDING REVIEW</span>
         </div>
       </div>
 
@@ -151,6 +151,10 @@
           <div class="data-label">Training Objectives & Justification</div>
           <div class="data-value" id="reqObjectives" style="background:#0f172a;padding:12px;border-radius:8px;border:1px solid #334155;">--</div>
         </div>
+        <div class="data-group" id="brochureGroup" style="margin-top:10px;display:none;">
+          <div class="data-label">📁 Uploaded Supporting Brochure / Document</div>
+          <div class="data-value" id="reqBrochure" style="background:#0f172a;padding:12px;border-radius:8px;border:1px solid #334155;">--</div>
+        </div>
       </div>
 
       <div class="section-divider"></div>
@@ -180,7 +184,7 @@
 
       <!-- Scroll Down Indicator -->
       <div style="text-align:center;margin-top:30px;color:var(--text-secondary);font-size:13px;">
-        👇 Scroll down to HOD Approval Section
+        👇 Scroll down to Approval Section
       </div>
     </div>
 
@@ -189,30 +193,30 @@
       <div class="approval-header">
         <span style="font-size:24px;">🛡️</span>
         <div>
-          <div class="approval-title">HOD Managerial Review & Digital Decision</div>
+          <div class="approval-title">Managerial & Executive Review (HOD, C-Suite, HOHR)</div>
           <div style="font-size:13px;color:var(--text-secondary);">Verify request details above and select decision below</div>
         </div>
       </div>
 
-      <!-- HOD Profile Display Box -->
+      <!-- Approver Profile Display Box -->
       <div class="hod-profile-box">
         <div class="profile-item">
-          <div class="data-label">HOD Employee ID</div>
+          <div class="data-label">Approver Employee ID</div>
           <div class="data-value" id="hodIdDisplay">Loading...</div>
         </div>
         <div class="profile-item">
-          <div class="data-label">HOD Name</div>
+          <div class="data-label">Approver Name & Role</div>
           <div class="data-value" id="hodNameDisplay">Loading...</div>
         </div>
         <div class="profile-item">
-          <div class="data-label">HOD Cost Centre</div>
+          <div class="data-label">Cost Centre / Department</div>
           <div class="data-value" id="hodCostCentreDisplay">Loading...</div>
         </div>
       </div>
 
-      <!-- HOD Remarks / Justification -->
+      <!-- Approver Remarks / Justification -->
       <div style="margin-bottom:16px;">
-        <label class="data-label">HOD Remarks / Comments / Justification <span style="font-size:12px;color:var(--text-muted);">(Required for Reject & Return)</span></label>
+        <label class="data-label">Approver Remarks / Comments / Justification <span style="font-size:12px;color:var(--text-muted);">(Required for Reject & Return)</span></label>
         <textarea id="hodRemarksInput" class="form-control" rows="3" placeholder="Enter remarks, comments, or justification..."></textarea>
       </div>
 
@@ -263,15 +267,15 @@
       document.getElementById('accessDeniedCard').style.display = 'none';
       document.getElementById('loginPromptCard').style.display = 'block';
 
-      // Load registered HOD emails from sheet to populate login select dropdown
+      // Load registered HOD/C-Suite/HOHR emails from sheet to populate login select dropdown
       google.script.run
         .withSuccessHandler(res => {
           const select = document.getElementById('loginHodSelect');
           if (res && res.length > 0) {
-            select.innerHTML = '<option value="">-- Select your registered HOD email --</option>' +
-              res.map(h => `<option value="${h.email}">${h.name} (${h.dept}) — ${h.email}</option>`).join('');
+            select.innerHTML = '<option value="">-- Select registered email --</option>' +
+              res.map(h => `<option value="${h.email}">[${h.role || 'Approver'}] ${h.name} (${h.dept}) — ${h.email}</option>`).join('');
           } else {
-            select.innerHTML = '<option value="">No HOD emails loaded. Enter email below.</option>';
+            select.innerHTML = '<option value="">No registered emails loaded. Enter email below.</option>';
           }
         })
         .withFailureHandler(() => {})
@@ -309,13 +313,13 @@
       document.getElementById('loginPromptCard').style.display = 'none';
       const deniedCard = document.getElementById('accessDeniedCard');
       deniedCard.style.display = 'block';
-      document.getElementById('deniedCardMsg').innerText = message || `The email address (${userEmail || 'unknown'}) is not registered as an authorized Head of Department. Access denied.`;
+      document.getElementById('deniedCardMsg').innerText = message || `The email address (${userEmail || 'unknown'}) is not registered in the HOD, C-Suite, or HOHR directory. Access denied.`;
     }
 
     function loadData(trainingIdOverride) {
       const targetId = trainingIdOverride || currentTrainingId;
 
-      showLoading('Authenticating HOD Session & Loading Supervision Queue...');
+      showLoading('Authenticating Approver Session & Loading Queue...');
       google.script.run
         .withSuccessHandler(resStr => {
           hideLoading();
@@ -354,35 +358,49 @@
 
 
 
-    function renderRequisition(data) {
-      currentHOD = data.hod || { Name: 'HOD Approver', ID: '', CostCentre: '' };
+    function getObjId(obj) {
+      if (!obj) return '';
+      return String(obj.ID || obj.Code || obj.TrainingID || obj['Training ID'] || obj.RequisitionID || obj['Requisition ID'] || '').trim();
+    }
 
-      // Header HOD profile
-      document.getElementById('badgeHodName').innerText = `${currentHOD.Name} (${currentHOD.CostCentre})`;
+    function renderRequisition(data) {
+      currentHOD = data.hod || { Name: 'Approver', ID: '', CostCentre: '', Position: '', RoleTitle: '' };
+
+      const roleBadgeText = currentHOD.RoleTitle || currentHOD.Position || 'Managerial Approver';
+
+      // Header approver profile
+      document.getElementById('badgeHodName').innerText = `${currentHOD.Name} [${roleBadgeText}]`;
       document.getElementById('hodIdDisplay').innerText = currentHOD.ID;
-      document.getElementById('hodNameDisplay').innerText = currentHOD.Name;
+      document.getElementById('hodNameDisplay').innerText = `${currentHOD.Name} (${roleBadgeText})`;
       document.getElementById('hodCostCentreDisplay').innerText = currentHOD.CostCentre;
 
-      // Render Supervision Queue Dropdown
+      // Render Supervision & Approval Queue Dropdown
       const queueSelect = document.getElementById('supervisionQueueSelect');
       cachedSupervisedQueue = data.supervisedRequisitions || [];
       document.getElementById('queueCountBadge').innerText = `${cachedSupervisedQueue.length} Request(s)`;
 
+      const currentTargetId = getObjId(data.training);
+
       if (cachedSupervisedQueue.length === 0) {
-        queueSelect.innerHTML = '<option value="">No pending requisitions found under your supervision</option>';
+        queueSelect.innerHTML = '<option value="">No pending requisitions found in your approval queue</option>';
       } else {
         queueSelect.innerHTML = cachedSupervisedQueue.map(q => {
-          const reqCode = q.Code || q.ID;
-          const reqName = q.Name || 'Training Request';
+          const qId = getObjId(q);
+          const reqCode = q.Code || q.TrainingCode || q['Training Code'] || q.ID || qId;
+          const reqName = q.Name || q.TrainingName || q['Training Name'] || 'Training Request';
           const reqUser = q.RequestedByName || q.RequestedBy || 'Employee';
           const reqDept = q.Department || 'Dept';
           const reqStatus = q.ApprovalStatus || q.Status || 'Pending';
-          const isSelected = data.training && String(q.ID).toLowerCase() === String(data.training.ID).toLowerCase();
+          const isSelected = currentTargetId && qId && String(qId).toLowerCase() === String(currentTargetId).toLowerCase();
 
-          return `<option value="${q.ID}" ${isSelected ? 'selected' : ''}>
+          return `<option value="${qId}" ${isSelected ? 'selected' : ''}>
             [${reqCode}] ${reqName} — Requester: ${reqUser} (${reqDept}) [${reqStatus}]
           </option>`;
         }).join('');
+
+        if (currentTargetId) {
+          queueSelect.value = currentTargetId;
+        }
       }
 
       const t = data.training;
@@ -396,7 +414,7 @@
       }
 
       const req = data.requester || { Name: 'N/A', ID: 'N/A', Department: 'N/A', Email: 'N/A' };
-      currentTrainingId = t.ID;
+      currentTrainingId = getObjId(t);
 
       // Requisition details
       document.getElementById('reqTitle').innerText = t.Name || 'Training Programme';
@@ -406,20 +424,63 @@
       const status = t.ApprovalStatus || t.Status || 'Pending Approval';
       renderStatusBadge(status);
 
+      function toDisplayDateStr(val) {
+        if (!val) return '';
+        const str = String(val).trim();
+        if (/^\d{2}\/\d{2}\/\d{4}/.test(str)) return str;
+        const ymdMatch = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+        if (ymdMatch) {
+          const year = ymdMatch[1];
+          const month = ymdMatch[2].padStart(2, '0');
+          const day = ymdMatch[3].padStart(2, '0');
+          return `${day}/${month}/${year}`;
+        }
+        const d = new Date(str);
+        if (!isNaN(d.getTime())) {
+          const day = String(d.getDate()).padStart(2, '0');
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const year = d.getFullYear();
+          return `${day}/${month}/${year}`;
+        }
+        return str;
+      }
+
       // Requester
       document.getElementById('reqEmployee').innerText = `${req.Name} (${req.ID})`;
       document.getElementById('reqCostCentre').innerText = req.Department || t.Department || 'N/A';
       document.getElementById('reqEmail').innerText = req.Email || t.RequestedByEmail || 'N/A';
-      document.getElementById('reqDate').innerText = t.CreatedDate || t.RequestedDate || 'N/A';
+      document.getElementById('reqDate').innerText = toDisplayDateStr(t.CreatedDate || t.RequestedDate) || 'N/A';
 
       // Specifications
       document.getElementById('reqCategory').innerText = t.Category || 'General';
       document.getElementById('reqTrainer').innerText = t.Trainer || 'TBD';
       document.getElementById('reqVenue').innerText = t.Venue || 'TBD';
-      document.getElementById('reqSchedule').innerText = `${t.StartDate || 'N/A'} to ${t.EndDate || t.StartDate || 'N/A'}`;
+      document.getElementById('reqSchedule').innerText = `${toDisplayDateStr(t.StartDate) || 'N/A'} to ${toDisplayDateStr(t.EndDate || t.StartDate) || 'N/A'}`;
       document.getElementById('reqHours').innerText = `${t.Duration || 1} Days (${t.TotalHours || 8} Total Hours)`;
       document.getElementById('reqFee').innerText = t.CourseFee ? `RM ${t.CourseFee}` : 'N/A';
-      document.getElementById('reqObjectives').innerText = t.Objectives || 'No objectives specified.';
+
+      // Objectives & Brochure Link
+      let rawObj = t.Objectives || '';
+      let brochureUrl = t.BrochureURL || t.BrochureUrl || t.AttachmentURL || '';
+      
+      if (!brochureUrl && rawObj.includes('[Brochure File:')) {
+        const match = rawObj.match(/\[Brochure File:\s*([^\]]+)\]/);
+        if (match && match[1]) {
+          brochureUrl = match[1].trim();
+        }
+        rawObj = rawObj.replace(/\[Brochure File:\s*[^\]]+\]/g, '').trim();
+      }
+
+      document.getElementById('reqObjectives').innerText = rawObj || 'No objectives specified.';
+
+      const brochureGroup = document.getElementById('brochureGroup');
+      const reqBrochure = document.getElementById('reqBrochure');
+      if (brochureUrl && brochureUrl.trim()) {
+        brochureGroup.style.display = 'block';
+        reqBrochure.innerHTML = `<a href="${brochureUrl.trim()}" target="_blank" style="color:#38bdf8;font-weight:600;display:inline-flex;align-items:center;gap:6px;text-decoration:underline;">📄 View / Download Uploaded Supporting Brochure ↗</a>`;
+      } else {
+        brochureGroup.style.display = 'none';
+      }
 
       // Participants Table
       const tbody = document.getElementById('participantsTableBody');

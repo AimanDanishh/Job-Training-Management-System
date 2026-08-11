@@ -55,6 +55,9 @@ function verifyGoogleUser(emailInput) {
   const adminEmailsStr = getConfigProperty('ADMIN_EMAILS', '').toLowerCase().trim();
   const adminEmails = adminEmailsStr ? adminEmailsStr.split(',').map(e => e.trim()).filter(Boolean) : [];
 
+  const hrRecords = getHrEmailRecords();
+  const hrEmails = hrRecords.map(r => r.email).filter(Boolean);
+
   if (!email) {
     return {
       success: false,
@@ -76,24 +79,29 @@ function verifyGoogleUser(emailInput) {
     };
   }
 
-  // 2. Check Administrator requirement (if ADMIN_EMAILS is configured)
-  if (adminEmails.length > 0 && !adminEmails.includes(userEmail)) {
+  // 2. Check Administrator / HR requirement (ADMIN_EMAILS + HR email tab)
+  const isAuthorized = adminEmails.includes(userEmail) || hrEmails.includes(userEmail);
+  const hasRestrictions = adminEmails.length > 0 || hrEmails.length > 0;
+
+  if (hasRestrictions && !isAuthorized) {
     return {
       success: false,
       authenticated: false,
       email: userEmail,
-      message: `Access Denied: Account (${userEmail}) is not authorized as an Administrator.`
+      message: `Access Denied: Account (${userEmail}) is not authorized as an Administrator or HR.`
     };
   }
 
-  // Successfully authorized admin
-  const formattedName = userEmail.split('@')[0].replace(/[\._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  // Successfully authorized admin/HR profile lookup
+  const hrProfile = getHrProfileByEmail(userEmail);
 
   return {
     success: true,
     authenticated: true,
     email: userEmail,
-    name: formattedName,
+    name: hrProfile.name,
+    employeeNo: hrProfile.employeeNo,
+    position: hrProfile.position,
     domain: domain,
     role: 'admin'
   };

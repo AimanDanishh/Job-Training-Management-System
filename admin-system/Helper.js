@@ -39,6 +39,7 @@ function initDefaultScriptProperties() {
     'ADMIN_PASS':              'admin123',
     'APP_TITLE':               'TrainHub — Training Management System',
     'SHEET_EMPLOYEES':         'Employees',
+    'SHEET_HR_EMAIL':          'HR email',
     'SHEET_TRAININGS':         'Trainings',
     'SHEET_ATTENDANCE':        'Attendance',
     'SHEET_TRAINING_EVAL':     'TrainingEval',
@@ -130,6 +131,7 @@ function convertDriveLinkToDirectImageUrl(input) {
 
 const SHEET_NAMES = {
   get employees()            { return getConfigProperty('SHEET_EMPLOYEES', 'Employees'); },
+  get hrEmail()              { return getConfigProperty('SHEET_HR_EMAIL', 'HR email'); },
   get trainings()            { return getConfigProperty('SHEET_TRAININGS', 'Trainings'); },
   get trainingSessions()     { return getConfigProperty('SHEET_TRAINING_SESSIONS', 'TrainingSessions'); },
   get attendance()           { return getConfigProperty('SHEET_ATTENDANCE', 'Attendance'); },
@@ -167,7 +169,16 @@ function getEmployeeSpreadsheet() {
 }
 
 function getSheet(name) {
-  const ss = (name === SHEET_NAMES.employees) ? getEmployeeSpreadsheet() : getSpreadsheet();
+  const isEmployeeSpreadsheetSheet = (
+    name === SHEET_NAMES.employees ||
+    name === SHEET_NAMES.hrEmail ||
+    name === 'HR email' ||
+    name === 'HR Email' ||
+    name === 'HOD email' ||
+    name === 'HOD Email' ||
+    name === 'For IT'
+  );
+  const ss = isEmployeeSpreadsheetSheet ? getEmployeeSpreadsheet() : getSpreadsheet();
   if (!ss) return null;
   let sheet = ss.getSheetByName(name);
   if (!sheet) {
@@ -212,6 +223,7 @@ function getSheet(name) {
 function initSheetHeaders(sheet, name) {
   const headers = {
     Employees:        ['ID', 'Name', 'Department', 'Position', 'Email', 'Phone', 'Status'],
+    'HR email':       ['Employee No', 'HR', 'Cost Centre', 'Position Title', 'Email'],
     Trainings:        ['ID', 'Code', 'Name', 'Category', 'Trainer', 'Venue', 'StartDate',
                        'EndDate', 'Duration', 'TotalHours', 'Department', 'Objectives',
                        'Status', 'Stage', 'Participants',
@@ -251,6 +263,112 @@ function seedInitialSheetData(sheet, name) {
   }
 }
 
+/**
+ * Reads all records from the "HR email" tab in EMPLOYEE_SPREADSHEET_ID.
+ * Header format: Employee No | HR | Cost Centre | Position Title | Email
+ */
+function getHrEmailRecords() {
+  const getVal = (rowObj, nameList) => {
+    if (!rowObj) return '';
+    const keys = Object.keys(rowObj);
+    for (let n of nameList) {
+      const matchKey = keys.find(k => k.toLowerCase().replace(/[^a-z0-9]/g, '') === n.toLowerCase().replace(/[^a-z0-9]/g, ''));
+      if (matchKey && rowObj[matchKey] !== undefined && rowObj[matchKey] !== null) {
+        return String(rowObj[matchKey]).trim();
+      }
+    }
+    return '';
+  };
+
+  const idAliases = ['Employee No', 'EmployeeNo', 'EmployeeID', 'ID', 'EmpNo', 'Staff ID'];
+  const nameAliases = ['HR', 'HRName', 'HR Name', 'Name', 'Employee Name'];
+  const deptAliases = ['Cost Centre', 'CostCentre', 'Department', 'Dept'];
+  const posAliases = ['Position Title', 'PositionTitle', 'Position', 'JobTitle'];
+  const emailAliases = ['Email', 'EmailAddress', 'Email Address', 'HREmail'];
+
+  const records = [];
+  try {
+    const hrSheet = getSheet(SHEET_NAMES.hrEmail || 'HR email');
+    if (hrSheet) {
+      const rows = sheetToJson(hrSheet);
+      rows.forEach(r => {
+        const email = getVal(r, emailAliases);
+        if (email) {
+          records.push({
+            employeeNo: getVal(r, idAliases),
+            name: getVal(r, nameAliases),
+            costCentre: getVal(r, deptAliases),
+            position: getVal(r, posAliases) || 'HR Department',
+            email: email.toLowerCase().trim()
+          });
+        }
+      });
+    }
+  } catch (e) {
+    Logger.log('getHrEmailRecords error: ' + e.message);
+  }
+  return records;
+}
+
+/**
+ * Resolves HR Profile by email address from "HR email" tab, falling back to "Employees" tab or default admin profile.
+ */
+function getHrProfileByEmail(emailInput) {
+  let emailClean = String(emailInput || '').toLowerCase().trim();
+  if (!emailClean) {
+    try {
+      emailClean = Session.getActiveUser().getEmail().toLowerCase().trim();
+    } catch (e) {}
+  }
+
+  // 1. Search "HR email" tab
+  const hrRecords = getHrEmailRecords();
+  const hrMatch = hrRecords.find(r => r.email === emailClean);
+  if (hrMatch) {
+    return {
+      employeeNo: hrMatch.employeeNo || 'HR-001',
+      name: hrMatch.name || emailClean.split('@')[0].replace(/[\._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+      position: hrMatch.position || 'HR Department',
+      costCentre: hrMatch.costCentre || '',
+      email: hrMatch.email
+    };
+  }
+
+  // 2. Fallback: Search "Employees" tab by Email
+  try {
+    const empSheet = getSheet(SHEET_NAMES.employees);
+    if (empSheet) {
+      const empRows = sheetToJson(empSheet);
+      const empMatch = empRows.find(e => {
+        const empEmail = String(e.Email || e['Email Address'] || '').toLowerCase().trim();
+        return empEmail && empEmail === emailClean;
+      });
+
+      if (empMatch) {
+        return {
+          employeeNo: String(empMatch.ID || empMatch.EmployeeID || empMatch.EmployeeNo || '').trim(),
+          name: String(empMatch.Name || empMatch.EmployeeName || '').trim(),
+          position: String(empMatch.Position || empMatch.JobTitle || empMatch.PositionTitle || 'HR Department').trim(),
+          costCentre: String(empMatch.Department || empMatch.CostCentre || '').trim(),
+          email: emailClean
+        };
+      }
+    }
+  } catch (e) {
+    Logger.log('getHrProfileByEmail Employees fallback error: ' + e.message);
+  }
+
+  // 3. Fallback: Default formatted profile for configured ADMIN_EMAILS
+  const defaultName = emailClean ? emailClean.split('@')[0].replace(/[\._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'HR Department';
+  return {
+    employeeNo: 'ADMIN',
+    name: defaultName,
+    position: 'HR Department',
+    costCentre: '',
+    email: emailClean
+  };
+}
+
 /** Adds fields introduced after the original training sheet was deployed. */
 function ensureTrainingSheetColumns(sheet) {
   if (!sheet) return [];
@@ -261,7 +379,7 @@ function ensureTrainingSheetColumns(sheet) {
     'FolderID', 'ParticipantsSheetID', 'SessionsSheetID', 'AttendanceSheetID',
     'EvaluationSheetID', 'PostSheetID', 'RequisitionFormFileID',
     'CreatedDate', 'UpdatedDate', 'CourseFee',
-    'ApprovalStatus', 'RequestedBy', 'RequestedByName', 'RequestedByEmail', 'RequestedDate', 'ApprovedBy', 'ApprovedCostCentre', 'ApprovedAt', 'ApprovalRemarks', 'RescheduledDate'
+    'ApprovalStatus', 'RequestedBy', 'RequestedByName', 'RequestedByEmail', 'RequestedDate', 'ApprovedBy', 'ApprovedCostCentre', 'ApprovedAt', 'ApprovalRemarks', 'RescheduledDate', 'BrochureURL'
   ];
   const lastCol = Math.max(sheet.getLastColumn(), 1);
   const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h).trim());
@@ -508,8 +626,8 @@ function findRowById(sheet, id) {
 function formatDate(date) {
   if (!date) return '';
   const d = new Date(date);
-  if (isNaN(d)) return String(date);
-  return Utilities.formatDate(d, Session.getScriptTimeZone(), 'dd MMM yyyy');
+  if (isNaN(d.getTime())) return String(date);
+  return Utilities.formatDate(d, Session.getScriptTimeZone(), 'dd/MM/yyyy');
 }
 
 /**
@@ -555,7 +673,7 @@ function getEmployeeById(employeeNo) {
 }
 
 function now() {
-  return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd MMM yyyy HH:mm');
+  return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm');
 }
 
 // ─── Response Helpers ───────────────────────────────────────────────────────────

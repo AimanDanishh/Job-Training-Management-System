@@ -119,10 +119,31 @@
     try {
       const session = await callServer('getSessionInfo', activeSessionId);
       
+      const formatAppDate = (val) => {
+        if (!val) return '—';
+        const str = String(val).trim();
+        if (/^\d{2}\/\d{2}\/\d{4}/.test(str)) return str;
+        const ymdMatch = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+        if (ymdMatch) {
+          const year = ymdMatch[1];
+          const month = ymdMatch[2].padStart(2, '0');
+          const day = ymdMatch[3].padStart(2, '0');
+          return `${day}/${month}/${year}`;
+        }
+        const d = new Date(str);
+        if (!isNaN(d.getTime())) {
+          const day = String(d.getDate()).padStart(2, '0');
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const year = d.getFullYear();
+          return `${day}/${month}/${year}`;
+        }
+        return str;
+      };
+
       document.getElementById('badge-session').textContent = session.SessionID || 'Session Check-In';
       document.getElementById('txt-training-title').textContent = session.TrainingTitle || 'Training Programme';
       document.getElementById('txt-session-name').textContent = session.SessionName || 'Attendance Registration';
-      document.getElementById('txt-session-date').textContent = session.SessionDate || '—';
+      document.getElementById('txt-session-date').textContent = formatAppDate(session.SessionDate);
       document.getElementById('txt-session-time').textContent = `${session.StartTime || '09:00'} - ${session.EndTime || '17:00'}`;
 
       document.getElementById('meta-row').style.display = 'flex';

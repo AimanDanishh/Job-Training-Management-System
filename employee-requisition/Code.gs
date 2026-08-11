@@ -127,6 +127,73 @@ function getEmployeeDetails(employeeId) {
 /**
  * API: Submit Employee Training Requisition Request Form
  */
+/**
+ * API: Retrieve all training requests submitted by a specific employee ID
+ */
+function getEmployeeSubmittedRequests(employeeId) {
+  try {
+    if (!employeeId || String(employeeId).trim() === '') {
+      return err('Employee ID is required.');
+    }
+
+    const cleanId = String(employeeId).trim().toLowerCase();
+    const sheet = getSheet('Trainings');
+    if (!sheet) return ok([]);
+
+    ensureTrainingSheetColumns(sheet);
+
+    const rows = sheetToJson(sheet);
+
+    let allParticipants = [];
+    try {
+      const tpSheet = getSheet('TrainingParticipants');
+      if (tpSheet) allParticipants = sheetToJson(tpSheet);
+    } catch(tpErr) {}
+
+    const matchedRequests = rows.filter(r => {
+      const reqId = String(r.RequestedBy || r.EmployeeID || r.EmployeeNo || '').trim().toLowerCase();
+      return reqId === cleanId;
+    });
+
+    const list = matchedRequests.map(r => {
+      const tId = String(r.ID || r.TrainingID || '').trim();
+      const reqParticipants = allParticipants.filter(p => String(p.TrainingID || p.TrainingId || '').trim() === tId);
+
+      return {
+        ID: tId,
+        Code: String(r.Code || '').trim(),
+        Name: String(r.Name || r.TrainingName || '').trim(),
+        Category: String(r.Category || 'General').trim(),
+        Trainer: String(r.Trainer || 'TBD').trim(),
+        Venue: String(r.Venue || 'TBD').trim(),
+        StartDate: String(r.StartDate || '').trim(),
+        EndDate: String(r.EndDate || r.StartDate || '').trim(),
+        Duration: r.Duration || 1,
+        TotalHours: r.TotalHours || 8,
+        CourseFee: String(r.CourseFee || '0.00').trim(),
+        Department: String(r.Department || 'N/A').trim(),
+        Objectives: String(r.Objectives || '').trim(),
+        ApprovalStatus: String(r.ApprovalStatus || r.Status || 'Pending HOD Approval').trim(),
+        ApprovalRemarks: String(r.ApprovalRemarks || '').trim(),
+        ApprovedBy: String(r.ApprovedBy || '').trim(),
+        RequestedDate: String(r.RequestedDate || r.CreatedDate || '').trim(),
+        BrochureURL: String(r.BrochureURL || r.BrochureUrl || '').trim(),
+        RequisitionFormFileID: String(r.RequisitionFormFileID || '').trim(),
+        FolderID: String(r.FolderID || '').trim(),
+        participants: reqParticipants
+      };
+    }).reverse();
+
+    return ok(list);
+  } catch(e) {
+    Logger.log('getEmployeeSubmittedRequests error: ' + e.message);
+    return err('Failed to load submitted requests: ' + e.message);
+  }
+}
+
+/**
+ * API: Submit or Edit/Resubmit Employee Training Requisition Request Form
+ */
 function submitEmployeeRequisition(data) {
   try {
     if (!data || !data.EmployeeID || !data.TrainingName || !data.StartDate) {
@@ -147,8 +214,26 @@ function submitEmployeeRequisition(data) {
     const sheet = getSheet('Trainings');
     if (!sheet) return err('Trainings sheet unavailable in master database.');
 
-    const id = generateId('TRN');
-    const code = generateTrainingCode(data.Category || 'General');
+    ensureTrainingSheetColumns(sheet);
+
+    const editingTrainingId = String(data.editingTrainingId || data.ID || '').trim();
+    const isEditing = Boolean(editingTrainingId);
+    let targetRow = isEditing ? findRowById(sheet, editingTrainingId) : -1;
+    if (isEditing && targetRow <= 1) {
+      return err(`Cannot find existing training request with ID: ${editingTrainingId}`);
+    }
+
+    const headers = sheet.getDataRange().getValues()[0].map(h => String(h).trim());
+    const getValFromRow = (rIdx, name) => {
+      const idx = headers.indexOf(name);
+      if (rIdx > 1 && idx >= 0) {
+        return sheet.getRange(rIdx, idx + 1).getValue();
+      }
+      return '';
+    };
+
+    const id = isEditing ? editingTrainingId : generateId('TRN');
+    const code = isEditing ? (String(getValFromRow(targetRow, 'Code')) || generateTrainingCode(data.Category || 'General')) : generateTrainingCode(data.Category || 'General');
     const timeNow = now();
 
     // 3. Multi-Tier Approval & Auto-Bypass Workflow Logic (2-Step Lookup: "For IT" -> "HOD email")
@@ -182,7 +267,7 @@ function submitEmployeeRequisition(data) {
       Logger.log('For IT lookup error: ' + itErr.message);
     }
 
-    // Step 2: Compare assigned HOD in "HOD email" tab (Header: Employee No | HOD | Cost Centre | Position Title | Email)
+    // Step 2: Compare assigned HOD in "HOD email" tab
     try {
       const hodSheet = getSheet('HOD email');
       if (hodSheet) {
@@ -258,7 +343,7 @@ function submitEmployeeRequisition(data) {
     let approvedByVal = '';
     let approvedCostCentreVal = '';
     let approvedAtVal = '';
-    let approvalRemarksVal = '';
+    let approvalRemarksVal = isEditing ? `Resubmitted by employee on ${timeNow}.` : '';
 
     if (isHodBypassed) {
       approvedByVal = `Auto-Verified: ${emp.Name} (${emp.ID})`;
@@ -275,23 +360,8 @@ function submitEmployeeRequisition(data) {
       }
     }
 
-    // Handle Brochure File upload if provided
-    let brochureUrl = data.BrochureUrl || '';
-    if (data.BrochureFile && data.BrochureFile.data) {
-      try {
-        const fileBlob = Utilities.newBlob(Utilities.base64Decode(data.BrochureFile.data), data.BrochureFile.mimeType || 'application/octet-stream', data.BrochureFile.name || 'brochure');
-        const driveFile = DriveApp.createFile(fileBlob);
-        driveFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-        brochureUrl = driveFile.getUrl();
-      } catch(fErr) {
-        Logger.log('Brochure file upload error: ' + fErr.message);
-      }
-    }
+    const objectivesVal = String(data.Objectives || data.Reason || '').trim();
 
-    const objectivesVal = (data.Objectives || data.Reason || '') + (brochureUrl ? `\n[Brochure File: ${brochureUrl}]` : '');
-
-    // Resolve every selection against the Employee sheet before it is stored,
-    // written to Training Data, or placed on the requisition form.
     const requestedParticipants = Array.isArray(data.ParticipantList) ? data.ParticipantList : (Array.isArray(data.participants) ? data.participants : []);
     const participantResolution = canonicalizeTrainingParticipants(requestedParticipants);
     if (participantResolution.rejected.length > 0) {
@@ -299,9 +369,27 @@ function submitEmployeeRequisition(data) {
     }
     const participantsList = participantResolution.participants;
 
-    // Create Google Drive Workspace and Training Requisition Form (AP-HRD-F01-01)
     let workspace = { folderId: '', folderUrl: '', partSheetId: '', sessionSheetId: '', attendanceSheetId: '', evaluationSheetId: '', postSheetId: '' };
     let reqForm = { fileId: '', fileUrl: '' };
+
+    if (isEditing) {
+      workspace.folderId = String(getValFromRow(targetRow, 'FolderID') || '');
+      workspace.partSheetId = String(getValFromRow(targetRow, 'ParticipantsSheetID') || '');
+      workspace.sessionSheetId = String(getValFromRow(targetRow, 'SessionsSheetID') || '');
+      workspace.attendanceSheetId = String(getValFromRow(targetRow, 'AttendanceSheetID') || '');
+      workspace.evaluationSheetId = String(getValFromRow(targetRow, 'EvaluationSheetID') || '');
+      workspace.postSheetId = String(getValFromRow(targetRow, 'PostSheetID') || '');
+      reqForm.fileId = String(getValFromRow(targetRow, 'RequisitionFormFileID') || '');
+    }
+
+    if (!workspace.folderId) {
+      try {
+        workspace = createTrainingWorkspace(code, data.TrainingName);
+      } catch(wErr) {
+        Logger.log('Workspace creation error: ' + wErr.message);
+      }
+    }
+
     const requesterSigData = {
       employeeNo: emp.ID || data.EmployeeID || data.EmployeeNo || '',
       name: emp.Name || data.EmployeeName || data.Name || 'Requester',
@@ -309,65 +397,144 @@ function submitEmployeeRequisition(data) {
       date: getFormattedCurrentDate()
     };
 
-    try {
-      workspace = createTrainingWorkspace(code, data.TrainingName);
-      reqForm = createTrainingRequisitionForm(code, {
-        Name: data.TrainingName,
-        CourseFee: data.CourseFee,
-        StartDate: data.StartDate,
-        EndDate: data.EndDate || data.StartDate,
-        Duration: data.Duration || 1,
-        TotalHours: data.TotalHours || 8,
-        Venue: data.Venue,
-        Trainer: data.Trainer,
-        TrainingProvider: data.TrainingProvider,
-        Objectives: objectivesVal,
-        ParticipantList: participantsList
-      }, workspace.folderId, requesterSigData);
-    } catch(wErr) {
-      Logger.log('Workspace / Form creation error: ' + wErr.message);
+    if (!reqForm.fileId) {
+      try {
+        reqForm = createTrainingRequisitionForm(code, {
+          Name: data.TrainingName,
+          CourseFee: data.CourseFee,
+          StartDate: data.StartDate,
+          EndDate: data.EndDate || data.StartDate,
+          Duration: data.Duration || 1,
+          TotalHours: data.TotalHours || 8,
+          Venue: data.Venue,
+          Trainer: data.Trainer,
+          TrainingProvider: data.TrainingProvider,
+          Objectives: objectivesVal,
+          ParticipantList: participantsList
+        }, workspace.folderId, requesterSigData);
+      } catch(fErr) {
+        Logger.log('Form creation error: ' + fErr.message);
+      }
+    } else if (isEditing) {
+      // Re-populate existing form sheet cells
+      try {
+        const ssForm = SpreadsheetApp.openById(reqForm.fileId);
+        const shForm = ssForm.getSheetByName('Training Form') || ssForm.getSheets()[0];
+
+        const setTemplateValue = (area, value) => shForm.getRange(area.split(':')[0]).setValue(value == null ? '' : value);
+        shForm.getRange('A5').setValue('Training Title:');
+        setTemplateValue('C5:I5', data.TrainingName || '');
+        shForm.getRange('A6').setValue('Course Fee (RM):');
+        setTemplateValue('C6:E6', data.CourseFee !== undefined ? data.CourseFee : '0.00');
+        shForm.getRange('F6').setValue('Date:');
+        setTemplateValue('G6:I6', data.EndDate && data.EndDate !== data.StartDate ? `${formatDate(data.StartDate)} - ${formatDate(data.EndDate)}` : (formatDate(data.StartDate) || ''));
+        shForm.getRange('A7').setValue('Duration:');
+        setTemplateValue('C7:E7', `${data.Duration || 1} day(s) (${data.TotalHours || 8} hours)`);
+        shForm.getRange('F7').setValue('Venue:');
+        setTemplateValue('G7:I7', data.Venue || '');
+        shForm.getRange('A8').setValue('Training Provider:');
+        setTemplateValue('C8:I8', data.TrainingProvider || data.Provider || data.Trainer || '');
+        shForm.getRange('A10').setValue('Reasons for Training:');
+        setTemplateValue('A11:I12', objectivesVal || '');
+
+        if (participantsList.length > 0) {
+          shForm.getRange('A15:I39').clearContent();
+          participantsList.slice(0, 25).forEach((p, index) => {
+            const r = 15 + index;
+            setTemplateValue(`A${r}:B${r}`, p.EmployeeID || p.ID || p.EmployeeNo || '');
+            setTemplateValue(`C${r}`, p.EmployeeName || p.Name || '');
+            setTemplateValue(`D${r}:G${r}`, p.Department || p.CostCentre || '');
+            setTemplateValue(`H${r}:I${r}`, p.Position || p.JobTitle || '');
+          });
+        }
+        resetRequisitionFormApprovals(reqForm.fileId);
+      } catch(reFormErr) {
+        Logger.log('Error re-populating existing requisition form: ' + reFormErr.message);
+      }
     }
 
-    const rowData = [
-      id,                                // Col 1 (A): ID
-      code,                              // Col 2 (B): Code
-      data.TrainingName,                 // Col 3 (C): Name
-      data.Category || 'General',        // Col 4 (D): Category
-      data.Trainer || 'TBD',             // Col 5 (E): Trainer
-      data.Venue || 'TBD',               // Col 6 (F): Venue
-      data.StartDate,                    // Col 7 (G): StartDate
-      data.EndDate || data.StartDate,    // Col 8 (H): EndDate
-      data.Duration || 1,                // Col 9 (I): Duration
-      data.TotalHours || 8,              // Col 10 (J): TotalHours
-      emp.Department || data.Department || 'N/A', // Col 11 (K): Department
-      objectivesVal,                     // Col 12 (L): Objectives
-      'Draft',                           // Col 13 (M): Status
-      'Created',                         // Col 14 (N): Stage
-      data.TotalPax || participantsList.length || 0, // Col 15 (O): Participants
-      workspace.folderId || '',          // Col 16 (P): FolderID
-      workspace.partSheetId || '',       // Col 17 (Q): ParticipantsSheetID
-      workspace.sessionSheetId || '',    // Col 18 (R): SessionsSheetID
-      workspace.attendanceSheetId || '', // Col 19 (S): AttendanceSheetID
-      workspace.evaluationSheetId || '', // Col 20 (T): EvaluationSheetID
-      workspace.postSheetId || '',       // Col 21 (U): PostSheetID
-      reqForm.fileId || '',              // Col 22 (V): RequisitionFormFileID
-      timeNow,                           // Col 23 (W): CreatedDate
-      timeNow,                           // Col 24 (X): UpdatedDate
-      data.CourseFee || '0.00'           // Col 25 (Y): CourseFee
-    ];
+    // Handle Brochure / Attachment File upload
+    let brochureUrl = data.BrochureUrl || '';
+    if (isEditing && !brochureUrl) {
+      brochureUrl = String(getValFromRow(targetRow, 'BrochureURL') || '');
+    }
+    if (data.BrochureFile && data.BrochureFile.data) {
+      try {
+        const fileBlob = Utilities.newBlob(
+          Utilities.base64Decode(data.BrochureFile.data),
+          data.BrochureFile.mimeType || 'application/octet-stream',
+          data.BrochureFile.name || `${code}_brochure`
+        );
+        let targetFolder = null;
+        if (workspace.folderId) {
+          try { targetFolder = DriveApp.getFolderById(workspace.folderId); } catch(fldErr) {}
+        }
+        if (!targetFolder) {
+          targetFolder = getSystemRootFolder();
+        }
+        const driveFile = targetFolder.createFile(fileBlob);
+        driveFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        brochureUrl = driveFile.getUrl();
+      } catch(fErr) {
+        Logger.log('Brochure file upload error: ' + fErr.message);
+      }
+    }
 
-    sheet.appendRow(rowData);
-    SpreadsheetApp.flush();
+    let activeRowIndex = -1;
+    if (isEditing) {
+      activeRowIndex = targetRow;
+    } else {
+      const rowData = [
+        id,                                // Col 1 (A): ID
+        code,                              // Col 2 (B): Code
+        data.TrainingName,                 // Col 3 (C): Name
+        data.Category || 'General',        // Col 4 (D): Category
+        data.Trainer || 'TBD',             // Col 5 (E): Trainer
+        data.Venue || 'TBD',               // Col 6 (F): Venue
+        data.StartDate,                    // Col 7 (G): StartDate
+        data.EndDate || data.StartDate,    // Col 8 (H): EndDate
+        data.Duration || 1,                // Col 9 (I): Duration
+        data.TotalHours || 8,              // Col 10 (J): TotalHours
+        emp.Department || data.Department || 'N/A', // Col 11 (K): Department
+        objectivesVal,                     // Col 12 (L): Objectives
+        'Draft',                           // Col 13 (M): Status
+        'Created',                         // Col 14 (N): Stage
+        data.TotalPax || participantsList.length || 0, // Col 15 (O): Participants
+        workspace.folderId || '',          // Col 16 (P): FolderID
+        workspace.partSheetId || '',       // Col 17 (Q): ParticipantsSheetID
+        workspace.sessionSheetId || '',    // Col 18 (R): SessionsSheetID
+        workspace.attendanceSheetId || '', // Col 19 (S): AttendanceSheetID
+        workspace.evaluationSheetId || '', // Col 20 (T): EvaluationSheetID
+        workspace.postSheetId || '',       // Col 21 (U): PostSheetID
+        reqForm.fileId || '',              // Col 22 (V): RequisitionFormFileID
+        timeNow,                           // Col 23 (W): CreatedDate
+        timeNow,                           // Col 24 (X): UpdatedDate
+        data.CourseFee || '0.00'           // Col 25 (Y): CourseFee
+      ];
 
-    ensureTrainingSheetColumns(sheet);
+      sheet.appendRow(rowData);
+      SpreadsheetApp.flush();
+      activeRowIndex = sheet.getLastRow();
+    }
 
-    const lastRow = sheet.getLastRow();
-    const headers = sheet.getDataRange().getValues()[0].map(h => String(h).trim());
     const setCol = (name, val) => {
       const idx = headers.indexOf(name) + 1;
-      if (idx > 0) sheet.getRange(lastRow, idx).setValue(val);
+      if (idx > 0) sheet.getRange(activeRowIndex, idx).setValue(val);
     };
 
+    setCol('Name', data.TrainingName);
+    setCol('Category', data.Category || 'General');
+    setCol('Trainer', data.Trainer || 'TBD');
+    setCol('Venue', data.Venue || 'TBD');
+    setCol('StartDate', data.StartDate);
+    setCol('EndDate', data.EndDate || data.StartDate);
+    setCol('Duration', data.Duration || 1);
+    setCol('TotalHours', data.TotalHours || 8);
+    setCol('Department', emp.Department || data.Department || 'N/A');
+    setCol('Objectives', objectivesVal);
+    setCol('Participants', data.TotalPax || participantsList.length || 0);
+    setCol('CourseFee', data.CourseFee || '0.00');
+    setCol('UpdatedDate', timeNow);
     setCol('ApprovalStatus', currentApprovalStatus);
     setCol('ApprovedBy', approvedByVal);
     setCol('ApprovedCostCentre', approvedCostCentreVal);
@@ -376,7 +543,7 @@ function submitEmployeeRequisition(data) {
     setCol('RequestedBy', emp.ID || data.EmployeeID);
     setCol('RequestedByName', emp.Name || data.EmployeeName || '');
     setCol('RequestedByEmail', empEmail);
-    setCol('RequestedDate', timeNow);
+    if (!isEditing) setCol('RequestedDate', timeNow);
     setCol('FolderID', workspace.folderId || '');
     setCol('ParticipantsSheetID', workspace.partSheetId || '');
     setCol('SessionsSheetID', workspace.sessionSheetId || '');
@@ -384,13 +551,23 @@ function submitEmployeeRequisition(data) {
     setCol('EvaluationSheetID', workspace.evaluationSheetId || '');
     setCol('PostSheetID', workspace.postSheetId || '');
     setCol('RequisitionFormFileID', reqForm.fileId || '');
+    setCol('BrochureURL', brochureUrl);
 
     SpreadsheetApp.flush();
 
-    if (participantsList.length > 0) {
-      try {
-        const tpMasterSheet = getSheet('TrainingParticipants');
-        if (tpMasterSheet) {
+    // Reset & update participants in TrainingParticipants master sheet
+    try {
+      const tpMasterSheet = getSheet('TrainingParticipants');
+      if (tpMasterSheet) {
+        if (isEditing) {
+          const tpData = tpMasterSheet.getDataRange().getValues();
+          for (let i = tpData.length - 1; i >= 1; i--) {
+            if (String(tpData[i][1]).trim() === id) {
+              tpMasterSheet.deleteRow(i + 1);
+            }
+          }
+        }
+        if (participantsList.length > 0) {
           const tpRows = participantsList.map(p => [
             generateId('TP'),
             id,
@@ -402,9 +579,12 @@ function submitEmployeeRequisition(data) {
           ]);
           tpMasterSheet.getRange(tpMasterSheet.getLastRow() + 1, 1, tpRows.length, 7).setValues(tpRows);
         }
-      } catch(pErr) {
-        Logger.log('Error saving participants in submitEmployeeRequisition: ' + pErr.message);
       }
+    } catch(pErr) {
+      Logger.log('Error saving participants in submitEmployeeRequisition: ' + pErr.message);
+    }
+
+    if (participantsList.length > 0) {
       try {
         syncParticipantsToTrainingDriveSheet(id, participantsList);
       } catch(sErr) {
@@ -457,7 +637,7 @@ function submitEmployeeRequisition(data) {
       }
     }
 
-    // Create Gmail Draft ONLY (Send function removed as requested)
+    // Create Gmail Draft for HOD / Approver
     let draftStatus = 'Not created';
     try {
       const hodPortalUrl = getConfigProperty('HOD_PORTAL_URL', '');
@@ -468,8 +648,8 @@ function submitEmployeeRequisition(data) {
       else if (currentApprovalStatus === 'Pending HOHR Approval' && hohrEmail) recipientEmail = hohrEmail;
       else if (currentApprovalStatus === 'Approved') recipientEmail = 'arina.ismail@apollofood.com.my';
 
-      const subject = `[TrainHub DRAFT] Training Requisition ${currentApprovalStatus} - ${data.TrainingName}`;
-      const body = `Dear Approver / Manager,\n\nA new Training Requisition Form (AP-HRD-F01-01) has been submitted:\n\n` +
+      const subject = `[TrainHub DRAFT] ${isEditing ? 'RESUBMITTED' : 'NEW'} Training Requisition ${currentApprovalStatus} - ${data.TrainingName}`;
+      const body = `Dear Approver / Manager,\n\nA Training Requisition Form (AP-HRD-F01-01) has been ${isEditing ? 'RESUBMITTED following updates by the employee' : 'submitted'}:\n\n` +
         `Requester: ${emp.Name || data.EmployeeID} (${emp.Department || 'N/A'})\n` +
         `Employee ID: ${emp.ID || data.EmployeeID}\n` +
         `Assigned HOD: ${hodName || 'N/A'} (${hodEmail || recipientEmail || 'N/A'})\n` +
@@ -499,24 +679,19 @@ function submitEmployeeRequisition(data) {
       } else {
         draftStatus = 'No recipient HOD email available to create draft.';
       }
-
-      if (currentApprovalStatus === 'Approved' && recipientEmail !== 'arina.ismail@apollofood.com.my') {
-        try {
-          GmailApp.createDraft('arina.ismail@apollofood.com.my', `[TrainHub DRAFT] Training Requisition Fully Approved - ${data.TrainingName}`, body);
-        } catch(dErr) {}
-      }
     } catch (mailErr) {
       draftStatus = `Notification error: ${mailErr.message}`;
       Logger.log(draftStatus);
     }
 
     return ok({
-      message: `Training Requisition Form (AP-HRD-F01-01) submitted! Status: ${currentApprovalStatus}. HOD: ${hodName || 'Assigned HOD'}. ${draftStatus}`,
+      message: `Training Requisition Form (AP-HRD-F01-01) ${isEditing ? 'resubmitted' : 'submitted'}! Status: ${currentApprovalStatus}. HOD: ${hodName || 'Assigned HOD'}. ${draftStatus}`,
       trainingId: id,
       trainingCode: code,
       approvalStatus: currentApprovalStatus,
       assignedHod: hodName,
-      draftStatus: draftStatus
+      draftStatus: draftStatus,
+      isEditing: isEditing
     });
   } catch (e) {
     Logger.log('submitEmployeeRequisition error: ' + e.message);

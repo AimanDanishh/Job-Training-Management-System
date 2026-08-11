@@ -396,12 +396,12 @@ function findRowById(sheet, id) {
 function formatDate(date) {
   if (!date) return '';
   const d = new Date(date);
-  if (isNaN(d)) return String(date);
-  return Utilities.formatDate(d, Session.getScriptTimeZone(), 'dd MMM yyyy');
+  if (isNaN(d.getTime())) return String(date);
+  return Utilities.formatDate(d, Session.getScriptTimeZone(), 'dd/MM/yyyy');
 }
 
 function now() {
-  return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd MMM yyyy HH:mm');
+  return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm');
 }
 
 // ─── Standardized JSON Response Helpers ────────────────────────────────────────

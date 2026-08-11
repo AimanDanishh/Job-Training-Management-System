@@ -50,8 +50,19 @@
         </div>
       </div>
 
+      <!-- Step 1.5: My Submitted Training Requests (History) -->
+      <div id="previousRequestsBox" style="display:none;margin-bottom:24px;">
+        <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>📋 My Submitted Training Requests (History)</span>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="loadEmployeePreviousRequests(activeEmployee ? activeEmployee.ID : '')" style="font-size:12px;padding:4px 10px;">🔄 Refresh History</button>
+        </div>
+        <div id="previousRequestsContainer" style="min-height:40px;"></div>
+      </div>
+
       <!-- Step 2: Training Specifications -->
       <div id="requisitionFormBody" style="display:none;">
+        <input type="hidden" id="editingTrainingId" value="">
+        <div id="editResubmitBanner" style="display:none;margin-bottom:16px;background:#451a03;border:1px solid #d97706;color:#fef3c7;padding:12px 16px;border-radius:8px;font-size:13.5px;"></div>
         <div class="section-title">🎓 Step 2: Training Programme Specifications</div>
 
         <div style="margin-bottom:16px;">
@@ -162,7 +173,7 @@
           <div id="paxChipContainer" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
         </div>
 
-        <button type="button" class="btn btn-success" style="width:100%;padding:14px;font-size:16px;" onclick="submitRequisition()">
+        <button type="button" id="btnSubmitRequisition" class="btn btn-success" style="width:100%;padding:14px;font-size:16px;" onclick="submitRequisition()">
           <span>📤</span> Submit Training Requisition for HOD Approval
         </button>
       </div>
@@ -218,8 +229,9 @@
     let activeEmployee = null;
     let masterParticipants = [];
     let selectedParticipants = [];
+    let userPreviousRequests = [];
+    let editingTrainingId = '';
     let uploadedFileObject = null;
-
     let loggedInUserEmail = '';
 
     window.addEventListener('DOMContentLoaded', () => {
@@ -227,6 +239,45 @@
       loadMasterParticipants();
       fetchLoggedInUserEmail();
     });
+
+    function toDisplayDateStr(val) {
+      if (!val) return '';
+      const str = String(val).trim();
+      if (/^\d{2}\/\d{2}\/\d{4}/.test(str)) return str;
+      const ymdMatch = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+      if (ymdMatch) {
+        const year = ymdMatch[1];
+        const month = ymdMatch[2].padStart(2, '0');
+        const day = ymdMatch[3].padStart(2, '0');
+        return `${day}/${month}/${year}`;
+      }
+      const d = new Date(str);
+      if (!isNaN(d.getTime())) {
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        return `${day}/${month}/${year}`;
+      }
+      return str;
+    }
+
+    function toInputDateStr(val) {
+      if (!val) return '';
+      const str = String(val).trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+      const dmyMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+      if (dmyMatch) {
+        const day = dmyMatch[1].padStart(2, '0');
+        const month = dmyMatch[2].padStart(2, '0');
+        const year = dmyMatch[3];
+        return `${year}-${month}-${day}`;
+      }
+      const d = new Date(str);
+      if (!isNaN(d.getTime())) {
+        return d.toISOString().split('T')[0];
+      }
+      return '';
+    }
 
     function fetchLoggedInUserEmail() {
       google.script.run
@@ -306,10 +357,160 @@
       document.getElementById('autoName').innerText = emp.Name || emp.ID;
       document.getElementById('autoDept').innerText = emp.Department || 'N/A';
       document.getElementById('autoPos').innerText = emp.Position || 'Staff';
-      document.getElementById('autoDate').innerText = emp.RequestDate || new Date().toLocaleDateString();
+      const getTodayFormatted = () => {
+        const nowD = new Date();
+        const dd = String(nowD.getDate()).padStart(2, '0');
+        const mm = String(nowD.getMonth() + 1).padStart(2, '0');
+        const yyyy = nowD.getFullYear();
+        return `${dd}/${mm}/${yyyy}`;
+      };
+      document.getElementById('autoDate').innerText = emp.RequestDate || getTodayFormatted();
 
       document.getElementById('autofillBox').style.display = 'block';
       document.getElementById('requisitionFormBody').style.display = 'block';
+
+      loadEmployeePreviousRequests(emp.ID);
+    }
+
+    function loadEmployeePreviousRequests(empId) {
+      const container = document.getElementById('previousRequestsContainer');
+      const box = document.getElementById('previousRequestsBox');
+      if (!empId) return;
+
+      container.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:14px;font-size:13px;">Loading previous requests...</div>';
+      box.style.display = 'block';
+
+      google.script.run
+        .withSuccessHandler(resStr => {
+          const res = JSON.parse(resStr);
+          if (res.success && Array.isArray(res.data)) {
+            userPreviousRequests = res.data;
+            renderPreviousRequests(res.data);
+          } else {
+            container.innerHTML = '<div style="color:var(--text-muted);padding:10px;text-align:center;font-size:13px;">No previous training requests found.</div>';
+          }
+        })
+        .withFailureHandler(err => {
+          container.innerHTML = '<div style="color:#ef4444;padding:10px;text-align:center;font-size:13px;">Failed to load history: ' + err.message + '</div>';
+        })
+        .getEmployeeSubmittedRequests(empId);
+    }
+
+    function renderPreviousRequests(requests) {
+      const container = document.getElementById('previousRequestsContainer');
+      if (!requests || requests.length === 0) {
+        container.innerHTML = '<div style="color:var(--text-muted);padding:12px;text-align:center;font-size:13px;">No previous training requests submitted under this Employee ID yet.</div>';
+        return;
+      }
+
+      container.innerHTML = requests.map(r => {
+        const status = r.ApprovalStatus || 'Pending Approval';
+        const statusLower = status.toLowerCase();
+        const isReturned = statusLower.includes('return');
+        const isApproved = statusLower === 'approved';
+        const isRejected = statusLower.includes('reject');
+
+        let badgeBg = '#334155';
+        let badgeColor = '#94a3b8';
+        if (isApproved) { badgeBg = '#065f46'; badgeColor = '#34d399'; }
+        else if (isReturned) { badgeBg = '#78350f'; badgeColor = '#fbbf24'; }
+        else if (isRejected) { badgeBg = '#881337'; badgeColor = '#f43f5e'; }
+        else { badgeBg = '#1e3a8a'; badgeColor = '#60a5fa'; }
+
+        return `
+          <div style="background:#0f172a;border:1px solid ${isReturned ? '#f59e0b' : '#334155'};border-radius:10px;padding:14px;margin-bottom:12px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
+              <div>
+                <div style="font-size:11px;font-family:monospace;color:#94a3b8;font-weight:700;">${r.Code || r.ID}</div>
+                <div style="font-size:15px;font-weight:700;color:#fff;margin-top:2px;">${r.Name}</div>
+                <div style="font-size:12px;color:#94a3b8;margin-top:4px;">
+                  <span>📅 ${toDisplayDateStr(r.StartDate)} ${r.EndDate && r.EndDate !== r.StartDate ? 'to ' + toDisplayDateStr(r.EndDate) : ''}</span>
+                  <span style="margin:0 6px;">•</span>
+                  <span>💰 RM ${r.CourseFee || '0.00'}</span>
+                  <span style="margin:0 6px;">•</span>
+                  <span>👥 ${r.participants ? r.participants.length : (r.Participants || 0)} Pax</span>
+                </div>
+              </div>
+              <div>
+                <span style="background:${badgeBg};color:${badgeColor};padding:4px 10px;border-radius:999px;font-size:11.5px;font-weight:700;display:inline-block;">
+                  ${status}
+                </span>
+              </div>
+            </div>
+
+            ${r.ApprovalRemarks ? `
+              <div style="margin-top:10px;padding:8px 12px;background:#1e293b;border-left:3px solid ${isReturned ? '#f59e0b' : '#64748b'};border-radius:4px;font-size:12.5px;color:#cbd5e1;">
+                <strong>💬 Approver Remarks:</strong> ${r.ApprovalRemarks}
+              </div>
+            ` : ''}
+
+            ${isReturned ? `
+              <div style="margin-top:12px;display:flex;gap:8px;align-items:center;">
+                <button type="button" class="btn btn-warning btn-sm" style="font-weight:600;display:inline-flex;align-items:center;gap:6px;background:#d97706;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;" onclick="editReturnedRequest('${r.ID}')">
+                  ✏️ Edit & Resubmit Request
+                </button>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function editReturnedRequest(trainingId) {
+      const req = userPreviousRequests.find(r => r.ID === trainingId);
+      if (!req) {
+        alert('Could not locate request details for ID: ' + trainingId);
+        return;
+      }
+
+      editingTrainingId = req.ID;
+      document.getElementById('editingTrainingId').value = req.ID;
+
+      // Populate form fields
+      document.getElementById('reqTrainingName').value = req.Name || '';
+      document.getElementById('reqCategory').value = req.Category || 'Behavioral Skills (Soft Skills + Leadership + Customer Service)';
+      document.getElementById('reqStartDate').value = toInputDateStr(req.StartDate);
+      document.getElementById('reqEndDate').value = toInputDateStr(req.EndDate || req.StartDate);
+      document.getElementById('reqHours').value = req.TotalHours || 8;
+      document.getElementById('reqFee').value = req.CourseFee || '';
+      document.getElementById('reqVenue').value = req.Venue || '';
+      document.getElementById('reqTrainer').value = req.Trainer || '';
+      document.getElementById('reqReason').value = req.Objectives || '';
+      if (req.BrochureURL) {
+        document.getElementById('reqBrochureUrl').value = req.BrochureURL;
+      }
+
+      // Populate participants
+      if (Array.isArray(req.participants) && req.participants.length > 0) {
+        selectedParticipants = req.participants.map((p, idx) => ({
+          _uid: p.ID || p.EmployeeID || p.EmployeeNo || `EXP-${idx}`,
+          ID: p.ID || p.EmployeeID || p.EmployeeNo || '',
+          Name: p.Name || p.EmployeeName || '',
+          Department: p.Department || p.CostCentre || '',
+          Position: p.Position || p.JobTitle || ''
+        }));
+      } else {
+        selectedParticipants = [];
+      }
+      document.getElementById('reqTotalPax').value = selectedParticipants.length || 1;
+      renderSelectedChips();
+
+      // Show edit banner and change submit button
+      const banner = document.getElementById('editResubmitBanner');
+      banner.style.display = 'block';
+      banner.innerHTML = `⚠️ <strong>Editing Returned Request (${req.Code || req.ID})</strong>: ${req.ApprovalRemarks ? 'Remarks: "' + req.ApprovalRemarks + '"' : 'Update details below and resubmit to restart approval.'} <button type="button" onclick="cancelEditResubmit()" style="margin-left:12px;background:none;border:none;color:#fbbf24;text-decoration:underline;cursor:pointer;">Cancel Edit</button>`;
+
+      document.getElementById('btnSubmitRequisition').innerHTML = '<span>🚀</span> Resubmit Training Requisition for HOD Approval';
+
+      // Scroll smoothly to Step 2 form
+      document.getElementById('requisitionFormBody').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function cancelEditResubmit() {
+      editingTrainingId = '';
+      document.getElementById('editingTrainingId').value = '';
+      document.getElementById('editResubmitBanner').style.display = 'none';
+      document.getElementById('btnSubmitRequisition').innerHTML = '<span>📤</span> Submit Training Requisition for HOD Approval';
     }
 
     function handleBrochureFileSelect(input) {
@@ -500,9 +701,10 @@
         return;
       }
 
-      showLoading('Submitting Requisition Request...');
+      showLoading(editingTrainingId ? 'Resubmitting Requisition Request...' : 'Submitting Requisition Request...');
 
       const payload = {
+        editingTrainingId: editingTrainingId,
         EmployeeID: activeEmployee.ID,
         Email: activeEmployee.Email || '',
         Department: costCentreStr,
@@ -534,7 +736,15 @@
             return;
           }
           showAlert(res.data.message, false);
-          window.location.reload();
+          cancelEditResubmit();
+          loadEmployeePreviousRequests(activeEmployee.ID);
+          document.getElementById('reqTrainingName').value = '';
+          document.getElementById('reqVenue').value = '';
+          document.getElementById('reqFee').value = '';
+          document.getElementById('reqReason').value = '';
+          document.getElementById('reqBrochureUrl').value = '';
+          selectedParticipants = [];
+          renderSelectedChips();
         })
         .withFailureHandler(err => {
           hideLoading();

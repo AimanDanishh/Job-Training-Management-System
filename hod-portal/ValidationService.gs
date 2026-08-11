@@ -17,6 +17,7 @@ function resolveRealHODProfile(userEmail, requesterIdOrName) {
   let csuiteEmail = '';
   let hohrName = '';
   let hohrEmail = '';
+  let sourceTabName = '';
 
   const getVal = (rowObj, nameList) => {
     if (!rowObj) return '';
@@ -34,11 +35,10 @@ function resolveRealHODProfile(userEmail, requesterIdOrName) {
   const idAliases = ['Employee No', 'EmployeeNo', 'EmployeeID', 'ID', 'HODID', 'Employee ID', 'Staff ID'];
   const nameAliases = ['HOD', 'HODName', 'HodName', 'Name', 'HOD Name', 'Employee Name'];
 
-  // STEP 1: Direct lookup in "HOD email", "Csuite email", and "HOHR email" directory tabs
+  // STEP 1: Direct lookup in "HOD email", "Csuite email", "HOHR email", and "HR email" directory tabs
   try {
-    const targetSheets = ['HOD email', 'Csuite email', 'C-Suite email', 'HOHR email'];
+    const targetSheets = ['HOD email', 'Csuite email', 'C-Suite email', 'HOHR email', 'HOHR Email', 'HR email'];
     let matchedHod = null;
-    let sourceTabName = '';
 
     for (let tabName of targetSheets) {
       const sheet = getSheet(tabName);
@@ -85,7 +85,10 @@ function resolveRealHODProfile(userEmail, requesterIdOrName) {
                 const hName = getVal(h, nameAliases).toLowerCase().trim();
                 return hName && (hName === empName || hName.includes(empName) || empName.includes(hName));
               });
-              if (matchedHod) break;
+              if (matchedHod) {
+                sourceTabName = tabName;
+                break;
+              }
             }
           }
         }
@@ -171,12 +174,49 @@ function resolveRealHODProfile(userEmail, requesterIdOrName) {
     }
   }
 
+  // STEP 4: Determine Role Flags & Role Title (HOD, C-Suite, HOHR)
+  const tabLower = sourceTabName.toLowerCase();
+  const posLower = realPosition.toLowerCase();
+
+  let isCsuite = tabLower.includes('csuite') || tabLower.includes('c-suite') || 
+                 posLower.includes('c-suite') || posLower.includes('csuite') || 
+                 posLower.includes('ceo') || posLower.includes('chief') || posLower.includes('managing director');
+  
+  let isHohr = tabLower.includes('hohr') || 
+               posLower.includes('hohr') || posLower.includes('head of hr') || 
+               posLower.includes('hr head');
+
+  let isHod = tabLower.includes('hod email') || (!isCsuite && !isHohr) || posLower.includes('hod') || posLower.includes('head of department') || posLower.includes('manager');
+
+  // Also check if user email matches C-Suite or HOHR profiles in directory
+  if (csuiteEmail && csuiteEmail.toLowerCase().trim() === userEmailClean) isCsuite = true;
+  if (hohrEmail && hohrEmail.toLowerCase().trim() === userEmailClean) isHohr = true;
+
+  let roleTitle = 'Head of Department';
+  if (isCsuite && isHohr && isHod) roleTitle = 'HOD / C-Suite / HOHR';
+  else if (isCsuite && isHohr) roleTitle = 'C-Suite / Head of HR';
+  else if (isCsuite && isHod) roleTitle = 'HOD / C-Suite Executive';
+  else if (isHohr && isHod) roleTitle = 'HOD / Head of HR';
+  else if (isCsuite) roleTitle = 'C-Suite Executive';
+  else if (isHohr) roleTitle = 'Head of HR';
+  else if (tabLower.includes('hr email')) roleTitle = 'HR Admin';
+
+  if (!realPosition || realPosition === 'Head of Department') {
+    if (isCsuite && !isHod) realPosition = 'C-Suite Executive';
+    else if (isHohr && !isHod) realPosition = 'Head of HR';
+    else if (tabLower.includes('hr email')) realPosition = 'HR Executive';
+    else if (!realPosition) realPosition = 'Head of Department';
+  }
 
   return {
     ID: realHodId || 'N/A',
-    Name: realHodName || 'Head of Department',
+    Name: realHodName || 'Approver',
     CostCentre: realCostCentre || 'Cost Centre',
-    Position: realPosition || 'Head of Department',
+    Position: realPosition || 'Manager',
+    RoleTitle: roleTitle,
+    isHod: isHod,
+    isCsuite: isCsuite,
+    isHohr: isHohr,
     Email: userEmailClean || '',
     CsuiteName: csuiteName,
     CsuiteEmail: csuiteEmail,
@@ -320,7 +360,8 @@ function getHOHREmailProfile() {
   };
 
   try {
-    const hrSheet = getSheet('HOHR email') || getSheet('HOHR Email');
+    // HOHR email tab is Head of HR; HR email tab is HR Admin
+    const hrSheet = getSheet('HOHR email') || getSheet('HOHR Email') || getSheet('HOHR') || getSheet('HR email') || getSheet('HR Email');
     if (hrSheet) {
       const rows = sheetToJson(hrSheet);
       if (rows.length > 0) {
@@ -357,13 +398,27 @@ function getAllRealHODProfiles() {
     return '';
   };
 
-  const targetTabs = ['HOD email', 'Csuite email', 'C-Suite email', 'HOHR email'];
+  const targetTabs = ['HOD email', 'Csuite email', 'C-Suite email', 'HOHR email', 'HOHR Email', 'HR email'];
 
   try {
     targetTabs.forEach(tabName => {
       const sheet = getSheet(tabName);
       if (sheet) {
         const rows = sheetToJson(sheet);
+        const tabLower = tabName.toLowerCase();
+        let defaultRole = 'HOD';
+        let defaultPos = 'Head of Department';
+        if (tabLower.includes('csuite') || tabLower.includes('c-suite')) {
+          defaultRole = 'C-Suite';
+          defaultPos = 'C-Suite Executive';
+        } else if (tabLower.includes('hohr')) {
+          defaultRole = 'HOHR';
+          defaultPos = 'Head of HR';
+        } else if (tabLower.includes('hr')) {
+          defaultRole = 'HR Admin';
+          defaultPos = 'HR Executive';
+        }
+
         rows.forEach(h => {
           const id = getVal(h, ['Employee No', 'EmployeeNo', 'EmployeeID', 'ID']);
           const name = getVal(h, ['HOD', 'HODName', 'HodName', 'Name']);
@@ -376,7 +431,8 @@ function getAllRealHODProfiles() {
               ID: id || 'N/A',
               Name: name,
               CostCentre: dept || 'Cost Centre',
-              Position: pos || 'Manager',
+              Position: pos || defaultPos,
+              RoleTag: defaultRole,
               Email: email || '',
               CsuiteName: getVal(h, ['CsuiteName', 'CSuiteName']),
               CsuiteEmail: getVal(h, ['CsuiteEmail', 'CSuiteEmail']),
@@ -403,7 +459,9 @@ function getAllHODEmails() {
     return hods.map(h => ({
       name: h.Name,
       email: h.Email,
-      dept: h.CostCentre
+      dept: h.CostCentre,
+      role: h.RoleTag || 'HOD',
+      position: h.Position || 'Manager'
     })).filter(x => x.email !== '');
   } catch (e) {
     return [];
