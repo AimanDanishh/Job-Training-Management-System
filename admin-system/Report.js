@@ -98,18 +98,20 @@ function getDashboardReport() {
 function getFilteredReportData(reportType, filters) {
   try {
     const opts = filters || {};
-    const selectedYear  = String(opts.year || '').trim();
-    const selectedMonth = String(opts.month || '').trim(); // e.g. '01', '08', or 'Jan', 'Feb'
-    const selectedTitle = String(opts.title || '').trim().toLowerCase();
-    const selectedDept  = String(opts.costCentre || opts.department || '').trim().toLowerCase();
-    const selectedCat   = String(opts.category || '').trim().toLowerCase();
+    const selectedYear   = String(opts.year || '').trim();
+    const selectedMonth  = String(opts.month || '').trim();
+    const selectedStatus = String(opts.status || '').trim().toLowerCase();
+    const selectedTitle  = String(opts.title || '').trim().toLowerCase();
+    const selectedDept   = String(opts.costCentre || opts.department || '').trim().toLowerCase();
+    const selectedCat    = String(opts.category || '').trim().toLowerCase();
+    const selectedMode   = String(opts.mode || '').trim().toLowerCase();
 
     const tSheet = getSheet(SHEET_NAMES.trainings);
     const tRows  = tSheet ? sheetToJson(tSheet) : [];
     const empSheet = getSheet(SHEET_NAMES.employees);
     const empRows = empSheet ? sheetToJson(empSheet) : [];
 
-    // Filter trainings by year, month, title, category, department
+    // Filter trainings by year, month/quarter, status, title, category, mode, department
     const filteredTrainings = tRows.filter(t => {
       const startDateStr = t.StartDate || '';
       let matchYear = true;
@@ -119,14 +121,20 @@ function getFilteredReportData(reportType, filters) {
         const d = parseDateObj(startDateStr);
         if (d) {
           const yStr = String(d.getFullYear());
-          const mNumStr = String(d.getMonth() + 1).padStart(2, '0');
+          const mNum = d.getMonth() + 1;
+          const mNumStr = String(mNum).padStart(2, '0');
           const mNameShort = Utilities.formatDate(d, Session.getScriptTimeZone(), 'MMM');
 
           if (selectedYear && selectedYear !== 'All') {
             matchYear = (yStr === selectedYear);
           }
+
           if (selectedMonth && selectedMonth !== 'All') {
-            matchMonth = (mNumStr === selectedMonth || mNameShort.toLowerCase() === selectedMonth.toLowerCase() || String(d.getMonth() + 1) === selectedMonth);
+            if (selectedMonth === 'Q1') matchMonth = (mNum >= 1 && mNum <= 3);
+            else if (selectedMonth === 'Q2') matchMonth = (mNum >= 4 && mNum <= 6);
+            else if (selectedMonth === 'Q3') matchMonth = (mNum >= 7 && mNum <= 9);
+            else if (selectedMonth === 'Q4') matchMonth = (mNum >= 10 && mNum <= 12);
+            else matchMonth = (mNumStr === selectedMonth || mNameShort.toLowerCase() === selectedMonth.toLowerCase() || String(mNum) === selectedMonth);
           }
         }
       }
@@ -134,20 +142,34 @@ function getFilteredReportData(reportType, filters) {
       const matchTitle = !selectedTitle || String(t.Name || t.ID || t.Code || '').toLowerCase().includes(selectedTitle);
       const matchDept  = !selectedDept  || String(t.Department || '').toLowerCase().includes(selectedDept);
       const matchCat   = !selectedCat   || String(t.Category || '').toLowerCase().includes(selectedCat);
+      const matchMode  = !selectedMode  || String(t.TrainingMode || '').toLowerCase().includes(selectedMode);
 
-      return matchYear && matchMonth && matchTitle && matchDept && matchCat;
+      const canonical = getCanonicalTrainingStatus(t);
+      let matchStatus = true;
+      if (selectedStatus) {
+        const targetQ = selectedStatus.toLowerCase();
+        if (targetQ === 'pending') matchStatus = (canonical === 'Pending Approval');
+        else if (targetQ === 'approved') matchStatus = (canonical === 'Approved');
+        else if (targetQ === 'ongoing') matchStatus = (canonical === 'Ongoing');
+        else if (targetQ === 'completed') matchStatus = (canonical === 'Completed');
+        else if (targetQ === 'rejected') matchStatus = (canonical === 'Rejected');
+        else matchStatus = canonical.toLowerCase().includes(targetQ);
+      }
+
+      return matchYear && matchMonth && matchTitle && matchDept && matchCat && matchMode && matchStatus;
     });
 
+    const currentYr = String(new Date().getFullYear());
     if (reportType === 'hours') {
-      return ok(buildHoursReportData(filteredTrainings, empRows, selectedYear || '2026'));
+      return ok(buildHoursReportData(filteredTrainings, empRows, selectedYear || currentYr, selectedDept));
     } else if (reportType === 'cost') {
-      return ok(buildCostReportData(filteredTrainings, selectedYear || '2026'));
+      return ok(buildCostReportData(filteredTrainings, selectedYear || currentYr, selectedDept));
     } else if (reportType === 'title') {
-      return ok(buildTrainingTitleReportData(filteredTrainings, empRows));
+      return ok(buildTrainingTitleReportData(filteredTrainings, empRows, selectedDept));
     } else if (reportType === 'employee') {
       return ok(buildEmployeeReportData(filteredTrainings, empRows, selectedDept));
     } else if (reportType === 'atp') {
-      return ok(buildAnnualTrainingPlanData(filteredTrainings));
+      return ok(buildAnnualTrainingPlanData(filteredTrainings, selectedDept));
     } else {
       return err('Invalid report type specified.');
     }
@@ -170,55 +192,69 @@ function cleanNum(val, fallback) {
   return isNaN(parsed) ? fallback : parsed;
 }
 
-// ─── Default Sample Training Seed Data (Used when sheet is empty) ───────────────
+// ─── Real Data Helper (Returns empty arrays when sheet rows are absent) ─────────
 function getFallbackTrainingsList() {
-  return [
-    { ID: 'TRN-101', Code: 'TRN-101', Name: 'Occupational Safety & Health (OSHA) Compliance', Category: 'Safety & Compliance', Trainer: 'NIOSH Certified Trainer', Department: 'Operations & Safety', StartDate: '2026-02-15', EndDate: '2026-02-16', Duration: 2, TotalHours: 16, Participants: 25, CourseFee: 1500, Status: 'In Progress', Stage: 'Attendance In Progress' },
-    { ID: 'TRN-102', Code: 'TRN-102', Name: 'Leadership & Strategic Management Excellence', Category: 'Leadership & Executive', Trainer: 'Dr. Ahmad Razak (Corporate Training Institute)', Department: 'Management & HR', StartDate: '2026-03-10', EndDate: '2026-03-11', Duration: 2, TotalHours: 16, Participants: 18, CourseFee: 2800, Status: 'Upcoming', Stage: 'Created' },
-    { ID: 'TRN-103', Code: 'TRN-103', Name: 'Cybersecurity Awareness & ISO 27001 Data Security', Category: 'IT & Digital', Trainer: 'CyberSecurity Malaysia', Department: 'IT & Engineering', StartDate: '2026-04-05', EndDate: '2026-04-05', Duration: 1, TotalHours: 8, Participants: 40, CourseFee: 1200, Status: 'Upcoming', Stage: 'Created' },
-    { ID: 'TRN-104', Code: 'TRN-104', Name: 'Financial Planning & Budgetary Control Masterclass', Category: 'Finance & Governance', Trainer: 'MIA Chartered Accountant', Department: 'Finance & Admin', StartDate: '2026-05-12', EndDate: '2026-05-13', Duration: 2, TotalHours: 16, Participants: 15, CourseFee: 2200, Status: 'Upcoming', Stage: 'Created' },
-    { ID: 'TRN-105', Code: 'TRN-105', Name: 'Customer Relationship & Service Quality Standard', Category: 'Customer Success', Trainer: 'Internal HR Trainer', Department: 'Sales & Customer Service', StartDate: '2026-06-20', EndDate: '2026-06-20', Duration: 1, TotalHours: 8, Participants: 30, CourseFee: 800, Status: 'Upcoming', Stage: 'Created' }
-  ];
+  return [];
 }
 
 function getFallbackEmployeesList() {
-  return [
-    { ID: 'EMP-001', EmployeeID: 'EMP-001', Name: 'Ahmad Abdullah', CostCentre: 'Operations & Safety', Position: 'Senior Safety Executive', Status: 'Active' },
-    { ID: 'EMP-002', EmployeeID: 'EMP-002', Name: 'Siti Sarah binti Ismail', CostCentre: 'Management & HR', Position: 'HR Specialist', Status: 'Active' },
-    { ID: 'EMP-003', EmployeeID: 'EMP-003', Name: 'Tan Wei Ming', CostCentre: 'IT & Engineering', Position: 'Systems Engineer', Status: 'Active' },
-    { ID: 'EMP-004', EmployeeID: 'EMP-004', Name: 'Kavitha A/P Muthu', CostCentre: 'Finance & Admin', Position: 'Finance Officer', Status: 'Active' },
-    { ID: 'EMP-005', EmployeeID: 'EMP-005', Name: 'Muhammad Farhan', CostCentre: 'Sales & Customer Service', Position: 'Customer Lead', Status: 'Active' }
-  ];
+  return [];
 }
 
 // ─── 1. Training Hours Report Data Builder (Cost Centre vs Month) ─────────────
-function buildHoursReportData(trainingsInput, employeesInput, year) {
-  let trainings = (Array.isArray(trainingsInput) && trainingsInput.length > 0) ? trainingsInput : getFallbackTrainingsList();
-  let employees = (Array.isArray(employeesInput) && employeesInput.length > 0) ? employeesInput : getFallbackEmployeesList();
+function buildHoursReportData(trainingsInput, employeesInput, year, selectedDept) {
+  let trainings = (Array.isArray(trainingsInput)) ? trainingsInput : [];
+  let employees = (Array.isArray(employeesInput)) ? employeesInput : [];
 
-  const yrSuffix = year && year.length === 4 ? year.slice(-2) : '26';
+  const yrSuffix = year && year.length === 4 ? year.slice(-2) : String(new Date().getFullYear()).slice(-2);
   const monthLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map(m => `${m}-${yrSuffix}`);
 
-  // Fetch unique cost centres
-  const costCentresSet = new Set();
-  employees.forEach(e => {
-    const cc = String(e.CostCentre || e['Cost Centre'] || e.Department || '').trim();
-    if (cc) costCentresSet.add(cc);
-  });
-  trainings.forEach(t => {
-    const cc = String(t.Department || '').trim();
-    if (cc && cc !== 'All Departments / Cost Centres') costCentresSet.add(cc);
-  });
-  if (costCentresSet.size === 0) {
-    ['Operations & Safety', 'Management & HR', 'IT & Engineering', 'Finance & Admin', 'Sales & Customer Service'].forEach(cc => costCentresSet.add(cc));
+  // Fetch official Cost Centres strictly from "Cost Centre" tab under Employee Spreadsheet
+  const ccMap = new Map(); // key: lowercased, value: canonical Cost Centre display name
+  try {
+    const ccRes = parseServerRes(getCostCentres());
+    if (ccRes.success && Array.isArray(ccRes.data)) {
+      ccRes.data.forEach(ccName => {
+        const str = String(ccName || '').trim();
+        if (str && str !== 'All Departments / Cost Centres') {
+          const key = str.toLowerCase();
+          if (!ccMap.has(key)) ccMap.set(key, str);
+        }
+      });
+    }
+  } catch (err) {}
+
+  if (ccMap.size === 0) {
+    ['Operations & Safety', 'Management & HR', 'IT & Engineering', 'Finance & Admin', 'Sales & Customer Service'].forEach(cc => {
+      ccMap.set(cc.toLowerCase(), cc);
+    });
   }
 
-  const costCentreList = Array.from(costCentresSet).sort();
+  let costCentreList = Array.from(ccMap.values());
+  if (selectedDept) {
+    const fKey = String(selectedDept).trim().toLowerCase();
+    const filteredCC = costCentreList.filter(cc => cc.toLowerCase().includes(fKey) || fKey.includes(cc.toLowerCase()));
+    if (filteredCC.length > 0) {
+      costCentreList = filteredCC;
+    }
+  }
+
   const matrix = {};
 
   costCentreList.forEach(cc => {
     matrix[cc] = Array(12).fill(0);
   });
+
+  // Helper function to match any incoming raw cost centre to official Cost Centre list (case-insensitive)
+  function matchOfficialCostCentre(rawCC) {
+    if (!rawCC) return costCentreList[0];
+    const key = String(rawCC).trim().toLowerCase();
+    if (ccMap.has(key)) return ccMap.get(key);
+    for (let [k, canonical] of ccMap.entries()) {
+      if (k.includes(key) || key.includes(k)) return canonical;
+    }
+    return costCentreList[0];
+  }
 
   // Calculate training hours per cost centre per month
   trainings.forEach(t => {
@@ -226,15 +262,17 @@ function buildHoursReportData(trainingsInput, employeesInput, year) {
     const monthIdx = startDate ? startDate.getMonth() : 1; // Default to Feb if unparsed
     const hours = cleanNum(t.TotalHours || (cleanNum(t.Duration, 1) * 8), 8);
 
-    const participants = getTrainingParticipantsList(t.ID);
+    const participants = getTrainingParticipantsList(t.ID || t.Code);
     if (participants.length > 0) {
       participants.forEach(p => {
-        const cc = String(p.Department || p.CostCentre || t.Department || costCentreList[0]).trim();
+        const rawCC = String(p.Department || p.CostCentre || t.Department || '').trim();
+        const cc = matchOfficialCostCentre(rawCC);
         if (!matrix[cc]) matrix[cc] = Array(12).fill(0);
         matrix[cc][monthIdx] += hours;
       });
     } else {
-      const cc = String(t.Department || costCentreList[0]).trim();
+      const rawCC = String(t.Department || '').trim();
+      const cc = matchOfficialCostCentre(rawCC);
       if (!matrix[cc]) matrix[cc] = Array(12).fill(0);
       matrix[cc][monthIdx] += hours;
     }
@@ -242,8 +280,9 @@ function buildHoursReportData(trainingsInput, employeesInput, year) {
 
   const rows = [];
   costCentreList.forEach(cc => {
-    const mData = matrix[cc] || Array(12).fill(0);
-    const totalYear = mData.reduce((a, b) => a + b, 0);
+    const mRaw = matrix[cc] || Array(12).fill(0);
+    const totalYear = mRaw.reduce((a, b) => a + Number(b || 0), 0);
+    const mData = mRaw.map(v => (v === 0 || !v) ? '' : v);
 
     rows.push({
       costCentre: cc,
@@ -261,8 +300,12 @@ function buildHoursReportData(trainingsInput, employeesInput, year) {
 }
 
 // ─── 2. Training Cost Report Data Builder ─────────────────────────────────────
-function buildCostReportData(trainingsInput, year) {
-  let trainings = (Array.isArray(trainingsInput) && trainingsInput.length > 0) ? trainingsInput : getFallbackTrainingsList();
+function buildCostReportData(trainingsInput, year, selectedDept) {
+  let trainings = (Array.isArray(trainingsInput)) ? trainingsInput : [];
+  if (selectedDept) {
+    const fKey = String(selectedDept).trim().toLowerCase();
+    trainings = trainings.filter(t => String(t.Department || t.CostCentre || '').toLowerCase().includes(fKey));
+  }
 
   const rows = trainings.map(t => {
     const feeNum = cleanNum(t.CourseFee || t['Course Fee'], 0);
@@ -270,10 +313,10 @@ function buildCostReportData(trainingsInput, year) {
 
     return {
       trainingTitle: t.Name || t['Training Name'] || t.Code || 'Training Programme',
-      dateFrom: formatDate(t.StartDate),
-      dateTo: formatDate(t.EndDate || t.StartDate),
-      totalParticipant: paxNum > 0 ? paxNum : 20,
-      trainingFees: feeNum > 0 ? `RM ${feeNum.toFixed(2)}` : '',
+      dateFrom: formatOrdinalDate(t.StartDate),
+      dateTo: formatOrdinalDate(t.EndDate || t.StartDate),
+      totalParticipant: paxNum > 0 ? paxNum : 0,
+      trainingFees: feeNum > 0 ? feeNum : '',
       meal: '',
       subsistanceAllowance: '',
       hotelFees: '',
@@ -281,7 +324,7 @@ function buildCostReportData(trainingsInput, year) {
       taxiFees: '',
       tollFees: '',
       flight: '',
-      totalCost: feeNum > 0 ? `RM ${feeNum.toFixed(2)}` : 'RM 0.00',
+      totalCost: feeNum > 0 ? feeNum : '',
       totalHrdfGrant: ''
     };
   });
@@ -292,131 +335,309 @@ function buildCostReportData(trainingsInput, year) {
   };
 }
 
-// ─── 3. Training Title Report Data Builder ────────────────────────────────────
-function buildTrainingTitleReportData(trainingsInput, employeesInput) {
-  let trainings = (Array.isArray(trainingsInput) && trainingsInput.length > 0) ? trainingsInput : getFallbackTrainingsList();
-  let employees = (Array.isArray(employeesInput) && employeesInput.length > 0) ? employeesInput : getFallbackEmployeesList();
+function formatMonthYear(dateStrOrObj) {
+  if (!dateStrOrObj) return '—';
+  const d = parseDateObj(dateStrOrObj);
+  if (!d || isNaN(d.getTime())) return String(dateStrOrObj).toUpperCase();
+  const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+  const mStr = months[d.getMonth()];
+  const yStr = d.getFullYear();
+  return `${mStr}-${yStr}`;
+}
 
-  const rows = [];
+// ─── 3. Training Title Report Data Builder ────────────────────────────────────
+function buildTrainingTitleReportData(trainingsInput, employeesInput, selectedDept) {
+  let trainings = (Array.isArray(trainingsInput)) ? trainingsInput : [];
+  let employees = (Array.isArray(employeesInput)) ? employeesInput : [];
+
+  // Build employee lookup dictionary by ID and Name
+  const empMap = {};
+  employees.forEach(e => {
+    const id = String(e.ID || e.EmployeeID || e.EmployeeNo || '').trim();
+    const name = String(e.Name || e.EmployeeName || '').trim().toLowerCase();
+    if (id) empMap[id.toLowerCase()] = e;
+    if (name) empMap[name] = e;
+  });
+
+  let rows = [];
 
   trainings.forEach(t => {
-    const participants = getTrainingParticipantsList(t.ID);
-    const startDate = parseDateObj(t.StartDate);
-    const monthName = startDate ? Utilities.formatDate(startDate, Session.getScriptTimeZone(), 'MMMM') : 'February';
-    const totalHours = cleanNum(t.TotalHours || (cleanNum(t.Duration, 1) * 8), 8);
+    const participants = getTrainingParticipantsList(t.ID || t.Code);
+    const monthFormatted = formatMonthYear(t.StartDate);
+    const totalHours = cleanNum(t.TotalHours || (cleanNum(t.Duration, 1) * 8), 0);
     const tTitle = t.Name || t['Training Name'] || t.Code || 'Training Programme';
+    const tType = formatTrainingMode(t.TrainingMode || t.Mode || t.Type || t.Category || t.Venue);
 
     if (participants.length > 0) {
       participants.forEach(p => {
+        const pEmpId = String(p.EmployeeID || p.EmployeeNo || p.EmpNo || p.EmpID || '').trim();
+        const pName = String(p.EmployeeName || p.Name || '').trim();
+
+        // Cross reference with Employee Directory if available
+        let matchedEmp = (pEmpId && empMap[pEmpId.toLowerCase()]) || (pName && empMap[pName.toLowerCase()]);
+
+        const resolvedEmpNo = (matchedEmp ? (matchedEmp.EmployeeID || matchedEmp.ID || matchedEmp.EmployeeNo) : null)
+          || pEmpId
+          || (p.ID && !String(p.ID).toUpperCase().startsWith('TP-') ? p.ID : '')
+          || '—';
+
+        const resolvedName = (matchedEmp ? matchedEmp.Name : null) || pName || 'Staff Member';
+        const resolvedDept = (matchedEmp ? (matchedEmp.CostCentre || matchedEmp.Department) : null) || p.Department || t.Department || '—';
+
         rows.push({
-          name: p.Name || p.EmployeeName || 'Staff Member',
-          empNo: p.ID || p.EmployeeID || p.EmployeeNo || 'EMP-001',
+          name: resolvedName,
+          empNo: resolvedEmpNo,
           trainingTitle: tTitle,
-          costCentreDesc: p.Department || t.Department || 'Operations',
-          trainingType: t.Category && t.Category.toLowerCase().includes('in-house') ? 'In-House Training' : 'Public',
-          dateFrom: formatDate(t.StartDate),
-          dateUntil: formatDate(t.EndDate || t.StartDate),
-          month: monthName,
+          costCentreDesc: resolvedDept,
+          trainingType: tType,
+          dateFrom: formatOrdinalDate(t.StartDate),
+          dateUntil: formatOrdinalDate(t.EndDate || t.StartDate),
+          month: monthFormatted,
           totalHours: totalHours,
-          trainer: t.Trainer || 'Internal Facilitator',
-          trainingProvider: t.Trainer || 'Corporate Training',
-          expiryDate: 'N/A'
-        });
-      });
-    } else {
-      // Use fallback employees to ensure participant rows exist
-      employees.slice(0, 3).forEach(e => {
-        rows.push({
-          name: e.Name,
-          empNo: e.ID || e.EmployeeID,
-          trainingTitle: tTitle,
-          costCentreDesc: e.CostCentre || t.Department || 'Operations',
-          trainingType: 'Public',
-          dateFrom: formatDate(t.StartDate),
-          dateUntil: formatDate(t.EndDate || t.StartDate),
-          month: monthName,
-          totalHours: totalHours,
-          trainer: t.Trainer || 'Internal Facilitator',
-          trainingProvider: t.Trainer || 'Corporate Training',
+          trainer: t.Trainer || '—',
+          trainingProvider: t.Trainer || '—',
           expiryDate: 'N/A'
         });
       });
     }
   });
 
+  if (selectedDept) {
+    const fKey = String(selectedDept).trim().toLowerCase();
+    rows = rows.filter(r => String(r.costCentreDesc || '').toLowerCase().includes(fKey));
+  }
+
   return { rows: rows };
 }
 
 // ─── 4. Employee Report Data Builder ──────────────────────────────────────────
 function buildEmployeeReportData(trainingsInput, employeesInput, filterDept) {
-  let trainings = (Array.isArray(trainingsInput) && trainingsInput.length > 0) ? trainingsInput : getFallbackTrainingsList();
-  let employees = (Array.isArray(employeesInput) && employeesInput.length > 0) ? employeesInput : getFallbackEmployeesList();
+  let trainings = (Array.isArray(trainingsInput)) ? trainingsInput : [];
+  let employees = (Array.isArray(employeesInput)) ? employeesInput : [];
 
   const empMap = {};
 
   employees.forEach((e, idx) => {
-    const id = String(e.ID || e.EmployeeID || e.EmployeeNo || `EMP-00${idx+1}`).trim();
-    empMap[id.toLowerCase()] = {
+    const id = String(e.ID || e.EmployeeID || e.EmployeeNo || '').trim();
+    if (!id) return;
+    const cleanId = id.toLowerCase();
+    const cleanName = String(e.Name || e.EmployeeName || id).trim().toLowerCase();
+
+    empMap[cleanId] = {
       no: idx + 1,
       empNo: id,
       name: e.Name || e.EmployeeName || id,
-      costCentre: e.CostCentre || e['Cost Centre'] || e.Department || 'Operations & Safety',
-      position: e.Position || e.JobTitle || e.PositionTitle || 'Senior Executive',
-      totalTrainings: 1,
-      totalHours: 16,
-      attendedList: [trainings[idx % trainings.length].Name],
-      status: e.Status || 'Active'
+      costCentre: e.CostCentre || e['Cost Centre'] || e.Department || '—',
+      position: e.Position || e.JobTitle || e.PositionTitle || '—',
+      totalTrainings: 0,
+      totalHours: 0,
+      attendedList: [],
+      status: e.Status || 'Active',
+      cleanName: cleanName
     };
   });
 
-  trainings.forEach(t => {
-    const participants = getTrainingParticipantsList(t.ID);
-    const hours = cleanNum(t.TotalHours || (cleanNum(t.Duration, 1) * 8), 8);
+  trainings.forEach((t, tIdx) => {
+    const tTitle = t.Name || t['Training Name'] || t.Code || `Training ${tIdx+1}`;
+    const hours = cleanNum(t.TotalHours || (cleanNum(t.Duration, 1) * 8), 0);
+    const tDept = String(t.Department || '').trim().toLowerCase();
 
-    participants.forEach(p => {
-      const id = String(p.ID || p.EmployeeID || p.EmployeeNo || '').trim().toLowerCase();
-      if (empMap[id]) {
-        empMap[id].totalTrainings += 1;
-        empMap[id].totalHours += hours;
-        if (!empMap[id].attendedList.includes(t.Name)) {
-          empMap[id].attendedList.push(t.Name);
+    const participants = getTrainingParticipantsList(t.ID || t.Code);
+
+    let attRecords = [];
+    try {
+      const attRes = parseServerRes(getAttendance(t.ID || t.Code));
+      if (attRes.success && Array.isArray(attRes.data)) {
+        attRes.data.forEach(dayObj => {
+          if (Array.isArray(dayObj.records)) {
+            attRecords.push(...dayObj.records);
+          }
+        });
+      }
+    } catch (err) {}
+
+    const matchedEmpKeys = new Set();
+    const allRecords = [...participants, ...attRecords];
+
+    if (allRecords.length > 0) {
+      allRecords.forEach(p => {
+        const pEmpId = String(p.EmployeeID || p.EmployeeNo || p.EmpNo || p.EmpID || p.ID || '').trim().toLowerCase();
+        const pName  = String(p.EmployeeName || p.Name || p.EmpName || '').trim().toLowerCase();
+
+        let targetKey = null;
+        if (pEmpId && empMap[pEmpId]) {
+          targetKey = pEmpId;
+        } else if (pName) {
+          Object.keys(empMap).forEach(k => {
+            if (empMap[k].cleanName === pName || (pName.length > 3 && empMap[k].cleanName.includes(pName))) {
+              targetKey = k;
+            }
+          });
+        }
+
+        if (targetKey && !matchedEmpKeys.has(targetKey)) {
+          matchedEmpKeys.add(targetKey);
+        }
+      });
+    }
+
+    matchedEmpKeys.forEach(empKey => {
+      const empObj = empMap[empKey];
+      if (empObj) {
+        if (!empObj.attendedList.includes(tTitle)) {
+          empObj.attendedList.push(tTitle);
+          empObj.totalTrainings = empObj.attendedList.length;
+          empObj.totalHours += hours;
         }
       }
     });
   });
 
-  let list = Object.values(empMap);
+  let list = Object.values(empMap).map(e => {
+    delete e.cleanName;
+    return e;
+  });
+
   if (filterDept) {
-    list = list.filter(e => e.costCentre.toLowerCase().includes(filterDept));
+    const fDept = filterDept.toLowerCase();
+    list = list.filter(e => e.costCentre.toLowerCase().includes(fDept));
   }
 
   return { rows: list };
 }
 
+// ─── ATP Helper Functions ──────────────────────────────────────────────────
+function getOrdinalSuffix(day) {
+  const d = parseInt(day, 10);
+  if (d >= 11 && d <= 13) return 'th';
+  switch (d % 10) {
+    case 1:  return 'st';
+    case 2:  return 'nd';
+    case 3:  return 'rd';
+    default: return 'th';
+  }
+}
+
+function formatOrdinalDate(dateStrOrObj) {
+  if (!dateStrOrObj) return '—';
+  if (typeof dateStrOrObj === 'string' && /^\d{2}(st|nd|rd|th)\s+[A-Za-z]{3}\s+\d{4}$/.test(dateStrOrObj.trim())) {
+    return dateStrOrObj.trim();
+  }
+  const d = parseDateObj(dateStrOrObj);
+  if (!d || isNaN(d.getTime())) return String(dateStrOrObj);
+
+  const dayStr = String(d.getDate()).padStart(2, '0');
+  const suffix = getOrdinalSuffix(d.getDate());
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const monthStr = months[d.getMonth()];
+  const yearStr = d.getFullYear();
+
+  return `${dayStr}${suffix} ${monthStr} ${yearStr}`;
+}
+
+function formatTrainingMode(val) {
+  if (!val) return 'In-house';
+  const s = String(val).trim().toLowerCase();
+  if (s.includes('public') || s.includes('external') || s.includes('vendor')) {
+    return 'Public';
+  }
+  return 'In-house';
+}
+
+function getCanonicalTrainingStatus(t) {
+  if (!t) return 'Pending Approval';
+  if (typeof t === 'string') {
+    const s = t.toLowerCase();
+    if (s.includes('reject')) return 'Rejected';
+    if (s.includes('pending') || s.includes('review') || s.includes('draft') || s.includes('plan')) return 'Pending Approval';
+    if (s.includes('completed') || s.includes('complete') || s.includes('closed')) return 'Completed';
+    if (s.includes('progress') || s.includes('ongoing') || s.includes('going') || s.includes('active') || s.includes('attendance')) return 'Ongoing';
+    if (s.includes('approved') || s.includes('acknowledged') || s.includes('upcoming')) return 'Approved';
+    return 'Pending Approval';
+  }
+
+  const appStatus = String(t.ApprovalStatus || t.Status || '').trim().toLowerCase();
+  const statusStr = String(t.Status || '').trim().toLowerCase();
+  const stageStr = String(t.Stage || '').trim().toLowerCase();
+
+  // 1. Rejected
+  if (appStatus.includes('reject') || statusStr.includes('reject')) {
+    return 'Rejected';
+  }
+
+  // 2. Pending Approval
+  if (appStatus.includes('pending') || appStatus.includes('review') || statusStr.includes('draft') || statusStr.includes('planning') || statusStr.includes('plan')) {
+    return 'Pending Approval';
+  }
+
+  // 3. Completed
+  if (statusStr.includes('completed') || statusStr.includes('complete') || stageStr.includes('completed') || stageStr.includes('closed') || stageStr.includes('review')) {
+    return 'Completed';
+  }
+
+  // 4. Ongoing / Active
+  if (statusStr.includes('progress') || statusStr.includes('ongoing') || statusStr.includes('going') || statusStr.includes('active') || stageStr.includes('attendance')) {
+    return 'Ongoing';
+  }
+
+  // 5. Approved
+  if (appStatus.includes('approved') || appStatus.includes('acknowledged') || statusStr.includes('approved') || statusStr.includes('upcoming')) {
+    return 'Approved';
+  }
+
+  if (stageStr.includes('created') || stageStr.includes('imported')) {
+    return 'Pending Approval';
+  }
+
+  return 'Pending Approval';
+}
+
+function normalizeAtpStatus(statusStr, stageStr, appStatusStr) {
+  const canonical = getCanonicalTrainingStatus({ Status: statusStr, Stage: stageStr, ApprovalStatus: appStatusStr });
+  if (canonical === 'Completed') return 'Completed';
+  if (canonical === 'Ongoing') return 'On going';
+  if (canonical === 'Pending Approval') return 'Pending';
+  return 'On planning';
+}
+
 // ─── 5. Annual Training Plan (ATP) Data Builder ───────────────────────────────
-function buildAnnualTrainingPlanData(trainingsInput) {
-  let trainings = (Array.isArray(trainingsInput) && trainingsInput.length > 0) ? trainingsInput : getFallbackTrainingsList();
+function buildAnnualTrainingPlanData(trainingsInput, selectedDept) {
+  let trainings = (Array.isArray(trainingsInput)) ? trainingsInput : [];
+  if (selectedDept) {
+    const fKey = String(selectedDept).trim().toLowerCase();
+    trainings = trainings.filter(t => String(t.Department || t.CostCentre || '').toLowerCase().includes(fKey));
+  }
 
   const rows = trainings.map((t, idx) => {
-    const duration = cleanNum(t.TotalHours || (cleanNum(t.Duration, 1) * 8), 8);
-    const pax = cleanNum(t.Participants || 20, 20);
+    const duration = cleanNum(t.TotalHours || (cleanNum(t.Duration, 1) * 8), 0);
+    const pax = cleanNum(t.Participants, 0);
+
+    let reqUrl = t.RequisitionUrl || t.RequisitionFormUrl || '';
+    if (!reqUrl && t.RequisitionFormFileID) {
+      reqUrl = `https://docs.google.com/spreadsheets/d/${encodeURIComponent(t.RequisitionFormFileID)}/edit`;
+    }
+    if (!reqUrl) {
+      reqUrl = `https://docs.google.com/spreadsheets/d/sample-requisition-form-${t.Code || t.ID || (idx+1)}/edit`;
+    }
 
     return {
       no: idx + 1,
       trainingTitle: t.Name || t['Training Name'] || `Training ${idx+1}`,
       trainingCategory: t.Category || 'Compliance',
-      tnaSource: 'Annual TNA',
-      trainingMode: t.Venue && t.Venue.toLowerCase().includes('online') ? 'Online' : 'Physical Classroom',
+      tnaSource: t.TnaSource || t['TNA Source'] || 'Training Requisition Form',
+      trainingMode: formatTrainingMode(t.TrainingMode || t.Mode || t.Venue),
       durationHours: duration,
       trainer: t.Trainer || 'Certified Trainer',
       department: t.Department || 'All Departments',
-      positionEmpNo: 'All Eligible Staff',
+      positionEmpNo: 'Name List',
+      requisitionFormUrl: reqUrl,
       totalPax: pax,
-      plannedDate: formatDate(t.StartDate),
-      actualDateFrom: formatDate(t.StartDate),
-      actualDateTo: formatDate(t.EndDate || t.StartDate),
-      trainingStatus: t.Status || 'In Progress',
-      remarks: t.Stage || 'Planned'
+      plannedDate: formatOrdinalDate(t.StartDate),
+      actualDateFrom: formatOrdinalDate(t.StartDate),
+      actualDateTo: formatOrdinalDate(t.EndDate || t.StartDate),
+      trainingStatus: normalizeAtpStatus(t.Status, t.Stage),
+      remarks: t.Stage || 'Planned',
+      trainingId: t.ID || t.Code || `TRN-${idx+1}`
     };
   });
 
@@ -491,14 +712,14 @@ function ensureSheetDimensions(sheet, minRows, minCols) {
  */
 function exportFilteredReportExcel(reportType, filters) {
   try {
-    if (reportType === 'master' || reportType === 'all') {
-      return exportAllInOneMasterReportExcel(filters);
+    if (reportType === 'master' || !reportType) {
+      reportType = 'hours';
     }
 
     const res = parseServerRes(getFilteredReportData(reportType, filters));
     if (!res.success) return err(res.message || 'Failed to parse report data.');
     const data = res.data || {};
-    const year = (filters && filters.year) ? filters.year : '2026';
+    const year = (filters && filters.year) ? filters.year : String(new Date().getFullYear());
     const timestamp = Date.now();
 
     let titleName = 'Report';
@@ -617,9 +838,805 @@ function exportAllInOneMasterReportExcel(filters) {
   }
 }
 
+// ─── Non-Destructive Report Synchronization & Admin Edit Protection Engine ──────
+
+const REPORT_CONFIG = {
+  'Training Hours': {
+    sheetName: 'Training Hours',
+    headerRowIndex: 2,
+    dataStartRow: 3,
+    keyColumnIndex: 1,
+    keyFieldName: 'costCentre',
+    columns: [
+      { name: 'Cost Centre/Month', field: 'costCentre', isKey: true },
+      { name: 'Jan', field: 'm0' },
+      { name: 'Feb', field: 'm1' },
+      { name: 'Mar', field: 'm2' },
+      { name: 'Apr', field: 'm3' },
+      { name: 'May', field: 'm4' },
+      { name: 'Jun', field: 'm5' },
+      { name: 'Jul', field: 'm6' },
+      { name: 'Aug', field: 'm7' },
+      { name: 'Sep', field: 'm8' },
+      { name: 'Oct', field: 'm9' },
+      { name: 'Nov', field: 'm10' },
+      { name: 'Dec', field: 'm11' },
+      { name: 'Total Year', field: 'totalYear' },
+      { name: 'Total Training Hours', field: 'totalHours' }
+    ]
+  },
+  'Training Cost': {
+    sheetName: 'Training Cost',
+    headerRowIndex: 2,
+    dataStartRow: 3,
+    keyColumnIndex: 1,
+    keyFieldName: 'trainingTitle',
+    columns: [
+      { name: 'Training Title', field: 'trainingTitle', isKey: true },
+      { name: 'Training Date (From)', field: 'dateFrom' },
+      { name: 'Training Date (To)', field: 'dateTo' },
+      { name: 'Total Participant', field: 'totalParticipant' },
+      { name: 'Training Fees', field: 'trainingFees' },
+      { name: 'Meal', field: 'meal' },
+      { name: 'Subsistance Allowance', field: 'subsistanceAllowance' },
+      { name: 'Hotel Fees', field: 'hotelFees' },
+      { name: 'Mileage Claim', field: 'mileageClaim' },
+      { name: 'Taxi Fees', field: 'taxiFees' },
+      { name: 'Toll Fees', field: 'tollFees' },
+      { name: 'Flight', field: 'flight' },
+      { name: 'Total Cost', field: 'totalCost' },
+      { name: 'Total HRDF Grant (RM)', field: 'totalHrdfGrant' }
+    ]
+  },
+  'Training Title': {
+    sheetName: 'Training Title',
+    headerRowIndex: 1,
+    dataStartRow: 2,
+    keyColumnIndex: 2,
+    keyFieldName: 'empNoKey',
+    columns: [
+      { name: 'Name', field: 'name' },
+      { name: 'Emp. No', field: 'empNo', isKey: true },
+      { name: 'Training Title', field: 'trainingTitle' },
+      { name: '(EE)/Cost Centre Description', field: 'costCentreDesc' },
+      { name: 'Training Type', field: 'trainingType' },
+      { name: 'Date (From)', field: 'dateFrom' },
+      { name: 'Date (Until)', field: 'dateUntil' },
+      { name: 'Month', field: 'month' },
+      { name: 'Total Hours', field: 'totalHours' },
+      { name: 'Trainer', field: 'trainer' },
+      { name: 'Training Provide', field: 'trainingProvider' },
+      { name: 'Expiry Date (if applicable)', field: 'expiryDate' }
+    ]
+  },
+  'Employee Report': {
+    sheetName: 'Employee Report',
+    headerRowIndex: 1,
+    dataStartRow: 2,
+    keyColumnIndex: 2,
+    keyFieldName: 'empNo',
+    columns: [
+      { name: 'No', field: 'no' },
+      { name: 'Emp. No', field: 'empNo', isKey: true },
+      { name: 'Employee Name', field: 'name' },
+      { name: 'Cost Centre / Department', field: 'costCentre' },
+      { name: 'Position', field: 'position' },
+      { name: 'Total Trainings', field: 'totalTrainings' },
+      { name: 'Total Hours', field: 'totalHours' },
+      { name: 'Attended Trainings', field: 'attendedList' },
+      { name: 'Status', field: 'status' }
+    ]
+  },
+  'Annual Training Plan (ATP)': {
+    sheetName: 'Annual Training Plan (ATP)',
+    headerRowIndex: 1,
+    dataStartRow: 2,
+    keyColumnIndex: 2,
+    keyFieldName: 'trainingTitle',
+    columns: [
+      { name: 'No', field: 'no' },
+      { name: 'Training Title', field: 'trainingTitle', isKey: true },
+      { name: 'Training Category', field: 'trainingCategory' },
+      { name: 'TNA Source', field: 'tnaSource' },
+      { name: 'Training Mode', field: 'trainingMode' },
+      { name: 'Training Duration (hrs)', field: 'durationHours' },
+      { name: 'Trainer', field: 'trainer' },
+      { name: 'Department', field: 'department' },
+      { name: 'Position / Employee No', field: 'positionFormula' },
+      { name: 'Total Pax', field: 'totalPax' },
+      { name: 'Planned Date', field: 'plannedDate' },
+      { name: 'Actual Date (From)', field: 'actualDateFrom' },
+      { name: 'Actual Date (To)', field: 'actualDateTo' },
+      { name: 'Training Status', field: 'trainingStatus' },
+      { name: 'Remarks', field: 'remarks' }
+    ]
+  }
+};
+
+function getOrCreateSyncMetadataSheet(ss) {
+  let metaSheet = ss.getSheetByName('_SYNC_METADATA');
+  if (!metaSheet) {
+    metaSheet = ss.insertSheet('_SYNC_METADATA');
+    metaSheet.appendRow(['Report Sheet', 'Record Key', 'Column Name', 'Last System Value', 'Last Sync Timestamp']);
+    metaSheet.getRange('A1:E1').setFontWeight('bold').setBackground('#334155').setFontColor('#FFFFFF');
+    try { metaSheet.hideSheet(); } catch (e) {}
+  } else {
+    try { metaSheet.hideSheet(); } catch (e) {}
+  }
+  return metaSheet;
+}
+
+function loadSyncMetadata(ss) {
+  const metaSheet = getOrCreateSyncMetadataSheet(ss);
+  const data = metaSheet.getDataRange().getValues();
+  const map = {};
+
+  if (data.length > 1) {
+    for (let i = 1; i < data.length; i++) {
+      const sheetName = String(data[i][0] || '').trim();
+      const recKey    = String(data[i][1] || '').trim();
+      const colName   = String(data[i][2] || '').trim();
+      const lastVal   = data[i][3];
+
+      if (sheetName && recKey && colName) {
+        if (!map[sheetName]) map[sheetName] = {};
+        if (!map[sheetName][recKey]) map[sheetName][recKey] = {};
+        map[sheetName][recKey][colName] = lastVal;
+      }
+    }
+  }
+  return map;
+}
+
+function saveSyncMetadata(ss, metadataMap) {
+  const metaSheet = getOrCreateSyncMetadataSheet(ss);
+  metaSheet.clearContents();
+  metaSheet.appendRow(['Report Sheet', 'Record Key', 'Column Name', 'Last System Value', 'Last Sync Timestamp']);
+
+  const timeStamp = new Date().toISOString();
+  const rows = [];
+
+  Object.keys(metadataMap).forEach(sheetName => {
+    Object.keys(metadataMap[sheetName]).forEach(recKey => {
+      Object.keys(metadataMap[sheetName][recKey]).forEach(colName => {
+        const val = metadataMap[sheetName][recKey][colName];
+        rows.push([sheetName, recKey, colName, val, timeStamp]);
+      });
+    });
+  });
+
+  if (rows.length > 0) {
+    metaSheet.getRange(2, 1, rows.length, 5).setValues(rows);
+  }
+  metaSheet.getRange('A1:E1').setFontWeight('bold').setBackground('#334155').setFontColor('#FFFFFF');
+  try { metaSheet.hideSheet(); } catch (e) {}
+}
+
+function normalizeSyncValue(val) {
+  if (val === null || val === undefined) return '';
+  if (val instanceof Date) {
+    if (isNaN(val.getTime())) return '';
+    return val.toISOString().slice(0, 10);
+  }
+  let str = String(val).trim();
+  if (str === '—' || str === 'N/A' || str === 'null' || str === 'undefined') {
+    return '';
+  }
+  return str;
+}
+
+function isCellAdminModified(currentSheetValue, lastSystemValue) {
+  const normCurrent = normalizeSyncValue(currentSheetValue);
+  const normLast = normalizeSyncValue(lastSystemValue);
+  return normCurrent !== normLast;
+}
+
+function ensureReportHeaderExists(sheet, reportKey, config, extraParams) {
+  if (sheet.getLastRow() > 0) return;
+
+  const year = (extraParams && extraParams.year) ? extraParams.year : '2026';
+
+  if (reportKey === 'Training Hours') {
+    const yrSuffix = year && year.length === 4 ? year.slice(-2) : '26';
+    const monthLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map(m => `${m}-${yrSuffix}`);
+    const row1 = ['Cost Centre/Month', 'Training Hours', '', '', '', '', '', '', '', '', '', '', '', `Total ${year}`, `Total Training Hours ${year}`];
+    const row2 = ['', ...monthLabels, '', ''];
+    sheet.getRange(1, 1, 1, row1.length).setValues([row1]);
+    sheet.getRange(2, 1, 1, row2.length).setValues([row2]);
+    sheet.getRange('A1:A2').merge().setValue('Cost Centre/Month');
+    sheet.getRange('B1:M1').merge().setValue('Training Hours');
+    sheet.getRange('N1:N2').merge().setValue(`Total ${year}`);
+    sheet.getRange('O1:O2').merge().setValue(`Total Training Hours ${year}`);
+    sheet.getRange('A1:O2').setFontWeight('bold').setBackground('#2563EB').setFontColor('#FFFFFF').setVerticalAlignment('middle').setHorizontalAlignment('center');
+  } else if (reportKey === 'Training Cost') {
+    const row1 = ['Training Title', 'Training Date (From)', 'Training Date (To)', 'Total Participant', 'Training Cost (RM)', '', '', '', '', '', '', '', `Total Cost ${year}`, 'Total HRDF Grant (RM)'];
+    const row2 = ['', '', '', '', 'Training Fees', 'Meal', 'Subsistance Allowance', 'Hotel Fees', 'Mileage Claim', 'Taxi Fees', 'Toll Fees', 'Flight', '', ''];
+    sheet.getRange(1, 1, 1, row1.length).setValues([row1]);
+    sheet.getRange(2, 1, 1, row2.length).setValues([row2]);
+    sheet.getRange('A1:A2').merge().setValue('Training Title');
+    sheet.getRange('B1:B2').merge().setValue('Training Date (From)');
+    sheet.getRange('C1:C2').merge().setValue('Training Date (To)');
+    sheet.getRange('D1:D2').merge().setValue('Total Participant');
+    sheet.getRange('E1:L1').merge().setValue('Training Cost (RM)');
+    sheet.getRange('M1:M2').merge().setValue(`Total Cost ${year}`);
+    sheet.getRange('N1:N2').merge().setValue('Total HRDF Grant (RM)');
+    sheet.getRange('A1:N2').setFontWeight('bold').setBackground('#2563EB').setFontColor('#FFFFFF').setVerticalAlignment('middle').setHorizontalAlignment('center');
+  } else {
+    const headerCols = config.columns.map(c => c.name);
+    sheet.getRange(1, 1, 1, headerCols.length).setValues([headerCols]);
+    sheet.getRange(1, 1, 1, headerCols.length).setFontWeight('bold').setBackground('#2563EB').setFontColor('#FFFFFF').setHorizontalAlignment('center');
+  }
+}
+
+function getRecordValueForColumn(record, colDef, rowNumber) {
+  const field = colDef.field;
+  if (!field) return '';
+  if (field.startsWith('m') && field.length <= 3 && !isNaN(parseInt(field.slice(1)))) {
+    const idx = parseInt(field.slice(1), 10);
+    const months = Array.isArray(record.months) ? record.months : [];
+    return months[idx] !== undefined ? months[idx] : 0;
+  }
+  if (field === 'positionFormula') {
+    const reqUrl = record.requisitionFormUrl || '#';
+    return (reqUrl && reqUrl !== '#') ? `=HYPERLINK("${reqUrl}", "Name List")` : 'Name List';
+  }
+  if (field === 'totalCost' || field === 'totalCostFormula') {
+    const rNum = rowNumber || 3;
+    return `=SUM(E${rNum}:L${rNum})`;
+  }
+  if (['trainingFees', 'meal', 'subsistanceAllowance', 'hotelFees', 'mileageClaim', 'taxiFees', 'tollFees', 'flight', 'totalHrdfGrant'].includes(field)) {
+    const val = record[field];
+    if (val === 0 || val === '0' || val === 'RM 0.00' || val === 'RM 0' || val === null || val === undefined) {
+      return '';
+    }
+    return val;
+  }
+  if (field === 'attendedList' && Array.isArray(record.attendedList)) {
+    return record.attendedList.join(', ');
+  }
+  return record[field] !== undefined ? record[field] : '';
+}
+
+function updateTrainingHoursTotalRow(sheet, rows, dataStartRow) {
+  const totalMonths = Array(12).fill(0);
+  let grandTotalYear = 0;
+  let grandTotalHours = 0;
+
+  rows.forEach(r => {
+    (r.months || []).forEach((val, idx) => {
+      totalMonths[idx] += Number(val || 0);
+    });
+    grandTotalYear += Number(r.totalYear || 0);
+    grandTotalHours += Number(r.totalHours || 0);
+  });
+
+  const totalRowValues = [
+    'Total',
+    ...totalMonths,
+    grandTotalYear,
+    grandTotalHours
+  ];
+
+  const lastRow = sheet.getLastRow();
+  let totalRowIndex = lastRow;
+
+  if (lastRow >= dataStartRow) {
+    const firstCellVal = String(sheet.getRange(lastRow, 1).getValue() || '').trim().toLowerCase();
+    if (firstCellVal === 'total') {
+      totalRowIndex = lastRow;
+    } else {
+      totalRowIndex = lastRow + 1;
+    }
+  } else {
+    totalRowIndex = dataStartRow;
+  }
+
+  sheet.getRange(totalRowIndex, 1, 1, 15).setValues([totalRowValues]);
+  const totalRange = sheet.getRange(totalRowIndex, 1, 1, 15);
+  totalRange.setFontWeight('bold').setBackground('#EFF6FF').setFontColor('#1E3A8A');
+}
+
+function autoFitSheetColumns(sheet, numCols) {
+  if (!sheet) return;
+  try {
+    const totalCols = numCols || sheet.getLastColumn();
+    if (totalCols > 0) {
+      sheet.autoResizeColumns(1, totalCols);
+      for (let col = 1; col <= totalCols; col++) {
+        try { sheet.autoResizeColumn(col); } catch (e) {}
+      }
+    }
+  } catch (e) {
+    Logger.log('autoFitSheetColumns error: ' + e.message);
+  }
+}
+
+function syncReportSheetIncrementally(ss, reportKey, reportData, extraParams) {
+  const config = REPORT_CONFIG[reportKey];
+  if (!config) {
+    Logger.log('[SYNC] No configuration found for reportKey: ' + reportKey);
+    return;
+  }
+
+  let sheet = ss.getSheetByName(config.sheetName);
+  if (!sheet) {
+    sheet = ss.insertSheet(config.sheetName);
+  }
+
+  ensureReportHeaderExists(sheet, reportKey, config, extraParams);
+
+  const metadataMap = loadSyncMetadata(ss);
+  if (!metadataMap[config.sheetName]) {
+    metadataMap[config.sheetName] = {};
+  }
+  const sheetMeta = metadataMap[config.sheetName];
+
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+
+  let existingSheetValues = [];
+  if (lastRow >= config.dataStartRow && lastCol >= 1) {
+    existingSheetValues = sheet.getRange(config.dataStartRow, 1, lastRow - config.dataStartRow + 1, Math.max(lastCol, config.columns.length)).getValues();
+  }
+
+  const rowMap = {};
+  existingSheetValues.forEach((rowVals, idx) => {
+    const sheetRowNumber = config.dataStartRow + idx;
+    const rawKeyVal = rowVals[config.keyColumnIndex - 1];
+    const keyVal = normalizeSyncValue(rawKeyVal);
+
+    if (keyVal && keyVal.toLowerCase() !== 'total' && keyVal.toLowerCase() !== 'summary') {
+      rowMap[keyVal.toLowerCase()] = {
+        rowNumber: sheetRowNumber,
+        rowValues: rowVals
+      };
+    }
+  });
+
+  const incomingRows = reportData.rows || [];
+
+  incomingRows.forEach(record => {
+    let recKey = '';
+    if (config.keyFieldName === 'empNoKey') {
+      recKey = normalizeSyncValue(`${record.empNo || record.name || ''}_${record.trainingTitle || ''}`);
+    } else {
+      recKey = normalizeSyncValue(record[config.keyFieldName] || record.trainingTitle || record.costCentre || record.empNo || record.ID || record.no);
+    }
+    if (!recKey) return;
+
+    if (!sheetMeta[recKey]) {
+      sheetMeta[recKey] = {};
+    }
+    const recordMeta = sheetMeta[recKey];
+
+    const existingRow = rowMap[recKey.toLowerCase()];
+
+    if (existingRow) {
+      const rowNum = existingRow.rowNumber;
+      const currentVals = existingRow.rowValues;
+
+      config.columns.forEach((colDef, cIdx) => {
+        const colNumber = cIdx + 1;
+        const colName = colDef.name;
+        const incomingVal = getRecordValueForColumn(record, colDef, rowNum);
+
+        const currentSheetVal = currentVals[cIdx] !== undefined ? currentVals[cIdx] : '';
+        let lastSystemVal     = recordMeta[colName];
+
+        if (lastSystemVal === undefined) {
+          lastSystemVal = currentSheetVal;
+          if (normalizeSyncValue(currentSheetVal) !== '') {
+            recordMeta[colName] = currentSheetVal;
+          }
+        }
+
+        if (!isCellAdminModified(currentSheetVal, lastSystemVal)) {
+          if (normalizeSyncValue(currentSheetVal) !== normalizeSyncValue(incomingVal)) {
+            sheet.getRange(rowNum, colNumber).setValue(incomingVal);
+            recordMeta[colName] = incomingVal;
+            Logger.log(`[SYNC] ${config.sheetName} - ${recKey} - ${colName} updated to: "${incomingVal}"`);
+          }
+        } else {
+          Logger.log(`[SYNC] ${config.sheetName} - ${recKey} - ${colName} preserved admin edit: "${currentSheetVal}"`);
+        }
+      });
+
+    } else {
+      const targetRowNum = sheet.getLastRow() + 1;
+      const newRowVals = config.columns.map(colDef => getRecordValueForColumn(record, colDef, targetRowNum));
+      sheet.appendRow(newRowVals);
+      const newRowNum = sheet.getLastRow();
+
+      config.columns.forEach((colDef, cIdx) => {
+        recordMeta[colDef.name] = newRowVals[cIdx];
+      });
+
+      Logger.log(`[SYNC] ${config.sheetName} - ${recKey} - New record added at row ${newRowNum}`);
+    }
+  });
+
+  if (reportKey === 'Training Hours') {
+    updateTrainingHoursTotalRow(sheet, incomingRows, config.dataStartRow);
+  }
+
+  saveSyncMetadata(ss, metadataMap);
+  autoFitSheetColumns(sheet, config.columns.length);
+}
+
+// ─── Targeted Event-Based Incremental Synchronization Engine ──────────────────
+
+function generateSyncId() {
+  return 'SYNC-' + String(Date.now()).slice(-6);
+}
+
+function getOrCreateSyncHistorySheet(ss) {
+  let historySheet = ss.getSheetByName('_SYNC_HISTORY');
+  if (!historySheet) {
+    historySheet = ss.insertSheet('_SYNC_HISTORY');
+    historySheet.appendRow(['Sync ID', 'Timestamp', 'Training ID', 'Action', 'Trigger', 'Reports', 'Status', 'Duration', 'Message', 'Error']);
+    historySheet.getRange('A1:J1').setFontWeight('bold').setBackground('#1E293B').setFontColor('#FFFFFF');
+    try { historySheet.setFrozenRows(1); } catch (e) {}
+  }
+  return historySheet;
+}
+
+function logSyncHistory(ss, rec) {
+  try {
+    if (!ss) {
+      const repFolder = getOrCreateReportsFolder();
+      const fileName = `Master Annual Training Report (2026)`;
+      let fileIter = repFolder.getFilesByName(fileName);
+      if (fileIter.hasNext()) ss = SpreadsheetApp.openById(fileIter.next().getId());
+    }
+    if (!ss) return;
+
+    const historySheet = getOrCreateSyncHistorySheet(ss);
+    const syncId = rec.syncId || generateSyncId();
+    const timeStamp = rec.timestamp || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+
+    historySheet.appendRow([
+      syncId,
+      timeStamp,
+      rec.trainingId || '',
+      rec.action || 'UPDATE',
+      rec.trigger || 'System Action',
+      rec.reports || '',
+      rec.status || 'SUCCESS',
+      rec.duration || '0.00s',
+      rec.message || '',
+      rec.error || ''
+    ]);
+  } catch (e) {
+    Logger.log('logSyncHistory error: ' + e.message);
+  }
+}
+
+function buildEmployeeReportDataForTraining(tRecord, empRows) {
+  const tSheet = getSheet(SHEET_NAMES.trainings);
+  const allTrainings = tSheet ? sheetToJson(tSheet) : [tRecord];
+  const participants = getTrainingParticipantsList(tRecord.ID || tRecord.Code);
+  const enrolledEmpIds = new Set(participants.map(p => String(p.EmployeeID || p.ID || p.EmployeeNo || '').trim().toLowerCase()));
+
+  let targetEmpRows = empRows;
+  if (enrolledEmpIds.size > 0) {
+    targetEmpRows = empRows.filter(e => {
+      const eId = String(e.ID || e.EmployeeID || e.EmployeeNo || '').trim().toLowerCase();
+      return enrolledEmpIds.has(eId);
+    });
+  }
+
+  return buildEmployeeReportData(allTrainings, targetEmpRows.length > 0 ? targetEmpRows : empRows);
+}
+
+function buildHoursReportDataForTraining(tRecord, empRows, year) {
+  const tSheet = getSheet(SHEET_NAMES.trainings);
+  const allTrainings = tSheet ? sheetToJson(tSheet) : [tRecord];
+  return buildHoursReportData(allTrainings, empRows, year);
+}
+
+/**
+ * Reusable Incremental Sync Function (Targeted Event-Based Synchronization).
+ * Synchronizes ONLY the specified Training ID across affected report sheets in real time.
+ */
+function syncTrainingById(trainingId, triggerName, actionName) {
+  const lock = LockService.getScriptLock();
+  let hasLock = false;
+  try {
+    hasLock = lock.tryLock(5000);
+    if (!hasLock) {
+      Logger.log('[SYNC] Could not acquire script lock within 5s for trainingId: ' + trainingId);
+    }
+  } catch (lErr) {
+    Logger.log('[SYNC] Script lock error: ' + lErr.message);
+  }
+
+  const startTime = Date.now();
+  const trigger = triggerName || 'System Trigger';
+  const action = actionName || 'UPDATE';
+  const displayYear = '2026';
+
+  try {
+    if (!trainingId || String(trainingId).trim() === '') {
+      return err('Invalid Training ID provided for incremental sync.');
+    }
+
+    const tId = String(trainingId).trim();
+
+    // 1. Retrieve the latest training record for trainingId
+    const tSheet = getSheet(SHEET_NAMES.trainings);
+    if (!tSheet) return err('Trainings sheet unavailable.');
+    const tRows = sheetToJson(tSheet);
+    const tRecord = tRows.find(r => String(r.ID || '').trim() === tId || String(r.Code || '').trim() === tId);
+
+    if (!tRecord) {
+      const durationStr = ((Date.now() - startTime) / 1000).toFixed(2) + 's';
+      const failMsg = `Unable to find Training ID: ${tId}`;
+      logSyncHistory(null, {
+        syncId: generateSyncId(),
+        timestamp: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss"),
+        trainingId: tId,
+        action: action,
+        trigger: trigger,
+        reports: 'None',
+        status: 'FAILED',
+        duration: durationStr,
+        message: failMsg,
+        error: `Training ID ${tId} not found in database.`
+      });
+      return err(failMsg);
+    }
+
+    // 2. Open Live Master Report Spreadsheet
+    const repFolder = getOrCreateReportsFolder();
+    const fileName = `Master Annual Training Report (${displayYear})`;
+
+    let fileIter = repFolder.getFilesByName(fileName);
+    let ss;
+    if (fileIter.hasNext()) {
+      ss = SpreadsheetApp.openById(fileIter.next().getId());
+    } else {
+      ss = SpreadsheetApp.create(fileName);
+      const file = DriveApp.getFileById(ss.getId());
+      repFolder.addFile(file);
+      try { DriveApp.getRootFolder().removeFile(file); } catch (e) {}
+    }
+
+    const empSheet = getSheet(SHEET_NAMES.employees);
+    const empRows = empSheet ? sheetToJson(empSheet) : [];
+
+    // 3. Build targeted report data for ONLY this training record
+    const atpData = buildAnnualTrainingPlanData([tRecord]);
+    const costData = buildCostReportData([tRecord], displayYear);
+    const titleData = buildTrainingTitleReportData([tRecord], empRows);
+    const empReportData = buildEmployeeReportDataForTraining(tRecord, empRows);
+    const hoursData = buildHoursReportDataForTraining(tRecord, empRows, displayYear);
+
+    const reportsUpdated = [];
+
+    // 4. Update affected report tabs incrementally while preserving admin-edited cells
+    if (atpData && atpData.rows && atpData.rows.length > 0) {
+      syncReportSheetIncrementally(ss, 'Annual Training Plan (ATP)', atpData);
+      reportsUpdated.push('Annual Training Plan (ATP)');
+    }
+
+    if (costData && costData.rows && costData.rows.length > 0) {
+      syncReportSheetIncrementally(ss, 'Training Cost', costData, { year: displayYear });
+      reportsUpdated.push('Training Cost');
+    }
+
+    if (titleData && titleData.rows && titleData.rows.length > 0) {
+      syncReportSheetIncrementally(ss, 'Training Title', titleData);
+      reportsUpdated.push('Training Title');
+    }
+
+    if (empReportData && empReportData.rows && empReportData.rows.length > 0) {
+      syncReportSheetIncrementally(ss, 'Employee Report', empReportData);
+      reportsUpdated.push('Employee Report');
+    }
+
+    if (hoursData && hoursData.rows && hoursData.rows.length > 0) {
+      syncReportSheetIncrementally(ss, 'Training Hours', hoursData, { year: displayYear });
+      reportsUpdated.push('Training Hours');
+    }
+
+    SpreadsheetApp.flush();
+
+    const durationStr = ((Date.now() - startTime) / 1000).toFixed(2) + 's';
+    const syncId = generateSyncId();
+    const message = `Successfully synchronized Training ID ${tId} across ${reportsUpdated.length} report tab(s).`;
+    const timeStampStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+
+    const historyRecord = {
+      syncId: syncId,
+      timestamp: timeStampStr,
+      trainingId: tId,
+      action: action,
+      trigger: trigger,
+      reports: reportsUpdated.join(', '),
+      status: 'SUCCESS',
+      duration: durationStr,
+      message: message,
+      error: ''
+    };
+
+    logSyncHistory(ss, historyRecord);
+
+    return ok({
+      syncId: syncId,
+      trainingId: tId,
+      action: action,
+      trigger: trigger,
+      reports: reportsUpdated,
+      status: 'SUCCESS',
+      duration: durationStr,
+      message: message,
+      fileUrl: ss.getUrl(),
+      timestamp: timeStampStr
+    });
+
+  } catch (e) {
+    const durationStr = ((Date.now() - startTime) / 1000).toFixed(2) + 's';
+    const errorMsg = 'Incremental sync failed for Training ID ' + trainingId + ': ' + e.message;
+    Logger.log('syncTrainingById error: ' + errorMsg);
+
+    try {
+      const repFolder = getOrCreateReportsFolder();
+      const fileName = `Master Annual Training Report (${displayYear})`;
+      let fileIter = repFolder.getFilesByName(fileName);
+      let ss = fileIter.hasNext() ? SpreadsheetApp.openById(fileIter.next().getId()) : null;
+      if (ss) {
+        logSyncHistory(ss, {
+          syncId: generateSyncId(),
+          timestamp: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss"),
+          trainingId: String(trainingId || 'UNKNOWN'),
+          action: action,
+          trigger: trigger,
+          reports: 'None',
+          status: 'FAILED',
+          duration: durationStr,
+          message: 'Synchronization failed',
+          error: e.message
+        });
+      }
+    } catch (hErr) {}
+
+    return err(errorMsg);
+  } finally {
+    if (hasLock) {
+      try { lock.releaseLock(); } catch(rErr) {}
+    }
+  }
+}
+
+/**
+ * API: Get Sync History logs from _SYNC_HISTORY sheet
+ */
+function getSyncHistory(limit, filterTrainingId, filterStatus) {
+  try {
+    const repFolder = getOrCreateReportsFolder();
+    const fileName = `Master Annual Training Report (2026)`;
+    let fileIter = repFolder.getFilesByName(fileName);
+    if (!fileIter.hasNext()) return ok([]);
+
+    const ss = SpreadsheetApp.openById(fileIter.next().getId());
+    const historySheet = ss.getSheetByName('_SYNC_HISTORY');
+    if (!historySheet) return ok([]);
+
+    const data = historySheet.getDataRange().getValues();
+    if (data.length <= 1) return ok([]);
+
+    let rows = [];
+    for (let i = 1; i < data.length; i++) {
+      rows.push({
+        syncId:     String(data[i][0] || ''),
+        timestamp:  String(data[i][1] || ''),
+        trainingId: String(data[i][2] || ''),
+        action:     String(data[i][3] || ''),
+        trigger:    String(data[i][4] || ''),
+        reports:    String(data[i][5] || ''),
+        status:     String(data[i][6] || ''),
+        duration:   String(data[i][7] || ''),
+        message:    String(data[i][8] || ''),
+        error:      String(data[i][9] || '')
+      });
+    }
+
+    rows.reverse(); // Most recent first
+
+    if (filterTrainingId) {
+      const cleanId = String(filterTrainingId).toLowerCase().trim();
+      rows = rows.filter(r => r.trainingId.toLowerCase().includes(cleanId));
+    }
+    if (filterStatus && filterStatus !== 'All') {
+      const cleanStatus = String(filterStatus).toLowerCase().trim();
+      rows = rows.filter(r => r.status.toLowerCase() === cleanStatus);
+    }
+
+    const maxLimit = limit ? parseInt(limit, 10) : 100;
+    return ok(rows.slice(0, maxLimit));
+  } catch (e) {
+    return err('Failed to load sync history: ' + e.message);
+  }
+}
+
+/**
+ * API: Get latest Sync Status for a specific Training ID
+ */
+function getTrainingSyncStatus(trainingId) {
+  try {
+    if (!trainingId) return err('Training ID is required.');
+    const res = parseServerRes(getSyncHistory(50, trainingId));
+    if (!res.success) return err(res.message);
+
+    const history = res.data || [];
+    if (history.length === 0) {
+      return ok({
+        trainingId: trainingId,
+        status: 'UNSYNCED',
+        lastSync: 'Never',
+        lastDuration: '—',
+        lastTrigger: '—',
+        lastAction: '—',
+        lastError: '',
+        reports: 'None'
+      });
+    }
+
+    const latest = history[0];
+    return ok({
+      trainingId: trainingId,
+      status: latest.status,
+      lastSync: latest.timestamp,
+      lastDuration: latest.duration,
+      lastTrigger: latest.trigger,
+      lastAction: latest.action,
+      lastError: latest.error,
+      reports: latest.reports
+    });
+  } catch (e) {
+    return err('Failed to get sync status: ' + e.message);
+  }
+}
+
+/**
+ * Manual Recovery Function: Synchronizes all training records across all 5 report tabs.
+ * Use for initial setup, data recovery, manual admin reconciliation, or scheduled maintenance.
+ */
+function syncAllTrainings(targetYear) {
+  const startTime = Date.now();
+  try {
+    const res = syncLiveMasterReportSheet(targetYear);
+    const durationStr = ((Date.now() - startTime) / 1000).toFixed(2) + 's';
+
+    const repFolder = getOrCreateReportsFolder();
+    const fileName = `Master Annual Training Report (${targetYear || '2026'})`;
+    let fileIter = repFolder.getFilesByName(fileName);
+    let ss = fileIter.hasNext() ? SpreadsheetApp.openById(fileIter.next().getId()) : null;
+
+    if (ss) {
+      logSyncHistory(ss, {
+        syncId: generateSyncId(),
+        timestamp: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss"),
+        trainingId: 'ALL',
+        action: 'FULL_SYNC',
+        trigger: 'Manual Admin Full Sync',
+        reports: 'All 5 Reports',
+        status: parseServerRes(res).success ? 'SUCCESS' : 'FAILED',
+        duration: durationStr,
+        message: 'Full master database synchronization executed.',
+        error: parseServerRes(res).success ? '' : parseServerRes(res).message
+      });
+    }
+    return res;
+  } catch (e) {
+    return err('Full sync failed: ' + e.message);
+  }
+}
+
 /**
  * Synchronizes and updates the Live Master Report Google Sheet inside the "Reports" folder in Google Drive.
  * Contains all 5 live tabs (Training Hours, Training Cost, Training Title, Employee Report, ATP).
+ * Uses cell-level admin edit protection with _SYNC_METADATA tracking.
  */
 function syncLiveMasterReportSheet(targetYear) {
   try {
@@ -645,34 +1662,34 @@ function syncLiveMasterReportSheet(targetYear) {
     const filters = { year: 'All' };
 
     // Tab 1: Training Hours
-    let sHours = ss.getSheetByName('Training Hours');
-    if (!sHours) sHours = ss.insertSheet('Training Hours');
     const hoursRes = parseServerRes(getFilteredReportData('hours', filters));
-    if (hoursRes.success && hoursRes.data) formatHoursReportSheet(sHours, hoursRes.data, displayYear);
+    if (hoursRes.success && hoursRes.data) {
+      syncReportSheetIncrementally(ss, 'Training Hours', hoursRes.data, { year: displayYear });
+    }
 
     // Tab 2: Training Cost
-    let sCost = ss.getSheetByName('Training Cost');
-    if (!sCost) sCost = ss.insertSheet('Training Cost');
     const costRes = parseServerRes(getFilteredReportData('cost', filters));
-    if (costRes.success && costRes.data) formatCostReportSheet(sCost, costRes.data, displayYear);
+    if (costRes.success && costRes.data) {
+      syncReportSheetIncrementally(ss, 'Training Cost', costRes.data, { year: displayYear });
+    }
 
     // Tab 3: Training Title
-    let sTitle = ss.getSheetByName('Training Title');
-    if (!sTitle) sTitle = ss.insertSheet('Training Title');
     const titleRes = parseServerRes(getFilteredReportData('title', filters));
-    if (titleRes.success && titleRes.data) formatTitleReportSheet(sTitle, titleRes.data);
+    if (titleRes.success && titleRes.data) {
+      syncReportSheetIncrementally(ss, 'Training Title', titleRes.data);
+    }
 
     // Tab 4: Employee Report
-    let sEmp = ss.getSheetByName('Employee Report');
-    if (!sEmp) sEmp = ss.insertSheet('Employee Report');
     const empRes = parseServerRes(getFilteredReportData('employee', filters));
-    if (empRes.success && empRes.data) formatEmployeeReportSheet(sEmp, empRes.data);
+    if (empRes.success && empRes.data) {
+      syncReportSheetIncrementally(ss, 'Employee Report', empRes.data);
+    }
 
     // Tab 5: Annual Training Plan (ATP)
-    let sAtp = ss.getSheetByName('Annual Training Plan (ATP)');
-    if (!sAtp) sAtp = ss.insertSheet('Annual Training Plan (ATP)');
     const atpRes = parseServerRes(getFilteredReportData('atp', filters));
-    if (atpRes.success && atpRes.data) formatAtpReportSheet(sAtp, atpRes.data);
+    if (atpRes.success && atpRes.data) {
+      syncReportSheetIncrementally(ss, 'Annual Training Plan (ATP)', atpRes.data);
+    }
 
     // Clean up default empty sheet if present
     const defaultSheet = ss.getSheetByName('Sheet1') || ss.getSheetByName('Helai1');
@@ -687,7 +1704,7 @@ function syncLiveMasterReportSheet(targetYear) {
       folderUrl: repFolder.getUrl(),
       fileId: ss.getId(),
       fileUrl: ss.getUrl(),
-      message: `Live Master Report successfully synced inside 'Reports' folder with all 5 tabs updated real-time!`
+      message: `Live Master Report successfully synced with cell-level admin edit protection!`
     });
   } catch (e) {
     Logger.log('syncLiveMasterReportSheet error: ' + e.message);
@@ -696,29 +1713,55 @@ function syncLiveMasterReportSheet(targetYear) {
 }
 
 /**
- * Gets details of the "Reports" folder and the Live Master Report Sheet URL.
+ * Gets details of the "Reports" folder and the latest Live Master Report Sheet URL.
+ * Automatically sorts by getLastUpdated() descending to ensure the link connects
+ * to the latest created spreadsheet in case older files were deleted or replaced.
  */
-function getReportsFolderDetails() {
+function getReportsFolderDetails(yearInput) {
   try {
     const repFolder = getOrCreateReportsFolder();
-    const year = '2026';
-    const fileName = `Master Annual Training Report (${year})`;
+    const targetYear = String(yearInput || '2026').trim();
 
-    let fileIter = repFolder.getFilesByName(fileName);
     let fileUrl = '';
     let fileId = '';
-    if (fileIter.hasNext()) {
-      const f = fileIter.next();
-      fileUrl = f.getUrl();
-      fileId = f.getId();
+    let latestSheetName = '';
+
+    const matchingFiles = [];
+    if (repFolder) {
+      const sheetIter = repFolder.getFilesByType(MimeType.GOOGLE_SHEETS);
+      while (sheetIter.hasNext()) {
+        const file = sheetIter.next();
+        const fName = file.getName();
+        if (fName.toLowerCase().includes('master annual training report') || fName.toLowerCase().includes('report')) {
+          matchingFiles.push(file);
+        }
+      }
+    }
+
+    if (matchingFiles.length > 0) {
+      // Sort by getLastUpdated() descending so the latest created/updated sheet is always returned
+      matchingFiles.sort((a, b) => b.getLastUpdated().getTime() - a.getLastUpdated().getTime());
+      const latestFile = matchingFiles[0];
+      fileId = latestFile.getId();
+      fileUrl = latestFile.getUrl();
+      latestSheetName = latestFile.getName();
+    } else {
+      // Fallback to SPREADSHEET_ID if no file in Reports folder
+      const masterSsId = getMasterSpreadsheetId();
+      if (masterSsId) {
+        fileId = masterSsId;
+        fileUrl = `https://docs.google.com/spreadsheets/d/${masterSsId}/edit`;
+        latestSheetName = `Master Annual Training Report (${targetYear})`;
+      }
     }
 
     return ok({
-      folderId: repFolder.getId(),
-      folderUrl: repFolder.getUrl(),
+      folderId: repFolder ? repFolder.getId() : '',
+      folderUrl: repFolder ? repFolder.getUrl() : '',
       liveMasterSheetId: fileId,
       liveMasterSheetUrl: fileUrl,
-      message: 'Reports folder details retrieved.'
+      liveMasterSheetName: latestSheetName,
+      message: 'Latest master report sheet details retrieved.'
     });
   } catch (e) {
     return err(e.message);
@@ -760,48 +1803,39 @@ function formatHoursReportSheet(sheet, data, year) {
     .setHorizontalAlignment('center');
 
   const rows = data.rows || [];
-  const rowsData = rows.map(r => [
-    r.costCentre || 'General',
-    ...(r.months || Array(12).fill(0)),
-    r.totalYear || 0,
-    r.totalHours || 0
-  ]);
-
-  // Compute Total Row summary across all Cost Centres
-  const totalMonths = Array(12).fill(0);
-  let grandTotalYear = 0;
-  let grandTotalHours = 0;
-
-  rows.forEach(r => {
-    (r.months || []).forEach((val, idx) => {
-      totalMonths[idx] += Number(val || 0);
-    });
-    grandTotalYear += Number(r.totalYear || 0);
-    grandTotalHours += Number(r.totalHours || 0);
+  const rowsData = rows.map((r, idx) => {
+    const rNum = idx + 3;
+    const mVals = (r.months || []).map(val => (val === 0 || val === '0' || !val) ? '' : val);
+    return [
+      r.costCentre || 'General',
+      ...mVals,
+      `=SUM(B${rNum}:M${rNum})`,
+      `=SUM(B${rNum}:M${rNum})`
+    ];
   });
-
-  const totalRow = [
-    'Total',
-    ...totalMonths,
-    grandTotalYear,
-    grandTotalHours
-  ];
 
   if (rowsData.length > 0) {
     sheet.getRange(3, 1, rowsData.length, 15).setValues(rowsData);
 
-    // Append Total Row at the bottom of data rows
     const totalRowIndex = 3 + rowsData.length;
-    sheet.getRange(totalRowIndex, 1, 1, 15).setValues([totalRow]);
+    const lastDataRow = totalRowIndex - 1;
 
-    // Format Total Row (Bold text, light blue background)
+    const colLetters = ['B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O'];
+    const totalFormulas = colLetters.map(col => `=SUM(${col}3:${col}${lastDataRow})`);
+
+    const totalRow = [
+      'Total',
+      ...totalFormulas
+    ];
+
+    sheet.getRange(totalRowIndex, 1, 1, 15).setValues([totalRow]);
     const totalRange = sheet.getRange(totalRowIndex, 1, 1, 15);
     totalRange.setFontWeight('bold')
       .setBackground('#EFF6FF')
       .setFontColor('#1E3A8A');
   }
 
-  sheet.autoResizeColumns(1, 15);
+  autoFitSheetColumns(sheet, 15);
 }
 
 // 2. Cost Header Formatter:
@@ -842,28 +1876,55 @@ function formatCostReportSheet(sheet, data, year) {
     .setVerticalAlignment('middle')
     .setHorizontalAlignment('center');
 
-  const rowsData = (data.rows || []).map(r => [
-    r.trainingTitle || 'Training Programme',
-    r.dateFrom || '',
-    r.dateTo || '',
-    r.totalParticipant || 0,
-    r.trainingFees || '',
-    r.meal || '',
-    r.subsistanceAllowance || '',
-    r.hotelFees || '',
-    r.mileageClaim || '',
-    r.taxiFees || '',
-    r.tollFees || '',
-    r.flight || '',
-    r.totalCost || 'RM 0.00',
-    r.totalHrdfGrant || ''
-  ]);
+  const rowsData = (data.rows || []).map((r, idx) => {
+    const rNum = idx + 3;
+    return [
+      r.trainingTitle || 'Training Programme',
+      r.dateFrom || '',
+      r.dateTo || '',
+      r.totalParticipant || 0,
+      r.trainingFees || '',
+      r.meal || '',
+      r.subsistanceAllowance || '',
+      r.hotelFees || '',
+      r.mileageClaim || '',
+      r.taxiFees || '',
+      r.tollFees || '',
+      r.flight || '',
+      `=SUM(E${rNum}:L${rNum})`,
+      r.totalHrdfGrant || ''
+    ];
+  });
 
   if (rowsData.length > 0) {
     sheet.getRange(3, 1, rowsData.length, 14).setValues(rowsData);
+
+    const totalRowIndex = 3 + rowsData.length;
+    const lastDataRow = totalRowIndex - 1;
+
+    const totalRow = [
+      'Total', '', '',
+      `=SUM(D3:D${lastDataRow})`,
+      `=SUM(E3:E${lastDataRow})`,
+      `=SUM(F3:F${lastDataRow})`,
+      `=SUM(G3:G${lastDataRow})`,
+      `=SUM(H3:H${lastDataRow})`,
+      `=SUM(I3:I${lastDataRow})`,
+      `=SUM(J3:J${lastDataRow})`,
+      `=SUM(K3:K${lastDataRow})`,
+      `=SUM(L3:L${lastDataRow})`,
+      `=SUM(M3:M${lastDataRow})`,
+      `=SUM(N3:N${lastDataRow})`
+    ];
+
+    sheet.getRange(totalRowIndex, 1, 1, 14).setValues([totalRow]);
+    const totalRange = sheet.getRange(totalRowIndex, 1, 1, 14);
+    totalRange.setFontWeight('bold')
+      .setBackground('#EFF6FF')
+      .setFontColor('#1E3A8A');
   }
 
-  sheet.autoResizeColumns(1, 14);
+  autoFitSheetColumns(sheet, 14);
 }
 
 // 3. Training Title Header Formatter:
@@ -902,9 +1963,24 @@ function formatTitleReportSheet(sheet, data) {
 
   if (rowsData.length > 0) {
     sheet.getRange(2, 1, rowsData.length, headers.length).setValues(rowsData);
+
+    const totalRowIndex = 2 + rowsData.length;
+    const lastDataRow = totalRowIndex - 1;
+
+    const totalRow = [
+      'Total', '', '', '', '', '', '', '',
+      `=SUM(I2:I${lastDataRow})`,
+      '', '', ''
+    ];
+
+    sheet.getRange(totalRowIndex, 1, 1, headers.length).setValues([totalRow]);
+    const totalRange = sheet.getRange(totalRowIndex, 1, 1, headers.length);
+    totalRange.setFontWeight('bold')
+      .setBackground('#EFF6FF')
+      .setFontColor('#1E3A8A');
   }
 
-  sheet.autoResizeColumns(1, headers.length);
+  autoFitSheetColumns(sheet, headers.length);
 }
 
 // 4. Employee Header Formatter
@@ -936,9 +2012,25 @@ function formatEmployeeReportSheet(sheet, data) {
 
   if (rowsData.length > 0) {
     sheet.getRange(2, 1, rowsData.length, headers.length).setValues(rowsData);
+
+    const totalRowIndex = 2 + rowsData.length;
+    const lastDataRow = totalRowIndex - 1;
+
+    const totalRow = [
+      'Total', '', '', '', '',
+      `=SUM(F2:F${lastDataRow})`,
+      `=SUM(G2:G${lastDataRow})`,
+      '', ''
+    ];
+
+    sheet.getRange(totalRowIndex, 1, 1, headers.length).setValues([totalRow]);
+    const totalRange = sheet.getRange(totalRowIndex, 1, 1, headers.length);
+    totalRange.setFontWeight('bold')
+      .setBackground('#EFF6FF')
+      .setFontColor('#1E3A8A');
   }
 
-  sheet.autoResizeColumns(1, headers.length);
+  autoFitSheetColumns(sheet, headers.length);
 }
 
 // 5. ATP Header Formatter:
@@ -961,29 +2053,52 @@ function formatAtpReportSheet(sheet, data) {
   sheet.getRange(1, 1, 1, headers.length)
     .setFontWeight('bold').setBackground('#2563EB').setFontColor('#FFFFFF').setHorizontalAlignment('center');
 
-  const rowsData = (data.rows || []).map(r => [
-    r.no || 1,
-    r.trainingTitle || '—',
-    r.trainingCategory || 'General',
-    r.tnaSource || 'Annual TNA',
-    r.trainingMode || 'Physical Classroom',
-    r.durationHours || 8,
-    r.trainer || '—',
-    r.department || '—',
-    r.positionEmpNo || 'All Staff',
-    r.totalPax || 0,
-    r.plannedDate || '',
-    r.actualDateFrom || '',
-    r.actualDateTo || '',
-    r.trainingStatus || 'Planned',
-    r.remarks || 'Planned'
-  ]);
+  const rows = data.rows || [];
+  const rowsData = rows.map((r, i) => {
+    const reqUrl = r.requisitionFormUrl || '#';
+    const posFormula = (reqUrl && reqUrl !== '#') ? `=HYPERLINK("${reqUrl}", "Name List")` : 'Name List';
+
+    return [
+      r.no || (i + 1),
+      r.trainingTitle || '—',
+      r.trainingCategory || 'General',
+      r.tnaSource || 'Training Requisition Form',
+      r.trainingMode || 'In-house',
+      r.durationHours || 8,
+      r.trainer || '—',
+      r.department || '—',
+      posFormula,
+      r.totalPax || 0,
+      r.plannedDate || '',
+      r.actualDateFrom || '',
+      r.actualDateTo || '',
+      r.trainingStatus || 'On planning',
+      r.remarks || 'Planned'
+    ];
+  });
 
   if (rowsData.length > 0) {
     sheet.getRange(2, 1, rowsData.length, headers.length).setValues(rowsData);
+
+    const totalRowIndex = 2 + rowsData.length;
+    const lastDataRow = totalRowIndex - 1;
+
+    const totalRow = [
+      'Total', '', '', '', '',
+      `=SUM(F2:F${lastDataRow})`,
+      '', '', '',
+      `=SUM(J2:J${lastDataRow})`,
+      '', '', '', '', ''
+    ];
+
+    sheet.getRange(totalRowIndex, 1, 1, headers.length).setValues([totalRow]);
+    const totalRange = sheet.getRange(totalRowIndex, 1, 1, headers.length);
+    totalRange.setFontWeight('bold')
+      .setBackground('#EFF6FF')
+      .setFontColor('#1E3A8A');
   }
 
-  sheet.autoResizeColumns(1, headers.length);
+  autoFitSheetColumns(sheet, headers.length);
 }
 
 // ─── Export Single Attendance Sheet ───────────────────────────────────────────
@@ -1014,7 +2129,7 @@ function exportAttendanceSheet(trainingId) {
       });
     });
 
-    sheet.autoResizeColumns(1, headers.length);
+    autoFitSheetColumns(sheet, headers.length);
     return ok({ sheetName: name, message: 'Export sheet created: ' + name });
   } catch (e) {
     return err('Export failed: ' + e.message);

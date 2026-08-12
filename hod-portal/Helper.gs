@@ -730,3 +730,583 @@ function buildTrainingRequisitionEmailHtml(params) {
 </body>
 </html>`;
 }
+
+// ─── Targeted Event-Based Incremental Synchronization Engine ──────────────────
+
+const REPORT_CONFIG = {
+  'Training Hours': {
+    sheetName: 'Training Hours',
+    headerRowIndex: 2,
+    dataStartRow: 3,
+    keyColumnIndex: 1,
+    keyFieldName: 'costCentre',
+    columns: [
+      { name: 'Cost Centre/Month', field: 'costCentre', isKey: true },
+      { name: 'Jan', field: 'm0' },
+      { name: 'Feb', field: 'm1' },
+      { name: 'Mar', field: 'm2' },
+      { name: 'Apr', field: 'm3' },
+      { name: 'May', field: 'm4' },
+      { name: 'Jun', field: 'm5' },
+      { name: 'Jul', field: 'm6' },
+      { name: 'Aug', field: 'm7' },
+      { name: 'Sep', field: 'm8' },
+      { name: 'Oct', field: 'm9' },
+      { name: 'Nov', field: 'm10' },
+      { name: 'Dec', field: 'm11' },
+      { name: 'Total Year', field: 'totalYear' },
+      { name: 'Total Training Hours', field: 'totalHours' }
+    ]
+  },
+  'Training Cost': {
+    sheetName: 'Training Cost',
+    headerRowIndex: 2,
+    dataStartRow: 3,
+    keyColumnIndex: 1,
+    keyFieldName: 'trainingTitle',
+    columns: [
+      { name: 'Training Title', field: 'trainingTitle', isKey: true },
+      { name: 'Training Date (From)', field: 'dateFrom' },
+      { name: 'Training Date (To)', field: 'dateTo' },
+      { name: 'Total Participant', field: 'totalParticipant' },
+      { name: 'Training Fees', field: 'trainingFees' },
+      { name: 'Meal', field: 'meal' },
+      { name: 'Subsistance Allowance', field: 'subsistanceAllowance' },
+      { name: 'Hotel Fees', field: 'hotelFees' },
+      { name: 'Mileage Claim', field: 'mileageClaim' },
+      { name: 'Taxi Fees', field: 'taxiFees' },
+      { name: 'Toll Fees', field: 'tollFees' },
+      { name: 'Flight', field: 'flight' },
+      { name: 'Total Cost', field: 'totalCost' },
+      { name: 'Total HRDF Grant (RM)', field: 'totalHrdfGrant' }
+    ]
+  },
+  'Training Title': {
+    sheetName: 'Training Title',
+    headerRowIndex: 1,
+    dataStartRow: 2,
+    keyColumnIndex: 2,
+    keyFieldName: 'empNoKey',
+    columns: [
+      { name: 'Name', field: 'name' },
+      { name: 'Emp. No', field: 'empNo', isKey: true },
+      { name: 'Training Title', field: 'trainingTitle' },
+      { name: '(EE)/Cost Centre Description', field: 'costCentreDesc' },
+      { name: 'Training Type', field: 'trainingType' },
+      { name: 'Date (From)', field: 'dateFrom' },
+      { name: 'Date (Until)', field: 'dateUntil' },
+      { name: 'Month', field: 'month' },
+      { name: 'Total Hours', field: 'totalHours' },
+      { name: 'Trainer', field: 'trainer' },
+      { name: 'Training Provide', field: 'trainingProvider' },
+      { name: 'Expiry Date (if applicable)', field: 'expiryDate' }
+    ]
+  },
+  'Employee Report': {
+    sheetName: 'Employee Report',
+    headerRowIndex: 1,
+    dataStartRow: 2,
+    keyColumnIndex: 2,
+    keyFieldName: 'empNo',
+    columns: [
+      { name: 'No', field: 'no' },
+      { name: 'Emp. No', field: 'empNo', isKey: true },
+      { name: 'Employee Name', field: 'name' },
+      { name: 'Cost Centre / Department', field: 'costCentre' },
+      { name: 'Position', field: 'position' },
+      { name: 'Total Trainings', field: 'totalTrainings' },
+      { name: 'Total Hours', field: 'totalHours' },
+      { name: 'Attended Trainings', field: 'attendedList' },
+      { name: 'Status', field: 'status' }
+    ]
+  },
+  'Annual Training Plan (ATP)': {
+    sheetName: 'Annual Training Plan (ATP)',
+    headerRowIndex: 1,
+    dataStartRow: 2,
+    keyColumnIndex: 2,
+    keyFieldName: 'trainingTitle',
+    columns: [
+      { name: 'No', field: 'no' },
+      { name: 'Training Title', field: 'trainingTitle', isKey: true },
+      { name: 'Training Category', field: 'trainingCategory' },
+      { name: 'TNA Source', field: 'tnaSource' },
+      { name: 'Training Mode', field: 'trainingMode' },
+      { name: 'Training Duration (hrs)', field: 'durationHours' },
+      { name: 'Trainer', field: 'trainer' },
+      { name: 'Department', field: 'department' },
+      { name: 'Position / Employee No', field: 'positionFormula' },
+      { name: 'Total Pax', field: 'totalPax' },
+      { name: 'Planned Date', field: 'plannedDate' },
+      { name: 'Actual Date (From)', field: 'actualDateFrom' },
+      { name: 'Actual Date (To)', field: 'actualDateTo' },
+      { name: 'Training Status', field: 'trainingStatus' },
+      { name: 'Remarks', field: 'remarks' }
+    ]
+  }
+};
+
+function generateSyncId() {
+  return 'SYNC-' + String(Date.now()).slice(-6);
+}
+
+function getOrCreateReportsFolder() {
+  let rootFolder = null;
+  try {
+    if (typeof getSystemRootFolder === 'function') {
+      rootFolder = getSystemRootFolder();
+    } else {
+      rootFolder = DriveApp.getRootFolder();
+    }
+  } catch(e) {
+    rootFolder = DriveApp.getRootFolder();
+  }
+  let folderIter = rootFolder.getFoldersByName('Reports');
+  if (folderIter.hasNext()) return folderIter.next();
+  return rootFolder.createFolder('Reports');
+}
+
+function getOrCreateSyncHistorySheet(ss) {
+  let historySheet = ss.getSheetByName('_SYNC_HISTORY');
+  if (!historySheet) {
+    historySheet = ss.insertSheet('_SYNC_HISTORY');
+    historySheet.appendRow(['Sync ID', 'Timestamp', 'Training ID', 'Action', 'Trigger', 'Reports', 'Status', 'Duration', 'Message', 'Error']);
+    historySheet.getRange('A1:J1').setFontWeight('bold').setBackground('#1E293B').setFontColor('#FFFFFF');
+    try { historySheet.setFrozenRows(1); } catch (e) {}
+  }
+  return historySheet;
+}
+
+function logSyncHistory(ss, rec) {
+  try {
+    if (!ss) {
+      const repFolder = getOrCreateReportsFolder();
+      const fileName = `Master Annual Training Report (2026)`;
+      let fileIter = repFolder.getFilesByName(fileName);
+      if (fileIter.hasNext()) ss = SpreadsheetApp.openById(fileIter.next().getId());
+    }
+    if (!ss) return;
+
+    const historySheet = getOrCreateSyncHistorySheet(ss);
+    const syncId = rec.syncId || generateSyncId();
+    const timeStamp = rec.timestamp || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+
+    historySheet.appendRow([
+      syncId,
+      timeStamp,
+      rec.trainingId || '',
+      rec.action || 'UPDATE',
+      rec.trigger || 'System Action',
+      rec.reports || '',
+      rec.status || 'SUCCESS',
+      rec.duration || '0.00s',
+      rec.message || '',
+      rec.error || ''
+    ]);
+  } catch (e) {
+    Logger.log('logSyncHistory error: ' + e.message);
+  }
+}
+
+function getOrCreateSyncMetadataSheet(ss) {
+  let metaSheet = ss.getSheetByName('_SYNC_METADATA');
+  if (!metaSheet) {
+    metaSheet = ss.insertSheet('_SYNC_METADATA');
+    metaSheet.appendRow(['Report Sheet', 'Record Key', 'Column Name', 'Last System Value', 'Last Sync Timestamp']);
+    metaSheet.getRange('A1:E1').setFontWeight('bold').setBackground('#334155').setFontColor('#FFFFFF');
+    try { metaSheet.hideSheet(); } catch (e) {}
+  } else {
+    try { metaSheet.hideSheet(); } catch (e) {}
+  }
+  return metaSheet;
+}
+
+function loadSyncMetadata(ss) {
+  const metaSheet = getOrCreateSyncMetadataSheet(ss);
+  const data = metaSheet.getDataRange().getValues();
+  const map = {};
+
+  if (data.length > 1) {
+    for (let i = 1; i < data.length; i++) {
+      const sheetName = String(data[i][0] || '').trim();
+      const recKey    = String(data[i][1] || '').trim();
+      const colName   = String(data[i][2] || '').trim();
+      const lastVal   = data[i][3];
+
+      if (sheetName && recKey && colName) {
+        if (!map[sheetName]) map[sheetName] = {};
+        if (!map[sheetName][recKey]) map[sheetName][recKey] = {};
+        map[sheetName][recKey][colName] = lastVal;
+      }
+    }
+  }
+  return map;
+}
+
+function saveSyncMetadata(ss, metadataMap) {
+  const metaSheet = getOrCreateSyncMetadataSheet(ss);
+  metaSheet.clearContents();
+  metaSheet.appendRow(['Report Sheet', 'Record Key', 'Column Name', 'Last System Value', 'Last Sync Timestamp']);
+
+  const timeStamp = new Date().toISOString();
+  const rows = [];
+
+  Object.keys(metadataMap).forEach(sheetName => {
+    Object.keys(metadataMap[sheetName]).forEach(recKey => {
+      Object.keys(metadataMap[sheetName][recKey]).forEach(colName => {
+        const val = metadataMap[sheetName][recKey][colName];
+        rows.push([sheetName, recKey, colName, val, timeStamp]);
+      });
+    });
+  });
+
+  if (rows.length > 0) {
+    metaSheet.getRange(2, 1, rows.length, 5).setValues(rows);
+  }
+  metaSheet.getRange('A1:E1').setFontWeight('bold').setBackground('#334155').setFontColor('#FFFFFF');
+  try { metaSheet.hideSheet(); } catch (e) {}
+}
+
+function normalizeSyncValue(val) {
+  if (val === null || val === undefined) return '';
+  if (val instanceof Date) {
+    if (isNaN(val.getTime())) return '';
+    return val.toISOString().slice(0, 10);
+  }
+  let str = String(val).trim();
+  if (str === '—' || str === 'N/A' || str === 'null' || str === 'undefined') {
+    return '';
+  }
+  return str;
+}
+
+function isCellAdminModified(currentSheetValue, lastSystemValue) {
+  const normCurrent = normalizeSyncValue(currentSheetValue);
+  const normLast = normalizeSyncValue(lastSystemValue);
+  return normCurrent !== normLast;
+}
+
+function ensureReportHeaderExists(sheet, reportKey, config, extraParams) {
+  if (sheet.getLastRow() > 0) return;
+  const year = (extraParams && extraParams.year) ? extraParams.year : '2026';
+
+  if (reportKey === 'Training Hours') {
+    const yrSuffix = year && year.length === 4 ? year.slice(-2) : '26';
+    const monthLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map(m => `${m}-${yrSuffix}`);
+    const row1 = ['Cost Centre/Month', 'Training Hours', '', '', '', '', '', '', '', '', '', '', '', `Total ${year}`, `Total Training Hours ${year}`];
+    const row2 = ['', ...monthLabels, '', ''];
+    sheet.getRange(1, 1, 1, row1.length).setValues([row1]);
+    sheet.getRange(2, 1, 1, row2.length).setValues([row2]);
+    sheet.getRange('A1:A2').merge().setValue('Cost Centre/Month');
+    sheet.getRange('B1:M1').merge().setValue('Training Hours');
+    sheet.getRange('N1:N2').merge().setValue(`Total ${year}`);
+    sheet.getRange('O1:O2').merge().setValue(`Total Training Hours ${year}`);
+    sheet.getRange('A1:O2').setFontWeight('bold').setBackground('#2563EB').setFontColor('#FFFFFF').setVerticalAlignment('middle').setHorizontalAlignment('center');
+  } else if (reportKey === 'Training Cost') {
+    const row1 = ['Training Title', 'Training Date (From)', 'Training Date (To)', 'Total Participant', 'Training Cost (RM)', '', '', '', '', '', '', '', `Total Cost ${year}`, 'Total HRDF Grant (RM)'];
+    const row2 = ['', '', '', '', 'Training Fees', 'Meal', 'Subsistance Allowance', 'Hotel Fees', 'Mileage Claim', 'Taxi Fees', 'Toll Fees', 'Flight', '', ''];
+    sheet.getRange(1, 1, 1, row1.length).setValues([row1]);
+    sheet.getRange(2, 1, 1, row2.length).setValues([row2]);
+    sheet.getRange('A1:A2').merge().setValue('Training Title');
+    sheet.getRange('B1:B2').merge().setValue('Training Date (From)');
+    sheet.getRange('C1:C2').merge().setValue('Training Date (To)');
+    sheet.getRange('D1:D2').merge().setValue('Total Participant');
+    sheet.getRange('E1:L1').merge().setValue('Training Cost (RM)');
+    sheet.getRange('M1:M2').merge().setValue(`Total Cost ${year}`);
+    sheet.getRange('N1:N2').merge().setValue('Total HRDF Grant (RM)');
+    sheet.getRange('A1:N2').setFontWeight('bold').setBackground('#2563EB').setFontColor('#FFFFFF').setVerticalAlignment('middle').setHorizontalAlignment('center');
+  } else {
+    const headerCols = config.columns.map(c => c.name);
+    sheet.getRange(1, 1, 1, headerCols.length).setValues([headerCols]);
+    sheet.getRange(1, 1, 1, headerCols.length).setFontWeight('bold').setBackground('#2563EB').setFontColor('#FFFFFF').setHorizontalAlignment('center');
+  }
+}
+
+function getRecordValueForColumn(record, colDef, rowNumber) {
+  const field = colDef.field;
+  if (!field) return '';
+  if (field.startsWith('m') && field.length <= 3 && !isNaN(parseInt(field.slice(1)))) {
+    const idx = parseInt(field.slice(1), 10);
+    const months = Array.isArray(record.months) ? record.months : [];
+    return months[idx] !== undefined ? months[idx] : 0;
+  }
+  if (field === 'positionFormula') {
+    const reqUrl = record.requisitionFormUrl || '#';
+    return (reqUrl && reqUrl !== '#') ? `=HYPERLINK("${reqUrl}", "Name List")` : 'Name List';
+  }
+  if (field === 'totalCost' || field === 'totalCostFormula') {
+    const rNum = rowNumber || 3;
+    return `=SUM(E${rNum}:L${rNum})`;
+  }
+  if (['trainingFees', 'meal', 'subsistanceAllowance', 'hotelFees', 'mileageClaim', 'taxiFees', 'tollFees', 'flight', 'totalHrdfGrant'].includes(field)) {
+    const val = record[field];
+    if (val === 0 || val === '0' || val === 'RM 0.00' || val === 'RM 0' || val === null || val === undefined) {
+      return '';
+    }
+    return val;
+  }
+  if (field === 'attendedList' && Array.isArray(record.attendedList)) {
+    return record.attendedList.join(', ');
+  }
+  return record[field] !== undefined ? record[field] : '';
+}
+
+function syncReportSheetIncrementally(ss, reportKey, reportData, extraParams) {
+  const config = REPORT_CONFIG[reportKey];
+  if (!config) return;
+
+  let sheet = ss.getSheetByName(config.sheetName);
+  if (!sheet) sheet = ss.insertSheet(config.sheetName);
+
+  ensureReportHeaderExists(sheet, reportKey, config, extraParams);
+
+  const metadataMap = loadSyncMetadata(ss);
+  if (!metadataMap[config.sheetName]) metadataMap[config.sheetName] = {};
+  const sheetMeta = metadataMap[config.sheetName];
+
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+
+  let existingSheetValues = [];
+  if (lastRow >= config.dataStartRow && lastCol >= 1) {
+    existingSheetValues = sheet.getRange(config.dataStartRow, 1, lastRow - config.dataStartRow + 1, Math.max(lastCol, config.columns.length)).getValues();
+  }
+
+  const rowMap = {};
+  existingSheetValues.forEach((rowVals, idx) => {
+    const sheetRowNumber = config.dataStartRow + idx;
+    const rawKeyVal = rowVals[config.keyColumnIndex - 1];
+    const keyVal = normalizeSyncValue(rawKeyVal);
+
+    if (keyVal && keyVal.toLowerCase() !== 'total' && keyVal.toLowerCase() !== 'summary') {
+      rowMap[keyVal.toLowerCase()] = {
+        rowNumber: sheetRowNumber,
+        rowValues: rowVals
+      };
+    }
+  });
+
+  const incomingRows = reportData.rows || [];
+
+  incomingRows.forEach(record => {
+    let recKey = '';
+    if (config.keyFieldName === 'empNoKey') {
+      recKey = normalizeSyncValue(`${record.empNo || record.name || ''}_${record.trainingTitle || ''}`);
+    } else {
+      recKey = normalizeSyncValue(record[config.keyFieldName] || record.trainingTitle || record.costCentre || record.empNo || record.ID || record.no);
+    }
+    if (!recKey) return;
+
+    if (!sheetMeta[recKey]) sheetMeta[recKey] = {};
+    const recordMeta = sheetMeta[recKey];
+    const existingRow = rowMap[recKey.toLowerCase()];
+
+    if (existingRow) {
+      const rowNum = existingRow.rowNumber;
+      const currentVals = existingRow.rowValues;
+
+      config.columns.forEach((colDef, cIdx) => {
+        const colNumber = cIdx + 1;
+        const colName = colDef.name;
+        const incomingVal = getRecordValueForColumn(record, colDef, rowNum);
+
+        const currentSheetVal = currentVals[cIdx] !== undefined ? currentVals[cIdx] : '';
+        let lastSystemVal     = recordMeta[colName];
+
+        if (lastSystemVal === undefined) {
+          lastSystemVal = currentSheetVal;
+          if (normalizeSyncValue(currentSheetVal) !== '') {
+            recordMeta[colName] = currentSheetVal;
+          }
+        }
+
+        if (!isCellAdminModified(currentSheetVal, lastSystemVal)) {
+          if (normalizeSyncValue(currentSheetVal) !== normalizeSyncValue(incomingVal)) {
+            sheet.getRange(rowNum, colNumber).setValue(incomingVal);
+            recordMeta[colName] = incomingVal;
+          }
+        }
+      });
+    } else {
+      const targetRowNum = sheet.getLastRow() + 1;
+      const newRowVals = config.columns.map(colDef => getRecordValueForColumn(record, colDef, targetRowNum));
+      sheet.appendRow(newRowVals);
+
+      config.columns.forEach((colDef, cIdx) => {
+        recordMeta[colDef.name] = newRowVals[cIdx];
+      });
+    }
+  });
+
+  saveSyncMetadata(ss, metadataMap);
+}
+
+function buildAnnualTrainingPlanData(trainingsInput) {
+  const trainings = Array.isArray(trainingsInput) ? trainingsInput : [];
+  const rows = trainings.map((t, idx) => {
+    const feeNum = parseFloat(String(t.CourseFee || '0').replace(/[^0-9\.-]/g, '')) || 0;
+    const paxNum = parseInt(String(t.Participants || 20), 10) || 20;
+    let reqUrl = t.RequisitionUrl || t.RequisitionFormUrl || '';
+    if (!reqUrl && t.RequisitionFormFileID) {
+      reqUrl = `https://docs.google.com/spreadsheets/d/${encodeURIComponent(t.RequisitionFormFileID)}/edit`;
+    }
+
+    return {
+      no: idx + 1,
+      trainingTitle: t.Name || t['Training Name'] || `Training ${idx+1}`,
+      trainingCategory: t.Category || 'General',
+      tnaSource: t.TnaSource || 'Training Requisition Form',
+      trainingMode: t.TrainingMode || t.Mode || 'In-house',
+      durationHours: t.TotalHours || 8,
+      trainer: t.Trainer || 'Certified Trainer',
+      department: t.Department || 'All Departments',
+      positionEmpNo: 'Name List',
+      requisitionFormUrl: reqUrl,
+      totalPax: paxNum,
+      plannedDate: t.StartDate || '',
+      actualDateFrom: t.StartDate || '',
+      actualDateTo: t.EndDate || t.StartDate || '',
+      trainingStatus: t.ApprovalStatus || t.Status || 'Pending',
+      remarks: t.Stage || 'Planned'
+    };
+  });
+  return { rows: rows };
+}
+
+function buildCostReportData(trainingsInput, year) {
+  const trainings = Array.isArray(trainingsInput) ? trainingsInput : [];
+  const rows = trainings.map(t => {
+    const feeNum = parseFloat(String(t.CourseFee || '0').replace(/[^0-9\.-]/g, '')) || 0;
+    const paxNum = parseInt(String(t.Participants || 20), 10) || 20;
+    return {
+      trainingTitle: t.Name || t['Training Name'] || 'Training Programme',
+      dateFrom: t.StartDate || '',
+      dateTo: t.EndDate || t.StartDate || '',
+      totalParticipant: paxNum,
+      trainingFees: feeNum > 0 ? feeNum : '',
+      meal: '',
+      subsistanceAllowance: '',
+      hotelFees: '',
+      mileageClaim: '',
+      taxiFees: '',
+      tollFees: '',
+      flight: '',
+      totalCost: feeNum > 0 ? feeNum : '',
+      totalHrdfGrant: ''
+    };
+  });
+  return { year: year, rows: rows };
+}
+
+function syncTrainingById(trainingId, triggerName, actionName) {
+  const lock = LockService.getScriptLock();
+  let hasLock = false;
+  try {
+    hasLock = lock.tryLock(5000);
+  } catch (lErr) {}
+
+  const startTime = Date.now();
+  const trigger = triggerName || 'System Trigger';
+  const action = actionName || 'UPDATE';
+  const displayYear = '2026';
+
+  try {
+    if (!trainingId || String(trainingId).trim() === '') {
+      return { success: false, message: 'Invalid Training ID.' };
+    }
+
+    const tId = String(trainingId).trim();
+    const tSheet = getSheet('Trainings');
+    if (!tSheet) return { success: false, message: 'Trainings sheet unavailable.' };
+    const tRows = sheetToJson(tSheet);
+    const tRecord = tRows.find(r => String(r.ID || '').trim() === tId || String(r.Code || '').trim() === tId);
+
+    if (!tRecord) {
+      const durationStr = ((Date.now() - startTime) / 1000).toFixed(2) + 's';
+      logSyncHistory(null, {
+        syncId: generateSyncId(),
+        timestamp: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss"),
+        trainingId: tId,
+        action: action,
+        trigger: trigger,
+        reports: 'None',
+        status: 'FAILED',
+        duration: durationStr,
+        message: `Unable to find Training ID: ${tId}`,
+        error: `Training ID ${tId} not found in database.`
+      });
+      return { success: false, message: `Unable to find Training ID: ${tId}` };
+    }
+
+    const repFolder = getOrCreateReportsFolder();
+    const fileName = `Master Annual Training Report (${displayYear})`;
+
+    let fileIter = repFolder.getFilesByName(fileName);
+    let ss;
+    if (fileIter.hasNext()) {
+      ss = SpreadsheetApp.openById(fileIter.next().getId());
+    } else {
+      ss = SpreadsheetApp.create(fileName);
+      const file = DriveApp.getFileById(ss.getId());
+      repFolder.addFile(file);
+      try { DriveApp.getRootFolder().removeFile(file); } catch (e) {}
+    }
+
+    const atpData = buildAnnualTrainingPlanData([tRecord]);
+    const costData = buildCostReportData([tRecord], displayYear);
+
+    const reportsUpdated = [];
+
+    if (atpData && atpData.rows && atpData.rows.length > 0) {
+      syncReportSheetIncrementally(ss, 'Annual Training Plan (ATP)', atpData);
+      reportsUpdated.push('Annual Training Plan (ATP)');
+    }
+
+    if (costData && costData.rows && costData.rows.length > 0) {
+      syncReportSheetIncrementally(ss, 'Training Cost', costData, { year: displayYear });
+      reportsUpdated.push('Training Cost');
+    }
+
+    SpreadsheetApp.flush();
+
+    const durationStr = ((Date.now() - startTime) / 1000).toFixed(2) + 's';
+    const syncId = generateSyncId();
+    const message = `Successfully synchronized Training ID ${tId} across ${reportsUpdated.length} report tab(s).`;
+    const timeStampStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+
+    logSyncHistory(ss, {
+      syncId: syncId,
+      timestamp: timeStampStr,
+      trainingId: tId,
+      action: action,
+      trigger: trigger,
+      reports: reportsUpdated.join(', '),
+      status: 'SUCCESS',
+      duration: durationStr,
+      message: message,
+      error: ''
+    });
+
+    return {
+      success: true,
+      syncId: syncId,
+      trainingId: tId,
+      action: action,
+      trigger: trigger,
+      reports: reportsUpdated,
+      status: 'SUCCESS',
+      duration: durationStr,
+      message: message,
+      fileUrl: ss.getUrl()
+    };
+
+  } catch (e) {
+    const durationStr = ((Date.now() - startTime) / 1000).toFixed(2) + 's';
+    Logger.log('syncTrainingById error: ' + e.message);
+    return { success: false, message: e.message };
+  } finally {
+    if (hasLock) {
+      try { lock.releaseLock(); } catch(rErr) {}
+    }
+  }
+}

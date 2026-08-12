@@ -650,6 +650,7 @@
         callServer('getEvaluationQRCodes', id).catch(() => null)
       ]);
       renderFullDetail(t, participants || [], sessions || [], attendance || [], evalQrs);
+      loadTrainingSyncStatusUI(id);
     } catch(e) {
       showToast(e.message, 'error');
       closeFullDetail();
@@ -762,6 +763,29 @@
             </a>
           </div>
         ` : ''}
+
+        <!-- Targeted Sync Status & Retry Sync Card -->
+        <div style="margin-top:16px; padding-top:16px; border-top:1px solid #F1F5F9">
+          <div style="background:#F8FAFC; border:1px solid #CBD5E1; border-radius:10px; padding:14px 16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px" id="sync-status-widget-${t.ID}">
+            <div style="display:flex; align-items:center; gap:12px">
+              <div style="width:38px; height:38px; border-radius:8px; background:#EFF6FF; display:flex; align-items:center; justify-content:center; flex-shrink:0">
+                <span class="icon filled" style="color:#2563EB; font-size:20px">sync</span>
+              </div>
+              <div>
+                <div style="font-size:13px; font-weight:700; color:#1E293B; display:flex; align-items:center; gap:8px">
+                  Report Synchronization Status:
+                  <span id="sync-badge-${t.ID}"><span class="badge-th badge-blue" style="font-size:11px">Checking...</span></span>
+                </div>
+                <div style="font-size:11.5px; color:#64748B; margin-top:2px" id="sync-meta-${t.ID}">
+                  Loading sync status for ${t.ID}...
+                </div>
+              </div>
+            </div>
+            <button class="btn-th btn-secondary btn-sm" onclick="retryTrainingSync('${t.ID}')" id="btn-retry-sync-${t.ID}">
+              <span class="icon sm">sync</span> Retry Sync
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- Training Sessions & QR Codes Section -->
@@ -1020,6 +1044,54 @@
       openDetail(trainingId);
       loadTrainings();
     } catch(e) { showToast(e.message, 'error'); }
+  }
+
+  async function loadTrainingSyncStatusUI(trainingId) {
+    try {
+      const res = await callServer('getTrainingSyncStatus', trainingId);
+      if (res && res.status) {
+        const badgeEl = document.getElementById(`sync-badge-${trainingId}`);
+        const metaEl = document.getElementById(`sync-meta-${trainingId}`);
+
+        const isSuccess = res.status === 'SUCCESS';
+        const isUnsynced = res.status === 'UNSYNCED';
+
+        if (badgeEl) {
+          if (isSuccess) {
+            badgeEl.innerHTML = '<span class="badge-th badge-green" style="font-size:11px">✓ Synced</span>';
+          } else if (isUnsynced) {
+            badgeEl.innerHTML = '<span class="badge-th badge-yellow" style="font-size:11px">● Not Synced Yet</span>';
+          } else {
+            badgeEl.innerHTML = '<span class="badge-th badge-red" style="font-size:11px">⚠ Sync Failed</span>';
+          }
+        }
+
+        if (metaEl) {
+          const timeStr = res.lastSync ? res.lastSync.replace('T', ' ').slice(0, 19) : 'Never';
+          metaEl.innerHTML = `Last Sync: <strong>${timeStr}</strong> | Duration: <strong>${res.lastDuration || '—'}</strong> | Trigger: <strong>${res.lastTrigger || '—'}</strong>`;
+        }
+      }
+    } catch(e) {}
+  }
+
+  async function retryTrainingSync(trainingId) {
+    const btn = document.getElementById(`btn-retry-sync-${trainingId}`);
+    if (btn) btn.disabled = true;
+    showToast(`Targeted sync running for Training ID ${trainingId}...`, 'info');
+    try {
+      const res = await callServer('syncTrainingById', trainingId, 'Manual Admin Retry', 'MANUAL_RETRY');
+      if (res && res.status === 'SUCCESS') {
+        showToast(`✓ Training ${trainingId} synchronized successfully in ${res.duration}!`, 'success');
+        loadTrainingSyncStatusUI(trainingId);
+      } else {
+        showToast(`⚠ Synchronization failed: ${res.message || res.error}`, 'error');
+        loadTrainingSyncStatusUI(trainingId);
+      }
+    } catch(e) {
+      showToast('Sync error: ' + e.message, 'error');
+    } finally {
+      if (btn) btn.disabled = false;
+    }
   }
 
   function openQrModal(trainingId) {

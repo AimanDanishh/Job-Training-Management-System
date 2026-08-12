@@ -23,35 +23,28 @@ function getCostCentres() {
       const ccSheet = ss.getSheetByName('Cost Centre') || ss.getSheetByName('CostCentre') || ss.getSheetByName('Cost Centres');
       if (ccSheet && ccSheet.getLastRow() > 1) {
         const data = ccSheet.getDataRange().getValues();
-        const list = [];
+        const ccMap = new Map(); // key: lowercased, val: canonical name
         for (let i = 1; i < data.length; i++) {
           const val = String(data[i][0] || data[i][1] || '').trim();
-          if (val && !list.includes(val)) list.push(val);
+          if (val && val !== 'All Departments / Cost Centres') {
+            const key = val.toLowerCase();
+            if (!ccMap.has(key)) {
+              ccMap.set(key, val);
+            }
+          }
         }
-        if (list.length > 0) return ok(list);
-      }
-
-      const empSheet = getSheet(SHEET_NAMES.employees);
-      if (empSheet) {
-        const rows = sheetToJson(empSheet);
-        const uniqueCC = new Set();
-        rows.forEach(r => {
-          const dept = String(r.Department || r.CostCentre || r.Cost_Centre || '').trim();
-          if (dept) uniqueCC.add(dept);
-        });
-        if (uniqueCC.size > 0) return ok(Array.from(uniqueCC));
+        if (ccMap.size > 0) return ok(Array.from(ccMap.values()));
       }
     }
   } catch (e) {
     Logger.log('getCostCentres error: ' + e.message);
   }
   return ok([
-    'Cost Centre 101 - Engineering',
-    'Cost Centre 102 - HR',
-    'Cost Centre 103 - Finance',
-    'Cost Centre 104 - Operations',
-    'Cost Centre 105 - IT',
-    'Cost Centre 106 - Sales'
+    'Operations & Safety',
+    'Management & HR',
+    'IT & Engineering',
+    'Finance & Admin',
+    'Sales & Customer Service'
   ]);
 }
 

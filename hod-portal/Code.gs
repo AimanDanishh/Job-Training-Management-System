@@ -820,7 +820,11 @@ function submitHODDecision(data) {
       draftLog.push(`General mail engine error: ${mailErr.message}`);
     }
 
-    const logSummary = draftLog.length > 0 ? ` (${draftLog.join('; ')})` : '';
+    try {
+      syncTrainingById(cleanId, 'HOD Decision (' + nextApprovalStatus + ')', 'STATUS_CHANGE');
+    } catch(syncErr) {
+      Logger.log('syncTrainingById error in submitHODDecision: ' + syncErr.message);
+    }
 
     return ok({
       trainingId: cleanId,

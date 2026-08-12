@@ -4,8 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <?!= include('style') ?>
-  <title>TrainHub — Reports & Annual Training Plan</title>
+  <title>TrainHub — Reports & Training Data Management</title>
   <style>
+    /* Data Management Card & Filters */
     .filter-card {
       background: #ffffff;
       border: 1px solid #CBD5E1;
@@ -13,6 +14,146 @@
       padding: 20px;
       box-shadow: 0 2px 8px rgba(15,23,42,0.04);
     }
+    
+    /* KPI Summary Cards */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    .kpi-card {
+      background: #ffffff;
+      border: 1px solid #CBD5E1;
+      border-radius: 12px;
+      padding: 16px;
+      transition: all 0.2s ease;
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(15,23,42,0.04);
+      user-select: none;
+    }
+    .kpi-card:hover {
+      border-color: #BFDBFE;
+      box-shadow: 0 4px 12px rgba(37,99,235,0.08);
+      transform: translateY(-2px);
+    }
+    .kpi-card.active {
+      border-color: #2563EB;
+      background: #EFF6FF;
+      box-shadow: 0 4px 12px rgba(37,99,235,0.15);
+    }
+    .kpi-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #64748B;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .kpi-value {
+      font-size: 22px;
+      font-weight: 800;
+      color: #0F172A;
+    }
+    .kpi-sub {
+      font-size: 11px;
+      color: #94A3B8;
+      margin-top: 4px;
+    }
+
+    /* Active Filter Chips */
+    .filter-chips-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid #F1F5F9;
+    }
+    .filter-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      background: #EFF6FF;
+      color: #1D4ED8;
+      border: 1px solid #BFDBFE;
+      border-radius: 20px;
+      font-size: 11.5px;
+      font-weight: 600;
+    }
+    .filter-chip-remove {
+      cursor: pointer;
+      font-size: 13px;
+      line-height: 1;
+      color: #2563EB;
+      font-weight: 700;
+    }
+    .filter-chip-remove:hover {
+      color: #1E40AF;
+    }
+
+    /* Slide-over Right Detail Drawer */
+    .drawer-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(15, 23, 42, 0.4);
+      backdrop-filter: blur(2px);
+      z-index: 1050;
+      display: flex;
+      justify-content: flex-end;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.25s ease, visibility 0.25s ease;
+    }
+    .drawer-overlay.open {
+      opacity: 1;
+      visibility: visible;
+    }
+    .drawer-box {
+      width: 100%;
+      max-width: 560px;
+      height: 100%;
+      background: #ffffff;
+      box-shadow: -4px 0 24px rgba(0,0,0,0.15);
+      display: flex;
+      flex-direction: column;
+      transform: translateX(100%);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .drawer-overlay.open .drawer-box {
+      transform: translateX(0);
+    }
+    .drawer-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid #E2E8F0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #F8FAFC;
+    }
+    .drawer-body {
+      padding: 24px;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .drawer-footer {
+      padding: 16px 24px;
+      border-top: 1px solid #E2E8F0;
+      background: #F8FAFC;
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+    /* Data Table Styling */
     .report-table-wrapper {
       overflow-x: auto;
       border: 1px solid #CBD5E1;
@@ -47,6 +188,54 @@
     }
     .table-report tbody tr:hover {
       background: #EFF6FF;
+      cursor: pointer;
+    }
+
+    /* Column Selector Dropdown Menu */
+    .col-picker-dropdown {
+      position: absolute;
+      right: 0;
+      top: 100%;
+      margin-top: 4px;
+      background: #ffffff;
+      border: 1px solid #CBD5E1;
+      border-radius: 10px;
+      box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
+      padding: 12px;
+      z-index: 100;
+      min-width: 220px;
+      display: none;
+    }
+    .col-picker-dropdown.open {
+      display: block;
+    }
+
+    /* View Switcher Bar */
+    .view-switcher-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #E2E8F0;
+      padding: 4px;
+      border-radius: 10px;
+      width: fit-content;
+      margin-bottom: 16px;
+    }
+    .view-btn {
+      padding: 6px 16px;
+      border-radius: 7px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #475569;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .view-btn.active {
+      background: #ffffff;
+      color: #2563EB;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
   </style>
 </head>
@@ -56,15 +245,27 @@
   <?!= include('sidebar') ?>
 
   <div class="main-area">
+    <!-- Topbar Header -->
     <header class="topbar">
       <div style="flex:1">
-        <h1 class="topbar-title">Reports & Annual Training Plan</h1>
-        <p class="topbar-sub">Filter training analytics, generate compliance reports, and access real-time synced Google Drive reports</p>
+        <h1 class="topbar-title">Reports & Training Data Management</h1>
+        <p class="topbar-sub">Manage, review, filter, and monitor all organization training records in real time</p>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+        <button class="btn-th btn-secondary btn-sm" onclick="refreshReportDataUI()">
+          <span class="icon sm">refresh</span> Refresh Data
+        </button>
+        <button class="btn-th btn-sm" style="background:#059669; color:#fff; border:none; font-weight:700" onclick="exportCurrentFilteredDataset()">
+          <span class="icon sm">download</span> Export Filtered Results
+        </button>
+        <button class="btn-th btn-secondary btn-sm" onclick="triggerManualFullRecoverySync()" style="color:#7C3AED; border-color:#DDD6FE; background:#F5F3FF" title="Rebuild & reconcile all report sheets">
+          <span class="icon sm">published_with_changes</span> Full Data Sync
+        </button>
       </div>
     </header>
 
     <main class="page-content">
-      <!-- Real-Time Auto-Synced Google Drive Reports Folder Banner -->
+      <!-- Drive Folder Reference & Sync Banner -->
       <div class="card-th mb-4" style="background:#F0FDF4; border:1px solid #BBF7D0; border-left:5px solid #16A34A">
         <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px">
           <div style="display:flex; align-items:center; gap:12px">
@@ -73,11 +274,11 @@
             </div>
             <div>
               <div style="font-size:14.5px; font-weight:800; color:#166534; display:flex; align-items:center; gap:6px">
-                Real-Time Google Drive "Reports" Folder
-                <span class="badge-th badge-green" style="font-size:10px">● Live Auto-Sync</span>
+                Google Drive Automated Report Repository
+                <span class="badge-th badge-green" style="font-size:10px">● Live Sync Active</span>
               </div>
               <div style="font-size:12px; color:#15803D; margin-top:2px">
-                All exported reports are saved inside <strong>Project Root ➔ Reports</strong> in Google Drive.
+                Individual training status updates trigger targeted incremental sync directly to <strong>Project Root ➔ Reports</strong>.
               </div>
             </div>
           </div>
@@ -88,124 +289,508 @@
             <a id="btn-open-live-sheet" class="btn-th btn-secondary btn-sm" style="font-weight:700; text-decoration:none" href="#" target="_blank">
               <span class="icon sm">table_chart</span> Open Live Master Sheet
             </a>
-            <button class="btn-th btn-secondary btn-sm" onclick="triggerManualReportSync()">
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI Summary Cards Row (Clickable) -->
+      <div class="kpi-grid">
+        <div class="kpi-card" id="kpi-card-total" onclick="applyKpiFilter('')">
+          <div class="kpi-title">Total Trainings <span class="icon sm" style="color:#2563EB">bar_chart</span></div>
+          <div class="kpi-value" id="kpi-total-val">0</div>
+          <div class="kpi-sub">All registered records</div>
+        </div>
+        <div class="kpi-card" id="kpi-card-pending" onclick="applyKpiFilter('Pending')">
+          <div class="kpi-title" style="color:#D97706">Pending Approval <span class="icon sm" style="color:#D97706">hourglass_top</span></div>
+          <div class="kpi-value" style="color:#D97706" id="kpi-pending-val">0</div>
+          <div class="kpi-sub">Awaiting HOD / C-Suite / HR</div>
+        </div>
+        <div class="kpi-card" id="kpi-card-approved" onclick="applyKpiFilter('Approved')">
+          <div class="kpi-title" style="color:#16A34A">Approved <span class="icon sm" style="color:#16A34A">check_circle</span></div>
+          <div class="kpi-value" style="color:#16A34A" id="kpi-approved-val">0</div>
+          <div class="kpi-sub">Ready for execution</div>
+        </div>
+        <div class="kpi-card" id="kpi-card-ongoing" onclick="applyKpiFilter('Ongoing')">
+          <div class="kpi-title" style="color:#2563EB">Ongoing / Active <span class="icon sm" style="color:#2563EB">play_circle</span></div>
+          <div class="kpi-value" style="color:#2563EB" id="kpi-ongoing-val">0</div>
+          <div class="kpi-sub">In-progress sessions</div>
+        </div>
+        <div class="kpi-card" id="kpi-card-completed" onclick="applyKpiFilter('Completed')">
+          <div class="kpi-title" style="color:#4F46E5">Completed <span class="icon sm" style="color:#4F46E5">task_alt</span></div>
+          <div class="kpi-value" style="color:#4F46E5" id="kpi-completed-val">0</div>
+          <div class="kpi-sub">Finished programmes</div>
+        </div>
+        <div class="kpi-card" id="kpi-card-cost" style="cursor:default">
+          <div class="kpi-title" style="color:#7C3AED">Total Investment <span class="icon sm" style="color:#7C3AED">payments</span></div>
+          <div class="kpi-value" style="color:#7C3AED; font-size:18px" id="kpi-cost-val">RM 0.00</div>
+          <div class="kpi-sub">Cumulative course fees</div>
+        </div>
+      </div>
+
+      <!-- View Switcher Tabs (Data Management Table vs Formatted Sheet Reports) -->
+      <div class="view-switcher-bar">
+        <button type="button" class="view-btn active" id="btn-view-table" onclick="switchReportViewMode('table')">
+          <span class="icon sm">table_view</span> Data Management Table
+        </button>
+        <button type="button" class="view-btn" id="btn-view-custom" onclick="switchReportViewMode('custom')">
+          <span class="icon sm">query_stats</span> Custom Sheet Reports
+        </button>
+      </div>
+
+      <!-- Section A: Data Management Table View -->
+      <div id="view-mode-table">
+        <!-- Search & Multi-Filter Control Card -->
+        <div class="filter-card mb-4">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px">
+            <div style="font-size:14px; font-weight:700; color:#1E293B; display:flex; align-items:center; gap:6px">
+              <span class="icon filled sm" style="color:#2563EB">filter_alt</span> Search & Record Filters
+            </div>
+
+            <!-- Column Visibility Toggle Button -->
+            <div style="position:relative">
+              <button type="button" class="btn-th btn-secondary btn-sm" onclick="toggleColumnPickerDropdown()">
+                <span class="icon sm">settings</span> ⚙ Columns <span class="icon sm">arrow_drop_down</span>
+              </button>
+
+              <div id="col-picker-dropdown" class="col-picker-dropdown">
+                <div style="font-size:11px; font-weight:800; color:#64748B; text-transform:uppercase; margin-bottom:8px">Visible Columns</div>
+                <label style="display:block; font-size:12px; margin-bottom:4px"><input type="checkbox" checked onchange="toggleColumnVis('id', this.checked)"> Training ID</label>
+                <label style="display:block; font-size:12px; margin-bottom:4px"><input type="checkbox" checked onchange="toggleColumnVis('title', this.checked)"> Training Title</label>
+                <label style="display:block; font-size:12px; margin-bottom:4px"><input type="checkbox" checked onchange="toggleColumnVis('dept', this.checked)"> Department</label>
+                <label style="display:block; font-size:12px; margin-bottom:4px"><input type="checkbox" checked onchange="toggleColumnVis('date', this.checked)"> Date</label>
+                <label style="display:block; font-size:12px; margin-bottom:4px"><input type="checkbox" checked onchange="toggleColumnVis('status', this.checked)"> Status</label>
+                <label style="display:block; font-size:12px; margin-bottom:4px"><input type="checkbox" checked onchange="toggleColumnVis('pax', this.checked)"> Participants</label>
+                <label style="display:block; font-size:12px; margin-bottom:4px"><input type="checkbox" checked onchange="toggleColumnVis('cost', this.checked)"> Fee (RM)</label>
+                <label style="display:block; font-size:12px; margin-bottom:4px"><input type="checkbox" checked onchange="toggleColumnVis('trainer', this.checked)"> Trainer / Provider</label>
+                <label style="display:block; font-size:12px; margin-bottom:4px"><input type="checkbox" checked onchange="toggleColumnVis('sync', this.checked)"> Sync Status</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="row g-3">
+            <!-- Multi-field Search Bar -->
+            <div class="col-md-4">
+              <label class="label-th">Search Training Records</label>
+              <div style="position:relative">
+                <span class="icon" style="position:absolute; left:10px; top:50%; transform:translateY(-50%); color:#94A3B8; font-size:16px">search</span>
+                <input id="mgmt-search-input" class="input-th" style="padding-left:32px" placeholder="Search ID, title, employee, dept, trainer..." oninput="onFilterChangeDebounced()">
+              </div>
+            </div>
+
+            <!-- Status Filter -->
+            <div class="col-md-2">
+              <label class="label-th">Status</label>
+              <select id="mgmt-filter-status" class="input-th" onchange="onFilterChange()">
+                <option value="">All Statuses</option>
+                <option value="Pending">Pending Approval</option>
+                <option value="Approved">Approved</option>
+                <option value="Ongoing">Ongoing / Active</option>
+                <option value="Completed">Completed</option>
+                <option value="Rejected">Rejected</option>
+              </select>
+            </div>
+
+            <!-- Department Filter -->
+            <div class="col-md-2">
+              <label class="label-th">Department</label>
+              <select id="mgmt-filter-dept" class="input-th" onchange="onFilterChange()">
+                <option value="">All Departments</option>
+              </select>
+            </div>
+
+            <!-- Category Filter -->
+            <div class="col-md-2">
+              <label class="label-th">Training Category</label>
+              <select id="mgmt-filter-category" class="input-th" onchange="onFilterChange()">
+                <option value="">All Categories</option>
+                <option value="Behavioral Skills">Behavioral Skills</option>
+                <option value="Technical Skills">Technical Skills</option>
+                <option value="Compliance Training">Compliance Training</option>
+                <option value="Business Skills">Business Skills</option>
+                <option value="Onboarding">Onboarding</option>
+              </select>
+            </div>
+
+            <!-- Training Type / Mode Filter -->
+            <div class="col-md-2">
+              <label class="label-th">Training Type</label>
+              <select id="mgmt-filter-mode" class="input-th" onchange="onFilterChange()">
+                <option value="">All Training Types</option>
+                <option value="In-house training">In-house training</option>
+                <option value="Public">Public</option>
+              </select>
+            </div>
+
+            <!-- Date Range Filter -->
+            <div class="col-md-2">
+              <label class="label-th">Date Range / Year</label>
+              <select id="mgmt-filter-date" class="input-th" onchange="onFilterChange()">
+                <option value="">All Dates & Years</option>
+                <option value="2026" selected>Year 2026</option>
+                <option value="2025">Year 2025</option>
+                <option value="2024">Year 2024</option>
+                <option value="2023">Year 2023</option>
+                <option value="2027">Year 2027</option>
+                <option value="2028">Year 2028</option>
+                <option value="2029">Year 2029</option>
+                <option value="2030">Year 2030</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Active Filter Chips Bar -->
+          <div id="filter-chips-bar" class="filter-chips-container" style="display:none">
+            <span style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase">Active Filters:</span>
+            <div id="filter-chips-list" style="display:flex; gap:6px; flex-wrap:wrap"></div>
+            <button type="button" class="btn-th btn-secondary btn-xs" style="margin-left:auto; color:#DC2626; border-color:#FCA5A5" onclick="clearAllFilters()">
+              Clear All Filters
+            </button>
+          </div>
+        </div>
+
+        <!-- Data Table Container -->
+        <div class="card-th" style="background:#ffffff; border:1px solid #CBD5E1; border-radius:12px">
+          <!-- Table Header Controls: Showing X-Y of Z & Page Size -->
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px">
+            <div style="font-size:13px; font-weight:700; color:#1E293B" id="table-record-count-info">
+              Showing 0 of 0 records
+            </div>
+            <div style="display:flex; align-items:center; gap:8px">
+              <label style="font-size:12px; color:#64748B; font-weight:600">Rows per page:</label>
+              <select id="mgmt-page-size" class="input-th" style="width:auto; font-size:12px; padding:4px 8px" onchange="onPageSizeChange()">
+                <option value="25" selected>25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Main Table -->
+          <div class="report-table-wrapper" style="margin-top:0">
+            <table class="table-report" id="mgmt-data-table">
+              <thead>
+                <tr>
+                  <th class="th-sortable col-id" onclick="toggleSort('ID')">Training ID <span id="sort-icon-ID">↑↓</span></th>
+                  <th class="th-sortable col-title" onclick="toggleSort('Name')">Training Title <span id="sort-icon-Name">↑↓</span></th>
+                  <th class="th-sortable col-dept" onclick="toggleSort('Department')">Department <span id="sort-icon-Department">↑↓</span></th>
+                  <th class="th-sortable col-date" onclick="toggleSort('StartDate')">Start Date <span id="sort-icon-StartDate">↑↓</span></th>
+                  <th class="th-sortable col-status" onclick="toggleSort('Status')">Status <span id="sort-icon-Status">↑↓</span></th>
+                  <th class="col-pax">Participants</th>
+                  <th class="th-sortable col-cost" onclick="toggleSort('CourseFee')">Fee (RM) <span id="sort-icon-CourseFee">↑↓</span></th>
+                  <th class="col-trainer">Trainer / Provider</th>
+                  <th class="col-sync">Sync Status</th>
+                  <th class="col-actions" style="width:100px">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="mgmt-table-tbody">
+                <tr>
+                  <td colspan="10" class="text-center p-4" style="color:#94A3B8">
+                    <div class="spinner" style="margin:0 auto 8px; width:24px; height:24px; border-color:rgba(37,99,235,0.2); border-top-color:#2563EB"></div>
+                    Loading training records...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination Bar -->
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px; flex-wrap:wrap; gap:10px">
+            <div style="font-size:12px; color:#64748B" id="pagination-summary">Page 1 of 1</div>
+            <div style="display:flex; gap:4px" id="pagination-controls">
+              <button class="btn-th btn-secondary btn-sm" disabled>‹ Previous</button>
+              <button class="btn-th btn-secondary btn-sm" disabled>Next ›</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section B: Custom Google Sheet Reports View (1-6 Reports) -->
+      <div id="view-mode-custom" style="display:none">
+        <div class="filter-card mb-4">
+          <div style="font-size:14px; font-weight:700; color:#1E293B; margin-bottom:14px; display:flex; align-items:center; gap:6px">
+            <span class="icon filled sm" style="color:#2563EB">summarize</span> Custom Sheet Report Preview Selector
+          </div>
+
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="label-th">Select Report Format <span class="required">*</span></label>
+              <select id="filter-report-type" class="input-th" onchange="onReportTypeChange()">
+                <option value="hours" selected>1. Training Hours (Cost Centre vs Month)</option>
+                <option value="cost">2. Training Cost Breakdown</option>
+                <option value="title">3. Training Title & Enrolled Participants</option>
+                <option value="employee">4. Employee Training Attendance Report</option>
+                <option value="atp">5. Annual Training Plan (ATP)</option>
+                <option value="single">6. Single Programme Detailed Summary</option>
+              </select>
+            </div>
+
+            <!-- Filter by Year -->
+            <div class="col-md-2">
+              <label class="label-th">Filter by Year</label>
+              <select id="filter-year" class="input-th">
+                <option value="2026" selected>Year 2026</option>
+                <option value="2025">Year 2025</option>
+                <option value="2024">Year 2024</option>
+                <option value="2023">Year 2023</option>
+                <option value="2027">Year 2027</option>
+                <option value="2028">Year 2028</option>
+                <option value="2029">Year 2029</option>
+                <option value="2030">Year 2030</option>
+                <option value="All">All Years</option>
+              </select>
+            </div>
+
+            <!-- Filter by Month / Quarter -->
+            <div class="col-md-3">
+              <label class="label-th">Filter by Month / Period</label>
+              <select id="filter-month" class="input-th">
+                <option value="All">All Months (Jan — Dec)</option>
+                <optgroup label="Quarters">
+                  <option value="Q1">Q1 — First Quarter (Jan–Mar)</option>
+                  <option value="Q2">Q2 — Second Quarter (Apr–Jun)</option>
+                  <option value="Q3">Q3 — Third Quarter (Jul–Sep)</option>
+                  <option value="Q4">Q4 — Fourth Quarter (Oct–Dec)</option>
+                </optgroup>
+                <optgroup label="Individual Months">
+                  <option value="01">01 — January</option>
+                  <option value="02">02 — February</option>
+                  <option value="03">03 — March</option>
+                  <option value="04">04 — April</option>
+                  <option value="05">05 — May</option>
+                  <option value="06">06 — June</option>
+                  <option value="07">07 — July</option>
+                  <option value="08">08 — August</option>
+                  <option value="09">09 — September</option>
+                  <option value="10">10 — October</option>
+                  <option value="11">11 — November</option>
+                  <option value="12">12 — December</option>
+                </optgroup>
+              </select>
+            </div>
+
+            <!-- Filter by Status -->
+            <div class="col-md-3">
+              <label class="label-th">Filter by Training Status</label>
+              <select id="filter-status" class="input-th">
+                <option value="">All Statuses</option>
+                <option value="Pending">Pending Approval</option>
+                <option value="Approved">Approved</option>
+                <option value="Ongoing">Ongoing / Active</option>
+                <option value="Completed">Completed</option>
+                <option value="Rejected">Rejected</option>
+              </select>
+            </div>
+
+            <!-- Filter by Cost Centre / Dept -->
+            <div class="col-md-3">
+              <label class="label-th">Filter by Cost Centre / Dept</label>
+              <select id="filter-dept" class="input-th">
+                <option value="">All Cost Centres / Departments</option>
+              </select>
+            </div>
+
+            <!-- Filter by Category -->
+            <div class="col-md-3">
+              <label class="label-th">Filter by Category</label>
+              <select id="filter-category" class="input-th">
+                <option value="">All Categories</option>
+                <option value="Behavioral Skills">Behavioral Skills</option>
+                <option value="Technical Skills">Technical Skills</option>
+                <option value="Compliance Training">Compliance Training</option>
+                <option value="Business Skills">Business Skills</option>
+                <option value="Onboarding">Onboarding</option>
+              </select>
+            </div>
+
+            <!-- Filter by Training Type -->
+            <div class="col-md-3">
+              <label class="label-th">Filter by Training Type</label>
+              <select id="filter-mode" class="input-th">
+                <option value="">All Training Types</option>
+                <option value="In-house training">In-house training</option>
+                <option value="Public">Public</option>
+              </select>
+            </div>
+
+            <!-- Filter / Search Training Title -->
+            <div class="col-md-3" id="title-filter-container">
+              <label class="label-th">Type / Search Training Title</label>
+              <div style="position:relative">
+                <input id="filter-training-title" class="input-th" list="training-title-datalist" placeholder="Type or select training title..." oninput="onTitleSearchInput()">
+                <datalist id="training-title-datalist"></datalist>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="col-md-12 d-flex align-items-center justify-content-end gap-2 mt-3 pt-2 border-top">
+              <button type="button" class="btn-th btn-secondary btn-sm" onclick="resetCustomSheetFilters()">
+                <span class="icon sm">restart_alt</span> Reset Filters
+              </button>
+              <button type="button" class="btn-th btn-primary" style="min-width:200px" onclick="generateSelectedReport()">
+                <span class="icon sm">bar_chart</span> Generate Sheet Preview
+              </button>
+              <button type="button" class="btn-th" style="background:#059669; color:#fff; border:none; min-width:200px" id="btn-export-excel" onclick="exportExcelCurrentReport()">
+                <span class="icon sm">table_chart</span> Export to Excel (.xlsx)
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div id="report-output-card" class="card-th" style="display:none">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px" id="report-output-header">
+            <div>
+              <h3 style="font-size:16px; font-weight:800; color:#1E293B; margin:0 0 2px" id="report-output-title">Report Title</h3>
+              <p style="font-size:12px; color:#64748B; margin:0" id="report-output-sub">Generated report preview</p>
+            </div>
+          </div>
+
+          <div id="report-table-container" class="report-table-wrapper">
+            <div class="p-4 text-center" style="color:#94A3B8">Generating report preview...</div>
+          </div>
+        </div>
+
+        <div id="report-loading" style="display:none; text-align:center; padding:48px; color:#94A3B8">
+          <div class="spinner" style="margin:0 auto 12px; width:32px; height:32px; border-color:rgba(37,99,235,0.2); border-top-color:#2563EB"></div>
+          Processing report & preparing data...
+        </div>
+      </div>
+
+      <!-- Sync History Log Section -->
+      <div class="card-th mt-4" style="background:#FFFFFF; border:1px solid #CBD5E1; border-radius:12px">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid #F1F5F9">
+          <div>
+            <h3 style="font-size:16px; font-weight:800; color:#1E293B; margin:0 0 2px; display:flex; align-items:center; gap:8px">
+              <span class="icon filled" style="color:#2563EB">history</span> Incremental Synchronization History Log
+            </h3>
+            <p style="font-size:12px; color:#64748B; margin:0">Real-time audit log of targeted single-training and recovery sync operations</p>
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center">
+            <div style="position:relative">
+              <span class="icon" style="position:absolute; left:8px; top:50%; transform:translateY(-50%); color:#94A3B8; font-size:14px">search</span>
+              <input id="sync-search-id" class="input-th" style="padding-left:28px; width:160px; font-size:12px" placeholder="Search Training ID..." onkeyup="filterSyncHistoryUI()">
+            </div>
+            <select id="sync-filter-status" class="input-th" style="width:auto; font-size:12px" onchange="loadSyncHistoryUI()">
+              <option value="All">All Status</option>
+              <option value="SUCCESS">✓ Success</option>
+              <option value="FAILED">✕ Failed</option>
+            </select>
+            <button class="btn-th btn-secondary btn-sm" onclick="loadSyncHistoryUI()">
+              <span class="icon sm">refresh</span> Refresh Log
+            </button>
+          </div>
+        </div>
+
+        <div class="report-table-wrapper" style="margin-top:0">
+          <table class="table-report" id="sync-history-table">
+            <thead>
+              <tr>
+                <th style="width:140px">Timestamp</th>
+                <th style="width:110px">Training ID</th>
+                <th style="width:130px">Action</th>
+                <th style="width:160px">Trigger</th>
+                <th>Reports Updated</th>
+                <th style="width:100px">Status</th>
+                <th style="width:80px">Duration</th>
+                <th style="width:90px">Details</th>
+              </tr>
+            </thead>
+            <tbody id="sync-history-tbody">
+              <tr>
+                <td colspan="8" class="text-center p-4" style="color:#94A3B8">Loading sync history...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Sync Record Detail Modal -->
+      <div id="modal-sync-detail" class="modal-overlay" style="display:none">
+        <div class="modal-box" style="max-width:600px">
+          <div class="modal-header">
+            <div>
+              <h3 class="modal-title" id="sync-modal-title">Sync Details</h3>
+              <p class="modal-sub" id="sync-modal-sub">Execution log</p>
+            </div>
+            <button class="modal-close" onclick="closeModal('modal-sync-detail')">✕</button>
+          </div>
+          <div id="sync-modal-content"></div>
+          <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:20px; padding-top:16px; border-top:1px solid #F1F5F9">
+            <button class="btn-th btn-secondary" onclick="closeModal('modal-sync-detail')">Close</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right-Side Training Detail Drawer -->
+      <div id="modal-training-drawer" class="drawer-overlay" onclick="handleDrawerBackdropClick(event)">
+        <div class="drawer-box">
+          <div class="drawer-header">
+            <div>
+              <div style="font-size:12px; font-weight:700; color:#2563EB; text-transform:uppercase" id="drawer-training-id">TRN-101</div>
+              <h3 style="font-size:16px; font-weight:800; color:#1E293B; margin:2px 0 0" id="drawer-training-name">Training Title</h3>
+            </div>
+            <button type="button" class="modal-close" onclick="closeTrainingDrawer()">✕</button>
+          </div>
+          <div class="drawer-body">
+            <div id="drawer-status-badge-container" class="mb-3"></div>
+
+            <!-- Requester & Employee Info -->
+            <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:14px; margin-bottom:16px">
+              <div style="font-size:11px; font-weight:800; color:#64748B; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px">Requester & Employee Details</div>
+              <div class="row g-2">
+                <div class="col-6"><span style="color:#64748B; font-size:11.5px">Department:</span> <strong style="color:#1E293B; font-size:12px" id="drawer-dept">—</strong></div>
+                <div class="col-6"><span style="color:#64748B; font-size:11.5px">Training Mode:</span> <strong style="color:#1E293B; font-size:12px" id="drawer-mode">—</strong></div>
+                <div class="col-12"><span style="color:#64748B; font-size:11.5px">TNA Source:</span> <strong style="color:#1E293B; font-size:12px" id="drawer-tna">—</strong></div>
+              </div>
+            </div>
+
+            <!-- Training Specification -->
+            <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:14px; margin-bottom:16px">
+              <div style="font-size:11px; font-weight:800; color:#64748B; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px">Training Specifications</div>
+              <div class="row g-2">
+                <div class="col-6"><span style="color:#64748B; font-size:11.5px">Start Date:</span> <strong style="color:#1E293B; font-size:12px" id="drawer-start">—</strong></div>
+                <div class="col-6"><span style="color:#64748B; font-size:11.5px">End Date:</span> <strong style="color:#1E293B; font-size:12px" id="drawer-end">—</strong></div>
+                <div class="col-6"><span style="color:#64748B; font-size:11.5px">Duration:</span> <strong style="color:#1E293B; font-size:12px" id="drawer-duration">—</strong></div>
+                <div class="col-6"><span style="color:#64748B; font-size:11.5px">Total Hours:</span> <strong style="color:#1E293B; font-size:12px" id="drawer-hours">—</strong></div>
+                <div class="col-12"><span style="color:#64748B; font-size:11.5px">Trainer:</span> <strong style="color:#1E293B; font-size:12px" id="drawer-trainer">—</strong></div>
+              </div>
+            </div>
+
+            <!-- Financial Breakdown -->
+            <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:14px; margin-bottom:16px">
+              <div style="font-size:11px; font-weight:800; color:#64748B; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px">Financial & Pax Breakdown</div>
+              <div class="row g-2">
+                <div class="col-6"><span style="color:#64748B; font-size:11.5px">Participants:</span> <strong style="color:#2563EB; font-size:13px" id="drawer-pax">—</strong></div>
+                <div class="col-6"><span style="color:#64748B; font-size:11.5px">Course Fee:</span> <strong style="color:#16A34A; font-size:13px" id="drawer-fee">—</strong></div>
+              </div>
+            </div>
+
+            <!-- Admin Remarks Field -->
+            <div style="margin-bottom:16px">
+              <label class="label-th">Admin Remarks & Notes <span style="font-weight:normal; color:#64748B">(Preserved during sync)</span></label>
+              <textarea id="drawer-remarks" class="input-th" style="height:70px; font-size:12px" placeholder="Enter admin notes or adjustments..."></textarea>
+            </div>
+
+            <!-- Real-Time Sync Status Widget -->
+            <div style="background:#EFF6FF; border:1px solid #BFDBFE; border-radius:10px; padding:14px">
+              <div style="font-size:11px; font-weight:800; color:#1D4ED8; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center">
+                <span>Sync Status</span>
+                <span id="drawer-sync-badge"><span class="badge-th badge-green">✓ Synced</span></span>
+              </div>
+              <div style="font-size:12px; color:#1E40AF" id="drawer-sync-msg">
+                Training data synchronized with Google Sheets report.
+              </div>
+              <div style="font-size:11px; color:#64748B; margin-top:4px" id="drawer-sync-time">
+                Last Sync: —
+              </div>
+            </div>
+          </div>
+          <div class="drawer-footer">
+            <button type="button" class="btn-th btn-secondary btn-sm" onclick="closeTrainingDrawer()">Close</button>
+            <button type="button" class="btn-th btn-sm" style="background:#7C3AED; color:#fff; border:none" onclick="triggerDrawerTargetedSync()">
               <span class="icon sm">sync</span> Sync Now
             </button>
           </div>
         </div>
-      </div>
-
-      <!-- Global Filter Card (Select filters first, then generate export) -->
-      <div class="filter-card mb-4">
-        <div style="font-size:14px; font-weight:700; color:#1E293B; margin-bottom:14px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px">
-          <div style="display:flex; align-items:center; gap:6px">
-            <span class="icon filled sm" style="color:#2563EB">filter_alt</span> Report & Export Filter Selection
-          </div>
-          <button class="btn-th" style="background:#7C3AED; color:#fff; border:none; font-size:12px; font-weight:700" onclick="exportMasterWorkbookDirect()">
-            <span class="icon sm">folder_zip</span> Export All-in-One Master Workbook (5 Tabs)
-          </button>
-        </div>
-
-        <div class="row g-3">
-          <!-- Report Requirement Selection -->
-          <div class="col-md-5">
-            <label class="label-th">Select Report Type <span class="required">*</span></label>
-            <select id="filter-report-type" class="input-th" onchange="onReportTypeChange()">
-              <option value="master">★ ALL-IN-ONE Master Workbook (All 5 Reports in 1 Sheet)</option>
-              <option value="hours">1. Training Hours (by year) (Cost Centre vs Month)</option>
-              <option value="cost">2. Training Cost (by year)</option>
-              <option value="title">3. Training Title Report</option>
-              <option value="employee">4. Employee Training Report</option>
-              <option value="atp">5. Annual Training Plan (ATP)</option>
-              <option value="single">6. Single Programme Detailed Summary</option>
-            </select>
-          </div>
-
-          <!-- Filter by Year -->
-          <div class="col-md-2">
-            <label class="label-th">Filter by Year</label>
-            <select id="filter-year" class="input-th">
-              <option value="2026" selected>2026</option>
-              <option value="2025">2025</option>
-              <option value="2027">2027</option>
-              <option value="All">All Years</option>
-            </select>
-          </div>
-
-          <!-- Filter by Month -->
-          <div class="col-md-2">
-            <label class="label-th">Filter by Month</label>
-            <select id="filter-month" class="input-th">
-              <option value="All">All Months (Jan — Dec)</option>
-              <option value="01">01 — January</option>
-              <option value="02">02 — February</option>
-              <option value="03">03 — March</option>
-              <option value="04">04 — April</option>
-              <option value="05">05 — May</option>
-              <option value="06">06 — June</option>
-              <option value="07">07 — July</option>
-              <option value="08">08 — August</option>
-              <option value="09">09 — September</option>
-              <option value="10">10 — October</option>
-              <option value="11">11 — November</option>
-              <option value="12">12 — December</option>
-            </select>
-          </div>
-
-          <!-- Filter by Cost Centre / Department -->
-          <div class="col-md-3">
-            <label class="label-th">Filter by Cost Centre / Dept</label>
-            <select id="filter-dept" class="input-th">
-              <option value="">All Cost Centres / Departments</option>
-            </select>
-          </div>
-
-          <!-- Filter by Training Title (Dropdown) -->
-          <div class="col-md-6" id="title-filter-container">
-            <label class="label-th">Filter by Training Title</label>
-            <select id="filter-training-title" class="input-th">
-              <option value="">All Training Titles</option>
-            </select>
-          </div>
-
-          <!-- Action Buttons -->
-          <div class="col-md-6 d-flex align-items-end gap-2">
-            <button class="btn-th btn-primary" style="flex:1" onclick="generateSelectedReport()">
-              <span class="icon sm">bar_chart</span> Generate Report
-            </button>
-            <button class="btn-th" style="background:#059669; color:#fff; border:none; flex:1" id="btn-export-excel" onclick="exportExcelCurrentReport()">
-              <span class="icon sm">table_chart</span> Export to Excel / Sheets
-            </button>
-            <button class="btn-th btn-secondary" onclick="exportPdfCurrentReport()" title="Export PDF">
-              <span class="icon sm">picture_as_pdf</span> PDF
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Report Output Display Container -->
-      <div id="report-output-card" class="card-th" style="display:none">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px" id="report-output-header">
-          <div>
-            <h3 style="font-size:16px; font-weight:800; color:#1E293B; margin:0 0 2px" id="report-output-title">Report Title</h3>
-            <p style="font-size:12px; color:#64748B; margin:0" id="report-output-sub">Generated report preview</p>
-          </div>
-          <div style="display:flex; gap:8px">
-            <button class="btn-th btn-sm" style="background:#059669; color:#fff; border:none" onclick="exportExcelCurrentReport()">
-              <span class="icon sm">download</span> Download Excel (.xlsx)
-            </button>
-          </div>
-        </div>
-
-        <div id="report-table-container" class="report-table-wrapper">
-          <div class="p-4 text-center" style="color:#94A3B8">Generating report preview...</div>
-        </div>
-      </div>
-
-      <!-- Loading Indicator -->
-      <div id="report-loading" style="display:none; text-align:center; padding:48px; color:#94A3B8">
-        <div class="spinner" style="margin:0 auto 12px; width:32px; height:32px; border-color:rgba(37,99,235,0.2); border-top-color:#2563EB"></div>
-        Processing report & preparing data...
       </div>
     </main>
   </div>
@@ -217,10 +802,56 @@
 <script>
   let masterTrainingsList = [];
   let masterCostCentresList = [];
-  let activeReportType = 'master';
+  let filteredTrainingsList = [];
+  let activeReportType = 'hours';
+  let activeViewMode = 'table'; // 'table' or 'custom'
+
+  // Pagination & Sorting State
+  let currentPage = 1;
+  let pageSize = 25;
+  let sortColumn = 'ID';
+  let sortDirection = 'asc';
+  let activeKpiFilter = '';
+  let activeDrawerTrainingId = null;
+
+  // Visible Columns Configuration
+  let visibleColumns = {
+    id: true,
+    title: true,
+    dept: true,
+    date: true,
+    status: true,
+    pax: true,
+    cost: true,
+    trainer: true,
+    sync: true
+  };
+
+  function populateYearOptions() {
+    const currentYr = new Date().getFullYear();
+    const years = [];
+    for (let y = currentYr - 3; y <= currentYr + 4; y++) {
+      years.push(y);
+    }
+    
+    const mgmtDateEl = document.getElementById('mgmt-filter-date');
+    const customYearEl = document.getElementById('filter-year');
+
+    if (mgmtDateEl) {
+      mgmtDateEl.innerHTML = '<option value="">All Dates & Years</option>' +
+        years.map(y => `<option value="${y}" ${y === currentYr ? 'selected' : ''}>Year ${y}</option>`).join('');
+    }
+
+    if (customYearEl) {
+      customYearEl.innerHTML = years.map(y => `<option value="${y}" ${y === currentYr ? 'selected' : ''}>Year ${y}</option>`).join('') +
+        '<option value="All">All Years</option>';
+    }
+  }
 
   document.addEventListener('DOMContentLoaded', async () => {
     try {
+      populateYearOptions();
+
       const [trainings, depts] = await Promise.all([
         callServer('getTrainings'),
         callServer('getCostCentres').catch(() => [])
@@ -229,40 +860,574 @@
       masterTrainingsList = Array.isArray(trainings) ? trainings : [];
       masterCostCentresList = Array.isArray(depts) ? depts : [];
 
-      // Populate Training Title dropdown
-      const selTitle = document.getElementById('filter-training-title');
-      if (selTitle) {
-        selTitle.innerHTML = '<option value="">All Training Titles</option>' +
-          masterTrainingsList.map(t => `<option value="${t.Name}">[${t.Code}] ${t.Name}</option>`).join('');
+      // Populate Department / Cost Centre Filter Options (Fix undefined issue)
+      const selDept = document.getElementById('mgmt-filter-dept');
+      const selDeptCustom = document.getElementById('filter-dept');
+      const deptOptions = '<option value="">All Departments / Cost Centres</option>' +
+        masterCostCentresList.map(c => {
+          const val = (typeof c === 'object' && c !== null) ? (c.Name || c.Code || '') : String(c || '');
+          return `<option value="${val}">${val}</option>`;
+        }).join('');
+
+      if (selDept) selDept.innerHTML = deptOptions;
+      if (selDeptCustom) selDeptCustom.innerHTML = deptOptions;
+
+      // Populate Training Title datalist for search & auto-complete
+      const datalistEl = document.getElementById('training-title-datalist');
+      if (datalistEl) {
+        datalistEl.innerHTML = masterTrainingsList.map(t => `<option value="${t.Name}">[${t.Code || t.ID}] ${t.Name}</option>`).join('');
       }
 
-      // Populate Cost Centre dropdown
-      const selDept = document.getElementById('filter-dept');
-      if (selDept) {
-        selDept.innerHTML = '<option value="">All Cost Centres / Departments</option>' +
-          masterCostCentresList.map(d => `<option value="${d}">${d}</option>`).join('');
-      }
-
-      // Read URL query parameter for page deep-linking
-      const qpReport = getQueryParam('type');
-      const qpId     = getQueryParam('id');
-
-      if (qpReport) {
-        document.getElementById('filter-report-type').value = qpReport;
-      } else if (qpId) {
-        document.getElementById('filter-report-type').value = 'single';
-        document.getElementById('filter-training-title').value = qpId;
-      }
-
-      onReportTypeChange();
-      generateSelectedReport();
+      // Initial Render of KPI Cards & Data Management Table
+      computeKpiMetrics(masterTrainingsList);
+      applyDataFilters();
       loadReportsFolderLinks();
+      loadSyncHistoryUI();
 
     } catch(e) {
-      showToast('Error initializing report filter options: ' + e.message, 'error');
+      showToast('Error initializing report interface: ' + e.message, 'error');
     }
   });
 
+  // ─── View Switcher Mode Handler ─────────────────────────────────────────────
+  function switchReportViewMode(mode) {
+    activeViewMode = mode;
+    const vTable  = document.getElementById('view-mode-table');
+    const vCustom = document.getElementById('view-mode-custom');
+    const btnTable  = document.getElementById('btn-view-table');
+    const btnCustom = document.getElementById('btn-view-custom');
+
+    if (mode === 'table') {
+      if (vTable) vTable.style.display = 'block';
+      if (vCustom) vCustom.style.display = 'none';
+      if (btnTable) btnTable.classList.add('active');
+      if (btnCustom) btnCustom.classList.remove('active');
+      applyDataFilters();
+    } else {
+      if (vTable) vTable.style.display = 'none';
+      if (vCustom) vCustom.style.display = 'block';
+      if (btnTable) btnTable.classList.remove('active');
+      if (btnCustom) btnCustom.classList.add('active');
+      generateSelectedReport();
+    }
+  }
+
+  // ─── Canonical Status Synchronizer ──────────────────────────────────────────
+  function getCanonicalTrainingStatus(t) {
+    if (!t) return 'Pending Approval';
+    if (typeof t === 'string') {
+      const s = t.toLowerCase();
+      if (s.includes('reject')) return 'Rejected';
+      if (s.includes('pending') || s.includes('review') || s.includes('draft') || s.includes('plan')) return 'Pending Approval';
+      if (s.includes('completed') || s.includes('complete') || s.includes('closed')) return 'Completed';
+      if (s.includes('progress') || s.includes('ongoing') || s.includes('going') || s.includes('active') || s.includes('attendance')) return 'Ongoing';
+      if (s.includes('approved') || s.includes('acknowledged') || s.includes('upcoming')) return 'Approved';
+      return 'Pending Approval';
+    }
+
+    const appStatus = String(t.ApprovalStatus || t.Status || '').trim().toLowerCase();
+    const statusStr = String(t.Status || '').trim().toLowerCase();
+    const stageStr = String(t.Stage || '').trim().toLowerCase();
+
+    // 1. Rejected
+    if (appStatus.includes('reject') || statusStr.includes('reject')) {
+      return 'Rejected';
+    }
+
+    // 2. Pending Approval
+    if (appStatus.includes('pending') || appStatus.includes('review') || statusStr.includes('draft') || statusStr.includes('planning') || statusStr.includes('plan')) {
+      return 'Pending Approval';
+    }
+
+    // 3. Completed
+    if (statusStr.includes('completed') || statusStr.includes('complete') || stageStr.includes('completed') || stageStr.includes('closed') || stageStr.includes('review')) {
+      return 'Completed';
+    }
+
+    // 4. Ongoing / Active
+    if (statusStr.includes('progress') || statusStr.includes('ongoing') || statusStr.includes('going') || statusStr.includes('active') || stageStr.includes('attendance')) {
+      return 'Ongoing';
+    }
+
+    // 5. Approved
+    if (appStatus.includes('approved') || appStatus.includes('acknowledged') || statusStr.includes('approved') || statusStr.includes('upcoming')) {
+      return 'Approved';
+    }
+
+    if (stageStr.includes('created') || stageStr.includes('imported')) {
+      return 'Pending Approval';
+    }
+
+    return 'Pending Approval';
+  }
+
+  // ─── KPI Metrics Compute & Render ───────────────────────────────────────────
+  function computeKpiMetrics(list) {
+    const total = list.length;
+    let pending = 0;
+    let approved = 0;
+    let ongoing = 0;
+    let completed = 0;
+    let totalCost = 0;
+
+    list.forEach(t => {
+      const canonical = getCanonicalTrainingStatus(t);
+      if (canonical === 'Pending Approval') pending++;
+      else if (canonical === 'Approved') approved++;
+      else if (canonical === 'Ongoing') ongoing++;
+      else if (canonical === 'Completed') completed++;
+
+      const fee = parseFloat(String(t.CourseFee || 0).replace(/[^0-9\.-]/g, '')) || 0;
+      totalCost += fee;
+    });
+
+    const elTotal = document.getElementById('kpi-total-val');
+    const elPending = document.getElementById('kpi-pending-val');
+    const elApproved = document.getElementById('kpi-approved-val');
+    const elOngoing = document.getElementById('kpi-ongoing-val');
+    const elCompleted = document.getElementById('kpi-completed-val');
+    const elCost = document.getElementById('kpi-cost-val');
+
+    if (elTotal) elTotal.textContent = total;
+    if (elPending) elPending.textContent = pending;
+    if (elApproved) elApproved.textContent = approved;
+    if (elOngoing) elOngoing.textContent = ongoing;
+    if (elCompleted) elCompleted.textContent = completed;
+    if (elCost) elCost.textContent = `RM ${totalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+
+  // ─── Clickable KPI Card Filter ──────────────────────────────────────────────
+  function applyKpiFilter(statusVal) {
+    activeKpiFilter = statusVal;
+    const selStatus = document.getElementById('mgmt-filter-status');
+    if (selStatus) selStatus.value = statusVal;
+
+    document.querySelectorAll('.kpi-card').forEach(card => card.classList.remove('active'));
+    if (statusVal === 'Pending') document.getElementById('kpi-card-pending')?.classList.add('active');
+    else if (statusVal === 'Approved') document.getElementById('kpi-card-approved')?.classList.add('active');
+    else if (statusVal === 'Ongoing') document.getElementById('kpi-card-ongoing')?.classList.add('active');
+    else if (statusVal === 'Completed') document.getElementById('kpi-card-completed')?.classList.add('active');
+    else document.getElementById('kpi-card-total')?.classList.add('active');
+
+    applyDataFilters();
+  }
+
+  // ─── Filter & Search Engine ──────────────────────────────────────────────────
+  let debounceTimer = null;
+  function onFilterChangeDebounced() {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => { applyDataFilters(); }, 250);
+  }
+
+  function onFilterChange() {
+    applyDataFilters();
+  }
+
+  function clearAllFilters() {
+    const currentYrStr = String(new Date().getFullYear());
+    const sInput = document.getElementById('mgmt-search-input');
+    const sStatus = document.getElementById('mgmt-filter-status');
+    const sDept = document.getElementById('mgmt-filter-dept');
+    const sCat = document.getElementById('mgmt-filter-category');
+    const sMode = document.getElementById('mgmt-filter-mode');
+    const sDate = document.getElementById('mgmt-filter-date');
+
+    if (sInput) sInput.value = '';
+    if (sStatus) sStatus.value = '';
+    if (sDept) sDept.value = '';
+    if (sCat) sCat.value = '';
+    if (sMode) sMode.value = '';
+    if (sDate) sDate.value = currentYrStr;
+
+    activeKpiFilter = '';
+    document.querySelectorAll('.kpi-card').forEach(card => card.classList.remove('active'));
+    document.getElementById('kpi-card-total')?.classList.add('active');
+
+    applyDataFilters();
+  }
+
+  function applyDataFilters() {
+    const qSearch = (document.getElementById('mgmt-search-input')?.value || '').trim().toLowerCase();
+    const qStatus = (document.getElementById('mgmt-filter-status')?.value || '').trim().toLowerCase();
+    const qDept = (document.getElementById('mgmt-filter-dept')?.value || '').trim().toLowerCase();
+    const qCat = (document.getElementById('mgmt-filter-category')?.value || '').trim().toLowerCase();
+    const qMode = (document.getElementById('mgmt-filter-mode')?.value || '').trim().toLowerCase();
+    const qDate = (document.getElementById('mgmt-filter-date')?.value || '').trim().toLowerCase();
+
+    // Render Filter Chips
+    renderFilterChips({ qSearch, qStatus, qDept, qCat, qMode, qDate });
+
+    filteredTrainingsList = masterTrainingsList.filter(t => {
+      const idMatch = !qSearch || String(t.ID || '').toLowerCase().includes(qSearch) || String(t.Code || '').toLowerCase().includes(qSearch) || String(t.Name || '').toLowerCase().includes(qSearch) || String(t.Department || '').toLowerCase().includes(qSearch) || String(t.Trainer || '').toLowerCase().includes(qSearch);
+      
+      const canonical = getCanonicalTrainingStatus(t);
+      let statusMatch = true;
+      if (qStatus) {
+        const targetQ = qStatus.toLowerCase();
+        if (targetQ === 'pending') statusMatch = (canonical === 'Pending Approval');
+        else if (targetQ === 'approved') statusMatch = (canonical === 'Approved');
+        else if (targetQ === 'ongoing') statusMatch = (canonical === 'Ongoing');
+        else if (targetQ === 'completed') statusMatch = (canonical === 'Completed');
+        else if (targetQ === 'rejected') statusMatch = (canonical === 'Rejected');
+        else statusMatch = canonical.toLowerCase().includes(targetQ);
+      }
+
+      const deptMatch = !qDept || String(t.Department || '').toLowerCase().includes(qDept);
+      const catMatch = !qCat || String(t.Category || '').toLowerCase().includes(qCat);
+      const modeMatch = !qMode || String(t.TrainingMode || t.Mode || '').toLowerCase().includes(qMode);
+
+      let dateMatch = true;
+      if (qDate) {
+        dateMatch = String(t.StartDate || '').toLowerCase().includes(qDate);
+      }
+
+      return idMatch && statusMatch && deptMatch && catMatch && modeMatch && dateMatch;
+    });
+
+    // Apply Sorting
+    sortDataList();
+
+    currentPage = 1;
+    renderDataTable();
+  }
+
+  function renderFilterChips(filters) {
+    const chipsBar = document.getElementById('filter-chips-bar');
+    const chipsList = document.getElementById('filter-chips-list');
+    if (!chipsBar || !chipsList) return;
+
+    const chips = [];
+    if (filters.qSearch) chips.push({ label: `Search: "${filters.qSearch}"`, type: 'search' });
+    if (filters.qStatus) chips.push({ label: `Status: ${filters.qStatus}`, type: 'status' });
+    if (filters.qDept) chips.push({ label: `Dept: ${filters.qDept}`, type: 'dept' });
+    if (filters.qCat) chips.push({ label: `Cat: ${filters.qCat}`, type: 'cat' });
+
+    if (chips.length > 0) {
+      chipsBar.style.display = 'flex';
+      chipsList.innerHTML = chips.map(c => `
+        <span class="filter-chip">
+          ${c.label}
+          <span class="filter-chip-remove" onclick="removeSingleFilter('${c.type}')">×</span>
+        </span>
+      `).join('');
+    } else {
+      chipsBar.style.display = 'none';
+    }
+  }
+
+  function removeSingleFilter(type) {
+    if (type === 'search') document.getElementById('mgmt-search-input').value = '';
+    if (type === 'status') document.getElementById('mgmt-filter-status').value = '';
+    if (type === 'dept') document.getElementById('mgmt-filter-dept').value = '';
+    if (type === 'cat') document.getElementById('mgmt-filter-category').value = '';
+    applyDataFilters();
+  }
+
+  // ─── Sorting Engine ──────────────────────────────────────────────────────────
+  function toggleSort(col) {
+    if (sortColumn === col) {
+      sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      sortColumn = col;
+      sortDirection = 'asc';
+    }
+
+    // Update Header Sort Icons
+    ['ID', 'Name', 'Department', 'StartDate', 'Status', 'CourseFee'].forEach(c => {
+      const el = document.getElementById(`sort-icon-${c}`);
+      if (el) {
+        if (c === sortColumn) el.textContent = sortDirection === 'asc' ? '↑' : '↓';
+        else el.textContent = '↑↓';
+      }
+    });
+
+    sortDataList();
+    renderDataTable();
+  }
+
+  function sortDataList() {
+    filteredTrainingsList.sort((a, b) => {
+      let valA = a[sortColumn] || '';
+      let valB = b[sortColumn] || '';
+
+      if (sortColumn === 'CourseFee') {
+        valA = parseFloat(String(valA).replace(/[^0-9\.-]/g, '')) || 0;
+        valB = parseFloat(String(valB).replace(/[^0-9\.-]/g, '')) || 0;
+      } else {
+        valA = String(valA).toLowerCase();
+        valB = String(valB).toLowerCase();
+      }
+
+      if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+      if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }
+
+  // ─── Data Table & Pagination Render ──────────────────────────────────────────
+  function onPageSizeChange() {
+    pageSize = parseInt(document.getElementById('mgmt-page-size').value, 10) || 25;
+    currentPage = 1;
+    renderDataTable();
+  }
+
+  function renderDataTable() {
+    const tbody = document.getElementById('mgmt-table-tbody');
+    const countInfo = document.getElementById('table-record-count-info');
+    const pagSummary = document.getElementById('pagination-summary');
+    const pagControls = document.getElementById('pagination-controls');
+    if (!tbody) return;
+
+    const totalRecords = filteredTrainingsList.length;
+
+    if (totalRecords === 0) {
+      tbody.innerHTML = '<tr><td colspan="10" class="text-center p-4" style="color:#94A3B8">No matching training records found. Try adjusting your search or filters.</td></tr>';
+      if (countInfo) countInfo.textContent = 'Showing 0 of 0 records';
+      if (pagSummary) pagSummary.textContent = 'Page 0 of 0';
+      if (pagControls) pagControls.innerHTML = '<button class="btn-th btn-secondary btn-sm" disabled>‹ Previous</button><button class="btn-th btn-secondary btn-sm" disabled>Next ›</button>';
+      return;
+    }
+
+    const totalPages = Math.ceil(totalRecords / pageSize);
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = Math.min(startIndex + pageSize, totalRecords);
+    const pageRecords = filteredTrainingsList.slice(startIndex, endIndex);
+
+    if (countInfo) countInfo.textContent = `Showing ${startIndex + 1}–${endIndex} of ${totalRecords} records`;
+    if (pagSummary) pagSummary.textContent = `Page ${currentPage} of ${totalPages}`;
+
+    // Render Pagination Controls
+    let navBtns = `<button class="btn-th btn-secondary btn-sm" ${currentPage === 1 ? 'disabled' : ''} onclick="changePage(${currentPage - 1})">‹ Previous</button>`;
+    for (let p = 1; p <= totalPages; p++) {
+      if (p === 1 || p === totalPages || (p >= currentPage - 1 && p <= currentPage + 1)) {
+        navBtns += `<button class="btn-th ${p === currentPage ? 'btn-primary' : 'btn-secondary'} btn-sm" onclick="changePage(${p})">${p}</button>`;
+      } else if (p === currentPage - 2 || p === currentPage + 2) {
+        navBtns += `<span style="padding:0 4px; color:#94A3B8">...</span>`;
+      }
+    }
+    navBtns += `<button class="btn-th btn-secondary btn-sm" ${currentPage === totalPages ? 'disabled' : ''} onclick="changePage(${currentPage + 1})">Next ›</button>`;
+    if (pagControls) pagControls.innerHTML = navBtns;
+
+    // Render Rows
+    tbody.innerHTML = pageRecords.map(t => {
+      const feeNum = parseFloat(String(t.CourseFee || 0).replace(/[^0-9\.-]/g, '')) || 0;
+      const feeFormatted = `RM ${feeNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+      return `
+        <tr onclick="openTrainingDrawer('${t.ID}')">
+          <td class="col-id" style="font-weight:700; color:#2563EB; font-family:monospace">${t.ID || t.Code || '—'}</td>
+          <td class="col-title" style="font-weight:700; color:#1E293B">${t.Name || '—'}</td>
+          <td class="col-dept">${t.Department || '—'}</td>
+          <td class="col-date" style="text-align:center">${t.StartDate || '—'}</td>
+          <td class="col-status" style="text-align:center">${renderStatusBadge(t)}</td>
+          <td class="col-pax" style="text-align:center; font-weight:700; color:#2563EB">${t.Participants || 0} pax</td>
+          <td class="col-cost" style="text-align:center; font-weight:700; color:#16A34A">${feeFormatted}</td>
+          <td class="col-trainer" style="font-size:11.5px; color:#64748B">${t.Trainer || '—'}</td>
+          <td class="col-sync" style="text-align:center"><span class="badge-th badge-green" style="font-size:10.5px">✓ Synced</span></td>
+          <td class="col-actions" onclick="event.stopPropagation()">
+            <button type="button" class="btn-th btn-secondary btn-xs" onclick="openTrainingDrawer('${t.ID}')">
+              <span class="icon sm">visibility</span> Details
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    applyColumnVisibilityUI();
+  }
+
+  function changePage(page) {
+    currentPage = page;
+    renderDataTable();
+  }
+
+  function renderStatusBadge(tOrStatus) {
+    let canonical = typeof tOrStatus === 'object' && tOrStatus !== null ? getCanonicalTrainingStatus(tOrStatus) : getCanonicalTrainingStatus({ Status: tOrStatus, ApprovalStatus: tOrStatus });
+
+    if (canonical === 'Pending Approval') return '<span class="badge-status pending">● Pending</span>';
+    if (canonical === 'Approved') return '<span class="badge-status approved">● Approved</span>';
+    if (canonical === 'Ongoing') return '<span class="badge-status ongoing">● Ongoing</span>';
+    if (canonical === 'Completed') return '<span class="badge-status completed">● Completed</span>';
+    if (canonical === 'Rejected') return '<span class="badge-status rejected">● Rejected</span>';
+    return `<span class="badge-status">${canonical}</span>`;
+  }
+
+  // ─── Column Visibility Controls ──────────────────────────────────────────────
+  function toggleColumnPickerDropdown() {
+    const dd = document.getElementById('col-picker-dropdown');
+    if (dd) dd.classList.toggle('open');
+  }
+
+  function toggleColumnVis(colKey, isChecked) {
+    visibleColumns[colKey] = isChecked;
+    applyColumnVisibilityUI();
+  }
+
+  function applyColumnVisibilityUI() {
+    const mapClass = {
+      id: '.col-id',
+      title: '.col-title',
+      dept: '.col-dept',
+      date: '.col-date',
+      status: '.col-status',
+      pax: '.col-pax',
+      cost: '.col-cost',
+      trainer: '.col-trainer',
+      sync: '.col-sync'
+    };
+
+    Object.keys(visibleColumns).forEach(key => {
+      const cls = mapClass[key];
+      if (cls) {
+        document.querySelectorAll(cls).forEach(el => {
+          el.style.display = visibleColumns[key] ? '' : 'none';
+        });
+      }
+    });
+  }
+
+  // ─── Right-Side Slide-Over Detail Drawer ─────────────────────────────────────
+  function openTrainingDrawer(trainingId) {
+    const t = masterTrainingsList.find(item => item.ID === trainingId || item.Code === trainingId);
+    if (!t) return;
+
+    activeDrawerTrainingId = t.ID;
+
+    const elId = document.getElementById('drawer-training-id');
+    const elName = document.getElementById('drawer-training-name');
+    const elStatus = document.getElementById('drawer-status-badge-container');
+    const elDept = document.getElementById('drawer-dept');
+    const elMode = document.getElementById('drawer-mode');
+    const elTna = document.getElementById('drawer-tna');
+    const elStart = document.getElementById('drawer-start');
+    const elEnd = document.getElementById('drawer-end');
+    const elDuration = document.getElementById('drawer-duration');
+    const elHours = document.getElementById('drawer-hours');
+    const elTrainer = document.getElementById('drawer-trainer');
+    const elPax = document.getElementById('drawer-pax');
+    const elFee = document.getElementById('drawer-fee');
+    const elRemarks = document.getElementById('drawer-remarks');
+
+    if (elId) elId.textContent = t.ID || t.Code || '—';
+    if (elName) elName.textContent = t.Name || '—';
+    if (elStatus) elStatus.innerHTML = renderStatusBadge(t);
+    if (elDept) elDept.textContent = t.Department || '—';
+    if (elMode) elMode.textContent = t.TrainingMode || 'In-house';
+    if (elTna) elTna.textContent = t.TnaSource || 'Training Requisition Form';
+    if (elStart) elStart.textContent = t.StartDate || '—';
+    if (elEnd) elEnd.textContent = t.EndDate || '—';
+    if (elDuration) elDuration.textContent = `${t.Duration || 1} Days`;
+    if (elHours) elHours.textContent = `${t.TotalHours || 8} Hours`;
+    if (elTrainer) elTrainer.textContent = t.Trainer || '—';
+    if (elPax) elPax.textContent = `${t.Participants || 0} pax`;
+    
+    const feeNum = parseFloat(String(t.CourseFee || 0).replace(/[^0-9\.-]/g, '')) || 0;
+    if (elFee) elFee.textContent = `RM ${feeNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (elRemarks) elRemarks.value = t.Remarks || '';
+
+    // Update Drawer Sync Status Widget
+    const syncLog = currentSyncHistory.find(h => h.trainingId === t.ID);
+    const msgEl = document.getElementById('drawer-sync-msg');
+    const timeEl = document.getElementById('drawer-sync-time');
+
+    if (syncLog) {
+      if (msgEl) msgEl.textContent = `Last sync operation (${syncLog.action}) completed in ${syncLog.duration}.`;
+      if (timeEl) timeEl.textContent = `Last Sync: ${syncLog.timestamp}`;
+    } else {
+      if (msgEl) msgEl.textContent = `Targeted incremental synchronization active for ${t.ID}.`;
+      if (timeEl) timeEl.textContent = `Last Sync: Just now`;
+    }
+
+    const drawerOverlay = document.getElementById('modal-training-drawer');
+    if (drawerOverlay) drawerOverlay.classList.add('open');
+  }
+
+  function closeTrainingDrawer() {
+    const drawerOverlay = document.getElementById('modal-training-drawer');
+    if (drawerOverlay) drawerOverlay.classList.remove('open');
+  }
+
+  function handleDrawerBackdropClick(e) {
+    if (e.target.id === 'modal-training-drawer') {
+      closeTrainingDrawer();
+    }
+  }
+
+  async function triggerDrawerTargetedSync() {
+    if (!activeDrawerTrainingId) return;
+    showToast(`Targeted Sync running for Training ID: ${activeDrawerTrainingId}...`, 'info');
+    try {
+      const res = await callServer('syncTrainingById', activeDrawerTrainingId, 'Manual Admin Drawer', 'UPDATE');
+      if (res && res.status === 'SUCCESS') {
+        showToast(`✓ Training ${activeDrawerTrainingId} synced successfully in ${res.duration}!`, 'success');
+        loadSyncHistoryUI();
+        openTrainingDrawer(activeDrawerTrainingId);
+      } else {
+        showToast(`⚠ Sync failed: ${res.message || res.error}`, 'error');
+      }
+    } catch(e) {
+      showToast('Sync error: ' + e.message, 'error');
+    }
+  }
+
+  // ─── Refresh UI Data Engine ──────────────────────────────────────────────────
+  async function refreshReportDataUI() {
+    showToast('Refreshing training data records...', 'info');
+    try {
+      const trainings = await callServer('getTrainings');
+      if (Array.isArray(trainings)) {
+        masterTrainingsList = trainings;
+        computeKpiMetrics(masterTrainingsList);
+        applyDataFilters();
+        showToast('✓ Training data records refreshed successfully!', 'success');
+      }
+    } catch(e) {
+      showToast('Refresh error: ' + e.message, 'error');
+    }
+  }
+
+  // ─── Export Filtered Dataset to CSV / Excel ───────────────────────────────
+  function exportCurrentFilteredDataset() {
+    if (filteredTrainingsList.length === 0) {
+      showToast('No filtered records available to export.', 'error');
+      return;
+    }
+
+    let csvContent = 'data:text/csv;charset=utf-8,';
+    csvContent += 'Training ID,Training Title,Department,Category,Start Date,End Date,Status,Participants,Course Fee (RM),Trainer\n';
+
+    filteredTrainingsList.forEach(t => {
+      const feeNum = parseFloat(String(t.CourseFee || 0).replace(/[^0-9\.-]/g, '')) || 0;
+      const row = [
+        `"${t.ID || t.Code || ''}"`,
+        `"${(t.Name || '').replace(/"/g, '""')}"`,
+        `"${(t.Department || '').replace(/"/g, '""')}"`,
+        `"${(t.Category || '').replace(/"/g, '""')}"`,
+        `"${t.StartDate || ''}"`,
+        `"${t.EndDate || ''}"`,
+        `"${t.Status || t.ApprovalStatus || ''}"`,
+        `"${t.Participants || 0}"`,
+        `"${feeNum}"`,
+        `"${(t.Trainer || '').replace(/"/g, '""')}"`
+      ];
+      csvContent += row.join(',') + '\n';
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `Training_Report_Filtered_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    showToast(`✓ Exported ${filteredTrainingsList.length} filtered training records to CSV!`, 'success');
+  }
+
+  // ─── Existing Custom Google Sheet Reports Integration ────────────────────────
   async function loadReportsFolderLinks() {
     try {
       const info = await callServer('getReportsFolderDetails');
@@ -277,39 +1442,177 @@
     } catch(e) {}
   }
 
-  async function triggerManualReportSync() {
-    const yr = document.getElementById('filter-year').value || '2026';
-    showToast(`Syncing Live Master Report Sheet for ${yr}...`, 'info');
+  let currentSyncHistory = [];
+
+  async function loadSyncHistoryUI() {
+    const tbody = document.getElementById('sync-history-tbody');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="text-center p-3" style="color:#94A3B8"><span class="icon sm spinner">sync</span> Loading history logs...</td></tr>';
+
+    const statusFilter = document.getElementById('sync-filter-status') ? document.getElementById('sync-filter-status').value : 'All';
+    const searchId = document.getElementById('sync-search-id') ? document.getElementById('sync-search-id').value.trim() : '';
+
     try {
-      const res = await callServer('syncLiveMasterReportSheet', yr);
-      if (res && res.fileUrl) {
-        const sheetBtn = document.getElementById('btn-open-live-sheet');
-        if (sheetBtn) sheetBtn.href = res.fileUrl;
-        showToast(res.message || 'Live Master Report Sheet synced successfully!', 'success');
+      const res = await callServer('getSyncHistory', 100, searchId, statusFilter);
+      if (res && Array.isArray(res)) {
+        currentSyncHistory = res;
+        renderSyncHistoryTable(res);
+      } else {
+        currentSyncHistory = [];
+        if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="text-center p-3" style="color:#94A3B8">No sync history logs found.</td></tr>';
       }
     } catch(e) {
-      showToast('Sync error: ' + e.message, 'error');
+      if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="text-center p-3" style="color:#EF4444">Failed to load sync history: ${e.message}</td></tr>`;
+    }
+  }
+
+  function renderSyncHistoryTable(rows) {
+    const tbody = document.getElementById('sync-history-tbody');
+    if (!tbody) return;
+
+    if (!rows || rows.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center p-4" style="color:#94A3B8">No sync history records matching current filter.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = rows.map((r, idx) => {
+      const isSuccess = r.status === 'SUCCESS';
+      const badge = isSuccess
+        ? '<span class="badge-th badge-green" style="font-size:11px">✓ Success</span>'
+        : '<span class="badge-th badge-red" style="font-size:11px">✕ Failed</span>';
+
+      const timeStr = r.timestamp ? r.timestamp.replace('T', ' ').slice(0, 19) : '—';
+
+      return `
+        <tr>
+          <td style="font-family:monospace; font-size:11.5px; color:#475569">${timeStr}</td>
+          <td style="font-weight:700; color:#1E293B">${r.trainingId || '—'}</td>
+          <td><span class="badge-th badge-blue" style="font-size:10.5px">${r.action || 'UPDATE'}</span></td>
+          <td style="color:#64748B; font-size:12px">${r.trigger || '—'}</td>
+          <td style="font-size:11.5px; color:#334155; max-width:240px; overflow:hidden; text-overflow:ellipsis">${r.reports || 'None'}</td>
+          <td>${badge}</td>
+          <td style="font-family:monospace; font-size:11.5px; color:#475569">${r.duration || '—'}</td>
+          <td>
+            <button class="btn-th btn-secondary btn-xs" onclick="viewSyncDetail(${idx})">
+              <span class="icon sm">visibility</span> Details
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function viewSyncDetail(idx) {
+    const rec = currentSyncHistory[idx];
+    if (!rec) return;
+    const title = document.getElementById('sync-modal-title');
+    const sub = document.getElementById('sync-modal-sub');
+    const content = document.getElementById('sync-modal-content');
+
+    if (title) title.innerText = `Sync Event: ${rec.syncId}`;
+    if (sub) sub.innerText = `Training ID: ${rec.trainingId} | ${rec.timestamp}`;
+
+    const isSuccess = rec.status === 'SUCCESS';
+
+    if (content) {
+      content.innerHTML = `
+        <div class="row g-3">
+          <div class="col-6">
+            <div style="font-size:11px; color:#64748B">Training ID</div>
+            <div style="font-size:13px; font-weight:700; color:#1E293B">${rec.trainingId || '—'}</div>
+          </div>
+          <div class="col-6">
+            <div style="font-size:11px; color:#64748B">Status</div>
+            <div>${isSuccess ? '<span class="badge-th badge-green">✓ SUCCESS</span>' : '<span class="badge-th badge-red">✕ FAILED</span>'}</div>
+          </div>
+          <div class="col-6">
+            <div style="font-size:11px; color:#64748B">Action</div>
+            <div style="font-size:13px; font-weight:600">${rec.action}</div>
+          </div>
+          <div class="col-6">
+            <div style="font-size:11px; color:#64748B">Trigger Event</div>
+            <div style="font-size:13px; font-weight:600">${rec.trigger}</div>
+          </div>
+          <div class="col-6">
+            <div style="font-size:11px; color:#64748B">Timestamp</div>
+            <div style="font-size:12px; font-family:monospace">${rec.timestamp}</div>
+          </div>
+          <div class="col-6">
+            <div style="font-size:11px; color:#64748B">Execution Duration</div>
+            <div style="font-size:12px; font-family:monospace">${rec.duration}</div>
+          </div>
+          <div class="col-12">
+            <div style="font-size:11px; color:#64748B">Reports Updated</div>
+            <div style="font-size:12.5px; font-weight:600; color:#2563EB">${rec.reports || 'None'}</div>
+          </div>
+          <div class="col-12">
+            <div style="font-size:11px; color:#64748B">System Message / Summary</div>
+            <div style="background:#F8FAFC; border:1px solid #E2E8F0; padding:10px; border-radius:6px; font-size:12px; color:#334155">${rec.message || '—'}</div>
+          </div>
+          ${rec.error ? `
+            <div class="col-12">
+              <div style="font-size:11px; color:#EF4444; font-weight:700">Error Details</div>
+              <div style="background:#FEF2F2; border:1px solid #FCA5A5; padding:10px; border-radius:6px; font-size:12px; color:#991B1B; font-family:monospace">${rec.error}</div>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+    openModal('modal-sync-detail');
+  }
+
+  function filterSyncHistoryUI() {
+    const searchId = document.getElementById('sync-search-id').value.trim().toLowerCase();
+    if (!searchId) {
+      renderSyncHistoryTable(currentSyncHistory);
+      return;
+    }
+    const filtered = currentSyncHistory.filter(r => r.trainingId.toLowerCase().includes(searchId) || r.action.toLowerCase().includes(searchId) || r.trigger.toLowerCase().includes(searchId));
+    renderSyncHistoryTable(filtered);
+  }
+
+  async function triggerManualFullRecoverySync() {
+    const currentYrStr = String(new Date().getFullYear());
+    if (!confirm('Run full master database recovery sync? This will reprocess all report sheets.')) return;
+    const yr = document.getElementById('filter-year')?.value || currentYrStr;
+    showToast(`Running Full Master Recovery Sync for ${yr}...`, 'info');
+    try {
+      const res = await callServer('syncAllTrainings', yr);
+      showToast(res.message || 'Full Master Recovery Sync complete!', 'success');
+      loadSyncHistoryUI();
+    } catch(e) {
+      showToast('Full sync error: ' + e.message, 'error');
     }
   }
 
   function onReportTypeChange() {
     activeReportType = document.getElementById('filter-report-type').value;
     const titleContainer = document.getElementById('title-filter-container');
-
-    if (activeReportType === 'single') {
-      if (titleContainer) titleContainer.style.display = 'block';
-    } else {
-      if (titleContainer) titleContainer.style.display = 'block';
-    }
+    if (titleContainer) titleContainer.style.display = 'block';
   }
 
   function getActiveFilters() {
+    const currentYrStr = String(new Date().getFullYear());
     return {
-      year:       document.getElementById('filter-year').value,
-      month:      document.getElementById('filter-month').value,
-      costCentre: document.getElementById('filter-dept').value,
-      title:      document.getElementById('filter-training-title').value
+      year:       document.getElementById('filter-year')?.value || currentYrStr,
+      month:      document.getElementById('filter-month')?.value || 'All',
+      status:     document.getElementById('filter-status')?.value || '',
+      costCentre: document.getElementById('filter-dept')?.value || '',
+      category:   document.getElementById('filter-category')?.value || '',
+      mode:       document.getElementById('filter-mode')?.value || '',
+      title:      document.getElementById('filter-training-title')?.value || ''
     };
+  }
+
+  function resetCustomSheetFilters() {
+    const currentYrStr = String(new Date().getFullYear());
+    if (document.getElementById('filter-year')) document.getElementById('filter-year').value = currentYrStr;
+    if (document.getElementById('filter-month')) document.getElementById('filter-month').value = 'All';
+    if (document.getElementById('filter-status')) document.getElementById('filter-status').value = '';
+    if (document.getElementById('filter-dept')) document.getElementById('filter-dept').value = '';
+    if (document.getElementById('filter-category')) document.getElementById('filter-category').value = '';
+    if (document.getElementById('filter-mode')) document.getElementById('filter-mode').value = '';
+    if (document.getElementById('filter-training-title')) document.getElementById('filter-training-title').value = '';
+    generateSelectedReport();
   }
 
   async function generateSelectedReport() {
@@ -336,8 +1639,6 @@
 
         const reportData = await callServer('generateReport', matchedT.ID);
         renderSingleProgrammeReport(reportData);
-      } else if (activeReportType === 'master') {
-        renderMasterReportPreview(filters);
       } else {
         const res = await callServer('getFilteredReportData', activeReportType, filters);
         renderCustomReportTable(activeReportType, res, filters);
@@ -350,86 +1651,6 @@
     }
   }
 
-  async function renderMasterReportPreview(filters) {
-    const titleEl = document.getElementById('report-output-title');
-    const subEl   = document.getElementById('report-output-sub');
-    const tableContainer = document.getElementById('report-table-container');
-
-    const year = filters.year || '2026';
-    titleEl.textContent = `★ ALL-IN-ONE Master Training Report Workbook (${year})`;
-    subEl.textContent   = `Master workbook combining 5 distinct report tabs: Training Hours, Training Cost, Training Title, Employee, and Annual Training Plan (ATP)`;
-
-    const [hoursRes, costRes, titleRes, empRes, atpRes] = await Promise.all([
-      callServer('getFilteredReportData', 'hours', filters).catch(() => ({ rows: [] })),
-      callServer('getFilteredReportData', 'cost', filters).catch(() => ({ rows: [] })),
-      callServer('getFilteredReportData', 'title', filters).catch(() => ({ rows: [] })),
-      callServer('getFilteredReportData', 'employee', filters).catch(() => ({ rows: [] })),
-      callServer('getFilteredReportData', 'atp', filters).catch(() => ({ rows: [] }))
-    ]);
-
-    tableContainer.innerHTML = `
-      <div style="padding:20px; background:#F8FAFC">
-        <div style="background:#EFF6FF; border:1px solid #BFDBFE; border-radius:10px; padding:16px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px">
-          <div>
-            <div style="font-size:15px; font-weight:800; color:#1D4ED8; display:flex; align-items:center; gap:8px">
-              <span class="icon filled sm" style="color:#2563EB">library_books</span> Multi-Tab Master Report Package Ready
-            </div>
-            <div style="font-size:12px; color:#1E40AF; margin-top:2px">
-              All 5 reports generated and formatted into individual sheets in one single master workbook file.
-            </div>
-          </div>
-          <button class="btn-th" style="background:#7C3AED; color:#fff; border:none; font-weight:700; padding:10px 20px" onclick="exportMasterWorkbookDirect()">
-            <span class="icon sm">download</span> Download Master Workbook (.xlsx)
-          </button>
-        </div>
-
-        <div class="row g-3">
-          <div class="col-md-4">
-            <div class="card-th" style="border-top:4px solid #2563EB">
-              <div style="font-size:12px; font-weight:700; color:#2563EB; text-transform:uppercase">Tab 1: Training Hours</div>
-              <div style="font-size:18px; font-weight:800; color:#1E293B; margin:4px 0">${(hoursRes.rows || []).length} Cost Centres</div>
-              <div style="font-size:11.5px; color:#64748B">Cost Centre vs Month matrix for ${year}</div>
-            </div>
-          </div>
-          <div class="col-md-4">
-            <div class="card-th" style="border-top:4px solid #16A34A">
-              <div style="font-size:12px; font-weight:700; color:#16A34A; text-transform:uppercase">Tab 2: Training Cost</div>
-              <div style="font-size:18px; font-weight:800; color:#1E293B; margin:4px 0">${(costRes.rows || []).length} Programmes</div>
-              <div style="font-size:11.5px; color:#64748B">Formatted cost breakdown & HRDF grant columns</div>
-            </div>
-          </div>
-          <div class="col-md-4">
-            <div class="card-th" style="border-top:4px solid #0891B2">
-              <div style="font-size:12px; font-weight:700; color:#0891B2; text-transform:uppercase">Tab 3: Training Title</div>
-              <div style="font-size:18px; font-weight:800; color:#1E293B; margin:4px 0">${(titleRes.rows || []).length} Enrolled Entries</div>
-              <div style="font-size:11.5px; color:#64748B">Employee details, dates, type & trainer</div>
-            </div>
-          </div>
-          <div class="col-md-6">
-            <div class="card-th" style="border-top:4px solid #D97706">
-              <div style="font-size:12px; font-weight:700; color:#D97706; text-transform:uppercase">Tab 4: Employee Report</div>
-              <div style="font-size:18px; font-weight:800; color:#1E293B; margin:4px 0">${(empRes.rows || []).length} Employees</div>
-              <div style="font-size:11.5px; color:#64748B">Total trainings attended & cumulative hours</div>
-            </div>
-          </div>
-          <div class="col-md-6">
-            <div class="card-th" style="border-top:4px solid #7C3AED">
-              <div style="font-size:12px; font-weight:700; color:#7C3AED; text-transform:uppercase">Tab 5: Annual Training Plan (ATP)</div>
-              <div style="font-size:18px; font-weight:800; color:#1E293B; margin:4px 0">${(atpRes.rows || []).length} Plan Entries</div>
-              <div style="font-size:11.5px; color:#64748B">Full annual plan matrix with planned/actual dates & pax</div>
-            </div>
-          </div>
-        </div>
-
-        <div style="margin-top:20px">
-          <h4 style="font-size:14px; font-weight:700; color:#1E293B; margin-bottom:10px">Preview: Tab 1 — Training Hours (Cost Centre vs Month)</h4>
-          ${buildHoursReportHtml(hoursRes, year)}
-        </div>
-      </div>
-    `;
-  }
-
-  // ─── Render Single Custom Report Table ───────────────────────────────────────
   function renderCustomReportTable(type, data, filters) {
     const titleEl = document.getElementById('report-output-title');
     const subEl   = document.getElementById('report-output-sub');
@@ -460,22 +1681,18 @@
     }
   }
 
-  // ─── 1. Training Hours HTML Builder ──────────────────────────────────────────
   function buildHoursReportHtml(data, year) {
     const monthHeaders = data.monthHeaders || ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map(m => `${m}-${year.slice(-2)}`);
     const rows = data.rows || [];
-
     const monthTotals = Array(12).fill(0);
-    let grandYearTotal = 0;
-    let grandHoursTotal = 0;
 
     rows.forEach(r => {
       (r.months || []).forEach((val, idx) => {
         monthTotals[idx] += Number(val || 0);
       });
-      grandYearTotal += Number(r.totalYear || 0);
-      grandHoursTotal += Number(r.totalHours || 0);
     });
+
+    const grandSum = monthTotals.reduce((a, b) => a + b, 0);
 
     return `
       <table class="table-report">
@@ -494,7 +1711,7 @@
           ${rows.length ? rows.map(r => `
             <tr>
               <td style="font-weight:700; color:#1E293B; background:#F8FAFC">${r.costCentre}</td>
-              ${(r.months || []).map(h => `<td style="text-align:center">${h > 0 ? `<strong>${h}</strong>` : '0'}</td>`).join('')}
+              ${(r.months || []).map(h => `<td style="text-align:center; color:${h > 0 ? '#1E293B' : '#CBD5E1'}">${h > 0 ? `<strong>${h}</strong>` : '—'}</td>`).join('')}
               <td style="text-align:center; font-weight:800; color:#2563EB; background:#EFF6FF">${r.totalYear} hrs</td>
               <td style="text-align:center; font-weight:800; color:#059669; background:#ECFDF5">${r.totalHours} hrs</td>
             </tr>
@@ -504,9 +1721,9 @@
           <tfoot>
             <tr style="background:#EFF6FF; border-top:2px solid #2563EB; font-weight:800">
               <td style="font-weight:800; color:#1E3A8A; background:#DBEAFE">Total</td>
-              ${monthTotals.map(t => `<td style="text-align:center; color:#1E3A8A">${t > 0 ? `<strong>${t}</strong>` : '0'}</td>`).join('')}
-              <td style="text-align:center; font-weight:800; color:#2563EB">${grandYearTotal} hrs</td>
-              <td style="text-align:center; font-weight:800; color:#059669">${grandHoursTotal} hrs</td>
+              ${monthTotals.map(t => `<td style="text-align:center; color:#1E3A8A">${t > 0 ? `<strong>${t}</strong>` : '—'}</td>`).join('')}
+              <td style="text-align:center; font-weight:800; color:#2563EB">${grandSum} hrs</td>
+              <td style="text-align:center; font-weight:800; color:#059669">${grandSum} hrs</td>
             </tr>
           </tfoot>
         ` : ''}
@@ -514,9 +1731,17 @@
     `;
   }
 
-  // ─── 2. Training Cost HTML Builder ───────────────────────────────────────────
   function buildCostReportHtml(data, year) {
     const rows = data.rows || [];
+    let sumPax = 0;
+    let sumFees = 0;
+    let sumCost = 0;
+
+    rows.forEach(r => {
+      sumPax += Number(r.totalParticipant || 0);
+      sumFees += parseFloat(String(r.trainingFees || 0).replace(/[^0-9\.-]/g, '')) || 0;
+      sumCost += parseFloat(String(r.totalCost || 0).replace(/[^0-9\.-]/g, '')) || 0;
+    });
 
     return `
       <table class="table-report">
@@ -548,6 +1773,7 @@
               <td style="text-align:center">${r.dateFrom}</td>
               <td style="text-align:center">${r.dateTo}</td>
               <td style="text-align:center; font-weight:700; color:#2563EB">${r.totalParticipant} pax</td>
+              <td style="text-align:center; color:#94A3B8">${r.trainingFees ? `RM ${r.trainingFees}` : '—'}</td>
               <td style="text-align:center; color:#94A3B8">—</td>
               <td style="text-align:center; color:#94A3B8">—</td>
               <td style="text-align:center; color:#94A3B8">—</td>
@@ -555,19 +1781,33 @@
               <td style="text-align:center; color:#94A3B8">—</td>
               <td style="text-align:center; color:#94A3B8">—</td>
               <td style="text-align:center; color:#94A3B8">—</td>
-              <td style="text-align:center; color:#94A3B8">—</td>
-              <td style="text-align:center; font-weight:700; color:#16A34A">RM ${r.totalCost || '0.00'}</td>
+              <td style="text-align:center; font-weight:700; color:#16A34A">${r.totalCost ? `RM ${r.totalCost}` : '—'}</td>
               <td style="text-align:center; color:#94A3B8">—</td>
             </tr>
           `).join('') : '<tr><td colspan="14" style="text-align:center; padding:24px; color:#94A3B8">No cost records found for selected filters.</td></tr>'}
         </tbody>
+        ${rows.length ? `
+          <tfoot>
+            <tr style="background:#EFF6FF; border-top:2px solid #2563EB; font-weight:800">
+              <td colspan="3" style="text-align:right; font-weight:800; color:#1E3A8A; background:#DBEAFE">Total:</td>
+              <td style="text-align:center; font-weight:800; color:#2563EB">${sumPax} pax</td>
+              <td style="text-align:center; font-weight:800; color:#16A34A">RM ${sumFees.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+              <td colspan="7"></td>
+              <td style="text-align:center; font-weight:800; color:#16A34A">RM ${sumCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        ` : ''}
       </table>
     `;
   }
 
-  // ─── 3. Training Title Report HTML Builder ───────────────────────────────────
   function buildTitleReportHtml(data) {
     const rows = data.rows || [];
+    let sumHours = 0;
+    rows.forEach(r => {
+      sumHours += Number(r.totalHours || 0);
+    });
 
     return `
       <table class="table-report">
@@ -594,10 +1834,10 @@
               <td style="font-family:monospace; font-weight:700; color:#2563EB">${r.empNo}</td>
               <td style="font-weight:600">${r.trainingTitle}</td>
               <td>${r.costCentreDesc}</td>
-              <td><span class="badge-th badge-blue">${r.trainingType}</span></td>
+              <td><span class="badge-th ${r.trainingType === 'Public' ? 'badge-yellow' : 'badge-blue'}">${r.trainingType}</span></td>
               <td style="text-align:center">${r.dateFrom}</td>
               <td style="text-align:center">${r.dateUntil}</td>
-              <td style="text-align:center">${r.month}</td>
+              <td style="text-align:center; font-weight:700; color:#1E293B">${r.month}</td>
               <td style="text-align:center; font-weight:700">${r.totalHours} hrs</td>
               <td>${r.trainer}</td>
               <td>${r.trainingProvider}</td>
@@ -605,13 +1845,28 @@
             </tr>
           `).join('') : '<tr><td colspan="12" style="text-align:center; padding:24px; color:#94A3B8">No records found.</td></tr>'}
         </tbody>
+        ${rows.length ? `
+          <tfoot>
+            <tr style="background:#EFF6FF; border-top:2px solid #2563EB; font-weight:800">
+              <td colspan="8" style="text-align:right; font-weight:800; color:#1E3A8A; background:#DBEAFE">Total Training Hours:</td>
+              <td style="text-align:center; font-weight:800; color:#059669">${sumHours} hrs</td>
+              <td colspan="3"></td>
+            </tr>
+          </tfoot>
+        ` : ''}
       </table>
     `;
   }
 
-  // ─── 4. Employee Report HTML Builder ─────────────────────────────────────────
   function buildEmployeeReportHtml(data) {
     const rows = data.rows || [];
+    let sumTrainings = 0;
+    let sumHours = 0;
+
+    rows.forEach(r => {
+      sumTrainings += Number(r.totalTrainings || 0);
+      sumHours += Number(r.totalHours || 0);
+    });
 
     return `
       <table class="table-report">
@@ -638,18 +1893,34 @@
               <td>${r.position}</td>
               <td style="text-align:center; font-weight:700; color:#2563EB">${r.totalTrainings}</td>
               <td style="text-align:center; font-weight:800; color:#059669">${r.totalHours} hrs</td>
-              <td style="font-size:11.5px; color:#64748B">${r.attendedList.join(', ') || '—'}</td>
-              <td>${statusBadge(r.status)}</td>
+              <td style="font-size:11.5px; color:#64748B">${Array.isArray(r.attendedList) ? (r.attendedList.join(', ') || '—') : (r.attendedList || '—')}</td>
+              <td>${renderStatusBadge(r.status)}</td>
             </tr>
           `).join('') : '<tr><td colspan="9" style="text-align:center; padding:24px; color:#94A3B8">No employee records found.</td></tr>'}
         </tbody>
+        ${rows.length ? `
+          <tfoot>
+            <tr style="background:#EFF6FF; border-top:2px solid #2563EB; font-weight:800">
+              <td colspan="5" style="text-align:right; font-weight:800; color:#1E3A8A; background:#DBEAFE">Total:</td>
+              <td style="text-align:center; font-weight:800; color:#2563EB">${sumTrainings}</td>
+              <td style="text-align:center; font-weight:800; color:#059669">${sumHours} hrs</td>
+              <td colspan="2"></td>
+            </tr>
+          </tfoot>
+        ` : ''}
       </table>
     `;
   }
 
-  // ─── 5. ATP Report HTML Builder ──────────────────────────────────────────────
   function buildAtpReportHtml(data) {
     const rows = data.rows || [];
+    let sumDuration = 0;
+    let sumPax = 0;
+
+    rows.forEach(r => {
+      sumDuration += Number(r.durationHours || 0);
+      sumPax += Number(r.totalPax || 0);
+    });
 
     return `
       <table class="table-report">
@@ -678,17 +1949,15 @@
               <td style="text-align:center; font-weight:700">${r.no}</td>
               <td style="font-weight:700; color:#1E293B">${r.trainingTitle}</td>
               <td><span class="badge-th badge-purple">${r.trainingCategory}</span></td>
-              <td>${r.tnaSource}</td>
-              <td>${r.trainingMode}</td>
-              <td style="text-align:center; font-weight:700; color:#2563EB">${r.durationHours} hrs</td>
-              <td>${r.trainer}</td>
+              <td style="font-size:11px; color:#64748B">${r.tnaSource || 'Training Requisition Form'}</td>
+              <td><span class="badge-th ${r.trainingMode === 'Public' ? 'badge-yellow' : 'badge-blue'}">${r.trainingMode}</span></td>
+              <td style="text-align:center; font-weight:800; color:#059669">${r.durationHours} hrs</td>
+              <td style="font-size:11.5px; color:#64748B">${r.trainer}</td>
               <td>${r.department}</td>
-              <td>${r.positionEmpNo}</td>
-              <td style="text-align:center; font-weight:700">${r.totalPax} pax</td>
               <td style="text-align:center">${r.plannedDate}</td>
               <td style="text-align:center">${r.actualDateFrom}</td>
               <td style="text-align:center">${r.actualDateTo}</td>
-              <td>${statusBadge(r.trainingStatus)}</td>
+              <td>${renderStatusBadge(r.trainingStatus)}</td>
               <td style="font-size:11.5px; color:#64748B">${r.remarks}</td>
             </tr>
           `).join('') : '<tr><td colspan="15" style="text-align:center; padding:24px; color:#94A3B8">No Annual Training Plan entries found for selected filters.</td></tr>'}
@@ -697,7 +1966,6 @@
     `;
   }
 
-  // ─── Single Programme Report Renderer ────────────────────────────────────────
   function renderSingleProgrammeReport(report) {
     const titleEl = document.getElementById('report-output-title');
     const subEl   = document.getElementById('report-output-sub');
@@ -747,70 +2015,9 @@
     `;
   }
 
-  // ─── Export Actions & Destination Modal ──────────────────────────────────────
-  function showExportSuccessModal(res) {
-    const fileName = res.fileName || 'Report_Export.xlsx';
-    const folderName = res.folderName || 'Reports';
-    const folderUrl  = res.folderUrl || '#';
-    const sheetUrl   = res.sheetUrl || '#';
-    const downloadUrl= res.downloadUrl || '#';
-
-    const modalHtml = `
-      <div id="export-success-modal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.6); z-index:99999; display:flex; align-items:center; justify-content:center; padding:16px">
-        <div style="background:#ffffff; border-radius:16px; max-width:540px; width:100%; padding:24px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04); animation:fadeIn 0.2s ease-out">
-          
-          <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px">
-            <div style="width:48px; height:48px; border-radius:12px; background:#DCFCE7; display:flex; align-items:center; justify-content:center; flex-shrink:0">
-              <span class="icon filled" style="color:#16A34A; font-size:28px">verified</span>
-            </div>
-            <div>
-              <h3 style="font-size:18px; font-weight:800; color:#1E293B; margin:0 0 2px">Report Exported Successfully!</h3>
-              <p style="font-size:12px; color:#64748B; margin:0">Your file has been generated and saved to Google Drive</p>
-            </div>
-          </div>
-
-          <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:14px; margin-bottom:18px">
-            <div style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px">📁 Google Drive Storage Location</div>
-            
-            <div style="font-size:13px; font-weight:700; color:#1E293B; word-break:break-all; margin-bottom:8px">
-              📄 ${fileName}
-            </div>
-
-            <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:#059669; font-weight:600">
-              <span class="icon sm">folder</span> Saved in: <code>Project Root / ${folderName}</code>
-            </div>
-          </div>
-
-          <div style="display:flex; flex-direction:column; gap:10px">
-            <a href="${downloadUrl}" class="btn-th" style="background:#059669; color:#ffffff; border:none; text-align:center; font-weight:700; padding:11px; border-radius:8px; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:8px" download>
-              <span class="icon sm">download</span> Download Excel (.xlsx) File Directly
-            </a>
-            
-            <a href="${sheetUrl}" target="_blank" class="btn-th" style="background:#2563EB; color:#ffffff; border:none; text-align:center; font-weight:700; padding:11px; border-radius:8px; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:8px">
-              <span class="icon sm">open_in_new</span> Open Web Spreadsheet in Google Sheets
-            </a>
-
-            <a href="${folderUrl}" target="_blank" class="btn-th btn-secondary" style="text-align:center; font-weight:700; padding:10px; border-radius:8px; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:8px">
-              <span class="icon sm">folder_open</span> Open "Reports" Drive Folder
-            </a>
-          </div>
-
-          <div style="margin-top:16px; text-align:right">
-            <button class="btn-th btn-secondary btn-sm" onclick="document.getElementById('export-success-modal').remove()">Close</button>
-          </div>
-        </div>
-      </div>
-    `;
-
-    const old = document.getElementById('export-success-modal');
-    if (old) old.remove();
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-  }
-
   async function exportExcelCurrentReport() {
     activeReportType = document.getElementById('filter-report-type').value;
     const filters = getActiveFilters();
-
     showToast('Exporting report & saving to Google Drive Reports folder...', 'info');
 
     try {
@@ -821,62 +2028,58 @@
         if (!matchedT) return;
 
         const res = await callServer('exportReportExcel', matchedT.ID);
-        if (res && res.sheetUrl) {
-          showExportSuccessModal(res);
-        }
+        if (res && res.sheetUrl) showExportSuccessModal(res);
       } else {
         const res = await callServer('exportFilteredReportExcel', activeReportType, filters);
-        if (res && res.sheetUrl) {
-          showExportSuccessModal(res);
-        }
+        if (res && res.sheetUrl) showExportSuccessModal(res);
       }
     } catch(e) {
       showToast('Export failed: ' + e.message, 'error');
     }
   }
 
-  async function exportMasterWorkbookDirect() {
-    const filters = getActiveFilters();
-    showToast('Generating Master All-in-One Report Workbook (All 5 Tabs)...', 'info');
+  function showExportSuccessModal(res) {
+    const fileName = res.fileName || 'Report_Export.xlsx';
+    const folderName = res.folderName || 'Reports';
+    const folderUrl  = res.folderUrl || '#';
+    const sheetUrl   = res.sheetUrl || '#';
+    const downloadUrl= res.downloadUrl || '#';
 
-    try {
-      const res = await callServer('exportAllInOneMasterReportExcel', filters);
-      if (res && res.sheetUrl) {
-        showExportSuccessModal(res);
-      }
-    } catch(e) {
-      showToast('Master export failed: ' + e.message, 'error');
-    }
-  }
+    const modalHtml = `
+      <div id="export-success-modal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.6); z-index:99999; display:flex; align-items:center; justify-content:center; padding:16px">
+        <div style="background:#ffffff; border-radius:16px; max-width:540px; width:100%; padding:24px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.1); animation:fadeIn 0.2s ease-out">
+          <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px">
+            <div style="width:48px; height:48px; border-radius:12px; background:#DCFCE7; display:flex; align-items:center; justify-content:center; flex-shrink:0">
+              <span class="icon filled" style="color:#16A34A; font-size:28px">verified</span>
+            </div>
+            <div>
+              <h3 style="font-size:18px; font-weight:800; color:#1E293B; margin:0 0 2px">Report Exported Successfully!</h3>
+              <p style="font-size:12px; color:#64748B; margin:0">Your file has been generated and saved to Google Drive</p>
+            </div>
+          </div>
+          <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:14px; margin-bottom:18px">
+            <div style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase; margin-bottom:6px">📁 Storage Location</div>
+            <div style="font-size:13px; font-weight:700; color:#1E293B; margin-bottom:8px">📄 ${fileName}</div>
+            <div style="font-size:12px; color:#059669; font-weight:600">Saved in: <code>Project Root / ${folderName}</code></div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:10px">
+            <a href="${downloadUrl}" class="btn-th" style="background:#059669; color:#fff; text-align:center; font-weight:700; padding:11px; border-radius:8px; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:8px" download>
+              <span class="icon sm">download</span> Download Excel (.xlsx) File
+            </a>
+            <a href="${sheetUrl}" target="_blank" class="btn-th" style="background:#2563EB; color:#fff; text-align:center; font-weight:700; padding:11px; border-radius:8px; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:8px">
+              <span class="icon sm">open_in_new</span> Open Web Spreadsheet in Google Sheets
+            </a>
+          </div>
+          <div style="margin-top:16px; text-align:right">
+            <button class="btn-th btn-secondary btn-sm" onclick="document.getElementById('export-success-modal').remove()">Close</button>
+          </div>
+        </div>
+      </div>
+    `;
 
-  async function exportPdfCurrentReport() {
-    const filters = getActiveFilters();
-    const selTitle = filters.title;
-    let matchedT = masterTrainingsList.find(t => t.Name === selTitle || t.ID === selTitle || t.Code === selTitle);
-    if (!matchedT && masterTrainingsList.length > 0) matchedT = masterTrainingsList[0];
-    if (!matchedT) {
-      showToast('Please select a training title for PDF generation.', 'error');
-      return;
-    }
-
-    showToast('Generating PDF report...', 'info');
-    try {
-      const res = await callServer('exportReportPdf', matchedT.ID);
-      if (res && res.dataUri) {
-        const link = document.createElement('a');
-        link.href = res.dataUri;
-        link.download = res.fileName || 'Training_Report.pdf';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        showToast('PDF downloaded successfully!', 'success');
-      } else if (res && res.pdfUrl) {
-        window.open(res.pdfUrl, '_blank');
-        showToast('PDF created in Google Drive!', 'success');
-      }
-    } catch(e) {
-      showToast('PDF export error: ' + e.message, 'error');
-    }
+    const old = document.getElementById('export-success-modal');
+    if (old) old.remove();
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
   }
 </script>
 </body>

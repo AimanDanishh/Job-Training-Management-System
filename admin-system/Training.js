@@ -161,7 +161,8 @@ function autoUpdateTrainingLifecycleStages() {
           }
         }
 
-        if (isUpdated && t._row) {
+        if (isUpdated) {
+          t._isLifecycleUpdated = true;
           if (statusCol > 0) sheet.getRange(t._row, statusCol).setValue(t.Status);
           if (stageCol > 0) sheet.getRange(t._row, stageCol).setValue(t.Stage);
           if (updatedDateCol > 0) sheet.getRange(t._row, updatedDateCol).setValue(now());
@@ -174,7 +175,14 @@ function autoUpdateTrainingLifecycleStages() {
       }
     });
 
-    if (sheetModified) SpreadsheetApp.flush();
+    if (sheetModified) {
+      SpreadsheetApp.flush();
+      rows.forEach(t => {
+        if (t._isLifecycleUpdated && t.ID) {
+          try { syncTrainingById(t.ID, 'System Lifecycle Auto-Advance', 'STATUS_CHANGE'); } catch(sErr) {}
+        }
+      });
+    }
     return rows;
   } catch (e) {
     Logger.log('autoUpdateTrainingLifecycleStages error: ' + e.message);
@@ -312,7 +320,7 @@ function addTraining(data) {
       }
     }
 
-    try { syncLiveMasterReportSheet(); } catch(syncErr) {}
+    try { syncTrainingById(id, 'Admin Programme Creation', 'CREATE'); } catch(syncErr) { Logger.log('syncTrainingById error in addTraining: ' + syncErr.message); }
 
     return ok({
       id: id,
@@ -388,7 +396,7 @@ function updateTraining(data) {
       }
     }
 
-    try { syncLiveMasterReportSheet(); } catch(syncErr) {}
+    try { syncTrainingById(data.ID, 'Admin Programme Update', 'UPDATE'); } catch(syncErr) { Logger.log('syncTrainingById error in updateTraining: ' + syncErr.message); }
 
     return ok({ message: 'Training updated successfully.' });
   } catch (e) {
@@ -457,6 +465,7 @@ function updateTrainingStage(trainingId, newStage) {
 
     sheet.getRange(row, 14).setValue(newStage); // Column N = Stage
     sheet.getRange(row, 25).setValue(now());    // Column Y = UpdatedDate
+    try { syncTrainingById(trainingId, 'Stage Change (' + newStage + ')', 'STATUS_CHANGE'); } catch(sErr) {}
     return ok({ message: 'Stage updated to: ' + newStage });
   } catch (e) {
     return err(e.message);

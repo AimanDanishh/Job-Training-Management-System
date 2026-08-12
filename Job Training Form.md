@@ -306,6 +306,7 @@ Overall UI
 **11/8/2026**
 
 **Improvement (Admin System):**
+
 1. Admin Dashboard: add training status (HOD approval, Csuite, HOHR)
 
 2\. Report
@@ -317,6 +318,7 @@ Overall UI
 
 
 **Report Requirement:**
+
 1. Training Hours (by year) (Cost Centre vs Month)
 
 Header:
@@ -345,7 +347,7 @@ D1-D2: "Total Participant"
 
 E1-L1:  Training Cost (RM)
 
-E2:  Training Fees 
+E2:  Training Fees
 
 F2:  Meal
 
@@ -410,15 +412,18 @@ No | Training Title | Training Category | TNA Source | Training Mode | Training 
 4. HOD portal (remove profile switcher), lock status after submit
 5. Participant UI: employee ID only
 6. Only allow view \& fill attendance and evaluation, after training got full approval only
+7. Goldenscoop access to all website
+8. Auto update sheets when employee request training
 
 
 
-**Annual Training Plan:**
+**Annual Training Plan (correct data):**
+
 1. TNA Source: Training Requisition Form
 
-2\. Training Mode: In-house or Public
+2\. Training Mode: In-house or Public 
 
-3\. Position: Name list (hyperlink)
+3\. Position: Name list (hyperlink to list of participant in another sheets just for training participant for the specific training)
 
 4\. Date format: 01st Jan 2026
 
