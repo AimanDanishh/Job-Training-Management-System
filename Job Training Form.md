@@ -429,3 +429,10 @@ No | Training Title | Training Category | TNA Source | Training Mode | Training 
 
 5\. Training status: Completed, On planning, On going, Pending
 
+
+
+**UI Cleanup:**
+TNA Source: "Training Requisition Form" and "Training Procedure"
+
+Training Type: add "On-Job Training"
+

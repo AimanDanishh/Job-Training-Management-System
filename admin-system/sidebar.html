@@ -1,28 +1,45 @@
 <aside class="sidebar">
   <div class="sidebar-logo">
-    <div style="display:flex;align-items:center;gap:10px">
-      <div class="logo-icon"><span class="icon filled md" style="color:white">corporate_fare</span></div>
-      <div>
-        <div class="logo-name">TrainHub</div>
-        <div class="logo-sub">Management System</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
+      <div style="display:flex;align-items:center;gap:10px;min-width:0">
+        <div class="logo-icon"><span class="icon filled md" style="color:white">corporate_fare</span></div>
+        <div class="sidebar-text-content">
+          <div class="logo-name">TrainHub</div>
+          <div class="logo-sub">Management System</div>
+        </div>
       </div>
+      <button id="sidebar-collapse-toggle" class="sidebar-collapse-btn" onclick="toggleSidebarCollapse()" title="Collapse/Expand Sidebar">
+        <span class="icon sm" id="sidebar-collapse-icon">chevron_left</span>
+      </button>
     </div>
   </div>
   <nav class="sidebar-nav">
-    <a class="nav-item" data-page="dashboard"  href="?page=dashboard"  onclick="navTo('dashboard'); return false;"><span class="icon">dashboard</span>Dashboard</a>
-    <a class="nav-item" data-page="training"   href="?page=training"   onclick="navTo('training'); return false;"><span class="icon">school</span>Training Programmes</a>
-    <a class="nav-item" data-page="attendance" href="?page=attendance" onclick="navTo('attendance'); return false;"><span class="icon">fact_check</span>Attendance</a>
-    <a class="nav-item" data-page="evaluation" href="?page=evaluation" onclick="navTo('evaluation'); return false;"><span class="icon">rate_review</span>Evaluation</a>
-    <a class="nav-item" data-page="report"     href="?page=report"     onclick="navTo('report'); return false;"><span class="icon">bar_chart</span>Reports</a>
+    <a class="nav-item" data-page="dashboard"  href="?page=dashboard"  onclick="navTo('dashboard'); return false;" title="Dashboard">
+      <span class="icon">dashboard</span><span class="sidebar-text-content nav-label">Dashboard</span>
+    </a>
+    <a class="nav-item" data-page="training"   href="?page=training"   onclick="navTo('training'); return false;" title="Training Programmes">
+      <span class="icon">school</span><span class="sidebar-text-content nav-label">Training Programmes</span>
+    </a>
+    <a class="nav-item" data-page="attendance" href="?page=attendance" onclick="navTo('attendance'); return false;" title="Attendance">
+      <span class="icon">fact_check</span><span class="sidebar-text-content nav-label">Attendance</span>
+    </a>
+    <a class="nav-item" data-page="evaluation" href="?page=evaluation" onclick="navTo('evaluation'); return false;" title="Evaluation">
+      <span class="icon">rate_review</span><span class="sidebar-text-content nav-label">Evaluation</span>
+    </a>
+    <a class="nav-item" data-page="report"     href="?page=report"     onclick="navTo('report'); return false;" title="Reports">
+      <span class="icon">bar_chart</span><span class="sidebar-text-content nav-label">Reports</span>
+    </a>
     <div class="nav-divider"></div>
-    <a class="nav-item nav-logout" href="?page=index" onclick="navTo('index'); return false;"><span class="icon">logout</span>Logout</a>
+    <a class="nav-item nav-logout" href="?page=index" onclick="navTo('index'); return false;" title="Logout">
+      <span class="icon">logout</span><span class="sidebar-text-content nav-label">Logout</span>
+    </a>
   </nav>
   <div class="sidebar-user">
     <div style="display:flex;align-items:center;gap:10px">
-      <div class="avatar" id="sidebar-user-avatar" style="background:#2563EB;width:32px;height:32px;font-size:12px">AD</div>
-      <div style="flex:1;min-width:0">
-        <div id="sidebar-user-name" style="font-size:12.5px;font-weight:600;color:#1E293B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Admin User</div>
-        <div id="sidebar-user-email" style="font-size:10.5px;color:#94A3B8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">System Administrator</div>
+      <div class="avatar" id="sidebar-user-avatar" style="background:#2563EB;width:32px;height:32px;font-size:12px">--</div>
+      <div class="sidebar-text-content" style="flex:1;min-width:0">
+        <div id="sidebar-user-name" style="font-size:12.5px;font-weight:600;color:#1E293B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Admin Profile</div>
+        <div id="sidebar-user-email" style="font-size:10.5px;color:#94A3B8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Loading account...</div>
       </div>
     </div>
   </div>

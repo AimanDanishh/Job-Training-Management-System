@@ -1,11 +1,119 @@
 <script>
+  // State Management
+  let activeEmployee = null;
+  let masterParticipants = [];
+  let selectedParticipants = [];
+  let selectedCostCentres = [];
+  let userPreviousRequests = [];
+  let currentHistoryFilter = 'ALL';
+  let editingTrainingId = '';
+  let uploadedFileObject = null;
+  let loggedInUserEmail = '';
+
+  window.addEventListener('DOMContentLoaded', () => {
+    initTheme();
+    // Focus Employee ID input on initial page load
+    const empInput = document.getElementById('employeeIdInput');
+    if (empInput) empInput.focus();
+  });
+
+  // ==========================================
+  // THEME TOGGLE WORKFLOW (LIGHT / DARK)
+  // ==========================================
+  function initTheme() {
+    let savedTheme = 'dark';
+    try {
+      savedTheme = localStorage.getItem('portalTheme') || 'dark';
+    } catch(e) {}
+    applyTheme(savedTheme);
+  }
+
+  function toggleTheme() {
+    const isLight = document.body.classList.contains('theme-light');
+    const newTheme = isLight ? 'dark' : 'light';
+    applyTheme(newTheme);
+    try {
+      localStorage.setItem('portalTheme', newTheme);
+    } catch(e) {}
+  }
+
+  function applyTheme(theme) {
+    const iconEl = document.getElementById('themeToggleIcon');
+    const textEl = document.getElementById('themeToggleText');
+    if (theme === 'light') {
+      document.body.classList.remove('theme-dark');
+      document.body.classList.add('theme-light');
+      if (iconEl) iconEl.innerText = '🌙';
+      if (textEl) textEl.innerText = 'Dark Mode';
+    } else {
+      document.body.classList.remove('theme-light');
+      document.body.classList.add('theme-dark');
+      if (iconEl) iconEl.innerText = '☀️';
+      if (textEl) textEl.innerText = 'Light Mode';
+    }
+  }
+
+  // Date Formatting Helper Utilities
+  function toDisplayDateStr(val) {
+    if (!val) return '';
+    const str = String(val).trim();
+    if (/^\d{2}\/\d{2}\/\d{4}/.test(str)) return str;
+    const ymdMatch = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+    if (ymdMatch) {
+      const year = ymdMatch[1];
+      const month = ymdMatch[2].padStart(2, '0');
+      const day = ymdMatch[3].padStart(2, '0');
+      return `${day}/${month}/${year}`;
+    }
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) {
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      return `${day}/${month}/${year}`;
+    }
+    return str;
+  }
+
+  function toInputDateStr(val) {
+    if (!val) return '';
+    const str = String(val).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+    const dmyMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+    if (dmyMatch) {
+      const day = dmyMatch[1].padStart(2, '0');
+      const month = dmyMatch[2].padStart(2, '0');
+      const year = dmyMatch[3];
+      return `${year}-${month}-${day}`;
+    }
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) {
+      return d.toISOString().split('T')[0];
+    }
+    return '';
+  }
+
+  function getTodayFormatted() {
+    const nowD = new Date();
+    const dd = String(nowD.getDate()).padStart(2, '0');
+    const mm = String(nowD.getMonth() + 1).padStart(2, '0');
+    const yyyy = nowD.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+  }
+
+  // Loading Overlay Utilities
   function showLoading(msg) {
     let overlay = document.getElementById('loadingOverlay');
     if (!overlay) {
       overlay = document.createElement('div');
       overlay.id = 'loadingOverlay';
       overlay.className = 'loading-overlay';
-      overlay.innerHTML = '<div class="spinner"></div><div id="loadingMsg" style="font-weight:600;color:#fff;">Processing...</div>';
+      overlay.innerHTML = `
+        <div class="loading-box">
+          <div class="spinner"></div>
+          <div id="loadingMsg" style="font-weight:700;color:var(--text-primary);font-size:14px;">Processing...</div>
+        </div>
+      `;
       document.body.appendChild(overlay);
     }
     document.getElementById('loadingMsg').innerText = msg || 'Processing...';
@@ -19,5 +127,824 @@
 
   function showAlert(msg, isError) {
     alert((isError ? '⚠️ Error: ' : '✅ Success: ') + msg);
+  }
+
+
+  // ==========================================
+  // 1. EMPLOYEE ID VERIFICATION WORKFLOW
+  // ==========================================
+  function submitEmployeeIdLookup() {
+    const rawId = document.getElementById('employeeIdInput').value;
+    const empId = String(rawId || '').trim();
+
+    if (!empId) {
+      showAlert('Please enter your Employee ID.', true);
+      return;
+    }
+
+    showLoading('Verifying Employee ID...');
+    const btn = document.getElementById('btnContinueLookup');
+    if (btn) btn.disabled = true;
+
+    google.script.run
+      .withSuccessHandler(resStr => {
+        hideLoading();
+        if (btn) btn.disabled = false;
+
+        let res;
+        try { res = JSON.parse(resStr); } catch (e) { res = { success: false, message: 'Invalid response from server.' }; }
+
+        if (!res.success || !res.data) {
+          showIdLookupError(res.message || 'Employee ID not found.');
+          return;
+        }
+
+        activeEmployee = res.data;
+        showIdLookupSuccess(activeEmployee);
+      })
+      .withFailureHandler(err => {
+        hideLoading();
+        if (btn) btn.disabled = false;
+        showIdLookupError('Unable to connect to the system. Please try again.');
+      })
+      .getEmployeeDetails(empId);
+  }
+
+  function showIdLookupSuccess(emp) {
+    document.getElementById('verEmpName').innerText = emp.Name || emp.ID;
+    document.getElementById('verEmpId').innerText = emp.ID || '--';
+    document.getElementById('verEmpPos').innerText = emp.Position || emp.JobTitle || 'Staff';
+    document.getElementById('verEmpDept').innerText = emp.Department || emp.CostCentre || 'N/A';
+    document.getElementById('verEmpDate').innerText = getTodayFormatted();
+
+    document.getElementById('idEntryBox').style.display = 'none';
+    document.getElementById('verifiedErrorBox').style.display = 'none';
+    document.getElementById('verifiedSuccessBox').style.display = 'block';
+  }
+
+  function showIdLookupError(errMsg) {
+    document.getElementById('idEntryBox').style.display = 'none';
+    document.getElementById('verifiedSuccessBox').style.display = 'none';
+    document.getElementById('verifiedErrorBox').style.display = 'block';
+  }
+
+  function resetToIdEntry() {
+    document.getElementById('verifiedErrorBox').style.display = 'none';
+    document.getElementById('verifiedSuccessBox').style.display = 'none';
+    document.getElementById('idEntryBox').style.display = 'block';
+    const empInput = document.getElementById('employeeIdInput');
+    if (empInput) {
+      empInput.value = '';
+      empInput.focus();
+    }
+  }
+
+
+  // ==========================================
+  // 2. MAIN PORTAL ENTRY & NAVIGATION
+  // ==========================================
+  function proceedToMainPortal() {
+    if (!activeEmployee) {
+      resetToIdEntry();
+      return;
+    }
+
+    // Hide ID screen, show main portal screen
+    document.getElementById('employeeIdScreen').style.display = 'none';
+    document.getElementById('mainPortalScreen').style.display = 'block';
+
+    // Populate header identity bar
+    document.getElementById('headerEmpName').innerText = activeEmployee.Name || activeEmployee.ID;
+    document.getElementById('headerEmpId').innerText = activeEmployee.ID;
+    document.getElementById('headerEmpDept').innerText = activeEmployee.Department || 'N/A';
+    document.getElementById('headerEmpPos').innerText = activeEmployee.Position || 'Staff';
+
+    // Populate read-only form step 1
+    document.getElementById('autoEmpNo').innerText = activeEmployee.ID;
+    document.getElementById('autoName').innerText = activeEmployee.Name || activeEmployee.ID;
+    document.getElementById('autoPos').innerText = activeEmployee.Position || 'Staff';
+    document.getElementById('autoDept').innerText = activeEmployee.Department || 'N/A';
+    document.getElementById('autoDate').innerText = activeEmployee.RequestDate || getTodayFormatted();
+
+    // Trigger async data loading
+    loadCostCentres();
+    loadMasterParticipants();
+    fetchLoggedInUserEmail();
+    loadAndRenderHistory();
+  }
+
+  function switchMainTab(tabName) {
+    const btnForm = document.getElementById('tabBtnForm');
+    const btnHistory = document.getElementById('tabBtnHistory');
+    const contentForm = document.getElementById('tabContentForm');
+    const contentHistory = document.getElementById('tabContentHistory');
+
+    if (tabName === 'form') {
+      btnForm.classList.add('active');
+      btnHistory.classList.remove('active');
+      contentForm.style.display = 'block';
+      contentHistory.style.display = 'none';
+    } else if (tabName === 'history') {
+      btnHistory.classList.add('active');
+      btnForm.classList.remove('active');
+      contentHistory.style.display = 'block';
+      contentForm.style.display = 'none';
+      loadAndRenderHistory();
+    }
+  }
+
+
+  // ==========================================
+  // 3. BACKEND DATA LOADERS & DEPARTMENT BUBBLES
+  // ==========================================
+  function fetchLoggedInUserEmail() {
+    google.script.run
+      .withSuccessHandler(resStr => {
+        try {
+          const res = JSON.parse(resStr);
+          if (res.success && res.data) {
+            loggedInUserEmail = res.data;
+            if (activeEmployee && !activeEmployee.Email) {
+              activeEmployee.Email = loggedInUserEmail;
+            }
+          }
+        } catch(e) {}
+      })
+      .getLoggedInUserEmail();
+  }
+
+  function loadCostCentres() {
+    google.script.run
+      .withSuccessHandler(resStr => {
+        try {
+          const res = JSON.parse(resStr);
+          if (res.success && Array.isArray(res.data)) {
+            const sel = document.getElementById('reqCostCentreSelect');
+            if (sel) {
+              sel.innerHTML = '<option value="" disabled selected>Select Department / Cost Centre...</option>' +
+                res.data.map(c => `<option value="${c}">${c}</option>`).join('');
+            }
+          }
+        } catch (e) {}
+      })
+      .getCostCentres();
+  }
+
+  function addCostCentreTag(val) {
+    if (!val || val.trim() === '') return;
+    const cleanVal = val.trim();
+    if (!selectedCostCentres.includes(cleanVal)) {
+      selectedCostCentres.push(cleanVal);
+      renderCostCentreChips();
+    }
+    const sel = document.getElementById('reqCostCentreSelect');
+    if (sel) sel.selectedIndex = 0;
+  }
+
+  function removeCostCentreTag(val) {
+    selectedCostCentres = selectedCostCentres.filter(c => c !== val);
+    renderCostCentreChips();
+  }
+
+  function renderCostCentreChips() {
+    const container = document.getElementById('costCentreChipContainer');
+    if (!container) return;
+
+    if (selectedCostCentres.length === 0) {
+      container.innerHTML = '<span style="color:var(--text-muted);font-size:12.5px;" id="emptyCostCentreMsg">All Departments / Cost Centres</span>';
+      return;
+    }
+
+    container.innerHTML = selectedCostCentres.map(c => `
+      <span class="pax-chip">
+        <span>🏢 ${c}</span>
+        <span class="pax-chip-remove" onclick="removeCostCentreTag('${c.replace(/'/g, "\\'")}')">✕</span>
+      </span>
+    `).join('');
+  }
+
+  function loadMasterParticipants() {
+    google.script.run
+      .withSuccessHandler(resStr => {
+        try {
+          const res = JSON.parse(resStr);
+          if (res.success && Array.isArray(res.data)) {
+            masterParticipants = res.data.map((p, idx) => ({
+              _uid: p.ID ? String(p.ID).trim() : `EMP-IDX-${idx}`,
+              ID: String(p.ID || '').trim(),
+              Name: String(p.Name || p.ID || 'Employee').trim(),
+              Department: String(p.Department || '').trim(),
+              Position: String(p.Position || '').trim()
+            }));
+          }
+        } catch (e) {}
+      })
+      .getParticipantsList();
+  }
+
+
+  // ==========================================
+  // 4. TRAINING HISTORY & DETAILS MODAL
+  // ==========================================
+  function loadAndRenderHistory() {
+    const container = document.getElementById('historyContainer');
+    if (!activeEmployee || !activeEmployee.ID) return;
+
+    google.script.run
+      .withSuccessHandler(resStr => {
+        let res;
+        try { res = JSON.parse(resStr); } catch (e) { res = { success: false, data: [] }; }
+
+        if (res.success && Array.isArray(res.data)) {
+          userPreviousRequests = res.data;
+        } else {
+          userPreviousRequests = [];
+        }
+        filterAndRenderHistory();
+      })
+      .withFailureHandler(err => {
+        if (container) {
+          container.innerHTML = '<div style="color:var(--danger);padding:20px;text-align:center;font-size:13.5px;">We couldn\'t load your training history. Please try again.</div>';
+        }
+      })
+      .getEmployeeSubmittedRequests(activeEmployee.ID);
+  }
+
+  function setHistoryFilter(filterName) {
+    currentHistoryFilter = filterName;
+    const pills = ['filterAll', 'filterPending', 'filterApproved', 'filterReturned', 'filterRejected'];
+    pills.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.remove('active');
+    });
+
+    const activeEl = document.getElementById('filter' + filterName.charAt(0) + filterName.slice(1).toLowerCase());
+    if (activeEl) activeEl.classList.add('active');
+
+    filterAndRenderHistory();
+  }
+
+  function filterHistoryList() {
+    filterAndRenderHistory();
+  }
+
+  function filterAndRenderHistory() {
+    const searchVal = (document.getElementById('historySearchInput')?.value || '').trim().toLowerCase();
+    let list = userPreviousRequests;
+
+    // Apply Filter Pill
+    if (currentHistoryFilter === 'PENDING') {
+      list = list.filter(r => (r.ApprovalStatus || '').toLowerCase().includes('pending'));
+    } else if (currentHistoryFilter === 'APPROVED') {
+      list = list.filter(r => (r.ApprovalStatus || '').toLowerCase() === 'approved');
+    } else if (currentHistoryFilter === 'RETURNED') {
+      list = list.filter(r => (r.ApprovalStatus || '').toLowerCase().includes('return'));
+    } else if (currentHistoryFilter === 'REJECTED') {
+      list = list.filter(r => (r.ApprovalStatus || '').toLowerCase().includes('reject'));
+    }
+
+    // Apply Search Query
+    if (searchVal) {
+      list = list.filter(r =>
+        (r.Name && r.Name.toLowerCase().includes(searchVal)) ||
+        (r.ID && r.ID.toLowerCase().includes(searchVal)) ||
+        (r.Code && r.Code.toLowerCase().includes(searchVal)) ||
+        (r.Category && r.Category.toLowerCase().includes(searchVal))
+      );
+    }
+
+    renderHistoryCards(list);
+  }
+
+  function renderHistoryCards(requests) {
+    const container = document.getElementById('historyContainer');
+    if (!container) return;
+
+    if (!requests || requests.length === 0) {
+      container.innerHTML = `
+        <div style="text-align:center;padding:36px;color:var(--text-muted);">
+          <div style="font-size:32px;margin-bottom:8px;">📁</div>
+          <div style="font-weight:600;font-size:14px;">No training requests found</div>
+          <div style="font-size:12.5px;margin-top:2px;">No records match your filter criteria.</div>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = requests.map(r => {
+      const status = r.ApprovalStatus || 'Pending HOD Approval';
+      const statusLower = status.toLowerCase();
+      const isReturned = statusLower.includes('return');
+      const isApproved = statusLower === 'approved';
+      const isRejected = statusLower.includes('reject');
+
+      let badgeClass = 'status-pending';
+      if (isApproved) badgeClass = 'status-approved';
+      else if (isReturned) badgeClass = 'status-returned';
+      else if (isRejected) badgeClass = 'status-rejected';
+
+      const paxCount = r.participants ? r.participants.length : (r.Participants || 0);
+
+      return `
+        <div class="neo-card-sm" style="cursor:pointer;border-left:4px solid ${isReturned ? 'var(--warning)' : (isApproved ? 'var(--success)' : 'var(--primary)')};" onclick="openRequestDetailsModal('${r.ID}')">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">
+            <div style="flex:1;min-width:240px;">
+              <div style="font-size:11.5px;font-weight:700;color:var(--primary);font-family:monospace;">${r.Code || r.ID}</div>
+              <h4 style="font-size:16px;font-weight:700;color:var(--text-primary);margin-top:2px;">${r.Name}</h4>
+              
+              <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;font-size:12.5px;color:var(--text-secondary);">
+                <span>📅 ${toDisplayDateStr(r.StartDate)} ${r.EndDate && r.EndDate !== r.StartDate ? 'to ' + toDisplayDateStr(r.EndDate) : ''}</span>
+                <span>💰 RM ${r.CourseFee || '0.00'}</span>
+                <span>👥 ${paxCount} Pax</span>
+              </div>
+            </div>
+
+            <div>
+              <span class="status-badge ${badgeClass}">${status}</span>
+            </div>
+          </div>
+
+          ${r.ApprovalRemarks ? `
+            <div style="margin-top:12px;padding:10px 14px;background:var(--bg-card);box-shadow:var(--shadow-inset);border-radius:var(--radius-sm);font-size:12.5px;color:var(--text-primary);">
+              <strong>💬 Approver Remarks:</strong> ${r.ApprovalRemarks}
+            </div>
+          ` : ''}
+
+          <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center;padding-top:10px;border-top:1px solid var(--border-color);">
+            <span style="font-size:12px;color:var(--text-muted);">Requested: ${toDisplayDateStr(r.RequestedDate) || 'Recently'}</span>
+            <div style="display:flex;gap:8px;">
+              ${isReturned ? `
+                <button type="button" class="btn btn-warning" style="padding:4px 12px;font-size:12px;" onclick="event.stopPropagation(); editReturnedRequest('${r.ID}')">
+                  ✏️ Edit & Resubmit
+                </button>
+              ` : ''}
+              <button type="button" class="btn btn-neo" style="padding:4px 12px;font-size:12px;" onclick="event.stopPropagation(); openRequestDetailsModal('${r.ID}')">
+                View Details ➔
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function openRequestDetailsModal(trainingId) {
+    const req = userPreviousRequests.find(r => r.ID === trainingId);
+    if (!req) return;
+
+    document.getElementById('modalReqCode').innerText = req.Code || req.ID;
+    document.getElementById('modalReqTitle').innerText = req.Name;
+
+    const status = req.ApprovalStatus || 'Pending HOD Approval';
+    const statusLower = status.toLowerCase();
+    let badgeClass = 'status-pending';
+    if (statusLower === 'approved') badgeClass = 'status-approved';
+    else if (statusLower.includes('return')) badgeClass = 'status-returned';
+    else if (statusLower.includes('reject')) badgeClass = 'status-rejected';
+
+    const paxList = req.participants || [];
+
+    document.getElementById('modalBodyContent').innerHTML = `
+      <div style="margin-bottom:16px;">
+        <span class="status-badge ${badgeClass}">${status}</span>
+      </div>
+
+      <div class="details-grid" style="margin-bottom:16px;">
+        <div class="detail-item">
+          <div class="detail-label">Training Category</div>
+          <div class="detail-val">${req.Category || 'General'}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Course Fee</div>
+          <div class="detail-val">RM ${req.CourseFee || '0.00'}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Training Dates</div>
+          <div class="detail-val">${toDisplayDateStr(req.StartDate)} ${req.EndDate && req.EndDate !== req.StartDate ? 'to ' + toDisplayDateStr(req.EndDate) : ''}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Duration</div>
+          <div class="detail-val">${req.Duration || 1} day(s) (${req.TotalHours || 8} hrs)</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Venue</div>
+          <div class="detail-val">${req.Venue || 'TBD'}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Trainer / Provider</div>
+          <div class="detail-val">${req.Trainer || 'N/A'}</div>
+        </div>
+      </div>
+
+      ${req.Objectives ? `
+        <div class="detail-item" style="margin-bottom:16px;">
+          <div class="detail-label">Reason for Training</div>
+          <div class="detail-val" style="font-weight:500;">${req.Objectives}</div>
+        </div>
+      ` : ''}
+
+      ${req.ApprovalRemarks ? `
+        <div class="detail-item" style="margin-bottom:16px;background:var(--warning-bg);border:1px solid var(--warning);">
+          <div class="detail-label" style="color:var(--warning-text);">Approver Remarks</div>
+          <div class="detail-val" style="color:var(--warning-text);">${req.ApprovalRemarks}</div>
+        </div>
+      ` : ''}
+
+      ${paxList.length > 0 ? `
+        <div style="margin-bottom:16px;">
+          <div class="detail-label" style="margin-bottom:8px;">Enrolled Participants (${paxList.length} Pax)</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            ${paxList.map(p => `
+              <span class="pax-chip">
+                <span>👤</span>
+                <span>${p.Name || p.EmployeeName || 'Employee'} (${p.ID || p.EmployeeID || ''})</span>
+              </span>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+
+      ${req.BrochureURL ? `
+        <div class="detail-item" style="margin-bottom:16px;">
+          <div class="detail-label">Brochure Attachment</div>
+          <div class="detail-val">
+            <a href="${req.BrochureURL}" target="_blank" style="color:var(--primary);text-decoration:underline;">📎 Open Brochure Document</a>
+          </div>
+        </div>
+      ` : ''}
+    `;
+
+    const actionsContainer = document.getElementById('modalActions');
+    if (statusLower.includes('return')) {
+      actionsContainer.innerHTML = `
+        <button type="button" class="btn btn-warning" onclick="closeDetailsModal(); editReturnedRequest('${req.ID}');">
+          ✏️ Edit & Resubmit Request
+        </button>
+        <button type="button" class="btn btn-neo" onclick="closeDetailsModal()">Close</button>
+      `;
+    } else {
+      actionsContainer.innerHTML = `
+        <button type="button" class="btn btn-neo" onclick="closeDetailsModal()">Close</button>
+      `;
+    }
+
+    document.getElementById('detailsModal').style.display = 'flex';
+  }
+
+  function closeDetailsModal() {
+    document.getElementById('detailsModal').style.display = 'none';
+  }
+
+
+  // ==========================================
+  // 5. RESUBMIT & FORM EDITING WORKFLOW
+  // ==========================================
+  function editReturnedRequest(trainingId) {
+    const req = userPreviousRequests.find(r => r.ID === trainingId);
+    if (!req) return;
+
+    editingTrainingId = req.ID;
+    document.getElementById('editingTrainingId').value = req.ID;
+
+    // Populate Form Fields
+    document.getElementById('reqTrainingName').value = req.Name || '';
+    document.getElementById('reqCategory').value = req.Category || 'Behavioral Skills (Soft Skills + Leadership + Customer Service)';
+    document.getElementById('reqStartDate').value = toInputDateStr(req.StartDate);
+    document.getElementById('reqEndDate').value = toInputDateStr(req.EndDate || req.StartDate);
+    document.getElementById('reqHours').value = req.TotalHours || 8;
+    document.getElementById('reqFee').value = req.CourseFee || '';
+    document.getElementById('reqVenue').value = req.Venue || '';
+    document.getElementById('reqTrainer').value = req.Trainer || '';
+    document.getElementById('reqReason').value = req.Objectives || '';
+    if (req.BrochureURL) {
+      document.getElementById('reqBrochureUrl').value = req.BrochureURL;
+    }
+
+    // Populate Department Bubble Chips
+    if (req.Department) {
+      const depts = req.Department.split(',').map(d => d.trim()).filter(d => d && d !== 'ALL');
+      selectedCostCentres = depts;
+      renderCostCentreChips();
+    } else {
+      selectedCostCentres = [];
+      renderCostCentreChips();
+    }
+
+    // Populate Participants
+    if (Array.isArray(req.participants) && req.participants.length > 0) {
+      selectedParticipants = req.participants.map((p, idx) => ({
+        _uid: p.ID || p.EmployeeID || p.EmployeeNo || `EXP-${idx}`,
+        ID: p.ID || p.EmployeeID || p.EmployeeNo || '',
+        Name: p.Name || p.EmployeeName || '',
+        Department: p.Department || p.CostCentre || '',
+        Position: p.Position || p.JobTitle || ''
+      }));
+    } else {
+      selectedParticipants = [];
+    }
+    document.getElementById('reqTotalPax').value = selectedParticipants.length || 1;
+    renderSelectedChips();
+
+    // Show Edit Banner
+    const banner = document.getElementById('editResubmitBanner');
+    banner.style.display = 'block';
+    banner.innerHTML = `⚠️ <strong>Editing Returned Request (${req.Code || req.ID})</strong>: ${req.ApprovalRemarks ? 'Remarks: "' + req.ApprovalRemarks + '"' : 'Update details below and resubmit.'} <button type="button" onclick="cancelEditResubmit()" style="margin-left:12px;background:none;border:none;color:var(--warning-text);text-decoration:underline;cursor:pointer;font-weight:700;">Cancel Edit</button>`;
+
+    document.getElementById('btnSubmitRequisition').innerHTML = '<span>🚀</span> Resubmit Training Requisition for HOD Approval';
+
+    // Switch to Form tab and scroll top
+    switchMainTab('form');
+  }
+
+  function cancelEditResubmit() {
+    editingTrainingId = '';
+    document.getElementById('editingTrainingId').value = '';
+    document.getElementById('editResubmitBanner').style.display = 'none';
+    document.getElementById('btnSubmitRequisition').innerHTML = '<span>📤</span> Submit Training Requisition for HOD Approval';
+  }
+
+
+  // ==========================================
+  // 6. REQUISITION FORM SUBMISSION
+  // ==========================================
+  function handleBrochureFileSelect(input) {
+    if (input.files && input.files[0]) {
+      const file = input.files[0];
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        uploadedFileObject = {
+          name: file.name,
+          mimeType: file.type,
+          data: e.target.result.split(',')[1]
+        };
+        document.getElementById('fileUploadStatus').innerText = `✓ Attached: ${file.name}`;
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  function submitRequisition() {
+    if (!activeEmployee) {
+      showAlert('Please verify your Employee ID first.', true);
+      return;
+    }
+
+    const name = document.getElementById('reqTrainingName').value.trim();
+    const startDate = document.getElementById('reqStartDate').value;
+    const endDate = document.getElementById('reqEndDate').value || startDate;
+    const fee = document.getElementById('reqFee').value || '0.00';
+    const venue = document.getElementById('reqVenue').value.trim();
+
+    const costCentreStr = selectedCostCentres.length > 0 ? selectedCostCentres.join(', ') : 'ALL';
+    const totalPax = parseInt(document.getElementById('reqTotalPax').value) || selectedParticipants.length || 1;
+
+    if (!name || !startDate || !fee || !venue) {
+      showAlert('Training Title, Dates, Fee, and Venue are required.', true);
+      return;
+    }
+
+    const submitBtn = document.getElementById('btnSubmitRequisition');
+    if (submitBtn) submitBtn.disabled = true;
+
+    showLoading(editingTrainingId ? 'Resubmitting Requisition Request...' : 'Submitting Requisition Request...');
+
+    const payload = {
+      editingTrainingId: editingTrainingId,
+      EmployeeID: activeEmployee.ID,
+      Email: activeEmployee.Email || '',
+      Department: costCentreStr,
+      TrainingName: name,
+      Category: document.getElementById('reqCategory').value,
+      TrainingType: document.getElementById('reqTrainingType').value,
+      Trainer: document.getElementById('reqTrainer').value.trim(),
+      TrainingProvider: document.getElementById('reqProvider').value.trim(),
+      StartDate: startDate,
+      EndDate: endDate,
+      Duration: Math.max(1, Math.ceil((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24)) + 1),
+      TotalHours: document.getElementById('reqHours').value || 8,
+      Venue: venue,
+      CourseFee: fee,
+      CertExpiryDate: document.getElementById('reqCertExpiry').value,
+      TotalPax: totalPax,
+      ParticipantList: selectedParticipants,
+      Reason: document.getElementById('reqReason').value.trim(),
+      BrochureUrl: document.getElementById('reqBrochureUrl').value.trim(),
+      BrochureFile: uploadedFileObject
+    };
+
+    google.script.run
+      .withSuccessHandler(resStr => {
+        hideLoading();
+        if (submitBtn) submitBtn.disabled = false;
+
+        let res;
+        try { res = JSON.parse(resStr); } catch (e) { res = { success: false, message: 'Invalid response from server.' }; }
+
+        if (!res.success) {
+          showAlert(res.message, true);
+          return;
+        }
+
+        // Show Success Screen
+        const reqId = (res.data && res.data.trainingId) ? res.data.trainingId : 'TRN-SUCCESS';
+        document.getElementById('successRequestId').innerText = reqId;
+
+        cancelEditResubmit();
+        clearFormFields();
+
+        document.getElementById('mainPortalScreen').style.display = 'none';
+        document.getElementById('successScreen').style.display = 'block';
+      })
+      .withFailureHandler(err => {
+        hideLoading();
+        if (submitBtn) submitBtn.disabled = false;
+        showAlert('Submission failed: ' + err.message, true);
+      })
+      .submitEmployeeRequisition(payload);
+  }
+
+  function clearFormFields() {
+    document.getElementById('reqTrainingName').value = '';
+    document.getElementById('reqVenue').value = '';
+    document.getElementById('reqFee').value = '';
+    document.getElementById('reqReason').value = '';
+    document.getElementById('reqBrochureUrl').value = '';
+    document.getElementById('reqTrainer').value = '';
+    document.getElementById('reqProvider').value = '';
+    selectedCostCentres = [];
+    renderCostCentreChips();
+    selectedParticipants = [];
+    renderSelectedChips();
+  }
+
+  function goToHistoryFromSuccess() {
+    document.getElementById('successScreen').style.display = 'none';
+    document.getElementById('mainPortalScreen').style.display = 'block';
+    switchMainTab('history');
+  }
+
+  function resetFormForNewSubmission() {
+    document.getElementById('successScreen').style.display = 'none';
+    document.getElementById('mainPortalScreen').style.display = 'block';
+    switchMainTab('form');
+  }
+
+
+  // ==========================================
+  // 7. PARTICIPANT PICKER MODAL
+  // ==========================================
+  function openParticipantPicker() {
+    switchPaxModalTab('search');
+    renderPaxList(masterParticipants);
+    document.getElementById('paxModal').style.display = 'flex';
+  }
+
+  function closePaxModal() {
+    document.getElementById('paxModal').style.display = 'none';
+  }
+
+  function switchPaxModalTab(tab) {
+    if (tab === 'search') {
+      document.getElementById('paxViewSearch').style.display = 'block';
+      document.getElementById('paxViewBulk').style.display = 'none';
+      document.getElementById('tabBtnSearch').classList.add('active');
+      document.getElementById('tabBtnBulk').classList.remove('active');
+    } else {
+      document.getElementById('paxViewSearch').style.display = 'none';
+      document.getElementById('paxViewBulk').style.display = 'block';
+      document.getElementById('tabBtnBulk').classList.add('active');
+      document.getElementById('tabBtnSearch').classList.remove('active');
+    }
+  }
+
+  function filterPaxList() {
+    const q = document.getElementById('paxSearchInput').value.trim().toLowerCase();
+    const filtered = masterParticipants.filter(p =>
+      (p.ID && p.ID.toLowerCase().includes(q)) ||
+      (p.Name && p.Name.toLowerCase().includes(q)) ||
+      (p.Department && p.Department.toLowerCase().includes(q))
+    );
+    renderPaxList(filtered);
+  }
+
+  function formatPaxLabel(p) {
+    const name = p.Name || 'Employee';
+    const id = p.ID ? ` (${p.ID})` : '';
+    return `${name}${id}`;
+  }
+
+  function renderPaxList(list) {
+    const container = document.getElementById('paxListContainer');
+    if (!container) return;
+
+    if (!list || list.length === 0) {
+      container.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:16px;">No matching employees found in database.</div>';
+      return;
+    }
+
+    container.innerHTML = list.map(p => {
+      const isChecked = selectedParticipants.some(sp => sp._uid === p._uid);
+      return `
+        <label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border-color);cursor:pointer;">
+          <input type="checkbox" value="${p._uid}" ${isChecked ? 'checked' : ''} onchange="togglePaxSelection('${p._uid}', this.checked)">
+          <div>
+            <div style="font-weight:700;font-size:13px;color:var(--text-primary);">${formatPaxLabel(p)}</div>
+            <div style="font-size:11.5px;color:var(--text-secondary);">${p.Department || 'N/A'} · ${p.Position || 'Staff'}</div>
+          </div>
+        </label>
+      `;
+    }).join('');
+    updatePaxCounter();
+  }
+
+  function togglePaxSelection(uid, checked) {
+    const emp = masterParticipants.find(p => p._uid === uid);
+    if (!emp) return;
+    if (checked) {
+      if (!selectedParticipants.some(p => p._uid === uid)) selectedParticipants.push(emp);
+    } else {
+      selectedParticipants = selectedParticipants.filter(p => p._uid !== uid);
+    }
+    updatePaxCounter();
+  }
+
+  function selectAllMatchingPax() {
+    const q = document.getElementById('paxSearchInput').value.trim().toLowerCase();
+    const filtered = masterParticipants.filter(p =>
+      (p.ID && p.ID.toLowerCase().includes(q)) ||
+      (p.Name && p.Name.toLowerCase().includes(q)) ||
+      (p.Department && p.Department.toLowerCase().includes(q))
+    );
+    filtered.forEach(p => {
+      if (!selectedParticipants.some(sp => sp._uid === p._uid)) {
+        selectedParticipants.push(p);
+      }
+    });
+    renderPaxList(filtered);
+  }
+
+  function clearPaxSelection() {
+    selectedParticipants = [];
+    renderPaxList(masterParticipants);
+  }
+
+  function applyBulkPastePax() {
+    const text = document.getElementById('paxBulkInput').value;
+    if (!text || !text.trim()) {
+      document.getElementById('bulkPasteFeedback').innerText = 'Please enter employee IDs.';
+      return;
+    }
+    const rawIds = text.split(/[\n,; \t]+/).map(s => s.trim().toLowerCase()).filter(s => s);
+    let countAdded = 0;
+
+    rawIds.forEach(idStr => {
+      const matched = masterParticipants.find(p => p.ID.toLowerCase() === idStr || p.Name.toLowerCase().includes(idStr));
+      if (matched && !selectedParticipants.some(sp => sp._uid === matched._uid)) {
+        selectedParticipants.push(matched);
+        countAdded++;
+      }
+    });
+
+    document.getElementById('bulkPasteFeedback').innerText = `✓ Matched and added ${countAdded} participant(s).`;
+    updatePaxCounter();
+  }
+
+  function updatePaxCounter() {
+    const counter = document.getElementById('paxSelectedCounter');
+    if (counter) counter.innerText = `${selectedParticipants.length} selected`;
+  }
+
+  function confirmPaxSelection() {
+    closePaxModal();
+    renderSelectedChips();
+  }
+
+  function renderSelectedChips() {
+    const box = document.getElementById('paxChipContainer');
+    const emptyMsg = document.getElementById('emptyPaxMsg');
+    const paxInput = document.getElementById('reqTotalPax');
+
+    if (paxInput) paxInput.value = selectedParticipants.length;
+
+    if (selectedParticipants.length === 0) {
+      if (emptyMsg) emptyMsg.style.display = 'block';
+      if (box) box.innerHTML = '';
+      return;
+    }
+
+    if (emptyMsg) emptyMsg.style.display = 'none';
+    if (box) {
+      box.innerHTML = selectedParticipants.map(p => `
+        <span class="pax-chip">
+          <span>${formatPaxLabel(p)}</span>
+          <span class="pax-chip-remove" onclick="removePaxChip('${p._uid}')">✕</span>
+        </span>
+      `).join('');
+    }
+  }
+
+  function removePaxChip(uid) {
+    selectedParticipants = selectedParticipants.filter(p => p._uid !== uid);
+    renderSelectedChips();
   }
 </script>

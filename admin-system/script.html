@@ -294,8 +294,70 @@ function avatar(name, size = 30, index = 0) {
   return `<div class="avatar" style="width:${size}px;height:${size}px;background:${bg};font-size:${size*0.38}px">${initials}</div>`;
 }
 
+// ─── Sidebar minimizable collapse & real profile helpers ─────────────────────
+function toggleSidebarCollapse() {
+  const sidebar = document.querySelector('.sidebar');
+  const mainArea = document.querySelector('.main-area');
+  const collapseIcon = document.getElementById('sidebar-collapse-icon');
+  
+  if (!sidebar) return;
+  const isCollapsed = sidebar.classList.toggle('collapsed');
+  if (mainArea) mainArea.classList.toggle('sidebar-collapsed', isCollapsed);
+  
+  if (collapseIcon) {
+    collapseIcon.textContent = isCollapsed ? 'chevron_right' : 'chevron_left';
+  }
+  
+  try {
+    localStorage.setItem('trainhub_sidebar_collapsed', isCollapsed ? 'true' : 'false');
+  } catch(e) {}
+}
+
+function initSidebarState() {
+  try {
+    const saved = localStorage.getItem('trainhub_sidebar_collapsed');
+    if (saved === 'true') {
+      const sidebar = document.querySelector('.sidebar');
+      const mainArea = document.querySelector('.main-area');
+      const collapseIcon = document.getElementById('sidebar-collapse-icon');
+      if (sidebar) sidebar.classList.add('collapsed');
+      if (mainArea) mainArea.classList.add('sidebar-collapsed');
+      if (collapseIcon) collapseIcon.textContent = 'chevron_right';
+    }
+  } catch(e) {}
+}
+
+function loadRealUserProfile() {
+  callServer('getCurrentUser').then(user => {
+    if (user && user.email) {
+      const nameEl = document.getElementById('sidebar-user-name');
+      const emailEl = document.getElementById('sidebar-user-email');
+      const avatarEl = document.getElementById('sidebar-user-avatar');
+      
+      const emailStr = user.email;
+      let nameStr = user.name;
+      if (!nameStr) {
+        const localPart = emailStr.split('@')[0] || 'User';
+        nameStr = localPart.replace(/[\._\-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      }
+      
+      if (nameEl) nameEl.textContent = nameStr;
+      if (emailEl) emailEl.textContent = emailStr;
+      
+      if (avatarEl) {
+        const initials = nameStr.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase() || 'AD';
+        avatarEl.textContent = initials;
+        avatarEl.title = `${nameStr} (${emailStr})`;
+      }
+    }
+  }).catch(() => {});
+}
+
 // ─── Sidebar active state & navigation ───────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+  initSidebarState();
+  loadRealUserProfile();
+
   const urlPage = getQueryParam('page');
   const page = window.__TRAINHUB_PAGE__ || urlPage || 'dashboard';
   document.querySelectorAll('.nav-item[data-page]').forEach(el => {

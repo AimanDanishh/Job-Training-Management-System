@@ -7,7 +7,14 @@
   <?!= include('style'); ?>
 </head>
 <body>
+  <!-- Fixed Top-Right Theme Toggle Button -->
+  <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle Light / Dark Theme">
+    <span id="themeToggleIcon">🌙</span>
+    <span id="themeToggleLabel">Dark</span>
+  </button>
+
   <div class="container">
+
     <!-- Header -->
     <header class="portal-header">
       <div class="brand-logo">
@@ -17,10 +24,16 @@
           <div class="brand-subtitle">3-Month Post-Training Performance Review (HOD, C-Suite, HOHR)</div>
         </div>
       </div>
-      <div class="hod-badge" id="hodProfileBadge">
-        <span>👤</span> <span id="badgeHodName">Loading Approver Profile...</span>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button class="btn btn-neo" onclick="window.location.href='?page=review'" style="font-size:12px;padding:6px 12px;">
+          <span>🛡️</span> Approval Portal
+        </button>
+        <div class="hod-badge" id="hodProfileBadge">
+          <span>👤</span> <span id="badgeHodName">Loading Approver Profile...</span>
+        </div>
       </div>
     </header>
+
 
     <!-- Training Overview -->
     <div class="card">
@@ -137,9 +150,41 @@
     let pendingParticipants = [];
 
     window.addEventListener('DOMContentLoaded', () => {
+      initTheme();
       initUserEmail();
       loadPostEvalData();
     });
+
+    function initTheme() {
+      const savedTheme = localStorage.getItem('portal_theme') || 'dark';
+      applyTheme(savedTheme);
+    }
+
+    function toggleTheme() {
+      const currentTheme = document.body.classList.contains('theme-light') ? 'light' : 'dark';
+      const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      applyTheme(newTheme);
+      localStorage.setItem('portal_theme', newTheme);
+    }
+
+    function applyTheme(theme) {
+      if (theme === 'light') {
+        document.body.classList.remove('theme-dark');
+        document.body.classList.add('theme-light');
+        const icon = document.getElementById('themeToggleIcon');
+        const label = document.getElementById('themeToggleLabel');
+        if (icon) icon.innerText = '☀️';
+        if (label) label.innerText = 'Light';
+      } else {
+        document.body.classList.remove('theme-light');
+        document.body.classList.add('theme-dark');
+        const icon = document.getElementById('themeToggleIcon');
+        const label = document.getElementById('themeToggleLabel');
+        if (icon) icon.innerText = '🌙';
+        if (label) label.innerText = 'Dark';
+      }
+    }
+
 
     function initUserEmail() {
       if (userEmail && userEmail.trim()) {

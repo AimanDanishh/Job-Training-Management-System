@@ -14,6 +14,15 @@ function getConfigProperty(key, defaultValue) {
   return defaultValue;
 }
 
+/**
+ * Returns configured Employee Portal URL from Script Properties
+ */
+function getEmployeePortalUrl() {
+  let url = getConfigProperty('EMPLOYEE_PORTAL_URL', '') || getConfigProperty('EMPLOYEE_REQUISITION_URL', '');
+  return url;
+}
+
+
 
 function getSpreadsheetId() {
   return getConfigProperty('SPREADSHEET_ID', '');

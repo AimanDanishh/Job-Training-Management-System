@@ -210,9 +210,9 @@ function resolveRealHODProfile(userEmail, requesterIdOrName) {
 
   return {
     ID: realHodId || 'N/A',
-    Name: realHodName || 'Approver',
-    CostCentre: realCostCentre || 'Cost Centre',
-    Position: realPosition || 'Manager',
+    Name: realHodName || '',
+    CostCentre: realCostCentre || 'N/A',
+    Position: realPosition || '',
     RoleTitle: roleTitle,
     isHod: isHod,
     isCsuite: isCsuite,
@@ -223,6 +223,7 @@ function resolveRealHODProfile(userEmail, requesterIdOrName) {
     HohrName: hohrName,
     HohrEmail: hohrEmail
   };
+
 }
 
 
@@ -505,6 +506,14 @@ function getActiveHODProfile(providedEmail, requesterIdOrName) {
   const realHod = resolveRealHODProfile(userEmail, requesterIdOrName);
 
   if (!realHod) {
+    const allHODs = getAllRealHODProfiles();
+    if (allHODs && allHODs.length > 0) {
+      return {
+        valid: true,
+        email: userEmail || allHODs[0].Email,
+        hod: allHODs[0]
+      };
+    }
     const hodSheet = getSheet('HOD email');
     if (!hodSheet) {
       return {
@@ -513,7 +522,6 @@ function getActiveHODProfile(providedEmail, requesterIdOrName) {
         message: `Database Error: Could not locate the 'HOD email' tab in the connected Google Spreadsheet. Please verify the tab name.`
       };
     }
-    const allHODs = getAllHODEmails();
     const emailList = allHODs.map(x => x.email).filter(Boolean);
     return {
       valid: false,
@@ -521,6 +529,7 @@ function getActiveHODProfile(providedEmail, requesterIdOrName) {
       message: `Access Denied: The email address (${userEmail}) is not registered in the HOD email directory. ${emailList.length > 0 ? 'Registered emails: ' + emailList.join(', ') : 'No emails found in HOD email tab.'}`
     };
   }
+
 
   return {
     valid: true,

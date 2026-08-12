@@ -3,240 +3,316 @@
 <head>
   <base target="_top">
   <meta charset="utf-8">
-  <title>TrainHub — Managerial & Executive Approval Portal (HOD, C-Suite, HOHR)</title>
+  <title>Job Training Management System — Approval Portal</title>
   <?!= include('style'); ?>
 </head>
 <body>
-  <div class="container">
-    <!-- Header -->
+  <!-- Fixed Top-Right Theme Toggle Button -->
+  <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle Light / Dark Theme">
+    <span id="themeToggleIcon">🌙</span>
+    <span id="themeToggleLabel">Dark</span>
+  </button>
+
+  <div class="app-container">
+    <!-- Top Header -->
+
     <header class="portal-header">
       <div class="brand-logo">
-        <div class="brand-icon">T</div>
+        <div class="brand-icon">🛡️</div>
         <div>
-          <div class="brand-title">TrainHub Review & Approval Portal</div>
-          <div class="brand-subtitle">Training Requisition Review & Digital Stamp (HOD, C-Suite, HOHR)</div>
+          <div class="brand-title">JOB TRAINING MANAGEMENT SYSTEM</div>
+          <div class="brand-subtitle">Approval Portal</div>
         </div>
-      </div>
-      <div class="hod-badge" id="hodProfileBadge">
-        <span>👤</span> <span id="badgeHodName">Loading Approver Profile...</span>
       </div>
     </header>
 
-    <!-- Supervision Requisition Queue Selector Bar -->
-    <div style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:16px;margin-bottom:20px;display:flex;flex-direction:column;gap:10px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-        <div style="font-weight:600;color:#60a5fa;display:flex;align-items:center;gap:8px;">
-          <span>📋</span> <span id="queueBadgeTitle">Supervision & Approval Queue</span>
-          <span class="badge badge-pending" id="queueCountBadge">Loading...</span>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <span style="font-size:12px;color:var(--text-secondary);" id="hodAuthenticatedEmailLabel">Auth: Checking...</span>
-          <button onclick="promptChangeEmail()" style="background:#334155;color:#94a3b8;border:none;border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer;">Switch Email</button>
-        </div>
-      </div>
+    <!-- Approver Identity Banner (Shown once user identity is verified) -->
+    <div id="approverIdentityBanner" class="approver-identity-card">
+
       <div>
-        <label style="font-size:12px;color:var(--text-muted);margin-bottom:4px;display:block;">Select Pending Training Requisition to Review:</label>
-        <select id="supervisionQueueSelect" class="form-control" style="width:100%;font-weight:600;background:#0f172a;border-color:#3b82f6;color:#f8fafc;" onchange="loadRequisitionBySelection(this.value)">
-          <option value="">Loading approval requisitions queue...</option>
-        </select>
+        <div class="user-name-title" id="displayApproverName" style="font-size:22px;font-weight:800;color:var(--text-primary);">
+          Loading...
+        </div>
+        <div class="user-meta-chips" style="margin-top:6px;">
+          <span class="meta-chip" id="displayApproverId">ID: --</span>
+          <span class="meta-chip" id="displayApproverDept">Dept: --</span>
+          <span class="meta-chip" id="displayApproverEmail">Email: --</span>
+        </div>
       </div>
     </div>
 
-    <!-- Access Denied Card (Shown if email is unauthorized) -->
-    <div class="card" id="accessDeniedCard" style="display:none;border-top:4px solid var(--danger);text-align:center;padding:40px 20px;">
+    <!-- Main Dashboard View Container -->
+    <main id="mainDashboardContent">
+
+      
+      <!-- 4 Dashboard Summary Stat Cards -->
+      <div class="stats-grid">
+        <div class="stat-card stat-pending">
+          <div class="stat-card-label">
+            <span>Pending Approval</span>
+            <span>⏳</span>
+          </div>
+          <div class="stat-card-value" id="statPendingCount">0</div>
+          <div class="stat-card-sub">Requires action</div>
+        </div>
+
+        <div class="stat-card stat-approved">
+          <div class="stat-card-label">
+            <span>Approved</span>
+            <span>✅</span>
+          </div>
+          <div class="stat-card-value" id="statApprovedCount">0</div>
+          <div class="stat-card-sub">Completed approvals</div>
+        </div>
+
+        <div class="stat-card stat-rejected">
+          <div class="stat-card-label">
+            <span>Rejected / Returned</span>
+            <span>❌</span>
+          </div>
+          <div class="stat-card-value" id="statRejectedCount">0</div>
+          <div class="stat-card-sub">Closed or returned</div>
+        </div>
+
+        <div class="stat-card stat-total">
+          <div class="stat-card-label">
+            <span>Total Requests</span>
+            <span>📊</span>
+          </div>
+          <div class="stat-card-value" id="statTotalCount">0</div>
+          <div class="stat-card-sub">Supervised queue</div>
+        </div>
+      </div>
+
+      <!-- Navigation & Real-Time Search Bar -->
+      <div class="nav-bar-container">
+        <div class="nav-tabs">
+          <button class="nav-tab-btn active" id="tabPendingBtn" onclick="switchNavTab('pending')">
+            <span>📌</span> Pending Requests (<span id="navPendingBadge">0</span>)
+          </button>
+          <button class="nav-tab-btn" id="tabHistoryBtn" onclick="switchNavTab('history')">
+            <span>📜</span> Request History
+          </button>
+          <button class="nav-tab-btn" onclick="openEmployeePortal()">
+            <span>📝</span> New Request
+          </button>
+          <button class="nav-tab-btn" onclick="openPostEvalPage()">
+            <span>📋</span> Post Evaluation
+          </button>
+        </div>
+
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="searchInput" class="search-input" placeholder="Search requests..." oninput="handleSearch(this.value)">
+        </div>
+      </div>
+
+      <!-- Request History Sub-Filter Pills (Shown only when in History tab) -->
+      <div id="historyFilterBar" style="display:none;margin-bottom:20px;gap:10px;align-items:center;">
+        <span style="font-size:12px;color:var(--text-muted);font-weight:700;text-transform:uppercase;">Filter Status:</span>
+        <button class="btn btn-neo filter-pill active" data-filter="ALL" onclick="setHistoryFilter('ALL', this)">All</button>
+        <button class="btn btn-neo filter-pill" data-filter="PENDING" onclick="setHistoryFilter('PENDING', this)">Pending</button>
+        <button class="btn btn-neo filter-pill" data-filter="APPROVED" onclick="setHistoryFilter('APPROVED', this)">Approved</button>
+        <button class="btn btn-neo filter-pill" data-filter="REJECTED" onclick="setHistoryFilter('REJECTED', this)">Rejected / Returned</button>
+      </div>
+
+      <!-- Requests Section Title -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h3 style="font-size:18px;font-weight:800;color:var(--text-primary);" id="sectionTitleHeader">
+          Requests Requiring Your Approval
+        </h3>
+        <span style="font-size:12px;color:var(--text-secondary);" id="requestCountSubtitle">Showing 0 requests</span>
+      </div>
+
+      <!-- Requests Cards Container -->
+      <div class="requests-grid" id="requestsContainer">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <!-- No Pending Request Empty State Card -->
+      <div id="noPendingStateCard" class="empty-state-card" style="display:none;">
+        <div class="empty-state-icon">🎉</div>
+        <h3 class="empty-state-title">All caught up!</h3>
+        <p class="empty-state-msg">
+          There are currently no training requests requiring your approval.<br>
+          <strong style="color:var(--success);">✓ No pending requests</strong>
+        </p>
+        <button class="btn btn-primary-action" onclick="openEmployeePortal()">
+          <span>📝</span> New Request
+        </button>
+      </div>
+
+
+    </main>
+
+    <!-- Access Denied Screen (Unauthorized or Unidentified Account) -->
+    <div id="accessDeniedScreen" class="access-card" style="display:none;">
       <div style="font-size:56px;margin-bottom:12px;">🔒</div>
-      <h2 style="color:var(--danger);margin-bottom:12px;" id="deniedCardTitle">Access Denied — Unauthorized Account</h2>
-      <p style="color:var(--text-secondary);max-width:520px;margin:0 auto 24px;line-height:1.6;" id="deniedCardMsg">
-        The email address you provided is not registered as an authorized Head of Department (HOD), C-Suite Executive, or Head of HR (HOHR) in the directory.
+      <h2 class="access-title" id="deniedScreenTitle">Access Not Available</h2>
+      <p class="access-desc" id="deniedScreenMsg">
+        Unable to identify your account.<br>Please make sure you are accessing the portal using your authorized company account.
       </p>
-      <div style="background:#0f172a;border:1px solid #334155;border-radius:12px;padding:20px;max-width:460px;margin:0 auto 20px;text-align:left;">
-        <label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:6px;">Sign In with Registered Approver Email (HOD / C-Suite / HOHR):</label>
-        <div style="display:flex;gap:8px;">
-          <input type="email" id="deniedEmailInput" class="form-control" placeholder="e.g. csuite@apollofood.com.my" style="flex:1;">
-          <button class="btn btn-approve" onclick="submitAuthEmail('deniedEmailInput')">Sign In</button>
+      <div style="display:flex;justify-content:center;gap:12px;">
+        <button class="btn btn-primary-action" onclick="openEmployeePortal()">
+          <span>📝</span> Go to Employee Portal
+        </button>
+      </div>
+    </div>
+
+    <!-- Request Details Modal -->
+    <div id="requestDetailsModal" class="modal-overlay">
+      <div class="modal-content">
+        <!-- Modal Header -->
+        <div class="modal-header">
+          <div>
+            <div class="modal-title" id="modalTrainingTitle">Training Title Details</div>
+            <div style="font-size:12px;color:var(--accent);font-weight:700;margin-top:2px;" id="modalRequestCode">TRN-0000</div>
+          </div>
+          <button class="modal-close" onclick="closeDetailsModal()">✕</button>
+        </div>
+
+        <!-- Modal Body (Scrollable) -->
+        <div class="modal-body">
+          <!-- Status Banner -->
+          <div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg-input);padding:12px 16px;border-radius:var(--radius-md);border:1px solid var(--border-color);">
+            <span style="font-size:12px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;">Current Request Status</span>
+            <div id="modalStatusBadge">
+              <span class="badge badge-pending">PENDING APPROVAL</span>
+            </div>
+          </div>
+
+          <!-- Section 1: Requester Details -->
+          <div>
+            <h4 style="font-size:14px;font-weight:700;color:var(--accent);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">
+              👤 Requester Information
+            </h4>
+            <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:12px;">
+              <div style="background:var(--bg-input);padding:10px 14px;border-radius:var(--radius-md);border:1px solid var(--border-color);">
+                <div class="data-item-label">Employee Name & ID</div>
+                <div class="data-item-val" id="modalReqName">--</div>
+              </div>
+              <div style="background:var(--bg-input);padding:10px 14px;border-radius:var(--radius-md);border:1px solid var(--border-color);">
+                <div class="data-item-label">Department / Cost Centre</div>
+                <div class="data-item-val" id="modalReqDept">--</div>
+              </div>
+              <div style="background:var(--bg-input);padding:10px 14px;border-radius:var(--radius-md);border:1px solid var(--border-color);">
+                <div class="data-item-label">Requester Email</div>
+                <div class="data-item-val" id="modalReqEmail">--</div>
+              </div>
+              <div style="background:var(--bg-input);padding:10px 14px;border-radius:var(--radius-md);border:1px solid var(--border-color);">
+                <div class="data-item-label">Submission Date</div>
+                <div class="data-item-val" id="modalReqDate">--</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 2: Programme Specifications -->
+          <div>
+            <h4 style="font-size:14px;font-weight:700;color:var(--accent);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">
+              🎓 Training Specifications
+            </h4>
+            <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:12px;">
+              <div style="background:var(--bg-input);padding:10px 14px;border-radius:var(--radius-md);border:1px solid var(--border-color);">
+                <div class="data-item-label">Category</div>
+                <div class="data-item-val" id="modalCategory">--</div>
+              </div>
+              <div style="background:var(--bg-input);padding:10px 14px;border-radius:var(--radius-md);border:1px solid var(--border-color);">
+                <div class="data-item-label">Trainer / Training Provider</div>
+                <div class="data-item-val" id="modalTrainer">--</div>
+              </div>
+              <div style="background:var(--bg-input);padding:10px 14px;border-radius:var(--radius-md);border:1px solid var(--border-color);">
+                <div class="data-item-label">Proposed Schedule</div>
+                <div class="data-item-val" id="modalSchedule">--</div>
+              </div>
+              <div style="background:var(--bg-input);padding:10px 14px;border-radius:var(--radius-md);border:1px solid var(--border-color);">
+                <div class="data-item-label">Duration & Total Hours</div>
+                <div class="data-item-val" id="modalHours">--</div>
+              </div>
+              <div style="background:var(--bg-input);padding:10px 14px;border-radius:var(--radius-md);border:1px solid var(--border-color);">
+                <div class="data-item-label">Proposed Venue</div>
+                <div class="data-item-val" id="modalVenue">--</div>
+              </div>
+              <div style="background:var(--bg-input);padding:10px 14px;border-radius:var(--radius-md);border:1px solid var(--border-color);">
+                <div class="data-item-label">Estimated Fee</div>
+                <div class="data-item-val" id="modalFee">--</div>
+              </div>
+            </div>
+
+            <!-- Objectives & Brochure -->
+            <div style="margin-top:12px;background:var(--bg-input);padding:12px 14px;border-radius:var(--radius-md);border:1px solid var(--border-color);">
+              <div class="data-item-label">Training Objective & Justification</div>
+              <div class="data-item-val" id="modalObjectives" style="font-weight:400;margin-top:4px;white-space:pre-line;">--</div>
+            </div>
+
+            <div id="modalBrochureBox" style="margin-top:10px;display:none;background:var(--bg-input);padding:12px 14px;border-radius:var(--radius-md);border:1px solid var(--border-color);">
+              <div class="data-item-label">📁 Supporting Document / Brochure</div>
+              <div id="modalBrochureLink" style="margin-top:4px;">--</div>
+            </div>
+          </div>
+
+          <!-- Section 3: Target Participants List -->
+          <div>
+            <h4 style="font-size:14px;font-weight:700;color:var(--accent);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">
+              👥 Target Participants List
+            </h4>
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>No</th>
+                    <th>Employee ID</th>
+                    <th>Name</th>
+                    <th>Department</th>
+                    <th>Position</th>
+                  </tr>
+                </thead>
+                <tbody id="modalParticipantsBody">
+                  <tr>
+                    <td colspan="5" style="text-align:center;color:var(--text-muted);padding:16px;">Loading participants...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Section 4: Approver Remarks / Justification Input -->
+          <div id="modalRemarksSection">
+            <label class="data-item-label" style="display:block;margin-bottom:6px;">
+              Approver Remarks / Comments / Justification <span style="color:var(--text-muted);font-weight:400;">(Required for Reject & Return)</span>
+            </label>
+            <textarea id="modalRemarksInput" class="form-control" rows="3" placeholder="Enter remarks or feedback..."></textarea>
+          </div>
+
+          <!-- Digital Stamp Container (If already stamped) -->
+          <div id="modalDigitalStampBox" class="digital-stamp-box" style="display:none;">
+            <div class="digital-stamp-title" id="modalStampStatusTitle">DIGITALLY STAMPED</div>
+            <div class="digital-stamp-details" id="modalStampDetails">--</div>
+          </div>
+        </div>
+
+        <!-- Modal Footer Actions -->
+        <div class="modal-footer">
+          <button class="btn btn-neo" onclick="closeDetailsModal()">Close</button>
+          <div id="modalActionButtons" style="display:flex;gap:8px;">
+            <button class="btn btn-approve" id="btnModalApprove" onclick="submitDecisionFromModal('Approved')">
+              <span>✅</span> Approve Request
+            </button>
+            <button class="btn btn-reject" id="btnModalReject" onclick="submitDecisionFromModal('Rejected')">
+              <span>❌</span> Reject Request
+            </button>
+            <button class="btn btn-return" id="btnModalReturn" onclick="submitDecisionFromModal('Returned')">
+              <span>↩️</span> Return with Remarks
+            </button>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Sign In Card (Shown if no email is set) -->
-    <div class="card" id="loginPromptCard" style="display:none;border-top:4px solid var(--primary);text-align:center;padding:40px 20px;">
-      <div style="font-size:56px;margin-bottom:12px;">🔑</div>
-      <h2 style="color:var(--primary);margin-bottom:12px;">HOD, C-Suite & HOHR Portal Authentication</h2>
-      <p style="color:var(--text-secondary);max-width:520px;margin:0 auto 24px;line-height:1.6;">
-        Please select or enter your registered Head of Department (HOD), C-Suite Executive, or Head of HR (HOHR) email address to access your pending approval queue.
-      </p>
-      <div style="background:#0f172a;border:1px solid #334155;border-radius:12px;padding:20px;max-width:460px;margin:0 auto;text-align:left;">
-        <label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:6px;">Select Registered Approver Profile / Email:</label>
-        <select id="loginHodSelect" class="form-control" style="margin-bottom:14px;" onchange="onLoginHodSelectChange(this.value)">
-          <option value="">-- Loading Approver Directory... --</option>
-        </select>
-        
-        <label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:6px;">Or Enter Registered Email Address:</label>
-        <div style="display:flex;gap:8px;">
-          <input type="email" id="loginEmailInput" class="form-control" placeholder="e.g. csuite@apollofood.com.my" style="flex:1;">
-          <button class="btn btn-approve" onclick="submitAuthEmail('loginEmailInput')">Access Portal</button>
-        </div>
-      </div>
-    </div>
-
-
-
-    <!-- Training Request Card (Scroll down to review) -->
-    <div class="card" id="reqCard">
-      <div class="card-header">
-        <div>
-          <div class="card-title" id="reqTitle">Loading Training Requisition Request...</div>
-          <div style="font-size:13px;color:var(--text-secondary);" id="reqCode">Please wait while data is loaded</div>
-        </div>
-        <div id="statusBadgeContainer">
-          <span class="badge badge-pending">PENDING REVIEW</span>
-        </div>
-      </div>
-
-      <!-- Section 1: Requester Details -->
-      <div style="margin-bottom:20px;">
-        <h4 style="color:#60a5fa;margin-bottom:12px;font-size:15px;">📋 Requester Information</h4>
-        <div class="grid-2">
-          <div class="data-group">
-            <div class="data-label">Requested By (Name & ID)</div>
-            <div class="data-value" id="reqEmployee">--</div>
-          </div>
-          <div class="data-group">
-            <div class="data-label">Cost Centre / Department</div>
-            <div class="data-value" id="reqCostCentre">--</div>
-          </div>
-          <div class="data-group">
-            <div class="data-label">Requester Email</div>
-            <div class="data-value" id="reqEmail">--</div>
-          </div>
-          <div class="data-group">
-            <div class="data-label">Submission Date</div>
-            <div class="data-value" id="reqDate">--</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="section-divider"></div>
-
-      <!-- Section 2: Programme Specifications -->
-      <div style="margin-bottom:20px;">
-        <h4 style="color:#60a5fa;margin-bottom:12px;font-size:15px;">🎓 Training Programme Specifications</h4>
-        <div class="grid-2">
-          <div class="data-group">
-            <div class="data-label">Course Category</div>
-            <div class="data-value" id="reqCategory">--</div>
-          </div>
-          <div class="data-group">
-            <div class="data-label">Trainer / Training Provider</div>
-            <div class="data-value" id="reqTrainer">--</div>
-          </div>
-          <div class="data-group">
-            <div class="data-label">Proposed Venue</div>
-            <div class="data-value" id="reqVenue">--</div>
-          </div>
-          <div class="data-group">
-            <div class="data-label">Proposed Schedule (Start - End)</div>
-            <div class="data-value" id="reqSchedule">--</div>
-          </div>
-          <div class="data-group">
-            <div class="data-label">Duration & Total Hours</div>
-            <div class="data-value" id="reqHours">--</div>
-          </div>
-          <div class="data-group">
-            <div class="data-label">Estimated Course Fee</div>
-            <div class="data-value" id="reqFee">--</div>
-          </div>
-        </div>
-        <div class="data-group" style="margin-top:10px;">
-          <div class="data-label">Training Objectives & Justification</div>
-          <div class="data-value" id="reqObjectives" style="background:#0f172a;padding:12px;border-radius:8px;border:1px solid #334155;">--</div>
-        </div>
-        <div class="data-group" id="brochureGroup" style="margin-top:10px;display:none;">
-          <div class="data-label">📁 Uploaded Supporting Brochure / Document</div>
-          <div class="data-value" id="reqBrochure" style="background:#0f172a;padding:12px;border-radius:8px;border:1px solid #334155;">--</div>
-        </div>
-      </div>
-
-      <div class="section-divider"></div>
-
-      <!-- Section 3: Target Participants -->
-      <div>
-        <h4 style="color:#60a5fa;margin-bottom:12px;font-size:15px;">👥 Target Participants List</h4>
-        <div class="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>No</th>
-                <th>Employee ID</th>
-                <th>Participant Name</th>
-                <th>Department / Cost Centre</th>
-                <th>Position</th>
-              </tr>
-            </thead>
-            <tbody id="participantsTableBody">
-              <tr>
-                <td colspan="5" style="text-align:center;color:var(--text-muted);padding:16px;">Loading participants...</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- Scroll Down Indicator -->
-      <div style="text-align:center;margin-top:30px;color:var(--text-secondary);font-size:13px;">
-        👇 Scroll down to Approval Section
-      </div>
-    </div>
-
-    <!-- BOTTOM APPROVAL SECTION -->
-    <div class="approval-section" id="approvalSection">
-      <div class="approval-header">
-        <span style="font-size:24px;">🛡️</span>
-        <div>
-          <div class="approval-title">Managerial & Executive Review (HOD, C-Suite, HOHR)</div>
-          <div style="font-size:13px;color:var(--text-secondary);">Verify request details above and select decision below</div>
-        </div>
-      </div>
-
-      <!-- Approver Profile Display Box -->
-      <div class="hod-profile-box">
-        <div class="profile-item">
-          <div class="data-label">Approver Employee ID</div>
-          <div class="data-value" id="hodIdDisplay">Loading...</div>
-        </div>
-        <div class="profile-item">
-          <div class="data-label">Approver Name & Role</div>
-          <div class="data-value" id="hodNameDisplay">Loading...</div>
-        </div>
-        <div class="profile-item">
-          <div class="data-label">Cost Centre / Department</div>
-          <div class="data-value" id="hodCostCentreDisplay">Loading...</div>
-        </div>
-      </div>
-
-      <!-- Approver Remarks / Justification -->
-      <div style="margin-bottom:16px;">
-        <label class="data-label">Approver Remarks / Comments / Justification <span style="font-size:12px;color:var(--text-muted);">(Required for Reject & Return)</span></label>
-        <textarea id="hodRemarksInput" class="form-control" rows="3" placeholder="Enter remarks, comments, or justification..."></textarea>
-      </div>
-
-      <!-- Digital Stamp Container -->
-      <div id="digitalStampBox" class="digital-stamp" style="display:none;">
-        <div class="digital-stamp-title" id="stampStatusTitle">DIGITALLY STAMPED</div>
-        <div class="digital-stamp-details" id="stampDetails">--</div>
-      </div>
-
-      <!-- Decision Action Buttons: Approve / Reject / Return (with remarks) ONLY -->
-      <div class="action-buttons" id="actionButtonsContainer">
-        <button class="btn btn-approve" onclick="handleDecision('Approved')">
-          <span>✅</span> Approve Request
-        </button>
-        <button class="btn btn-reject" onclick="handleDecision('Rejected')">
-          <span>❌</span> Reject Request
-        </button>
-        <button class="btn btn-postpone" style="background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%);color:#fff;" onclick="handleDecision('Returned')">
-          <span>↩️</span> Return with Remarks
-        </button>
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+      <div class="loading-card">
+        <div class="spinner"></div>
+        <div style="font-size:14px;font-weight:700;color:var(--text-primary);" id="loadingText">Loading Approval Portal...</div>
       </div>
     </div>
   </div>
@@ -244,368 +320,492 @@
   <?!= include('script'); ?>
 
   <script>
-    let currentTrainingId = '<?= params.id || params.req || "" ?>';
-    let userEmail = '<?= params.email || "" ?>';
-    let currentHOD = null;    window.addEventListener('DOMContentLoaded', () => {
-      initUserEmail();
+    // System State Variables
+    let currentApprover = null;
+    let dashboardMetrics = { pending: 0, approved: 0, rejected: 0, total: 0 };
+    let pendingRequestsList = [];
+    let historyRequestsList = [];
+    let allSupervisedList = [];
+    let employeePortalUrl = '';
+
+    let activeTab = 'pending'; // 'pending' | 'history'
+    let currentHistoryFilter = 'ALL';
+    let currentSearchTerm = '';
+    let selectedRequestForModal = null;
+
+    window.addEventListener('DOMContentLoaded', () => {
+      initTheme();
+      initApprovalPortal();
     });
 
-    function initUserEmail() {
-      if (userEmail && userEmail.trim()) {
-        sessionStorage.setItem('hod_user_email', userEmail.trim());
-      } else {
-        userEmail = sessionStorage.getItem('hod_user_email') || '';
-      }
-      
-      // Attempt automatic load (will check Session.getActiveUser().getEmail() on server)
-      loadData();
+    function initTheme() {
+      const savedTheme = localStorage.getItem('portal_theme') || 'dark';
+      applyTheme(savedTheme);
     }
 
-    function showLoginPrompt() {
-      document.getElementById('reqCard').style.display = 'none';
-      document.getElementById('approvalSection').style.display = 'none';
-      document.getElementById('accessDeniedCard').style.display = 'none';
-      document.getElementById('loginPromptCard').style.display = 'block';
+    function toggleTheme() {
+      const currentTheme = document.body.classList.contains('theme-light') ? 'light' : 'dark';
+      const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      applyTheme(newTheme);
+      localStorage.setItem('portal_theme', newTheme);
+    }
 
-      // Load registered HOD/C-Suite/HOHR emails from sheet to populate login select dropdown
+    function applyTheme(theme) {
+      if (theme === 'light') {
+        document.body.classList.remove('theme-dark');
+        document.body.classList.add('theme-light');
+        document.getElementById('themeToggleIcon').innerText = '☀️';
+        document.getElementById('themeToggleLabel').innerText = 'Light';
+      } else {
+        document.body.classList.remove('theme-light');
+        document.body.classList.add('theme-dark');
+        document.getElementById('themeToggleIcon').innerText = '🌙';
+        document.getElementById('themeToggleLabel').innerText = 'Dark';
+      }
+    }
+
+
+    function showLoading(msg) {
+      document.getElementById('loadingText').innerText = msg || 'Loading...';
+      document.getElementById('loadingOverlay').style.display = 'flex';
+    }
+
+    function hideLoading() {
+      document.getElementById('loadingOverlay').style.display = 'none';
+    }
+
+    function openEmployeePortal() {
+      if (employeePortalUrl && employeePortalUrl.trim()) {
+        window.open(employeePortalUrl.trim(), '_top');
+      } else {
+        alert('Employee Portal URL is not configured in script properties.');
+      }
+    }
+
+    function openPostEvalPage() {
+      window.location.href = '?page=posteval';
+    }
+
+    function initApprovalPortal() {
+      showLoading('Loading Approval Portal...');
+
       google.script.run
-        .withSuccessHandler(res => {
-          const select = document.getElementById('loginHodSelect');
-          if (res && res.length > 0) {
-            select.innerHTML = '<option value="">-- Select registered email --</option>' +
-              res.map(h => `<option value="${h.email}">[${h.role || 'Approver'}] ${h.name} (${h.dept}) — ${h.email}</option>`).join('');
-          } else {
-            select.innerHTML = '<option value="">No registered emails loaded. Enter email below.</option>';
+        .withSuccessHandler(resStr => {
+          hideLoading();
+          const res = JSON.parse(resStr);
+
+          if (!res.success) {
+            showAccessDeniedScreen(res.message);
+            return;
+          }
+
+          const data = res.data;
+          currentApprover = data.approver || null;
+          dashboardMetrics = data.metrics || { pending: 0, approved: 0, rejected: 0, total: 0 };
+          pendingRequestsList = data.pendingRequests || [];
+          historyRequestsList = data.historyRequests || [];
+          allSupervisedList = data.allSupervisedRequests || [];
+          employeePortalUrl = data.employeePortalUrl || '';
+
+          renderApproverIdentity(currentApprover);
+          renderDashboardMetrics(dashboardMetrics);
+
+          if (employeePortalUrl) {
+            document.getElementById('employeePortalHeaderBtn').style.display = 'inline-flex';
+          }
+
+          document.getElementById('mainDashboardContent').style.display = 'block';
+          renderActiveView();
+
+          // Auto-open specific request if 'id' parameter is in URL
+          const urlParams = new URLSearchParams(window.location.search);
+          const reqIdParam = urlParams.get('id') || urlParams.get('req');
+          if (reqIdParam) {
+            const found = allSupervisedList.find(r => {
+              const tid = String(r.ID || r.Code || '').toLowerCase();
+              return tid === reqIdParam.toLowerCase();
+            });
+            if (found) {
+              viewRequestDetails(found.ID || found.Code);
+            }
           }
         })
-        .withFailureHandler(() => {})
-        .getAllHODEmails();
+        .withFailureHandler(err => {
+          hideLoading();
+          showAccessDeniedScreen('Unable to connect to backend server: ' + err.message);
+        })
+        .getApproverDashboardData('');
     }
 
-    function onLoginHodSelectChange(selectedEmail) {
-      if (selectedEmail) {
-        document.getElementById('loginEmailInput').value = selectedEmail;
+    function renderApproverIdentity(appr) {
+      if (!appr) return;
+      document.getElementById('approverIdentityBanner').style.display = 'flex';
+      const nameStr = (appr.Name && appr.Name.trim() !== '') ? appr.Name.trim() : 'User';
+      document.getElementById('displayApproverName').innerText = `Welcome, ${nameStr}!`;
+      document.getElementById('displayApproverId').innerText = `ID: ${appr.ID || 'N/A'}`;
+      document.getElementById('displayApproverDept').innerText = `Dept: ${appr.CostCentre || 'N/A'}`;
+      
+      if (appr.Email) {
+        document.getElementById('displayApproverEmail').innerText = appr.Email;
+        document.getElementById('displayApproverEmail').style.display = 'inline-block';
+      } else {
+        document.getElementById('displayApproverEmail').style.display = 'none';
       }
     }
 
-    function submitAuthEmail(inputId) {
-      const input = document.getElementById(inputId);
-      const email = input ? input.value.trim() : '';
-      if (!email) {
-        alert('Please select or enter a valid email address.');
+
+
+    function renderDashboardMetrics(m) {
+      document.getElementById('statPendingCount').innerText = m.pending || 0;
+      document.getElementById('statApprovedCount').innerText = m.approved || 0;
+      document.getElementById('statRejectedCount').innerText = m.rejected || 0;
+      document.getElementById('statTotalCount').innerText = m.total || 0;
+      document.getElementById('navPendingBadge').innerText = m.pending || 0;
+    }
+
+    function switchNavTab(tabName) {
+      activeTab = tabName;
+      document.getElementById('tabPendingBtn').classList.toggle('active', tabName === 'pending');
+      document.getElementById('tabHistoryBtn').classList.toggle('active', tabName === 'history');
+      document.getElementById('historyFilterBar').style.display = (tabName === 'history') ? 'flex' : 'none';
+
+      if (tabName === 'pending') {
+        document.getElementById('sectionTitleHeader').innerText = 'Requests Requiring Your Approval';
+      } else {
+        document.getElementById('sectionTitleHeader').innerText = 'Processed Request History';
+      }
+
+      renderActiveView();
+    }
+
+    function setHistoryFilter(filterName, btnEl) {
+      currentHistoryFilter = filterName;
+      document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('active'));
+      if (btnEl) btnEl.classList.add('active');
+      renderActiveView();
+    }
+
+    function handleSearch(val) {
+      currentSearchTerm = (val || '').toLowerCase().trim();
+      renderActiveView();
+    }
+
+    function filterRequests(sourceList) {
+      return sourceList.filter(r => {
+        if (!currentSearchTerm) return true;
+        const title = (r.Name || r.TrainingName || '').toLowerCase();
+        const code = (r.Code || r.ID || '').toLowerCase();
+        const user = (r.RequestedBy || r.RequestedByName || '').toLowerCase();
+        const empId = (r.EmployeeID || '').toLowerCase();
+        const dept = (r.Department || '').toLowerCase();
+
+        return title.includes(currentSearchTerm) ||
+               code.includes(currentSearchTerm) ||
+               user.includes(currentSearchTerm) ||
+               empId.includes(currentSearchTerm) ||
+               dept.includes(currentSearchTerm);
+      });
+    }
+
+    function renderActiveView() {
+      const container = document.getElementById('requestsContainer');
+      const emptyCard = document.getElementById('noPendingStateCard');
+      const subtitle = document.getElementById('requestCountSubtitle');
+
+      if (activeTab === 'pending') {
+        const filteredPending = filterRequests(pendingRequestsList);
+        subtitle.innerText = `Showing ${filteredPending.length} pending request(s)`;
+
+        if (filteredPending.length === 0) {
+          container.style.display = 'none';
+          emptyCard.style.display = 'block';
+        } else {
+          emptyCard.style.display = 'none';
+          container.style.display = 'grid';
+          container.innerHTML = filteredPending.map(r => renderRequestCardHtml(r, true)).join('');
+        }
+      } else {
+        // History Tab
+        emptyCard.style.display = 'none';
+        let list = historyRequestsList;
+
+        if (currentHistoryFilter === 'PENDING') {
+          list = historyRequestsList.filter(r => (r.ApprovalStatus || '').toLowerCase().includes('pending'));
+        } else if (currentHistoryFilter === 'APPROVED') {
+          list = historyRequestsList.filter(r => (r.ApprovalStatus || '').toLowerCase().includes('approved'));
+        } else if (currentHistoryFilter === 'REJECTED') {
+          list = historyRequestsList.filter(r => {
+            const st = (r.ApprovalStatus || '').toLowerCase();
+            return st.includes('reject') || st.includes('returned');
+          });
+        }
+
+        const filteredHistory = filterRequests(list);
+        subtitle.innerText = `Showing ${filteredHistory.length} history record(s)`;
+
+        if (filteredHistory.length === 0) {
+          container.style.display = 'grid';
+          container.innerHTML = '<div style="background:var(--bg-card);padding:32px;border-radius:12px;text-align:center;color:var(--text-secondary);border:1px solid var(--border-color);">No requests match the selected search or filter criteria.</div>';
+        } else {
+          container.style.display = 'grid';
+          container.innerHTML = filteredHistory.map(r => renderRequestCardHtml(r, false)).join('');
+        }
+      }
+    }
+
+    function renderRequestCardHtml(r, isPendingAction) {
+      const status = r.ApprovalStatus || 'Pending HOD Approval';
+      const badgeClass = getBadgeClassForStatus(status);
+      const reqDate = r.RequestedDate ? formatDateStr(r.RequestedDate) : 'N/A';
+      const trainDate = r.StartDate ? formatDateStr(r.StartDate) : 'N/A';
+
+      return `
+        <div class="request-card">
+          <div class="request-card-header">
+            <div>
+              <div class="request-code-pill">[${r.Code || r.ID}] · ${r.Category || 'General'}</div>
+              <div class="request-title">${escapeHtml(r.Name || 'Training Request')}</div>
+            </div>
+            <div>
+              <span class="badge ${badgeClass}">${escapeHtml(status.toUpperCase())}</span>
+            </div>
+          </div>
+
+          <div class="request-card-body">
+            <div>
+              <div class="data-item-label">Requested By</div>
+              <div class="data-item-val">${escapeHtml(r.RequestedBy)}</div>
+            </div>
+            <div>
+              <div class="data-item-label">Employee ID</div>
+              <div class="data-item-val">${escapeHtml(r.EmployeeID)}</div>
+            </div>
+            <div>
+              <div class="data-item-label">Requested Date</div>
+              <div class="data-item-val">${reqDate}</div>
+            </div>
+            <div>
+              <div class="data-item-label">Training Date</div>
+              <div class="data-item-val">${trainDate}</div>
+            </div>
+          </div>
+
+          <div class="request-card-footer">
+            <div style="font-size:12.5px;color:var(--text-secondary);">
+              <strong>Dept:</strong> ${escapeHtml(r.Department || 'N/A')}
+            </div>
+            <button class="btn btn-primary-action" onclick="viewRequestDetails('${r.ID || r.Code}')">
+              <span>👁️</span> View Details
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function getBadgeClassForStatus(status) {
+      const st = String(status).toLowerCase();
+      if (st.includes('approved')) return 'badge-approved';
+      if (st.includes('reject')) return 'badge-rejected';
+      if (st.includes('return')) return 'badge-returned';
+      return 'badge-pending';
+    }
+
+    function viewRequestDetails(reqId) {
+      const found = allSupervisedList.find(r => {
+        const id = String(r.ID || r.Code || '').toLowerCase();
+        return id === String(reqId).toLowerCase();
+      });
+
+      if (!found) {
+        alert('Training request details not found.');
         return;
       }
-      userEmail = email;
-      sessionStorage.setItem('hod_user_email', userEmail);
-      document.getElementById('hodAuthenticatedEmailLabel').innerText = `Auth: ${userEmail}`;
-      document.getElementById('loginPromptCard').style.display = 'none';
-      document.getElementById('accessDeniedCard').style.display = 'none';
-      loadData();
-    }
 
-    function promptChangeEmail() {
-      showLoginPrompt();
-    }
+      selectedRequestForModal = found;
+      showLoading('Loading request details...');
 
-    function showAccessDeniedScreen(message) {
-      document.getElementById('reqCard').style.display = 'none';
-      document.getElementById('approvalSection').style.display = 'none';
-      document.getElementById('loginPromptCard').style.display = 'none';
-      const deniedCard = document.getElementById('accessDeniedCard');
-      deniedCard.style.display = 'block';
-      document.getElementById('deniedCardMsg').innerText = message || `The email address (${userEmail || 'unknown'}) is not registered in the HOD, C-Suite, or HOHR directory. Access denied.`;
-    }
-
-    function loadData(trainingIdOverride) {
-      const targetId = trainingIdOverride || currentTrainingId;
-
-      showLoading('Authenticating Approver Session & Loading Queue...');
       google.script.run
         .withSuccessHandler(resStr => {
           hideLoading();
           const res = JSON.parse(resStr);
           if (!res.success) {
-            if (!userEmail) {
-              showLoginPrompt();
-            } else {
-              showAccessDeniedScreen(res.message);
-            }
+            alert(res.message);
             return;
           }
-
-          // Automatically capture authenticated user email from server response
-          if (res.data && res.data.hod && res.data.hod.Email) {
-            userEmail = res.data.hod.Email;
-            sessionStorage.setItem('hod_user_email', userEmail);
-            document.getElementById('hodAuthenticatedEmailLabel').innerText = `Auth: ${userEmail}`;
-          }
-
-          document.getElementById('accessDeniedCard').style.display = 'none';
-          document.getElementById('loginPromptCard').style.display = 'none';
-          document.getElementById('reqCard').style.display = 'block';
-          renderRequisition(res.data);
+          renderDetailsModal(res.data);
         })
         .withFailureHandler(err => {
           hideLoading();
-          if (!userEmail) {
-            showLoginPrompt();
-          } else {
-            showAlert('Failed to connect to server: ' + err.message, true);
-          }
+          alert('Failed to load request details: ' + err.message);
         })
-        .getRequisitionDetails(targetId, userEmail);
+        .getRequisitionDetails(reqId, currentApprover ? currentApprover.Email : '');
     }
 
-
-
-    function getObjId(obj) {
-      if (!obj) return '';
-      return String(obj.ID || obj.Code || obj.TrainingID || obj['Training ID'] || obj.RequisitionID || obj['Requisition ID'] || '').trim();
-    }
-
-    function renderRequisition(data) {
-      currentHOD = data.hod || { Name: 'Approver', ID: '', CostCentre: '', Position: '', RoleTitle: '' };
-
-      const roleBadgeText = currentHOD.RoleTitle || currentHOD.Position || 'Managerial Approver';
-
-      // Header approver profile
-      document.getElementById('badgeHodName').innerText = `${currentHOD.Name} [${roleBadgeText}]`;
-      document.getElementById('hodIdDisplay').innerText = currentHOD.ID;
-      document.getElementById('hodNameDisplay').innerText = `${currentHOD.Name} (${roleBadgeText})`;
-      document.getElementById('hodCostCentreDisplay').innerText = currentHOD.CostCentre;
-
-      // Render Supervision & Approval Queue Dropdown
-      const queueSelect = document.getElementById('supervisionQueueSelect');
-      cachedSupervisedQueue = data.supervisedRequisitions || [];
-      document.getElementById('queueCountBadge').innerText = `${cachedSupervisedQueue.length} Request(s)`;
-
-      const currentTargetId = getObjId(data.training);
-
-      if (cachedSupervisedQueue.length === 0) {
-        queueSelect.innerHTML = '<option value="">No pending requisitions found in your approval queue</option>';
-      } else {
-        queueSelect.innerHTML = cachedSupervisedQueue.map(q => {
-          const qId = getObjId(q);
-          const reqCode = q.Code || q.TrainingCode || q['Training Code'] || q.ID || qId;
-          const reqName = q.Name || q.TrainingName || q['Training Name'] || 'Training Request';
-          const reqUser = q.RequestedByName || q.RequestedBy || 'Employee';
-          const reqDept = q.Department || 'Dept';
-          const reqStatus = q.ApprovalStatus || q.Status || 'Pending';
-          const isSelected = currentTargetId && qId && String(qId).toLowerCase() === String(currentTargetId).toLowerCase();
-
-          return `<option value="${qId}" ${isSelected ? 'selected' : ''}>
-            [${reqCode}] ${reqName} — Requester: ${reqUser} (${reqDept}) [${reqStatus}]
-          </option>`;
-        }).join('');
-
-        if (currentTargetId) {
-          queueSelect.value = currentTargetId;
-        }
-      }
-
-      const t = data.training;
-      if (!t) {
-        document.getElementById('reqTitle').innerText = 'No Pending Requisitions';
-        document.getElementById('reqCode').innerText = 'There are currently no training requisitions pending your managerial approval.';
-        document.getElementById('approvalSection').style.display = 'none';
-        return;
-      } else {
-        document.getElementById('approvalSection').style.display = 'block';
-      }
-
-      const req = data.requester || { Name: 'N/A', ID: 'N/A', Department: 'N/A', Email: 'N/A' };
-      currentTrainingId = getObjId(t);
-
-      // Requisition details
-      document.getElementById('reqTitle').innerText = t.Name || 'Training Programme';
-      document.getElementById('reqCode').innerText = `Requisition Code: ${t.Code || t.ID} | Category: ${t.Category || 'N/A'}`;
-      
-      // Badge
+    function renderDetailsModal(data) {
+      const t = data.training || selectedRequestForModal;
+      const req = data.requester || { Name: t.RequestedBy, ID: t.EmployeeID, Department: t.Department, Email: t.RequestedByEmail };
       const status = t.ApprovalStatus || t.Status || 'Pending Approval';
-      renderStatusBadge(status);
 
-      function toDisplayDateStr(val) {
-        if (!val) return '';
-        const str = String(val).trim();
-        if (/^\d{2}\/\d{2}\/\d{4}/.test(str)) return str;
-        const ymdMatch = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
-        if (ymdMatch) {
-          const year = ymdMatch[1];
-          const month = ymdMatch[2].padStart(2, '0');
-          const day = ymdMatch[3].padStart(2, '0');
-          return `${day}/${month}/${year}`;
-        }
-        const d = new Date(str);
-        if (!isNaN(d.getTime())) {
-          const day = String(d.getDate()).padStart(2, '0');
-          const month = String(d.getMonth() + 1).padStart(2, '0');
-          const year = d.getFullYear();
-          return `${day}/${month}/${year}`;
-        }
-        return str;
-      }
+      document.getElementById('modalTrainingTitle').innerText = t.Name || 'Training Request';
+      document.getElementById('modalRequestCode').innerText = `Requisition Code: ${t.Code || t.ID} | Category: ${t.Category || 'General'}`;
+
+      document.getElementById('modalStatusBadge').innerHTML = `<span class="badge ${getBadgeClassForStatus(status)}">${escapeHtml(status.toUpperCase())}</span>`;
 
       // Requester
-      document.getElementById('reqEmployee').innerText = `${req.Name} (${req.ID})`;
-      document.getElementById('reqCostCentre').innerText = req.Department || t.Department || 'N/A';
-      document.getElementById('reqEmail').innerText = req.Email || t.RequestedByEmail || 'N/A';
-      document.getElementById('reqDate').innerText = toDisplayDateStr(t.CreatedDate || t.RequestedDate) || 'N/A';
+      document.getElementById('modalReqName').innerText = `${req.Name || t.RequestedByName || 'N/A'} (${req.ID || t.RequestedBy || 'N/A'})`;
+      document.getElementById('modalReqDept').innerText = req.Department || t.Department || 'N/A';
+      document.getElementById('modalReqEmail').innerText = req.Email || t.RequestedByEmail || 'N/A';
+      document.getElementById('modalReqDate').innerText = formatDateStr(t.CreatedDate || t.RequestedDate) || 'N/A';
 
       // Specifications
-      document.getElementById('reqCategory').innerText = t.Category || 'General';
-      document.getElementById('reqTrainer').innerText = t.Trainer || 'TBD';
-      document.getElementById('reqVenue').innerText = t.Venue || 'TBD';
-      document.getElementById('reqSchedule').innerText = `${toDisplayDateStr(t.StartDate) || 'N/A'} to ${toDisplayDateStr(t.EndDate || t.StartDate) || 'N/A'}`;
-      document.getElementById('reqHours').innerText = `${t.Duration || 1} Days (${t.TotalHours || 8} Total Hours)`;
-      document.getElementById('reqFee').innerText = t.CourseFee ? `RM ${t.CourseFee}` : 'N/A';
+      document.getElementById('modalCategory').innerText = t.Category || 'General';
+      document.getElementById('modalTrainer').innerText = t.Trainer || 'TBD';
+      document.getElementById('modalSchedule').innerText = `${formatDateStr(t.StartDate) || 'N/A'} to ${formatDateStr(t.EndDate || t.StartDate) || 'N/A'}`;
+      document.getElementById('modalHours').innerText = `${t.Duration || 1} Days (${t.TotalHours || 8} Total Hours)`;
+      document.getElementById('modalVenue').innerText = t.Venue || 'TBD';
+      document.getElementById('modalFee').innerText = t.CourseFee ? `RM ${t.CourseFee}` : 'N/A';
 
-      // Objectives & Brochure Link
-      let rawObj = t.Objectives || '';
-      let brochureUrl = t.BrochureURL || t.BrochureUrl || t.AttachmentURL || '';
+      // Objectives & Brochure
+      document.getElementById('modalObjectives').innerText = t.Objectives || 'No training objectives specified.';
       
-      if (!brochureUrl && rawObj.includes('[Brochure File:')) {
-        const match = rawObj.match(/\[Brochure File:\s*([^\]]+)\]/);
-        if (match && match[1]) {
-          brochureUrl = match[1].trim();
-        }
-        rawObj = rawObj.replace(/\[Brochure File:\s*[^\]]+\]/g, '').trim();
-      }
-
-      document.getElementById('reqObjectives').innerText = rawObj || 'No objectives specified.';
-
-      const brochureGroup = document.getElementById('brochureGroup');
-      const reqBrochure = document.getElementById('reqBrochure');
+      const brochureUrl = t.BrochureURL || t.BrochureUrl || '';
+      const brochureBox = document.getElementById('modalBrochureBox');
       if (brochureUrl && brochureUrl.trim()) {
-        brochureGroup.style.display = 'block';
-        reqBrochure.innerHTML = `<a href="${brochureUrl.trim()}" target="_blank" style="color:#38bdf8;font-weight:600;display:inline-flex;align-items:center;gap:6px;text-decoration:underline;">📄 View / Download Uploaded Supporting Brochure ↗</a>`;
+        brochureBox.style.display = 'block';
+        document.getElementById('modalBrochureLink').innerHTML = `<a href="${brochureUrl.trim()}" target="_blank" style="color:var(--accent);font-weight:700;text-decoration:underline;">📄 View Uploaded Supporting Brochure / Document ↗</a>`;
       } else {
-        brochureGroup.style.display = 'none';
+        brochureBox.style.display = 'none';
       }
 
       // Participants Table
-      const tbody = document.getElementById('participantsTableBody');
+      const tbody = document.getElementById('modalParticipantsBody');
       if (!data.participants || data.participants.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:16px;">No participants specified.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:16px;">No target participants specified.</td></tr>';
       } else {
         tbody.innerHTML = data.participants.map((p, idx) => `
           <tr>
             <td>${idx + 1}</td>
-            <td><strong>${p.EmployeeID || p.ID || 'N/A'}</strong></td>
-            <td>${p.EmployeeName || p.Name || 'N/A'}</td>
-            <td>${p.Department || p.CostCentre || 'N/A'}</td>
-            <td>${p.Position || 'Participant'}</td>
+            <td><strong>${escapeHtml(p.EmployeeID || p.ID || 'N/A')}</strong></td>
+            <td>${escapeHtml(p.EmployeeName || p.Name || 'N/A')}</td>
+            <td>${escapeHtml(p.Department || p.CostCentre || 'N/A')}</td>
+            <td>${escapeHtml(p.Position || 'Participant')}</td>
           </tr>
         `).join('');
       }
 
-      // If already stamped, show digital stamp box
+      // Remarks input
+      document.getElementById('modalRemarksInput').value = '';
+
+      // Digital Stamp preview if already approved/stamped
+      const stampBox = document.getElementById('modalDigitalStampBox');
       if (t.ApprovedAt && t.ApprovedBy) {
-        showDigitalStamp(t.ApprovalStatus || 'Approved', t.ApprovedBy, t.ApprovedCostCentre, t.ApprovedAt, t.ApprovalRemarks);
+        stampBox.style.display = 'block';
+        document.getElementById('modalStampStatusTitle').innerText = `DIGITALLY STAMPED: ${String(status).toUpperCase()}`;
+        document.getElementById('modalStampDetails').innerHTML = `
+          <strong>Approved By:</strong> ${escapeHtml(t.ApprovedBy)} | <strong>Cost Centre:</strong> ${escapeHtml(t.ApprovedCostCentre || 'N/A')}<br>
+          <strong>Timestamp:</strong> ${escapeHtml(t.ApprovedAt)} ${t.ApprovalRemarks ? '<br><strong>Remarks:</strong> ' + escapeHtml(t.ApprovalRemarks) : ''}
+        `;
       } else {
-        document.getElementById('digitalStampBox').style.display = 'none';
-      }
-    }
-
-    function loadRequisitionBySelection(selectedTrainingId) {
-      if (!selectedTrainingId) return;
-      currentTrainingId = selectedTrainingId;
-      loadData(selectedTrainingId);
-    }
-
-    function renderStatusBadge(status) {
-      const container = document.getElementById('statusBadgeContainer');
-      const st = String(status).toUpperCase();
-      let badgeHtml = '';
-      if (st === 'APPROVED') {
-        badgeHtml = '<span class="badge badge-approved">FULLY APPROVED</span>';
-      } else if (st.includes('C-SUITE')) {
-        badgeHtml = '<span class="badge badge-pending" style="background:#8b5cf6;">PENDING C-SUITE APPROVAL</span>';
-      } else if (st.includes('HOHR')) {
-        badgeHtml = '<span class="badge badge-pending" style="background:#ec4899;">PENDING HOHR APPROVAL</span>';
-      } else if (st.includes('REJECT')) {
-        badgeHtml = '<span class="badge badge-rejected">REJECTED</span>';
-      } else if (st.includes('RETURN')) {
-        badgeHtml = '<span class="badge badge-postponed">RETURNED WITH REMARKS</span>';
-      } else {
-        badgeHtml = '<span class="badge badge-pending">PENDING HOD APPROVAL</span>';
-      }
-      container.innerHTML = badgeHtml;
-    }
-
-    function handleDecision(decision) {
-      if (!currentTrainingId) {
-        alert('Invalid training request identifier.');
-        return;
+        stampBox.style.display = 'none';
       }
 
-      const remarks = document.getElementById('hodRemarksInput').value.trim();
+      document.getElementById('requestDetailsModal').style.display = 'flex';
+    }
+
+    function closeDetailsModal() {
+      document.getElementById('requestDetailsModal').style.display = 'none';
+      selectedRequestForModal = null;
+    }
+
+    function submitDecisionFromModal(decision) {
+      if (!selectedRequestForModal) return;
+
+      const reqId = selectedRequestForModal.ID || selectedRequestForModal.Code;
+      const remarks = document.getElementById('modalRemarksInput').value.trim();
 
       if ((decision === 'Rejected' || decision === 'Returned') && !remarks) {
-        alert(`Remarks are mandatory when choosing to ${decision} a requisition request. Please provide remarks/justification.`);
-        document.getElementById('hodRemarksInput').focus();
+        alert(`Remarks / Justification are mandatory when choosing to ${decision.toUpperCase()} a training request.`);
+        document.getElementById('modalRemarksInput').focus();
         return;
       }
 
-      if (!confirm(`Are you sure you want to mark this Training Requisition as ${decision.toUpperCase()}?`)) {
+      if (!confirm(`Are you sure you want to mark this training request (${reqId}) as ${decision.toUpperCase()}?`)) {
         return;
       }
 
-      showLoading(`Processing ${decision.toUpperCase()} decision & creating draft emails...`);
+      showLoading(`Processing ${decision.toUpperCase()} approval decision...`);
+
+      // Disable buttons during submit
+      document.querySelectorAll('#modalActionButtons button').forEach(b => b.disabled = true);
 
       const payload = {
-        trainingId: currentTrainingId,
+        trainingId: reqId,
         decision: decision,
         remarks: remarks,
-        userEmail: userEmail,
-        hodId: currentHOD ? currentHOD.ID : '',
-        hodName: currentHOD ? currentHOD.Name : '',
-        hodCostCentre: currentHOD ? currentHOD.CostCentre : ''
+        userEmail: currentApprover ? currentApprover.Email : '',
+        hodId: currentApprover ? currentApprover.ID : '',
+        hodName: currentApprover ? currentApprover.Name : '',
+        hodCostCentre: currentApprover ? currentApprover.CostCentre : ''
       };
 
       google.script.run
         .withSuccessHandler(resStr => {
           hideLoading();
+          document.querySelectorAll('#modalActionButtons button').forEach(b => b.disabled = false);
           const res = JSON.parse(resStr);
+
           if (!res.success) {
-            showAlert(res.message, true);
+            alert(res.message);
             return;
           }
-          showAlert(res.data.message, false);
-          renderStatusBadge(res.data.decision);
-          showDigitalStamp(res.data.decision, `${res.data.approvedBy} (${currentHOD.ID})`, currentHOD.CostCentre, res.data.timestamp, remarks);
+
+          alert(res.data.message || `Training request successfully marked as ${decision.toUpperCase()}.`);
+          closeDetailsModal();
+
+          // Refresh Dashboard data
+          initApprovalPortal();
         })
         .withFailureHandler(err => {
           hideLoading();
-          showAlert('Submission failed: ' + err.message, true);
+          document.querySelectorAll('#modalActionButtons button').forEach(b => b.disabled = false);
+          alert('Submission failed: ' + err.message);
         })
         .submitHODDecision(payload);
     }
 
-    function showDigitalStamp(decision, by, costCentre, timestamp, remarks) {
-      const box = document.getElementById('digitalStampBox');
-      box.style.display = 'block';
-      
-      const stTitle = document.getElementById('stampStatusTitle');
-      stTitle.innerText = `DIGITALLY STAMPED: ${String(decision).toUpperCase()}`;
-      if (decision === 'Approved') stTitle.style.color = 'var(--success)';
-      else if (decision === 'Rejected') stTitle.style.color = 'var(--danger)';
-      else stTitle.style.color = 'var(--warning)';
-
-      let cleanBy = by;
-      let cleanCc = costCentre;
-      if (cleanBy && (cleanBy.includes('IT.INTERN') || cleanBy.includes('It Intern') || cleanBy.includes('EMP-HOD001') || cleanBy.includes('Head of Department'))) {
-        cleanBy = currentHOD ? `${currentHOD.Name} (${currentHOD.ID})` : by;
+    function showAccessDeniedScreen(msg) {
+      document.getElementById('mainDashboardContent').style.display = 'block';
+      document.getElementById('approverIdentityBanner').style.display = 'flex';
+      document.getElementById('accessDeniedScreen').style.display = 'none';
+      if (msg) {
+        console.warn('Dashboard notice:', msg);
       }
-      if (!cleanCc || cleanCc.includes('All Departments')) {
-        cleanCc = currentHOD ? currentHOD.CostCentre : costCentre;
-      }
+    }
 
-      document.getElementById('stampDetails').innerHTML = `
-        <strong>Manager:</strong> ${cleanBy} | <strong>Cost Centre:</strong> ${cleanCc}<br>
-        <strong>Timestamp:</strong> ${timestamp} ${remarks ? '<br><strong>Remarks:</strong> ' + remarks : ''}
-      `;
+
+    function formatDateStr(val) {
+      if (!val) return '';
+      const str = String(val).trim();
+      if (/^\d{2}\/\d{2}\/\d{4}/.test(str)) return str;
+      const d = new Date(str);
+      if (!isNaN(d.getTime())) {
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        return `${day}/${month}/${year}`;
+      }
+      return str;
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
     }
   </script>
 </body>
 </html>
-

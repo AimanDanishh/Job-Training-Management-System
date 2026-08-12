@@ -41,11 +41,11 @@
             </select>
             <select id="cat-t" class="input-th" style="width:auto">
               <option value="">All Categories</option>
-              <option>Behavioral Skills (Soft Skills + Leadership + Customer Service)</option>
-              <option>Technical Skills (Technical + Quality + SHE + Digital)</option>
-              <option>Compliance Training (Compliance + Safety)</option>
-              <option>Business Skills (Finance + Sales & Marketing + Project Management)</option>
-              <option>Onboarding</option>
+              <option value="Behavioral Skills">Behavioral Skills</option>
+              <option value="Technical Skills">Technical Skills</option>
+              <option value="Compliance Training">Compliance Training</option>
+              <option value="Business Skills">Business Skills</option>
+              <option value="Onboarding">Onboarding</option>
             </select>
           </div>
           <button class="btn-th btn-secondary btn-sm" onclick="loadTrainings()"><span class="icon sm">refresh</span>Refresh</button>
@@ -78,37 +78,47 @@
     </div>
     <input type="hidden" id="t-id">
     <div class="row g-3">
+      <!-- Section 1: Specifications -->
+      <div class="col-12" style="font-weight:700; font-size:13px; color:#2563EB; border-bottom:1px solid #E2E8F0; padding-bottom:4px; margin-top:10px">
+        🎓 1. Training Programme Specifications (AP-HRD-F01-01)
+      </div>
       <div class="col-12">
-        <label class="label-th">Programme Name <span class="required">*</span></label>
-        <input id="t-name" class="input-th" placeholder="e.g. Leadership Excellence Programme">
+        <label class="label-th">Programme Name / Title <span class="required">*</span></label>
+        <input id="t-name" class="input-th" placeholder="e.g. Leadership Excellence & Strategic Management">
       </div>
-      <div class="col-md-6">
-        <label class="label-th">Category</label>
+      <div class="col-md-4">
+        <label class="label-th">Training Category</label>
         <select id="t-cat" class="input-th">
-          <option>Behavioral Skills (Soft Skills + Leadership + Customer Service)</option>
-          <option>Technical Skills (Technical + Quality + SHE + Digital)</option>
-          <option>Compliance Training (Compliance + Safety)</option>
-          <option>Business Skills (Finance + Sales & Marketing + Project Management)</option>
-          <option>Onboarding</option>
+          <option value="Behavioral Skills">Behavioral Skills</option>
+          <option value="Technical Skills">Technical Skills</option>
+          <option value="Compliance Training">Compliance Training</option>
+          <option value="Business Skills">Business Skills</option>
+          <option value="Onboarding">Onboarding</option>
         </select>
       </div>
-      <div class="col-md-6">
-        <label class="label-th">Trainer / Facilitator <span class="required">*</span></label>
-        <input id="t-trainer" class="input-th" placeholder="Trainer name">
-      </div>
-      <div class="col-md-6">
-        <label class="label-th">Venue</label>
-        <input id="t-venue" class="input-th" placeholder="Training venue">
-      </div>
-      <div class="col-md-6">
-        <label class="label-th">Course Fee (RM)</label>
-        <input id="t-fee" class="input-th" type="number" min="0" step="0.01" placeholder="0.00">
-      </div>
-      <div class="col-md-6">
-        <label class="label-th">Department / Cost Centre</label>
-        <select id="t-dept" class="input-th">
-          <option value="">All Departments / Cost Centres</option>
+      <div class="col-md-4">
+        <label class="label-th">Training Type / Mode</label>
+        <select id="t-mode" class="input-th">
+          <option value="In-House Training">In-House Training</option>
+          <option value="Public">Public Training</option>
+          <option value="On-Job Training">On-Job Training</option>
         </select>
+      </div>
+      <div class="col-md-4">
+        <label class="label-th">TNA Source</label>
+        <select id="t-tna" class="input-th">
+          <option value="Training Requisition Form">Training Requisition Form</option>
+          <option value="Training Procedure">Training Procedure</option>
+          <option value="Annual Training Need Analysis">Annual Training Need Analysis</option>
+          <option value="Management Directive">Management Directive</option>
+          <option value="Performance Review">Performance Review</option>
+          <option value="Skill Gap">Skill Gap</option>
+        </select>
+      </div>
+
+      <!-- Section 2: Dates & Financials -->
+      <div class="col-12" style="font-weight:700; font-size:13px; color:#2563EB; border-bottom:1px solid #E2E8F0; padding-bottom:4px; margin-top:16px">
+        📅 2. Dates, Duration & Financials
       </div>
       <div class="col-md-4">
         <label class="label-th">Start Date <span class="required">*</span></label>
@@ -123,16 +133,69 @@
         <input id="t-duration" class="input-th" type="number" min="1" value="1">
       </div>
       <div class="col-md-2">
-        <label class="label-th">Hours/Day</label>
-        <input id="t-hours" class="input-th" type="number" min="1" value="8">
+        <label class="label-th">Total Hours</label>
+        <input id="t-hours" class="input-th" type="number" min="0.5" step="0.5" value="8">
       </div>
       <div class="col-md-6">
+        <label class="label-th">Course Fee (RM)</label>
+        <input id="t-fee" class="input-th" type="number" min="0" step="0.01" placeholder="1500.00">
+      </div>
+      <div class="col-md-6">
+        <label class="label-th">Department / Cost Centre</label>
+        <select id="t-dept" class="input-th">
+          <option value="">All Departments / Cost Centres</option>
+        </select>
+      </div>
+
+      <!-- Section 3: Facilitator & Provider Details -->
+      <div class="col-12" style="font-weight:700; font-size:13px; color:#2563EB; border-bottom:1px solid #E2E8F0; padding-bottom:4px; margin-top:16px">
+        🏫 3. Facilitator, Venue & Provider Details
+      </div>
+      <div class="col-md-6">
+        <label class="label-th">Trainer / Facilitator Name <span class="required">*</span></label>
+        <input id="t-trainer" class="input-th" placeholder="Trainer name">
+      </div>
+      <div class="col-md-6">
+        <label class="label-th">Training Venue</label>
+        <input id="t-venue" class="input-th" placeholder="e.g. Training Room A / Hotel Ballroom">
+      </div>
+      <div class="col-md-6">
+        <label class="label-th">Training Provider / Vendor Company</label>
+        <input id="t-provider" class="input-th" placeholder="Vendor / Provider Company Name">
+      </div>
+      <div class="col-md-6">
+        <label class="label-th">Certificate Expiry Date (if applicable)</label>
+        <input id="t-cert-expiry" class="input-th" type="date">
+      </div>
+
+      <!-- Section 4: Supporting Materials & Justifications -->
+      <div class="col-12" style="font-weight:700; font-size:13px; color:#2563EB; border-bottom:1px solid #E2E8F0; padding-bottom:4px; margin-top:16px">
+        📄 4. Supporting Documents & Business Justification
+      </div>
+      <div class="col-12">
+        <label class="label-th">Brochure Link / Requisition URL</label>
+        <input id="t-brochure" class="input-th" type="url" placeholder="https://drive.google.com/...">
+      </div>
+      <div class="col-12">
+        <label class="label-th">Reason for Training / Business Justification</label>
+        <textarea id="t-reason" class="input-th" rows="2" placeholder="State business justification, operational need, or skill gap..."></textarea>
+      </div>
+      <div class="col-12">
+        <label class="label-th">Programme Objectives</label>
+        <textarea id="t-obj" class="input-th" rows="2" placeholder="Describe key learning outcomes and objectives..."></textarea>
+      </div>
+
+      <!-- Section 5: Lifecycle & Status Controls -->
+      <div class="col-12" style="font-weight:700; font-size:13px; color:#2563EB; border-bottom:1px solid #E2E8F0; padding-bottom:4px; margin-top:16px">
+        ⚙️ 5. Lifecycle & Status Controls
+      </div>
+      <div class="col-md-4">
         <label class="label-th">Status</label>
         <select id="t-status" class="input-th">
           <option>Draft</option><option>Upcoming</option><option>In Progress</option><option>Completed</option>
         </select>
       </div>
-      <div class="col-md-6">
+      <div class="col-md-4">
         <label class="label-th">Lifecycle Stage</label>
         <select id="t-stage" class="input-th">
           <option value="Created">Created</option>
@@ -144,19 +207,15 @@
           <option value="Programme Closed">Programme Closed</option>
         </select>
       </div>
-      <div class="col-md-6">
-        <label class="label-th">Approval Status <span style="font-size:10.5px;color:#64748B">(Automated)</span></label>
-        <select id="t-app-status" class="input-th" disabled style="background:#F8FAFC;cursor:not-allowed">
+      <div class="col-md-4">
+        <label class="label-th">Approval Status</label>
+        <select id="t-app-status" class="input-th">
           <option value="Approved">Approved</option>
           <option value="Pending HOD Approval">Pending HOD Approval</option>
           <option value="Pending C-Suite Approval">Pending C-Suite Approval</option>
           <option value="Pending HOHR Approval">Pending HOHR Approval</option>
           <option value="Rejected">Rejected</option>
         </select>
-      </div>
-      <div class="col-12">
-        <label class="label-th">Programme Objectives</label>
-        <textarea id="t-obj" class="input-th" rows="3" placeholder="Describe the training objectives..."></textarea>
       </div>
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid #F1F5F9">
@@ -398,7 +457,7 @@
       const matchQ   = !q || name.includes(q) || code.includes(q) || trainer.includes(q);
       const matchSt  = !st || status === st;
       const matchApp = !app || appStatus === app || (app === 'Approved' && (!t.ApprovalStatus || t.ApprovalStatus === 'Auto-Approved'));
-      const matchCat = !cat || category === cat;
+      const matchCat = !cat || category.toLowerCase().includes(cat.toLowerCase()) || cat.toLowerCase().includes(category.toLowerCase());
 
       return matchQ && matchSt && matchApp && matchCat;
     });
@@ -407,10 +466,10 @@
   }
 
   const CAT_COLORS = {
-    'Behavioral Skills (Soft Skills + Leadership + Customer Service)': '#2563EB',
-    'Technical Skills (Technical + Quality + SHE + Digital)': '#8B5CF6',
-    'Compliance Training (Compliance + Safety)': '#EF4444',
-    'Business Skills (Finance + Sales & Marketing + Project Management)': '#0891B2',
+    'Behavioral Skills': '#2563EB',
+    'Technical Skills': '#8B5CF6',
+    'Compliance Training': '#EF4444',
+    'Business Skills': '#0891B2',
     'Onboarding': '#22C55E'
   };
 
@@ -554,27 +613,57 @@
     return '';
   }
 
+  function clearTrainingForm() {
+    document.getElementById('t-id').value = '';
+    document.getElementById('t-name').value = '';
+    document.getElementById('t-cat').value = 'Behavioral Skills';
+    document.getElementById('t-mode').value = 'In-House Training';
+    document.getElementById('t-tna').value = 'Training Requisition Form';
+    document.getElementById('t-trainer').value = '';
+    document.getElementById('t-venue').value = '';
+    document.getElementById('t-provider').value = '';
+    document.getElementById('t-fee').value = '';
+    document.getElementById('t-dept').value = '';
+    document.getElementById('t-start').value = '';
+    document.getElementById('t-end').value = '';
+    document.getElementById('t-duration').value = '1';
+    document.getElementById('t-hours').value = '8';
+    document.getElementById('t-cert-expiry').value = '';
+    document.getElementById('t-brochure').value = '';
+    document.getElementById('t-reason').value = '';
+    document.getElementById('t-obj').value = '';
+    document.getElementById('t-status').value = 'Draft';
+    if (document.getElementById('t-stage')) document.getElementById('t-stage').value = 'Created';
+    if (document.getElementById('t-app-status')) document.getElementById('t-app-status').value = 'Approved';
+  }
+
   function editTraining(idOrObj) {
     const t = typeof idOrObj === 'object' ? idOrObj : allTrainings.find(x => x.ID === idOrObj);
     if (!t) return;
     document.getElementById('t-modal-title').textContent = 'Edit Training Programme';
     document.getElementById('t-id').value       = t.ID;
-    document.getElementById('t-name').value     = t.Name;
-    document.getElementById('t-cat').value      = t.Category;
-    document.getElementById('t-trainer').value  = t.Trainer;
+    document.getElementById('t-name').value     = t.Name || '';
+    document.getElementById('t-cat').value      = t.Category || 'Behavioral Skills';
+    document.getElementById('t-mode').value     = t.TrainingMode || t.Mode || 'In-House Training';
+    document.getElementById('t-tna').value      = t.TnaSource || 'Training Requisition Form';
+    document.getElementById('t-trainer').value  = t.Trainer || '';
     document.getElementById('t-venue').value    = t.Venue || '';
+    document.getElementById('t-provider').value = t.TrainingProvider || t.Vendor || '';
     document.getElementById('t-fee').value      = t.CourseFee || '';
     document.getElementById('t-dept').value     = t.Department || '';
     document.getElementById('t-start').value    = toInputDateStr(t.StartDate);
     document.getElementById('t-end').value      = toInputDateStr(t.EndDate);
     document.getElementById('t-duration').value = t.Duration  || 1;
     document.getElementById('t-hours').value    = t.TotalHours|| 8;
+    document.getElementById('t-cert-expiry').value = toInputDateStr(t.ExpiryDate || t.CertificateExpiryDate);
+    document.getElementById('t-brochure').value = t.RequisitionUrl || t.BrochureUrl || '';
+    document.getElementById('t-reason').value   = t.Reason || t.Justification || '';
+    document.getElementById('t-obj').value      = t.Objectives || '';
     document.getElementById('t-status').value   = t.Status    || 'Draft';
     const stageEl = document.getElementById('t-stage');
     if (stageEl) stageEl.value = t.Stage || 'Created';
     const appSelect = document.getElementById('t-app-status');
     if (appSelect) appSelect.value = t.ApprovalStatus || 'Approved';
-    document.getElementById('t-obj').value      = t.Objectives|| '';
     openModal('modal-training');
   }
 
@@ -593,19 +682,25 @@
 
     const data = {
       ID: id, Name: name,
-      Category:   document.getElementById('t-cat').value,
-      Trainer:    trainer,
-      Venue:      document.getElementById('t-venue').value.trim(),
-      CourseFee:  document.getElementById('t-fee').value,
-      Department: document.getElementById('t-dept').value,
-      StartDate:  startDate,
-      EndDate:    document.getElementById('t-end').value,
-      Duration:   document.getElementById('t-duration').value || 1,
-      TotalHours: document.getElementById('t-hours').value || 8,
-      Status:     document.getElementById('t-status').value,
-      ApprovalStatus: appStatusVal,
-      Stage:      document.getElementById('t-stage') ? document.getElementById('t-stage').value : 'Created',
-      Objectives: document.getElementById('t-obj').value.trim(),
+      Category:         document.getElementById('t-cat').value,
+      TrainingMode:     document.getElementById('t-mode').value,
+      TnaSource:        document.getElementById('t-tna').value,
+      Trainer:          trainer,
+      Venue:            document.getElementById('t-venue').value.trim(),
+      TrainingProvider: document.getElementById('t-provider').value.trim(),
+      CourseFee:        document.getElementById('t-fee').value,
+      Department:       document.getElementById('t-dept').value,
+      StartDate:        startDate,
+      EndDate:          document.getElementById('t-end').value,
+      Duration:         document.getElementById('t-duration').value || 1,
+      TotalHours:       document.getElementById('t-hours').value || 8,
+      ExpiryDate:       document.getElementById('t-cert-expiry').value,
+      RequisitionUrl:   document.getElementById('t-brochure').value.trim(),
+      Reason:           document.getElementById('t-reason').value.trim(),
+      Objectives:       document.getElementById('t-obj').value.trim(),
+      Status:           document.getElementById('t-status').value,
+      ApprovalStatus:   appStatusVal,
+      Stage:            document.getElementById('t-stage') ? document.getElementById('t-stage').value : 'Created',
       Participants: 0
     };
     const btn = document.getElementById('btn-save-t');

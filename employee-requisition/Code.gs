@@ -704,6 +704,8 @@ function submitEmployeeRequisition(data) {
     } catch (mailErr) {
       draftStatus = `Notification error: ${mailErr.message}`;
       Logger.log(draftStatus);
+    }
+
     try {
       syncTrainingById(id, 'Employee Requisition Submission', isEditing ? 'UPDATE' : 'CREATE');
     } catch(syncErr) {

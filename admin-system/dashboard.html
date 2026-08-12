@@ -15,14 +15,15 @@
   <div class="main-area">
     <header class="topbar">
       <button id="sidebar-toggle" class="btn-th btn-secondary btn-sm" style="display:none"><span class="icon sm">menu</span></button>
-      <div style="flex:1">
-        <h1 class="topbar-title">Dashboard</h1>
-        <p class="topbar-sub">Welcome back. System overview & real-time training analytics.</p>
-      </div>
-      <div style="display:flex;gap:8px">
-        <button class="btn-th btn-primary btn-sm" onclick="navTo('training')">
-          <span class="icon sm">add</span>New Programme
-        </button>
+      <div style="flex:1; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px">
+        <div>
+          <h1 class="topbar-title">Dashboard</h1>
+          <p class="topbar-sub">Welcome back. System overview & real-time training analytics.</p>
+        </div>
+        <div style="background:#F8FAFC; border:1px solid #E2E8F0; padding:6px 14px; border-radius:20px; font-size:12.5px; font-weight:600; color:#334155; display:flex; align-items:center; gap:6px">
+          <span class="icon sm" style="color:#2563EB">calendar_today</span>
+          <span id="dashboard-header-date"></span>
+        </div>
       </div>
     </header>
 
@@ -88,9 +89,9 @@
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px">
           <div>
             <div style="font-size:14px; font-weight:700; color:#1E293B; display:flex; align-items:center; gap:6px">
-              <span class="icon filled sm" style="color:#2563EB">verified</span> Training Requisition Approval Pipeline Status
+              Training Requisition Approval Status
             </div>
-            <div style="font-size:11.5px; color:#64748B">Real-time multi-tier approval tracking (HOD ➔ C-Suite ➔ HOHR ➔ Arina Acknowledgment)</div>
+            <div style="font-size:11.5px; color:#64748B">Real-time approval tracking</div>
           </div>
           <button class="btn-th btn-secondary btn-sm" onclick="navTo('training')">
             <span class="icon sm">filter_alt</span> View Approval Queue
@@ -226,7 +227,22 @@
 <script>window.__TRAINHUB_PAGE__ = '<?!= currentPage ?>';</script>
 <?!= include('script') ?>
 <script>
-  document.addEventListener('DOMContentLoaded', loadDashboard);
+  function formatMinimalistDate(dInput) {
+    if (!dInput) return '';
+    const d = (dInput instanceof Date) ? dInput : new Date(dInput);
+    if (isNaN(d.getTime())) return String(dInput);
+
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    
+    return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const hdrEl = document.getElementById('dashboard-header-date');
+    if (hdrEl) hdrEl.textContent = formatMinimalistDate(new Date());
+    loadDashboard();
+  });
 
   async function loadDashboard() {
     try {
@@ -280,24 +296,30 @@
       el.innerHTML = '<div class="empty-state"><span class="icon">school</span><p style="color:#94A3B8">No active or upcoming programmes</p></div>';
       return;
     }
-    el.innerHTML = list.map((p, i) => `
-      <div style="display:flex;gap:12px;align-items:center;padding:12px 20px;border-bottom:${i < list.length - 1 ? '1px solid #F1F5F9' : 'none'};cursor:pointer;transition:background 0.12s"
-           onclick="navTo('training', {id:'${p.ID}'})" onmouseover="this.style.background='#F8FAFC'" onmouseout="this.style.background='transparent'">
-        <div style="width:36px;height:36px;border-radius:10px;background:${p.Status==='In Progress'?'#EFF6FF':p.Status==='Upcoming'?'#FFFBEB':'#F8FAFC'};
-                    display:flex;align-items:center;justify-content:center;flex-shrink:0">
-          <span class="icon" style="color:${p.Status==='In Progress'?'#2563EB':p.Status==='Upcoming'?'#D97706':'#64748B'}">school</span>
+    el.innerHTML = list.map((p, i) => {
+      const startFormatted = formatMinimalistDate(p.StartDate) || p.StartDate || '—';
+      const endFormatted   = formatMinimalistDate(p.EndDate) || p.EndDate || '';
+      const dateDisplay    = endFormatted && endFormatted !== startFormatted ? `${startFormatted} — ${endFormatted}` : startFormatted;
+
+      return `
+        <div style="display:flex;gap:12px;align-items:center;padding:12px 20px;border-bottom:${i < list.length - 1 ? '1px solid #F1F5F9' : 'none'};cursor:pointer;transition:background 0.12s"
+             onclick="navTo('training', {id:'${p.ID}'})" onmouseover="this.style.background='#F8FAFC'" onmouseout="this.style.background='transparent'">
+          <div style="width:36px;height:36px;border-radius:10px;background:${p.Status==='In Progress'?'#EFF6FF':p.Status==='Upcoming'?'#FFFBEB':'#F8FAFC'};
+                      display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <span class="icon" style="color:${p.Status==='In Progress'?'#2563EB':p.Status==='Upcoming'?'#D97706':'#64748B'}">school</span>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:700;color:#1E293B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.Name}</div>
+            <div style="font-size:11.5px;color:#64748B;margin-top:2px">${p.Code} · ${dateDisplay}</div>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;flex-wrap:wrap">
+            <span style="font-size:11.5px;font-weight:600;color:#64748B">${p.Participants || 0} pax</span>
+            ${statusBadge(p.Status)}
+            ${approvalStatusBadge(p.ApprovalStatus || 'Approved')}
+          </div>
         </div>
-        <div style="flex:1;min-width:0">
-          <div style="font-size:13px;font-weight:700;color:#1E293B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.Name}</div>
-          <div style="font-size:11.5px;color:#64748B;margin-top:2px">${p.Code} · ${p.StartDate} — ${p.EndDate||'TBD'}</div>
-        </div>
-        <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;flex-wrap:wrap">
-          <span style="font-size:11.5px;font-weight:600;color:#64748B">${p.Participants || 0} pax</span>
-          ${statusBadge(p.Status)}
-          ${approvalStatusBadge(p.ApprovalStatus || 'Approved')}
-        </div>
-      </div>
-    `).join('');
+      `;
+    }).join('');
   }
 
   function renderActivityFeed(trainings) {
@@ -312,7 +334,7 @@
       sub: `${t.Code} · Stage: ${t.Stage || 'Created'}`,
       icon: 'school',
       color: '#2563EB',
-      time: t.CreatedDate || 'Recently'
+      time: formatMinimalistDate(t.CreatedDate || t.StartDate) || 'Recently'
     }));
 
     feed.innerHTML = items.map((item, idx) => `

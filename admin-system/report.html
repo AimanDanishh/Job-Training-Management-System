@@ -252,6 +252,12 @@
         <p class="topbar-sub">Manage, review, filter, and monitor all organization training records in real time</p>
       </div>
       <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+        <a id="btn-open-live-sheet" href="#" target="_blank" class="btn-th btn-secondary btn-sm" style="text-decoration:none" title="Open Live Master Google Sheet">
+          <span class="icon sm">table_chart</span> Open Live Master Sheet
+        </a>
+        <a id="btn-open-reports-folder" href="#" target="_blank" class="btn-th btn-secondary btn-sm" style="text-decoration:none" title="Open Google Drive Reports Folder">
+          <span class="icon sm">folder</span> Reports Folder
+        </a>
         <button class="btn-th btn-secondary btn-sm" onclick="refreshReportDataUI()">
           <span class="icon sm">refresh</span> Refresh Data
         </button>
@@ -259,39 +265,12 @@
           <span class="icon sm">download</span> Export Filtered Results
         </button>
         <button class="btn-th btn-secondary btn-sm" onclick="triggerManualFullRecoverySync()" style="color:#7C3AED; border-color:#DDD6FE; background:#F5F3FF" title="Rebuild & reconcile all report sheets">
-          <span class="icon sm">published_with_changes</span> Full Data Sync
+          <span class="icon sm">published_with_changes</span> Full Sync
         </button>
       </div>
     </header>
 
     <main class="page-content">
-      <!-- Drive Folder Reference & Sync Banner -->
-      <div class="card-th mb-4" style="background:#F0FDF4; border:1px solid #BBF7D0; border-left:5px solid #16A34A">
-        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px">
-          <div style="display:flex; align-items:center; gap:12px">
-            <div style="width:42px; height:42px; border-radius:10px; background:#DCFCE7; display:flex; align-items:center; justify-content:center; flex-shrink:0">
-              <span class="icon filled" style="color:#16A34A; font-size:24px">folder_special</span>
-            </div>
-            <div>
-              <div style="font-size:14.5px; font-weight:800; color:#166534; display:flex; align-items:center; gap:6px">
-                Google Drive Automated Report Repository
-                <span class="badge-th badge-green" style="font-size:10px">● Live Sync Active</span>
-              </div>
-              <div style="font-size:12px; color:#15803D; margin-top:2px">
-                Individual training status updates trigger targeted incremental sync directly to <strong>Project Root ➔ Reports</strong>.
-              </div>
-            </div>
-          </div>
-          <div style="display:flex; gap:8px; flex-wrap:wrap">
-            <a id="btn-open-reports-folder" class="btn-th btn-sm" style="background:#16A34A; color:#fff; border:none; font-weight:700; text-decoration:none" href="#" target="_blank">
-              <span class="icon sm">folder</span> Open "Reports" Folder
-            </a>
-            <a id="btn-open-live-sheet" class="btn-th btn-secondary btn-sm" style="font-weight:700; text-decoration:none" href="#" target="_blank">
-              <span class="icon sm">table_chart</span> Open Live Master Sheet
-            </a>
-          </div>
-        </div>
-      </div>
 
       <!-- KPI Summary Cards Row (Clickable) -->
       <div class="kpi-grid">
@@ -418,6 +397,7 @@
                 <option value="">All Training Types</option>
                 <option value="In-house training">In-house training</option>
                 <option value="Public">Public</option>
+                <option value="On-Job Training">On-Job Training</option>
               </select>
             </div>
 
@@ -609,6 +589,7 @@
                 <option value="">All Training Types</option>
                 <option value="In-house training">In-house training</option>
                 <option value="Public">Public</option>
+                <option value="On-Job Training">On-Job Training</option>
               </select>
             </div>
 

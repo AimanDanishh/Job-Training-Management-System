@@ -2,6 +2,10 @@
  * Code.gs — HOD Portal Web App Entry Point & Server Engine
  */
 
+/**
+ * Code.gs — HOD Portal Web App Entry Point & Server Engine
+ */
+
 function doGet(e) {
   const pageParam = (e && e.parameter && e.parameter.page) ? String(e.parameter.page).toLowerCase().trim() : 'review';
   const emailParam = (e && e.parameter && e.parameter.email) ? String(e.parameter.email).trim() : '';
@@ -14,33 +18,27 @@ function doGet(e) {
   };
 
   const templateName = pageMap[pageParam] || 'HodReview';
-  const appTitle = getConfigProperty('APP_TITLE', 'TrainHub — HOD Management Portal');
+  const appTitle = getConfigProperty('APP_TITLE', 'TrainHub — Approval Portal');
 
-  // Determine user email from parameter or Session (never use getEffectiveUser)
-  let activeEmail = emailParam;
-  if (!activeEmail) {
-    try {
-      activeEmail = Session.getActiveUser().getEmail() || '';
-    } catch (err) { activeEmail = ''; }
-  }
+  // Determine user email strictly from Session if available, fallback to parameter
+  let activeEmail = resolveActiveSessionEmail(emailParam);
 
-  // If explicit email is passed in URL or Google account session, validate authorization
+  // If active user email is available, validate authorization
   if (activeEmail) {
     const auth = validateHODAccess(activeEmail);
     if (!auth.valid) {
       try {
         const errTemplate = HtmlService.createTemplateFromFile('Error');
         errTemplate.params = { 
-          title: 'Access Denied — Non Accessible Website',
-          message: auth.message || `Access Denied: The email address (${activeEmail}) is not authorized to access the HOD Portal.`
+          title: 'Access Denied — Non Authorized Account',
+          message: auth.message || `Access Denied: The email address (${activeEmail}) is not registered as an authorized approver.`
         };
         return errTemplate.evaluate()
-          .setTitle('Access Denied — TrainHub HOD Portal')
+          .setTitle('Access Denied — TrainHub Approval Portal')
           .addMetaTag('viewport', 'width=device-width, initial-scale=1');
       } catch (err) {}
     }
   }
-
 
   try {
     const template = HtmlService.createTemplateFromFile(templateName);
@@ -57,7 +55,7 @@ function doGet(e) {
       const errTemplate = HtmlService.createTemplateFromFile('Error');
       errTemplate.params = { message: 'Failed to load page: ' + err.message };
       return errTemplate.evaluate()
-        .setTitle('Error — TrainHub HOD Portal')
+        .setTitle('Error — TrainHub Approval Portal')
         .addMetaTag('viewport', 'width=device-width, initial-scale=1');
     } catch (fallbackErr) {
       return HtmlService.createHtmlOutput('<h3 style="font-family:sans-serif;color:#ef4444;padding:20px;">System Error: ' + err.message + '</h3>');
@@ -78,11 +76,26 @@ function getAppUrl() {
 }
 
 /**
+ * Helper: Resolve active Google Session user email server-side
+ */
+function resolveActiveSessionEmail(providedEmail) {
+  let sessionEmail = '';
+  try {
+    sessionEmail = Session.getActiveUser().getEmail();
+  } catch (e) {}
+  if (sessionEmail && sessionEmail.trim() !== '') {
+    return sessionEmail.trim();
+  }
+  return String(providedEmail || '').trim();
+}
+
+/**
  * API: Verify if user email is authorized in HOD email directory
  */
 function verifyHODEmail(userEmail) {
   try {
-    const auth = validateHODAccess(userEmail);
+    const activeEmail = resolveActiveSessionEmail(userEmail);
+    const auth = validateHODAccess(activeEmail);
     if (!auth.valid) {
       return err(auth.message);
     }
@@ -109,12 +122,107 @@ function getTrainingCode(t) {
 }
 
 /**
+ * API: Fetch complete dashboard data for the authenticated approver.
+ * Dynamic summary statistics (Pending, Approved, Rejected, Total),
+ * pending requests, request history, and Employee Portal URL.
+ */
+function getApproverDashboardData(userEmailParam) {
+  try {
+    const activeEmail = resolveActiveSessionEmail(userEmailParam);
+    if (!activeEmail) {
+      return err('Unable to identify your Google account. Please ensure you are logged into your authorized company account.');
+    }
+
+    const auth = validateHODAccess(activeEmail);
+    if (!auth.valid) {
+      return err(auth.message || `Access Denied: Account (${activeEmail}) is not registered as an authorized approver.`);
+    }
+
+    const hodProfile = auth.hod;
+    const supervisedRequisitions = getHODSupervisedRequisitions(hodProfile);
+
+    let pendingCount = 0;
+    let approvedCount = 0;
+    let rejectedCount = 0;
+    let totalCount = supervisedRequisitions.length;
+
+    const pendingRequests = [];
+    const historyRequests = [];
+
+    supervisedRequisitions.forEach(r => {
+      const statusStr = String(r.ApprovalStatus || r.Status || 'Pending HOD Approval').trim();
+      const statusLower = statusStr.toLowerCase();
+
+      const item = {
+        ID: getTrainingId(r),
+        Code: getTrainingCode(r),
+        Name: String(r.Name || r.TrainingName || 'Training Request').trim(),
+        Category: String(r.Category || 'General').trim(),
+        RequestedBy: String(r.RequestedByName || r.RequestedBy || 'Employee Requester').trim(),
+        EmployeeID: String(r.RequestedBy || r.EmployeeID || 'N/A').trim(),
+        RequestedByEmail: String(r.RequestedByEmail || '').trim(),
+        Department: String(r.Department || r.CostCentre || 'N/A').trim(),
+        Trainer: String(r.Trainer || 'TBD').trim(),
+        Venue: String(r.Venue || 'TBD').trim(),
+        StartDate: String(r.StartDate || '').trim(),
+        EndDate: String(r.EndDate || r.StartDate || '').trim(),
+        RequestedDate: String(r.RequestedDate || r.CreatedDate || '').trim(),
+        Duration: r.Duration || 1,
+        TotalHours: r.TotalHours || 8,
+        CourseFee: String(r.CourseFee || '0.00').trim(),
+        Objectives: String(r.Objectives || '').trim(),
+        ApprovalStatus: statusStr,
+        ApprovalRemarks: String(r.ApprovalRemarks || '').trim(),
+        ApprovedBy: String(r.ApprovedBy || '').trim(),
+        ApprovedAt: String(r.ApprovedAt || '').trim(),
+        ApprovedCostCentre: String(r.ApprovedCostCentre || '').trim(),
+        BrochureURL: String(r.BrochureURL || r.BrochureUrl || '').trim()
+      };
+
+      if (statusLower.includes('pending')) {
+        pendingCount++;
+        pendingRequests.push(item);
+      } else if (statusLower.includes('approved')) {
+        approvedCount++;
+        historyRequests.push(item);
+      } else if (statusLower.includes('reject') || statusLower.includes('returned') || statusLower.includes('cancel')) {
+        rejectedCount++;
+        historyRequests.push(item);
+      } else {
+        historyRequests.push(item);
+      }
+    });
+
+    const empPortalUrl = getEmployeePortalUrl();
+
+    return ok({
+      approver: hodProfile,
+      metrics: {
+        pending: pendingCount,
+        approved: approvedCount,
+        rejected: rejectedCount,
+        total: totalCount
+      },
+      pendingRequests: pendingRequests,
+      historyRequests: historyRequests,
+      allSupervisedRequests: supervisedRequisitions,
+      employeePortalUrl: empPortalUrl
+    });
+  } catch (e) {
+    Logger.log('getApproverDashboardData error: ' + e.message);
+    return err('Failed to load dashboard data: ' + e.message);
+  }
+}
+
+/**
  * API: Fetch complete Training Requisition details and Supervision Queue for HOD Review
  */
 function getRequisitionDetails(trainingId, userEmail) {
   try {
-    const auth = validateHODAccess(userEmail);
+    const activeEmail = resolveActiveSessionEmail(userEmail);
+    const auth = validateHODAccess(activeEmail);
     if (!auth.valid) return err(auth.message);
+
 
     const hodProfile = auth.hod;
 
@@ -386,12 +494,20 @@ function submitHODDecision(data) {
     }
 
     const cleanId = String(data.trainingId).trim();
-    const userEmail = data.userEmail || data.email || '';
-    const auth = validateHODAccess(userEmail);
+    const activeEmail = resolveActiveSessionEmail(data.userEmail || data.email);
+    const auth = validateHODAccess(activeEmail);
     if (!auth.valid) return err(auth.message);
+
+    // Verify server-side authorization: request must be in approver's supervised queue
+    const supervisedQueue = getHODSupervisedRequisitions(auth.hod);
+    const isAuthorizedRequest = supervisedQueue.some(s => getTrainingId(s).toLowerCase() === cleanId.toLowerCase());
+    if (!isAuthorizedRequest) {
+      return err(`Unauthorized Access: Training request (${cleanId}) is not assigned to your approval queue.`);
+    }
 
     const tSheet = getSheet('Trainings');
     if (!tSheet) return err('Trainings sheet unavailable.');
+
 
     const row = findRowById(tSheet, cleanId);
     if (row === -1) return err(`Training request (${cleanId}) not found in database.`);

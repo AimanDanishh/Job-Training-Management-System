@@ -3,755 +3,466 @@
 <head>
   <base target="_top">
   <meta charset="utf-8">
-  <title>TrainHub — Training Requisition Form (AP-HRD-F01-01)</title>
+  <title>TrainHub — Employee Training Portal</title>
   <?!= include('style'); ?>
 </head>
-<body>
-  <div class="container">
-    <header class="portal-header">
-      <div class="brand-title">Training Requisition Form (AP-HRD-F01-01)</div>
-      <div class="brand-subtitle">Fill and submit your training request for managerial & HOD approval</div>
-    </header>
+<body class="theme-dark">
 
-    <div class="card">
-      <!-- Step 1: Requester Identification (Fills REQUEST BY column) -->
-      <div class="section-box">
-        <div class="section-title">👤 Step 1: Requester Identification (REQUEST BY)</div>
-        <div style="display:flex;gap:12px;">
-          <input type="text" id="employeeIdInput" class="form-control" placeholder="Enter Your Employee ID (e.g. EMP-1001)" style="flex:1;">
-          <button type="button" class="btn btn-primary" onclick="lookupEmployee()">Lookup Employee</button>
+  <!-- Top-Right Fixed Theme Toggle Button -->
+  <button type="button" class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle Light / Dark Mode">
+    <span id="themeToggleIcon">☀️</span>
+    <span id="themeToggleText" style="font-size:12px;font-weight:700;">Light Mode</span>
+  </button>
+
+  <div class="app-container">
+
+    <!-- ==========================================
+         SCREEN 1 & 3: EMPLOYEE ID & VERIFICATION
+         ========================================== -->
+    <div id="employeeIdScreen" style="max-width:520px;margin:40px auto 0 auto;">
+      <div class="portal-header">
+        <div class="brand-badge"><span>🏢</span> Apollo HR Portal</div>
+        <h1 class="brand-title">TRAINING REQUEST PORTAL</h1>
+        <p class="brand-subtitle">Job Training Management System</p>
+      </div>
+
+      <!-- State 1: Employee ID Input Form -->
+      <div id="idEntryBox" class="neo-card">
+        <div style="text-align:center;margin-bottom:24px;">
+          <div style="width:56px;height:56px;border-radius:50%;background:var(--bg-card);box-shadow:var(--shadow-raised);display:inline-flex;align-items:center;justify-content:center;font-size:24px;color:var(--primary);margin-bottom:12px;">
+            🪪
+          </div>
+          <h2 style="font-size:18px;font-weight:700;color:var(--text-primary);">Employee Verification</h2>
+          <p style="font-size:13px;color:var(--text-secondary);margin-top:4px;">Enter your Employee ID to access the training portal</p>
         </div>
 
-        <div id="autofillBox" style="display:none;margin-top:16px;padding-top:14px;border-top:1px dashed var(--border-color);">
-          <div class="grid-2" style="margin-bottom:12px;">
-            <div>
-              <div class="label-sm">EMPLOYEE NO.</div>
-              <div class="val-lg" id="autoEmpNo">--</div>
-            </div>
-            <div>
-              <div class="label-sm">EMPLOYEE NAME</div>
-              <div class="val-lg" id="autoName">--</div>
-            </div>
+        <form onsubmit="event.preventDefault(); submitEmployeeIdLookup();">
+          <div class="form-group">
+            <label class="form-label" for="employeeIdInput">Employee ID / No. *</label>
+            <input type="text" id="employeeIdInput" class="form-control" placeholder="e.g. 00000" autocomplete="off" autofocus required style="text-align:center;font-size:16px;letter-spacing:1px;font-weight:700;">
           </div>
-          <div class="grid-3">
-            <div>
-              <div class="label-sm">JOB POSITION (POSITION TITLE)</div>
-              <div class="val-lg" id="autoPos">--</div>
-            </div>
-            <div>
-              <div class="label-sm">COST CENTRE / DEPARTMENT</div>
-              <div class="val-lg" id="autoDept">--</div>
-            </div>
-            <div>
-              <div class="label-sm">REQUEST DATE</div>
-              <div class="val-lg" id="autoDate">--</div>
-            </div>
-          </div>
+
+          <button type="submit" id="btnContinueLookup" class="btn btn-primary btn-block" style="padding:14px;">
+            <span>Continue</span>
+            <span>➔</span>
+          </button>
+        </form>
+
+        <div style="text-align:center;margin-top:20px;font-size:11.5px;color:var(--text-muted);display:flex;align-items:center;justify-content:center;gap:6px;">
+          <span>🔒</span> Secure Internal Employee Verification
         </div>
       </div>
 
-      <!-- Step 1.5: My Submitted Training Requests (History) -->
-      <div id="previousRequestsBox" style="display:none;margin-bottom:24px;">
-        <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
-          <span>📋 My Submitted Training Requests (History)</span>
-          <button type="button" class="btn btn-secondary btn-sm" onclick="loadEmployeePreviousRequests(activeEmployee ? activeEmployee.ID : '')" style="font-size:12px;padding:4px 10px;">🔄 Refresh History</button>
+      <!-- State 3A: Employee Verified Confirmation Box -->
+      <div id="verifiedSuccessBox" class="neo-card" style="display:none;text-align:center;">
+        <div style="width:64px;height:64px;border-radius:50%;background:var(--success-bg);box-shadow:var(--shadow-raised-sm);display:inline-flex;align-items:center;justify-content:center;font-size:28px;color:var(--success);margin-bottom:16px;">
+          ✓
         </div>
-        <div id="previousRequestsContainer" style="min-height:40px;"></div>
+        <div style="font-size:12px;font-weight:700;color:var(--success);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Employee Verified</div>
+        <h2 style="font-size:22px;font-weight:800;color:var(--text-primary);margin-bottom:16px;" id="verEmpName">--</h2>
+
+        <div class="neo-inset" style="text-align:left;margin-bottom:24px;">
+          <div class="details-grid">
+            <div>
+              <div class="detail-label">Employee ID</div>
+              <div class="detail-val" id="verEmpId">--</div>
+            </div>
+            <div>
+              <div class="detail-label">Position Title</div>
+              <div class="detail-val" id="verEmpPos">--</div>
+            </div>
+            <div>
+              <div class="detail-label">Cost Centre / Dept</div>
+              <div class="detail-val" id="verEmpDept">--</div>
+            </div>
+            <div>
+              <div class="detail-label">Verification Date</div>
+              <div class="detail-val" id="verEmpDate">--</div>
+            </div>
+          </div>
+        </div>
+
+        <button type="button" class="btn btn-primary btn-block" style="padding:14px;font-size:15px;" onclick="proceedToMainPortal()">
+          <span>Continue to Training Form</span>
+          <span>🚀</span>
+        </button>
       </div>
 
-      <!-- Step 2: Training Specifications -->
-      <div id="requisitionFormBody" style="display:none;">
-        <input type="hidden" id="editingTrainingId" value="">
-        <div id="editResubmitBanner" style="display:none;margin-bottom:16px;background:#451a03;border:1px solid #d97706;color:#fef3c7;padding:12px 16px;border-radius:8px;font-size:13.5px;"></div>
-        <div class="section-title">🎓 Step 2: Training Programme Specifications</div>
-
-        <div style="margin-bottom:16px;">
-          <label class="label-sm">Training Title *</label>
-          <input type="text" id="reqTrainingName" class="form-control" placeholder="e.g. Leadership Excellence & Strategic Management">
+      <!-- State 3B: Employee Not Found Error Box -->
+      <div id="verifiedErrorBox" class="neo-card" style="display:none;text-align:center;">
+        <div style="width:64px;height:64px;border-radius:50%;background:var(--danger-bg);box-shadow:var(--shadow-raised-sm);display:inline-flex;align-items:center;justify-content:center;font-size:28px;color:var(--danger);margin-bottom:16px;">
+          ⚠️
         </div>
+        <h2 style="font-size:18px;font-weight:700;color:var(--text-primary);margin-bottom:8px;">Employee ID Not Found</h2>
+        <p style="font-size:13.5px;color:var(--text-secondary);margin-bottom:24px;">Please check your Employee ID and try again. If you believe this is an error, please contact HR.</p>
 
-        <div class="grid-2" style="margin-bottom:16px;">
-          <div>
-            <label class="label-sm">Training Category *</label>
-            <select id="reqCategory" class="form-control">
-              <option value="Behavioral Skills (Soft Skills + Leadership + Customer Service)">Behavioral Skills (Soft Skills + Leadership + Customer Service)</option>
-              <option value="Technical Skills (Technical + Quality + SHE + Digital)">Technical Skills (Technical + Quality + SHE + Digital)</option>
-              <option value="Compliance Training (Compliance + Safety)">Compliance Training (Compliance + Safety)</option>
-              <option value="Business Skills (Finance + Sales & Marketing + Project Management)">Business Skills (Finance + Sales & Marketing + Project Management)</option>
-              <option value="Onboarding">Onboarding</option>
-            </select>
-          </div>
-          <div>
-            <label class="label-sm">Training Type *</label>
-            <select id="reqTrainingType" class="form-control">
-              <option value="In-House Training">In-House Training</option>
-              <option value="Public">Public Training</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="grid-3" style="margin-bottom:16px;">
-          <div>
-            <label class="label-sm">Training Date (From) *</label>
-            <input type="date" id="reqStartDate" class="form-control">
-          </div>
-          <div>
-            <label class="label-sm">Training Date (Until) *</label>
-            <input type="date" id="reqEndDate" class="form-control">
-          </div>
-          <div>
-            <label class="label-sm">Training Duration (hrs, 0.5 accuracy) *</label>
-            <input type="number" id="reqHours" class="form-control" value="8" min="0.5" step="0.5">
-          </div>
-        </div>
-
-        <div class="grid-3" style="margin-bottom:16px;">
-          <div>
-            <label class="label-sm">Training Fee (RM) *</label>
-            <input type="number" id="reqFee" class="form-control" placeholder="1500.00" step="0.01">
-          </div>
-          <div>
-            <label class="label-sm">Training Venue *</label>
-            <input type="text" id="reqVenue" class="form-control" placeholder="Training Room A / Hotel Ballroom">
-          </div>
-          <div>
-            <label class="label-sm">Department (Cost Centre) * <span style="font-size:10.5px;color:var(--text-muted);font-weight:normal;">(Hold Ctrl/Cmd for multi-select)</span></label>
-            <select id="reqCostCentre" class="form-control" multiple size="3" style="height: auto;">
-              <option value="ALL" selected>All Departments / Cost Centres</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="grid-3" style="margin-bottom:16px;">
-          <div>
-            <label class="label-sm">Trainer's Name (if applicable)</label>
-            <input type="text" id="reqTrainer" class="form-control" placeholder="Trainer Name">
-          </div>
-          <div>
-            <label class="label-sm">Training Provider (Text Box) (if applicable)</label>
-            <input type="text" id="reqProvider" class="form-control" placeholder="Provider / Vendor Company Name">
-          </div>
-          <div>
-            <label class="label-sm">Certificate Expiry Date (if applicable)</label>
-            <input type="date" id="reqCertExpiry" class="form-control">
-          </div>
-        </div>
-
-        <div style="margin-bottom:16px;">
-          <label class="label-sm">Reason for Training (Optional)</label>
-          <textarea id="reqReason" class="form-control" rows="2" placeholder="State business reason or skill gap..."></textarea>
-        </div>
-
-        <div style="margin-bottom:24px;">
-          <label class="label-sm">Brochure Upload / Link (Optional, to support application)</label>
-          <div class="grid-2" style="gap:12px;">
-            <div>
-              <input type="file" id="reqBrochureFile" class="form-control" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onchange="handleBrochureFileSelect(this)">
-              <div id="fileUploadStatus" style="font-size:11px;color:#38bdf8;margin-top:4px;"></div>
-            </div>
-            <div>
-              <input type="url" id="reqBrochureUrl" class="form-control" placeholder="Or paste link (https://drive.google.com/...)">
-            </div>
-          </div>
-        </div>
-
-        <!-- Step 3: Participant List Selection & Total Pax -->
-        <div class="section-title">👥 Step 3: Participant List (Master Registry Only) & Total Pax</div>
-        
-        <div class="grid-2" style="margin-bottom:16px;">
-          <div>
-            <label class="label-sm">No. of Pax (Total Participants) *</label>
-            <input type="number" id="reqTotalPax" class="form-control" min="1" value="0">
-          </div>
-          <div style="display:flex;align-items:flex-end;">
-            <button type="button" class="btn btn-secondary btn-sm" style="width:100%;padding:10px;" onclick="openParticipantPicker()">+ Search & Select / Bulk Add Participants</button>
-          </div>
-        </div>
-
-        <div id="selectedParticipantsBox" style="min-height:60px;padding:12px;border:1px solid var(--border-color);border-radius:8px;background:#0f172a;margin-bottom:24px;">
-          <div id="emptyPaxMsg" style="color:var(--text-muted);font-size:13px;text-align:center;padding:10px;">No participants selected yet. Click "+ Search & Select / Bulk Add Participants" above.</div>
-          <div id="paxChipContainer" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
-        </div>
-
-        <button type="button" id="btnSubmitRequisition" class="btn btn-success" style="width:100%;padding:14px;font-size:16px;" onclick="submitRequisition()">
-          <span>📤</span> Submit Training Requisition for HOD Approval
+        <button type="button" class="btn btn-neo btn-block" style="padding:12px;" onclick="resetToIdEntry()">
+          <span>🔄 Try Again</span>
         </button>
       </div>
     </div>
-  </div>
 
-  <!-- Participant Selection & Bulk Add Modal -->
-  <div id="paxModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.75);z-index:999;align-items:center;justify-content:center;padding:20px;">
-    <div style="background:#1e293b;border-radius:12px;max-width:700px;width:100%;padding:20px;border:1px solid #334155;color:#fff;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-        <h3 style="margin:0;font-size:16px;">Select Enrolled Participants (EMPLOYEE_SPREADSHEET_ID)</h3>
-        <button type="button" onclick="closePaxModal()" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;">✕</button>
-      </div>
 
-      <!-- Tab selection inside modal: Search List vs Bulk Paste -->
-      <div style="display:flex;gap:8px;margin-bottom:12px;border-bottom:1px solid #334155;padding-bottom:8px;">
-        <button type="button" class="btn btn-secondary btn-sm" id="tabBtnSearch" onclick="switchPaxModalTab('search')">🔍 Search & Click</button>
-        <button type="button" class="btn btn-secondary btn-sm" id="tabBtnBulk" onclick="switchPaxModalTab('bulk')">📋 Bulk Paste Employee IDs</button>
-      </div>
+    <!-- ==========================================
+         SCREEN 4: MAIN TRAINING PORTAL
+         ========================================== -->
+    <div id="mainPortalScreen" style="display:none;">
 
-      <!-- Search View -->
-      <div id="paxViewSearch">
-        <div style="display:flex;gap:8px;margin-bottom:12px;">
-          <input type="text" id="paxSearchInput" class="form-control" placeholder="Search by Employee ID or Name..." oninput="filterPaxList()" style="flex:1;">
-          <button type="button" class="btn btn-secondary btn-sm" onclick="selectAllMatchingPax()">Select All Matching</button>
-          <button type="button" class="btn btn-secondary btn-sm" onclick="clearPaxSelection()">Clear All</button>
+      <!-- Header & Identity Bar -->
+      <div class="user-identity-bar">
+        <div>
+          <div class="user-welcome-text">TRAINING REQUEST PORTAL</div>
+          <div class="user-name-display">
+            <span>Welcome,</span>
+            <span id="headerEmpName" style="color:var(--primary);">--</span>
+          </div>
         </div>
-        <div id="paxListContainer" style="max-height:260px;overflow-y:auto;border:1px solid #334155;border-radius:8px;padding:8px;background:#0f172a;">
-          <div style="text-align:center;color:#94a3b8;padding:16px;">Loading employees from registry...</div>
+        <div class="user-meta-chips">
+          <span class="meta-chip">🆔 <span id="headerEmpId">--</span></span>
+          <span class="meta-chip">🏢 <span id="headerEmpDept">--</span></span>
+          <span class="meta-chip">💼 <span id="headerEmpPos">--</span></span>
         </div>
       </div>
 
-      <!-- Bulk Paste View -->
-      <div id="paxViewBulk" style="display:none;">
-        <div style="margin-bottom:8px;font-size:12.5px;color:#94a3b8;">
-          Paste employee IDs separated by commas, spaces, or newlines (e.g. <code>EMP-1001, EMP-1002, EMP-1003</code>):
-        </div>
-        <textarea id="paxBulkInput" class="form-control" rows="5" placeholder="EMP-1001&#10;EMP-1002&#10;EMP-1003" style="background:#0f172a;color:#fff;font-family:monospace;margin-bottom:10px;"></textarea>
-        <button type="button" class="btn btn-primary btn-sm" onclick="applyBulkPastePax()">Apply Bulk Selection</button>
-        <div id="bulkPasteFeedback" style="font-size:12px;margin-top:6px;color:#38bdf8;"></div>
+      <!-- Navigation Tabs -->
+      <div class="neo-nav-tabs">
+        <button type="button" class="nav-tab-btn active" id="tabBtnForm" onclick="switchMainTab('form')">
+          <span>📝 Training Request</span>
+        </button>
+        <button type="button" class="nav-tab-btn" id="tabBtnHistory" onclick="switchMainTab('history')">
+          <span>📋 History</span>
+        </button>
       </div>
 
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding-top:12px;border-top:1px solid #334155;">
-        <span style="font-size:13px;color:#94a3b8;" id="paxSelectedCounter">0 selected</span>
-        <button type="button" class="btn btn-success" onclick="confirmPaxSelection()">Confirm Selection</button>
+
+      <!-- TAB 1: TRAINING REQUEST FORM -->
+      <div id="tabContentForm">
+        <div class="neo-card">
+          <input type="hidden" id="editingTrainingId" value="">
+          <div id="editResubmitBanner" style="display:none;margin-bottom:20px;background:var(--warning-bg);border:1px solid var(--warning);color:var(--warning-text);padding:14px 18px;border-radius:var(--radius-md);font-size:13.5px;box-shadow:var(--shadow-raised-sm);"></div>
+
+          <!-- Form Step 1: Requester Summary (Auto-filled) -->
+          <div style="margin-bottom:28px;">
+            <div class="step-header">
+              <span class="step-num">1</span>
+              <span>Requester Identity (Verified)</span>
+            </div>
+            <div class="neo-inset">
+              <div class="grid-3">
+                <div>
+                  <div class="form-label">Employee ID</div>
+                  <div style="font-weight:700;font-size:14px;color:var(--text-primary);" id="autoEmpNo">--</div>
+                </div>
+                <div>
+                  <div class="form-label">Employee Name</div>
+                  <div style="font-weight:700;font-size:14px;color:var(--text-primary);" id="autoName">--</div>
+                </div>
+                <div>
+                  <div class="form-label">Job Position</div>
+                  <div style="font-weight:700;font-size:14px;color:var(--text-primary);" id="autoPos">--</div>
+                </div>
+              </div>
+              <div class="grid-2" style="margin-top:12px;padding-top:12px;border-top:1px dashed rgba(82,97,107,0.2);">
+                <div>
+                  <div class="form-label">Cost Centre / Department</div>
+                  <div style="font-weight:700;font-size:14px;color:var(--text-primary);" id="autoDept">--</div>
+                </div>
+                <div>
+                  <div class="form-label">Request Date</div>
+                  <div style="font-weight:700;font-size:14px;color:var(--text-primary);" id="autoDate">--</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Form Step 2: Training Specifications -->
+          <div style="margin-bottom:28px;">
+            <div class="step-header">
+              <span class="step-num">2</span>
+              <span>Training Programme Specifications</span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="reqTrainingName">Training Title *</label>
+              <input type="text" id="reqTrainingName" class="form-control" placeholder="e.g. Leadership Excellence & Strategic Management">
+            </div>
+
+            <div class="grid-2">
+              <div class="form-group">
+                <label class="form-label" for="reqCategory">Training Category *</label>
+                <select id="reqCategory" class="form-control">
+                  <option value="Behavioral Skills (Soft Skills + Leadership + Customer Service)">Behavioral Skills (Soft Skills + Leadership + Customer Service)</option>
+                  <option value="Technical Skills (Technical + Quality + SHE + Digital)">Technical Skills (Technical + Quality + SHE + Digital)</option>
+                  <option value="Compliance Training (Compliance + Safety)">Compliance Training (Compliance + Safety)</option>
+                  <option value="Business Skills (Finance + Sales & Marketing + Project Management)">Business Skills (Finance + Sales & Marketing + Project Management)</option>
+                  <option value="Onboarding">Onboarding</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="reqTrainingType">Training Type *</label>
+                <select id="reqTrainingType" class="form-control">
+                  <option value="In-House Training">In-House Training</option>
+                  <option value="Public">Public Training</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid-3">
+              <div class="form-group">
+                <label class="form-label" for="reqStartDate">Training Date (From) *</label>
+                <input type="date" id="reqStartDate" class="form-control">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="reqEndDate">Training Date (Until) *</label>
+                <input type="date" id="reqEndDate" class="form-control">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="reqHours">Duration (Hours) *</label>
+                <input type="number" id="reqHours" class="form-control" value="8" min="0.5" step="0.5">
+              </div>
+            </div>
+
+            <div class="grid-3">
+              <div class="form-group">
+                <label class="form-label" for="reqFee">Course Fee (RM) *</label>
+                <input type="number" id="reqFee" class="form-control" placeholder="1500.00" step="0.01">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="reqVenue">Training Venue *</label>
+                <input type="text" id="reqVenue" class="form-control" placeholder="e.g. Training Room A / Hotel Ballroom">
+              </div>
+
+              <!-- Department Dropdown with Bubble Chips -->
+              <div class="form-group">
+                <label class="form-label" for="reqCostCentreSelect">Department (Cost Centre) *</label>
+                <select id="reqCostCentreSelect" class="form-control" onchange="addCostCentreTag(this.value)">
+                  <option value="" disabled selected>Select Department...</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Department Bubble Chips Display -->
+            <div class="form-group" style="margin-top:-10px;margin-bottom:20px;">
+              <div class="form-label" style="font-size:10.5px;color:var(--text-muted);">Selected Departments:</div>
+              <div id="costCentreChipContainer" style="display:flex;gap:8px;flex-wrap:wrap;min-height:36px;padding:8px 12px;background:var(--bg-card);box-shadow:var(--shadow-inset);border-radius:var(--radius-md);align-items:center;">
+                <span style="color:var(--text-muted);font-size:12.5px;" id="emptyCostCentreMsg">All Departments / Cost Centres</span>
+              </div>
+            </div>
+
+            <div class="grid-3">
+              <div class="form-group">
+                <label class="form-label" for="reqTrainer">Trainer's Name</label>
+                <input type="text" id="reqTrainer" class="form-control" placeholder="Trainer Name (Optional)">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="reqProvider">Training Provider</label>
+                <input type="text" id="reqProvider" class="form-control" placeholder="Vendor Company Name (Optional)">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="reqCertExpiry">Cert Expiry Date</label>
+                <input type="date" id="reqCertExpiry" class="form-control">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="reqReason">Reason for Training</label>
+              <textarea id="reqReason" class="form-control" rows="2" placeholder="State business objective or skill gap..."></textarea>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Brochure Attachment / Link (Optional)</label>
+              <div class="grid-2">
+                <div>
+                  <input type="file" id="reqBrochureFile" class="form-control" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onchange="handleBrochureFileSelect(this)" style="padding:8px 12px;font-size:12.5px;">
+                  <div id="fileUploadStatus" style="font-size:11.5px;color:var(--primary);margin-top:4px;font-weight:600;"></div>
+                </div>
+                <div>
+                  <input type="url" id="reqBrochureUrl" class="form-control" placeholder="Or paste link (https://...)">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Form Step 3: Participant Selection -->
+          <div style="margin-bottom:28px;">
+            <div class="step-header">
+              <span class="step-num">3</span>
+              <span>Participant List & Total Pax</span>
+            </div>
+
+            <div class="grid-2" style="margin-bottom:16px;">
+              <div>
+                <label class="form-label" for="reqTotalPax">Total Participants (Pax) *</label>
+                <input type="number" id="reqTotalPax" class="form-control" min="1" value="0">
+              </div>
+              <div style="display:flex;align-items:flex-end;">
+                <button type="button" class="btn btn-neo btn-block" style="padding:11px;" onclick="openParticipantPicker()">
+                  <span>👥 Select / Bulk Add Participants</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="neo-inset" style="min-height:60px;">
+              <div id="emptyPaxMsg" style="color:var(--text-muted);font-size:13px;text-align:center;padding:8px;">No participants selected yet. Click button above to select.</div>
+              <div id="paxChipContainer" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+            </div>
+          </div>
+
+          <button type="button" id="btnSubmitRequisition" class="btn btn-success btn-block" style="padding:16px;font-size:16px;" onclick="submitRequisition()">
+            <span>📤</span>
+            <span>Submit Training Requisition for HOD Approval</span>
+          </button>
+        </div>
+      </div>
+
+
+      <!-- TAB 2: TRAINING REQUEST HISTORY -->
+      <div id="tabContentHistory" style="display:none;">
+        <div class="neo-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+            <div>
+              <h2 style="font-size:18px;font-weight:700;color:var(--text-primary);">Training Request History</h2>
+              <p style="font-size:12.5px;color:var(--text-secondary);">Filter and view details of your previously submitted requests</p>
+            </div>
+            <button type="button" class="btn btn-neo" style="padding:8px 16px;font-size:12.5px;" onclick="loadAndRenderHistory()">
+              <span>🔄 Refresh</span>
+            </button>
+          </div>
+
+          <!-- Search & Filter Controls -->
+          <div style="margin-bottom:20px;">
+            <div class="form-group" style="margin-bottom:12px;">
+              <input type="text" id="historySearchInput" class="form-control" placeholder="🔍 Search training title, ID, category..." oninput="filterHistoryList()">
+            </div>
+
+            <div class="filter-bar">
+              <button type="button" class="filter-pill active" id="filterAll" onclick="setHistoryFilter('ALL')">All Requests</button>
+              <button type="button" class="filter-pill" id="filterPending" onclick="setHistoryFilter('PENDING')">Pending</button>
+              <button type="button" class="filter-pill" id="filterApproved" onclick="setHistoryFilter('APPROVED')">Approved</button>
+              <button type="button" class="filter-pill" id="filterReturned" onclick="setHistoryFilter('RETURNED')">Returned</button>
+              <button type="button" class="filter-pill" id="filterRejected" onclick="setHistoryFilter('REJECTED')">Rejected</button>
+            </div>
+          </div>
+
+          <!-- History Container -->
+          <div id="historyContainer" style="min-height:120px;">
+            <div style="text-align:center;padding:30px;color:var(--text-muted);">
+              <div class="spinner" style="margin-bottom:8px;"></div>
+              <div>Loading training history...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+
+    <!-- ==========================================
+         SUCCESS SCREEN (STATE 5)
+         ========================================== -->
+    <div id="successScreen" style="display:none;max-width:560px;margin:40px auto 0 auto;">
+      <div class="neo-card" style="text-align:center;padding:40px 32px;">
+        <div style="width:72px;height:72px;border-radius:50%;background:var(--success-bg);box-shadow:var(--shadow-raised);display:inline-flex;align-items:center;justify-content:center;font-size:36px;color:var(--success);margin-bottom:20px;">
+          ✓
+        </div>
+        <h2 style="font-size:24px;font-weight:800;color:var(--text-primary);margin-bottom:8px;">Training Request Submitted</h2>
+        <p style="font-size:14px;color:var(--text-secondary);margin-bottom:24px;">Your training requisition form (AP-HRD-F01-01) has been successfully routed for approval.</p>
+
+        <div class="neo-inset" style="margin-bottom:28px;">
+          <div class="detail-label">Generated Request ID</div>
+          <div style="font-size:20px;font-weight:800;color:var(--primary);margin-top:4px;" id="successRequestId">--</div>
+        </div>
+
+        <div class="grid-2">
+          <button type="button" class="btn btn-neo" style="padding:14px;" onclick="goToHistoryFromSuccess()">
+            <span>📋 View History</span>
+          </button>
+          <button type="button" class="btn btn-primary" style="padding:14px;" onclick="resetFormForNewSubmission()">
+            <span>➕ New Request</span>
+          </button>
+        </div>
       </div>
     </div>
+
+
+    <!-- ==========================================
+         MODAL: REQUEST DETAILS
+         ========================================== -->
+    <div id="detailsModal" class="neo-modal-overlay">
+      <div class="neo-modal-content">
+        <div class="modal-header">
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--primary);text-transform:uppercase;" id="modalReqCode">--</div>
+            <h3 class="modal-title" id="modalReqTitle">Training Request Details</h3>
+          </div>
+          <button type="button" class="modal-close-btn" onclick="closeDetailsModal()">✕</button>
+        </div>
+
+        <div class="modal-body-scrollable" id="modalBodyContent">
+          <!-- Populated dynamically by JS -->
+        </div>
+
+        <div class="modal-footer-fixed" id="modalActions" style="justify-content:flex-end;gap:12px;">
+          <button type="button" class="btn btn-neo" onclick="closeDetailsModal()">Close</button>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ==========================================
+         MODAL: PARTICIPANT PICKER (ALWAYS VISIBLE FOOTER)
+         ========================================== -->
+    <div id="paxModal" class="neo-modal-overlay">
+      <div class="neo-modal-content">
+        <!-- Fixed Modal Header -->
+        <div class="modal-header">
+          <h3 class="modal-title">Select Participants (Employee Database)</h3>
+          <button type="button" class="modal-close-btn" onclick="closePaxModal()">✕</button>
+        </div>
+
+        <!-- Fixed Modal Sub-Tabs -->
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-shrink:0;">
+          <button type="button" class="filter-pill active" id="tabBtnSearch" onclick="switchPaxModalTab('search')">🔍 Search List</button>
+          <button type="button" class="filter-pill" id="tabBtnBulk" onclick="switchPaxModalTab('bulk')">📋 Bulk Paste IDs</button>
+        </div>
+
+        <!-- Scrollable Body Content -->
+        <div class="modal-body-scrollable">
+          <!-- Search View -->
+          <div id="paxViewSearch">
+            <div class="form-group" style="margin-bottom:10px;">
+              <input type="text" id="paxSearchInput" class="form-control" placeholder="Search by Employee ID or Name..." oninput="filterPaxList()">
+            </div>
+            <div style="display:flex;gap:8px;margin-bottom:10px;">
+              <button type="button" class="btn btn-neo" style="padding:6px 12px;font-size:12px;" onclick="selectAllMatchingPax()">Select All Matching</button>
+              <button type="button" class="btn btn-neo" style="padding:6px 12px;font-size:12px;" onclick="clearPaxSelection()">Clear Selection</button>
+            </div>
+            <div id="paxListContainer" class="neo-inset" style="padding:8px;">
+              <div style="text-align:center;color:var(--text-muted);padding:16px;">Loading employees from database...</div>
+            </div>
+          </div>
+
+          <!-- Bulk Paste View -->
+          <div id="paxViewBulk" style="display:none;">
+            <p style="font-size:12.5px;color:var(--text-secondary);margin-bottom:8px;">
+              Paste employee IDs separated by commas, spaces, or newlines:
+            </p>
+            <textarea id="paxBulkInput" class="form-control" rows="5" placeholder="00001&#10;00002&#10;00003" style="font-family:monospace;margin-bottom:12px;"></textarea>
+            <button type="button" class="btn btn-primary" style="padding:8px 16px;font-size:13px;" onclick="applyBulkPastePax()">Apply Bulk Paste</button>
+            <div id="bulkPasteFeedback" style="font-size:12px;margin-top:6px;color:var(--primary);font-weight:600;"></div>
+          </div>
+        </div>
+
+        <!-- Always Visible Sticky Footer -->
+        <div class="modal-footer-fixed">
+          <span style="font-size:13px;font-weight:700;color:var(--text-secondary);" id="paxSelectedCounter">0 selected</span>
+          <button type="button" class="btn btn-success" style="padding:10px 22px;font-size:14.5px;" onclick="confirmPaxSelection()">Confirm Selection</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <?!= include('script'); ?>
-
-  <script>
-    let activeEmployee = null;
-    let masterParticipants = [];
-    let selectedParticipants = [];
-    let userPreviousRequests = [];
-    let editingTrainingId = '';
-    let uploadedFileObject = null;
-    let loggedInUserEmail = '';
-
-    window.addEventListener('DOMContentLoaded', () => {
-      loadCostCentres();
-      loadMasterParticipants();
-      fetchLoggedInUserEmail();
-    });
-
-    function toDisplayDateStr(val) {
-      if (!val) return '';
-      const str = String(val).trim();
-      if (/^\d{2}\/\d{2}\/\d{4}/.test(str)) return str;
-      const ymdMatch = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
-      if (ymdMatch) {
-        const year = ymdMatch[1];
-        const month = ymdMatch[2].padStart(2, '0');
-        const day = ymdMatch[3].padStart(2, '0');
-        return `${day}/${month}/${year}`;
-      }
-      const d = new Date(str);
-      if (!isNaN(d.getTime())) {
-        const day = String(d.getDate()).padStart(2, '0');
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const year = d.getFullYear();
-        return `${day}/${month}/${year}`;
-      }
-      return str;
-    }
-
-    function toInputDateStr(val) {
-      if (!val) return '';
-      const str = String(val).trim();
-      if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
-      const dmyMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-      if (dmyMatch) {
-        const day = dmyMatch[1].padStart(2, '0');
-        const month = dmyMatch[2].padStart(2, '0');
-        const year = dmyMatch[3];
-        return `${year}-${month}-${day}`;
-      }
-      const d = new Date(str);
-      if (!isNaN(d.getTime())) {
-        return d.toISOString().split('T')[0];
-      }
-      return '';
-    }
-
-    function fetchLoggedInUserEmail() {
-      google.script.run
-        .withSuccessHandler(resStr => {
-          try {
-            const res = JSON.parse(resStr);
-            if (res.success && res.data) {
-              loggedInUserEmail = res.data;
-            }
-          } catch(e) {}
-        })
-        .getLoggedInUserEmail();
-    }
-
-    function loadCostCentres() {
-      google.script.run
-        .withSuccessHandler(resStr => {
-          const res = JSON.parse(resStr);
-          if (res.success && Array.isArray(res.data)) {
-            const sel = document.getElementById('reqCostCentre');
-            sel.innerHTML = '<option value="ALL" selected>All Departments / Cost Centres</option>' +
-              res.data.map(c => `<option value="${c}">${c}</option>`).join('');
-          }
-        })
-        .getCostCentres();
-    }
-
-    function loadMasterParticipants() {
-      google.script.run
-        .withSuccessHandler(resStr => {
-          const res = JSON.parse(resStr);
-          if (res.success && Array.isArray(res.data)) {
-            masterParticipants = res.data.map((p, idx) => ({
-              _uid: p.ID ? String(p.ID).trim() : `EMP-IDX-${idx}`,
-              ID: String(p.ID || '').trim(),
-              Name: String(p.Name || p.ID || 'Employee').trim(),
-              Department: String(p.Department || '').trim(),
-              Position: String(p.Position || '').trim()
-            }));
-          }
-        })
-        .getParticipantsList();
-    }
-
-    function lookupEmployee() {
-      const empId = document.getElementById('employeeIdInput').value.trim();
-      if (!empId) {
-        alert('Please enter your Employee ID.');
-        return;
-      }
-
-      showLoading('Verifying Employee ID...');
-      google.script.run
-        .withSuccessHandler(resStr => {
-          hideLoading();
-          const res = JSON.parse(resStr);
-          if (!res.success) {
-            showAlert(res.message, true);
-            return;
-          }
-          activeEmployee = res.data;
-          displayAutofill(activeEmployee);
-        })
-        .withFailureHandler(err => {
-          hideLoading();
-          showAlert('Lookup failed: ' + err.message, true);
-        })
-        .getEmployeeDetails(empId);
-    }
-
-    function displayAutofill(emp) {
-      if (loggedInUserEmail) {
-        emp.Email = loggedInUserEmail;
-      }
-
-      document.getElementById('autoEmpNo').innerText = emp.ID;
-      document.getElementById('autoName').innerText = emp.Name || emp.ID;
-      document.getElementById('autoDept').innerText = emp.Department || 'N/A';
-      document.getElementById('autoPos').innerText = emp.Position || 'Staff';
-      const getTodayFormatted = () => {
-        const nowD = new Date();
-        const dd = String(nowD.getDate()).padStart(2, '0');
-        const mm = String(nowD.getMonth() + 1).padStart(2, '0');
-        const yyyy = nowD.getFullYear();
-        return `${dd}/${mm}/${yyyy}`;
-      };
-      document.getElementById('autoDate').innerText = emp.RequestDate || getTodayFormatted();
-
-      document.getElementById('autofillBox').style.display = 'block';
-      document.getElementById('requisitionFormBody').style.display = 'block';
-
-      loadEmployeePreviousRequests(emp.ID);
-    }
-
-    function loadEmployeePreviousRequests(empId) {
-      const container = document.getElementById('previousRequestsContainer');
-      const box = document.getElementById('previousRequestsBox');
-      if (!empId) return;
-
-      container.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:14px;font-size:13px;">Loading previous requests...</div>';
-      box.style.display = 'block';
-
-      google.script.run
-        .withSuccessHandler(resStr => {
-          const res = JSON.parse(resStr);
-          if (res.success && Array.isArray(res.data)) {
-            userPreviousRequests = res.data;
-            renderPreviousRequests(res.data);
-          } else {
-            container.innerHTML = '<div style="color:var(--text-muted);padding:10px;text-align:center;font-size:13px;">No previous training requests found.</div>';
-          }
-        })
-        .withFailureHandler(err => {
-          container.innerHTML = '<div style="color:#ef4444;padding:10px;text-align:center;font-size:13px;">Failed to load history: ' + err.message + '</div>';
-        })
-        .getEmployeeSubmittedRequests(empId);
-    }
-
-    function renderPreviousRequests(requests) {
-      const container = document.getElementById('previousRequestsContainer');
-      if (!requests || requests.length === 0) {
-        container.innerHTML = '<div style="color:var(--text-muted);padding:12px;text-align:center;font-size:13px;">No previous training requests submitted under this Employee ID yet.</div>';
-        return;
-      }
-
-      container.innerHTML = requests.map(r => {
-        const status = r.ApprovalStatus || 'Pending Approval';
-        const statusLower = status.toLowerCase();
-        const isReturned = statusLower.includes('return');
-        const isApproved = statusLower === 'approved';
-        const isRejected = statusLower.includes('reject');
-
-        let badgeBg = '#334155';
-        let badgeColor = '#94a3b8';
-        if (isApproved) { badgeBg = '#065f46'; badgeColor = '#34d399'; }
-        else if (isReturned) { badgeBg = '#78350f'; badgeColor = '#fbbf24'; }
-        else if (isRejected) { badgeBg = '#881337'; badgeColor = '#f43f5e'; }
-        else { badgeBg = '#1e3a8a'; badgeColor = '#60a5fa'; }
-
-        return `
-          <div style="background:#0f172a;border:1px solid ${isReturned ? '#f59e0b' : '#334155'};border-radius:10px;padding:14px;margin-bottom:12px;">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
-              <div>
-                <div style="font-size:11px;font-family:monospace;color:#94a3b8;font-weight:700;">${r.Code || r.ID}</div>
-                <div style="font-size:15px;font-weight:700;color:#fff;margin-top:2px;">${r.Name}</div>
-                <div style="font-size:12px;color:#94a3b8;margin-top:4px;">
-                  <span>📅 ${toDisplayDateStr(r.StartDate)} ${r.EndDate && r.EndDate !== r.StartDate ? 'to ' + toDisplayDateStr(r.EndDate) : ''}</span>
-                  <span style="margin:0 6px;">•</span>
-                  <span>💰 RM ${r.CourseFee || '0.00'}</span>
-                  <span style="margin:0 6px;">•</span>
-                  <span>👥 ${r.participants ? r.participants.length : (r.Participants || 0)} Pax</span>
-                </div>
-              </div>
-              <div>
-                <span style="background:${badgeBg};color:${badgeColor};padding:4px 10px;border-radius:999px;font-size:11.5px;font-weight:700;display:inline-block;">
-                  ${status}
-                </span>
-              </div>
-            </div>
-
-            ${r.ApprovalRemarks ? `
-              <div style="margin-top:10px;padding:8px 12px;background:#1e293b;border-left:3px solid ${isReturned ? '#f59e0b' : '#64748b'};border-radius:4px;font-size:12.5px;color:#cbd5e1;">
-                <strong>💬 Approver Remarks:</strong> ${r.ApprovalRemarks}
-              </div>
-            ` : ''}
-
-            ${isReturned ? `
-              <div style="margin-top:12px;display:flex;gap:8px;align-items:center;">
-                <button type="button" class="btn btn-warning btn-sm" style="font-weight:600;display:inline-flex;align-items:center;gap:6px;background:#d97706;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;" onclick="editReturnedRequest('${r.ID}')">
-                  ✏️ Edit & Resubmit Request
-                </button>
-              </div>
-            ` : ''}
-          </div>
-        `;
-      }).join('');
-    }
-
-    function editReturnedRequest(trainingId) {
-      const req = userPreviousRequests.find(r => r.ID === trainingId);
-      if (!req) {
-        alert('Could not locate request details for ID: ' + trainingId);
-        return;
-      }
-
-      editingTrainingId = req.ID;
-      document.getElementById('editingTrainingId').value = req.ID;
-
-      // Populate form fields
-      document.getElementById('reqTrainingName').value = req.Name || '';
-      document.getElementById('reqCategory').value = req.Category || 'Behavioral Skills (Soft Skills + Leadership + Customer Service)';
-      document.getElementById('reqStartDate').value = toInputDateStr(req.StartDate);
-      document.getElementById('reqEndDate').value = toInputDateStr(req.EndDate || req.StartDate);
-      document.getElementById('reqHours').value = req.TotalHours || 8;
-      document.getElementById('reqFee').value = req.CourseFee || '';
-      document.getElementById('reqVenue').value = req.Venue || '';
-      document.getElementById('reqTrainer').value = req.Trainer || '';
-      document.getElementById('reqReason').value = req.Objectives || '';
-      if (req.BrochureURL) {
-        document.getElementById('reqBrochureUrl').value = req.BrochureURL;
-      }
-
-      // Populate participants
-      if (Array.isArray(req.participants) && req.participants.length > 0) {
-        selectedParticipants = req.participants.map((p, idx) => ({
-          _uid: p.ID || p.EmployeeID || p.EmployeeNo || `EXP-${idx}`,
-          ID: p.ID || p.EmployeeID || p.EmployeeNo || '',
-          Name: p.Name || p.EmployeeName || '',
-          Department: p.Department || p.CostCentre || '',
-          Position: p.Position || p.JobTitle || ''
-        }));
-      } else {
-        selectedParticipants = [];
-      }
-      document.getElementById('reqTotalPax').value = selectedParticipants.length || 1;
-      renderSelectedChips();
-
-      // Show edit banner and change submit button
-      const banner = document.getElementById('editResubmitBanner');
-      banner.style.display = 'block';
-      banner.innerHTML = `⚠️ <strong>Editing Returned Request (${req.Code || req.ID})</strong>: ${req.ApprovalRemarks ? 'Remarks: "' + req.ApprovalRemarks + '"' : 'Update details below and resubmit to restart approval.'} <button type="button" onclick="cancelEditResubmit()" style="margin-left:12px;background:none;border:none;color:#fbbf24;text-decoration:underline;cursor:pointer;">Cancel Edit</button>`;
-
-      document.getElementById('btnSubmitRequisition').innerHTML = '<span>🚀</span> Resubmit Training Requisition for HOD Approval';
-
-      // Scroll smoothly to Step 2 form
-      document.getElementById('requisitionFormBody').scrollIntoView({ behavior: 'smooth' });
-    }
-
-    function cancelEditResubmit() {
-      editingTrainingId = '';
-      document.getElementById('editingTrainingId').value = '';
-      document.getElementById('editResubmitBanner').style.display = 'none';
-      document.getElementById('btnSubmitRequisition').innerHTML = '<span>📤</span> Submit Training Requisition for HOD Approval';
-    }
-
-    function handleBrochureFileSelect(input) {
-      if (input.files && input.files[0]) {
-        const file = input.files[0];
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          uploadedFileObject = {
-            name: file.name,
-            mimeType: file.type,
-            data: e.target.result.split(',')[1]
-          };
-          document.getElementById('fileUploadStatus').innerText = `✓ File attached: ${file.name}`;
-        };
-        reader.readAsDataURL(file);
-      }
-    }
-
-    function openParticipantPicker() {
-      switchPaxModalTab('search');
-      renderPaxList(masterParticipants);
-      document.getElementById('paxModal').style.display = 'flex';
-    }
-
-    function closePaxModal() {
-      document.getElementById('paxModal').style.display = 'none';
-    }
-
-    function switchPaxModalTab(tab) {
-      if (tab === 'search') {
-        document.getElementById('paxViewSearch').style.display = 'block';
-        document.getElementById('paxViewBulk').style.display = 'none';
-        document.getElementById('tabBtnSearch').classList.add('btn-primary');
-        document.getElementById('tabBtnBulk').classList.remove('btn-primary');
-      } else {
-        document.getElementById('paxViewSearch').style.display = 'none';
-        document.getElementById('paxViewBulk').style.display = 'block';
-        document.getElementById('tabBtnBulk').classList.add('btn-primary');
-        document.getElementById('tabBtnSearch').classList.remove('btn-primary');
-      }
-    }
-
-    function filterPaxList() {
-      const q = document.getElementById('paxSearchInput').value.trim().toLowerCase();
-      const filtered = masterParticipants.filter(p =>
-        (p.ID && p.ID.toLowerCase().includes(q)) ||
-        (p.Name && p.Name.toLowerCase().includes(q)) ||
-        (p.Department && p.Department.toLowerCase().includes(q))
-      );
-      renderPaxList(filtered);
-    }
-
-    function formatPaxLabel(p) {
-      const name = p.Name || 'Employee';
-      const id = p.ID ? ` (${p.ID})` : '';
-      return `${name}${id}`;
-    }
-
-    function renderPaxList(list) {
-      const container = document.getElementById('paxListContainer');
-      if (!list || list.length === 0) {
-        container.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:16px;">No matching employees found in master registry.</div>';
-        return;
-      }
-
-      container.innerHTML = list.map(p => {
-        const isChecked = selectedParticipants.some(sp => sp._uid === p._uid);
-        return `
-          <label style="display:flex;align-items:center;gap:10px;padding:8px;border-bottom:1px solid #1e293b;cursor:pointer;">
-            <input type="checkbox" value="${p._uid}" ${isChecked ? 'checked' : ''} onchange="togglePaxSelection('${p._uid}', this.checked)">
-            <div>
-              <div style="font-weight:600;font-size:13px;color:#fff;">${formatPaxLabel(p)}</div>
-              <div style="font-size:11px;color:#94a3b8;">${p.Department || 'N/A'} · ${p.Position || 'Staff'}</div>
-            </div>
-          </label>
-        `;
-      }).join('');
-      updatePaxCounter();
-    }
-
-    function togglePaxSelection(uid, checked) {
-      const emp = masterParticipants.find(p => p._uid === uid);
-      if (!emp) return;
-      if (checked) {
-        if (!selectedParticipants.some(p => p._uid === uid)) selectedParticipants.push(emp);
-      } else {
-        selectedParticipants = selectedParticipants.filter(p => p._uid !== uid);
-      }
-      updatePaxCounter();
-    }
-
-    function selectAllMatchingPax() {
-      const q = document.getElementById('paxSearchInput').value.trim().toLowerCase();
-      const filtered = masterParticipants.filter(p =>
-        (p.ID && p.ID.toLowerCase().includes(q)) ||
-        (p.Name && p.Name.toLowerCase().includes(q)) ||
-        (p.Department && p.Department.toLowerCase().includes(q))
-      );
-      filtered.forEach(p => {
-        if (!selectedParticipants.some(sp => sp._uid === p._uid)) {
-          selectedParticipants.push(p);
-        }
-      });
-      renderPaxList(filtered);
-    }
-
-    function clearPaxSelection() {
-      selectedParticipants = [];
-      renderPaxList(masterParticipants);
-    }
-
-    function applyBulkPastePax() {
-      const text = document.getElementById('paxBulkInput').value;
-      if (!text || !text.trim()) {
-        document.getElementById('bulkPasteFeedback').innerText = 'Please enter employee IDs.';
-        return;
-      }
-      const rawIds = text.split(/[\n,; \t]+/).map(s => s.trim().toLowerCase()).filter(s => s);
-      let countAdded = 0;
-
-      rawIds.forEach(idStr => {
-        const matched = masterParticipants.find(p => p.ID.toLowerCase() === idStr || p.Name.toLowerCase().includes(idStr));
-        if (matched && !selectedParticipants.some(sp => sp._uid === matched._uid)) {
-          selectedParticipants.push(matched);
-          countAdded++;
-        }
-      });
-
-      document.getElementById('bulkPasteFeedback').innerText = `✓ Matched and added ${countAdded} participant(s) from registry.`;
-      updatePaxCounter();
-    }
-
-    function updatePaxCounter() {
-      document.getElementById('paxSelectedCounter').innerText = `${selectedParticipants.length} selected`;
-    }
-
-    function confirmPaxSelection() {
-      closePaxModal();
-      renderSelectedChips();
-    }
-
-    function renderSelectedChips() {
-      const box = document.getElementById('paxChipContainer');
-      const emptyMsg = document.getElementById('emptyPaxMsg');
-      const paxInput = document.getElementById('reqTotalPax');
-
-      paxInput.value = selectedParticipants.length;
-
-      if (selectedParticipants.length === 0) {
-        emptyMsg.style.display = 'block';
-        box.innerHTML = '';
-        return;
-      }
-
-      emptyMsg.style.display = 'none';
-      box.innerHTML = selectedParticipants.map(p => `
-        <span style="background:#2563eb;color:#fff;padding:4px 10px;border-radius:999px;font-size:12px;display:inline-flex;align-items:center;gap:6px;">
-          ${formatPaxLabel(p)}
-          <span style="cursor:pointer;" onclick="removePaxChip('${p._uid}')">✕</span>
-        </span>
-      `).join('');
-    }
-
-    function removePaxChip(uid) {
-      selectedParticipants = selectedParticipants.filter(p => p._uid !== uid);
-      renderSelectedChips();
-    }
-
-    function submitRequisition() {
-      if (!activeEmployee) {
-        alert('Please lookup your Employee ID first.');
-        return;
-      }
-
-      const name = document.getElementById('reqTrainingName').value.trim();
-      const startDate = document.getElementById('reqStartDate').value;
-      const endDate = document.getElementById('reqEndDate').value || startDate;
-      const fee = document.getElementById('reqFee').value || '0.00';
-      const venue = document.getElementById('reqVenue').value.trim();
-      
-      const costCentreSelect = document.getElementById('reqCostCentre');
-      const selectedDepts = Array.from(costCentreSelect.selectedOptions).map(o => o.value).filter(v => v);
-      const costCentreStr = selectedDepts.length > 0 ? selectedDepts.join(', ') : 'ALL';
-      const totalPax = parseInt(document.getElementById('reqTotalPax').value) || selectedParticipants.length || 1;
-
-      if (!name || !startDate || !fee || !venue) {
-        alert('Training Title, Dates, Fee, and Venue are required.');
-        return;
-      }
-
-      showLoading(editingTrainingId ? 'Resubmitting Requisition Request...' : 'Submitting Requisition Request...');
-
-      const payload = {
-        editingTrainingId: editingTrainingId,
-        EmployeeID: activeEmployee.ID,
-        Email: activeEmployee.Email || '',
-        Department: costCentreStr,
-        TrainingName: name,
-        Category: document.getElementById('reqCategory').value,
-        TrainingType: document.getElementById('reqTrainingType').value,
-        Trainer: document.getElementById('reqTrainer').value.trim(),
-        TrainingProvider: document.getElementById('reqProvider').value.trim(),
-        StartDate: startDate,
-        EndDate: endDate,
-        Duration: Math.max(1, Math.ceil((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24)) + 1),
-        TotalHours: document.getElementById('reqHours').value || 8,
-        Venue: venue,
-        CourseFee: fee,
-        CertExpiryDate: document.getElementById('reqCertExpiry').value,
-        TotalPax: totalPax,
-        ParticipantList: selectedParticipants,
-        Reason: document.getElementById('reqReason').value.trim(),
-        BrochureUrl: document.getElementById('reqBrochureUrl').value.trim(),
-        BrochureFile: uploadedFileObject
-      };
-
-      google.script.run
-        .withSuccessHandler(resStr => {
-          hideLoading();
-          const res = JSON.parse(resStr);
-          if (!res.success) {
-            showAlert(res.message, true);
-            return;
-          }
-          showAlert(res.data.message, false);
-          cancelEditResubmit();
-          loadEmployeePreviousRequests(activeEmployee.ID);
-          document.getElementById('reqTrainingName').value = '';
-          document.getElementById('reqVenue').value = '';
-          document.getElementById('reqFee').value = '';
-          document.getElementById('reqReason').value = '';
-          document.getElementById('reqBrochureUrl').value = '';
-          selectedParticipants = [];
-          renderSelectedChips();
-        })
-        .withFailureHandler(err => {
-          hideLoading();
-          showAlert('Submission failed: ' + err.message, true);
-        })
-        .submitEmployeeRequisition(payload);
-    }
-  </script>
 </body>
 </html>
