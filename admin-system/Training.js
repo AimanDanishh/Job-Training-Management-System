@@ -367,7 +367,11 @@ function updateTraining(data) {
     if (data.Duration !== undefined) rowObj['Duration'] = data.Duration;
     if (data.TotalHours !== undefined) rowObj['TotalHours'] = data.TotalHours;
     if (data.Department !== undefined) rowObj['Department'] = data.Department;
-    if (data.ExpiryDate !== undefined) rowObj['ExpiryDate'] = data.ExpiryDate;
+    if (data.ExpiryDate !== undefined || data.CertExpiryDate !== undefined) {
+      const expVal = data.ExpiryDate || data.CertExpiryDate || '';
+      rowObj['ExpiryDate'] = expVal;
+      rowObj['CertExpiryDate'] = expVal;
+    }
     if (data.RequisitionUrl !== undefined) rowObj['RequisitionUrl'] = data.RequisitionUrl;
     if (data.Reason !== undefined) rowObj['Reason'] = data.Reason;
     if (data.Objectives !== undefined) rowObj['Objectives'] = data.Objectives;
@@ -484,8 +488,24 @@ function deleteTraining(id) {
     const sheet = getSheet(SHEET_NAMES.trainings);
     const row = findRowById(sheet, id);
     if (row === -1) return err('Training not found.');
+
+    const headers = ensureTrainingSheetColumns(sheet);
+    const values = sheet.getRange(row, 1, 1, headers.length).getValues()[0];
+    const folderId = values[headers.indexOf('FolderID')];
+
+    // The per-training spreadsheet, requisition form, attendance and evaluation
+    // history are all inside this workspace. Trashing the workspace removes the
+    // complete training history while keeping it recoverable from Drive Trash.
+    if (folderId) {
+      try {
+        DriveApp.getFolderById(String(folderId).trim()).setTrashed(true);
+      } catch (driveErr) {
+        return err('Training record was not deleted because its Drive workspace could not be moved to Trash: ' + driveErr.message);
+      }
+    }
+
     sheet.deleteRow(row);
-    return ok({ message: 'Training deleted.' });
+    return ok({ message: 'Training and its workspace were moved to Trash.' });
   } catch (e) {
     return err('Failed to delete training: ' + e.message);
   }
@@ -681,37 +701,5 @@ function updateTrainingParticipantCount(trainingId, count) {
     }
   } catch (e) {
     Logger.log('updateTrainingParticipantCount error: ' + e.message);
-  }
-}
-
-/**
- * One-time repair for existing training records created before participant
- * canonicalisation. It rewrites each Training Data participant tab from the
- * Employee sheet and refreshes the linked requisition form.
- */
-function repairAllTrainingParticipantData() {
-  try {
-    const trainingSheet = getSheet(SHEET_NAMES.trainings);
-    const trainings = trainingSheet ? sheetToJson(trainingSheet) : [];
-    let repaired = 0;
-    let skipped = 0;
-
-    trainings.forEach(training => {
-      if (!training.ID) return;
-      const trainingData = getTrainingDataSpreadsheet(training.ID);
-      const participantSheet = trainingData ? trainingData.getSheetByName('TrainingParticipants') : null;
-      const existingParticipants = participantSheet ? sheetToJson(participantSheet) : [];
-      try {
-        syncParticipantsToTrainingDriveSheet(training.ID, existingParticipants);
-        syncTrainingRequisitionParticipants(training.ID);
-        repaired++;
-      } catch (e) {
-        skipped++;
-        Logger.log('Participant repair failed for ' + training.ID + ': ' + e.message);
-      }
-    });
-    return ok({ message: `Repaired ${repaired} training participant record(s).`, repaired: repaired, skipped: skipped });
-  } catch (e) {
-    return err('Could not repair training participant data: ' + e.message);
   }
 }

@@ -101,7 +101,7 @@
       <div class="mb-3">
         <label class="label-th">Employee Number / ID <span class="required">*</span></label>
         <div style="position:relative">
-          <input id="p-emp-no" class="input-th" placeholder="e.g. EMP-1001" oninput="onEmployeeNoInput()">
+          <input id="p-emp-no" class="input-th" placeholder="00000" oninput="onEmployeeNoInput()">
           <div id="p-emp-dropdown" class="autocomplete-dropdown" style="display:none"></div>
         </div>
         <div style="font-size:11px; color:#94A3B8; margin-top:4px">Enter your assigned Employee ID number</div>
@@ -217,45 +217,6 @@
   </div>
 </div>
 
-<!-- Select Participants Modal -->
-<div id="modal-select-participants" class="modal-overlay" style="display:none">
-  <div class="modal-box" style="max-width:680px">
-    <div class="modal-header">
-      <div>
-        <h3 class="modal-title">Select Participants from Employee List</h3>
-        <p class="modal-sub">Search by Name or Employee ID</p>
-      </div>
-      <button class="modal-close" onclick="closeModal('modal-select-participants')">✕</button>
-    </div>
-    <div class="row g-2 mb-3">
-      <div class="col-md-7">
-        <div style="position:relative">
-          <span class="icon" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94A3B8;font-size:14px">search</span>
-          <input id="p-search" class="input-th" style="padding-left:28px" placeholder="Search by name, ID, position...">
-        </div>
-      </div>
-      <div class="col-md-5">
-        <select id="p-dept" class="input-th">
-          <option value="">All Departments</option>
-        </select>
-      </div>
-    </div>
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px 8px 0 0;font-size:12px;font-weight:600;color:#64748B">
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0">
-        <input type="checkbox" id="p-select-all" onchange="toggleSelectAllParticipants(this.checked)">
-        <span>Select All Filtered (<span id="p-filtered-count">0</span>)</span>
-      </label>
-      <span id="p-selected-count" style="color:#2563EB">0 selected</span>
-    </div>
-    <div id="p-list-container" style="max-height:300px;overflow-y:auto;border:1px solid #E2E8F0;border-top:none;border-radius:0 0 8px 8px;background:#fff">
-      <div class="p-3 text-center" style="color:#94A3B8">Loading employees...</div>
-    </div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:16px;border-top:1px solid #F1F5F9">
-      <button class="btn-th btn-secondary" onclick="closeModal('modal-select-participants')">Cancel</button>
-      <button class="btn-th btn-primary" onclick="confirmAddSelectedParticipants()"><span class="icon sm">add_circle</span>Add Selected Participants</button>
-    </div>
-  </div>
-</div>
 
 <div id="toast-container"></div>
 <script>window.__TRAINHUB_PAGE__ = '<?!= currentPage ?>';</script>
@@ -314,11 +275,29 @@
       const res = await callServer('getSession', sessionId);
       currentSessionObj = res;
 
+      const formatTimeOnly = (val, defaultTime = '09:00') => {
+        if (!val) return defaultTime;
+        const str = String(val).replace(/GMT.*$/, '').replace(/\(.*\)$/, '').trim();
+        const simpleMatch = str.match(/^(\d{1,2}:\d{2}(?::\d{2})?)/);
+        if (simpleMatch && !str.includes('1899') && !str.includes('Singapore') && !str.includes('Standard')) {
+          return simpleMatch[1];
+        }
+        const d = new Date(str);
+        if (!isNaN(d.getTime())) {
+          return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+        }
+        const match = str.match(/(\d{2}:\d{2})/);
+        if (match) return match[1];
+        return defaultTime;
+      };
+
       document.getElementById('p-session-badge').textContent = res.SessionID || 'Session';
       document.getElementById('p-training-title').textContent = res.TrainingTitle || 'Training Programme';
       document.getElementById('p-session-name').textContent = res.SessionName || 'Session Check-In';
       document.getElementById('p-session-date').textContent = res.SessionDate || '—';
-      document.getElementById('p-session-time').textContent = `${res.StartTime || '09:00'} - ${res.EndTime || '17:00'}`;
+      const sTime = formatTimeOnly(res.StartTime, '09:00');
+      const eTime = formatTimeOnly(res.EndTime, '17:00');
+      document.getElementById('p-session-time').textContent = `${sTime} - ${eTime}`;
 
       document.getElementById('p-loading').style.display = 'none';
 
@@ -649,180 +628,7 @@
     }
   }
 
-  let recordRowCount = 0;
-  function addRecordRow(prefill = {}) {
-    const i = recordRowCount++;
-    const row = document.createElement('div');
-    row.className = 'row g-2 mb-2 align-items-center';
-    row.id = 'rrow-' + i;
-    const empIdVal = prefill.ID || prefill.EmployeeID || '';
-    const nameVal  = prefill.Name || prefill.EmployeeName || '';
-    const deptVal  = prefill.Department || '';
-    const statVal  = prefill.Status || 'Present';
 
-    row.innerHTML = `
-      <div class="col-md-3 autocomplete-wrapper">
-        <input class="input-th" placeholder="EMP ID" id="r-empid-${i}" value="${empIdVal}" autocomplete="off">
-        <div id="r-empid-drop-${i}" class="autocomplete-dropdown" style="display:none"></div>
-      </div>
-      <div class="col-md-3 autocomplete-wrapper">
-        <input class="input-th" placeholder="Name" id="r-name-${i}" value="${nameVal}" autocomplete="off">
-        <div id="r-name-drop-${i}" class="autocomplete-dropdown" style="display:none"></div>
-      </div>
-      <div class="col-md-3"><input class="input-th" placeholder="Dept" id="r-dept-${i}" value="${deptVal}"></div>
-      <div class="col-md-2"><select class="input-th" id="r-stat-${i}">${STATUS_OPTIONS.map(s=>`<option ${s===statVal?'selected':''}>${s}</option>`).join('')}</select></div>
-      <div class="col-md-1"><button class="btn-th btn-danger btn-xs" onclick="document.getElementById('rrow-${i}').remove()"><span class="icon sm">delete</span></button></div>
-    `;
-    document.getElementById('records-list').appendChild(row);
-    attachRowAutocomplete(i);
-  }
-
-  async function loadTrainingParticipantsIntoEditor() {
-    if (!currentTraining) { showToast('Select a training first.', 'error'); return; }
-    try {
-      const list = await callServer('getTrainingParticipants', currentTraining.ID);
-      if (!list || !list.length) {
-        showToast('No enrolled participants found for this training.', 'info');
-        return;
-      }
-      list.forEach(p => addRecordRow(p));
-      showToast(`Loaded ${list.length} enrolled participants.`, 'success');
-    } catch(e) { showToast(e.message, 'error'); }
-  }
-
-  function attachRowAutocomplete(i) {
-    const empInput = document.getElementById(`r-empid-${i}`);
-    const nameInput = document.getElementById(`r-name-${i}`);
-    const empDrop  = document.getElementById(`r-empid-drop-${i}`);
-    const nameDrop = document.getElementById(`r-name-drop-${i}`);
-
-    function setupField(inputEl, dropEl) {
-      inputEl.addEventListener('input', () => {
-        const q = inputEl.value.trim().toLowerCase();
-        if (q.length < 1) { dropEl.style.display = 'none'; return; }
-        const matches = allEmployeesList.filter(e =>
-          (e.ID || '').toLowerCase().includes(q) || (e.Name || '').toLowerCase().includes(q)
-        ).slice(0, 8);
-
-        if (!matches.length) { dropEl.style.display = 'none'; return; }
-
-        dropEl.innerHTML = matches.map(m => `
-          <div class="autocomplete-item" onclick="selectRowEmployee(${i}, '${m.ID}')">
-            <div><span class="emp-code">${m.ID}</span> <strong>${m.Name}</strong></div>
-            <span class="emp-dept">${m.Department}</span>
-          </div>
-        `).join('');
-        dropEl.style.display = 'block';
-      });
-
-      inputEl.addEventListener('blur', () => {
-        setTimeout(() => { dropEl.style.display = 'none'; }, 200);
-      });
-    }
-
-    setupField(empInput, empDrop);
-    setupField(nameInput, nameDrop);
-  }
-
-  function selectRowEmployee(rowIndex, empId) {
-    const emp = allEmployeesList.find(e => e.ID === empId);
-    if (!emp) return;
-    document.getElementById(`r-empid-${rowIndex}`).value = emp.ID || '';
-    document.getElementById(`r-name-${rowIndex}`).value  = emp.Name || '';
-    document.getElementById(`r-dept-${rowIndex}`).value  = emp.Department || '';
-  }
-
-  async function openParticipantModal() {
-    selectedParticipantIds.clear();
-    openModal('modal-select-participants');
-    filterParticipantsModal();
-  }
-
-  function filterParticipantsModal() {
-    const q    = document.getElementById('p-search').value.trim().toLowerCase();
-    const dept = document.getElementById('p-dept').value;
-
-    currentFilteredEmployees = allEmployeesList.filter(e =>
-      (!q || (e.Name||'').toLowerCase().includes(q) || (e.ID||'').toLowerCase().includes(q)) &&
-      (!dept || e.Department === dept)
-    );
-
-    document.getElementById('p-filtered-count').textContent = currentFilteredEmployees.length;
-    renderParticipantModalList(currentFilteredEmployees);
-  }
-
-  function renderParticipantModalList(list) {
-    const container = document.getElementById('p-list-container');
-    if (!list.length) {
-      container.innerHTML = '<div class="p-4 text-center" style="color:#94A3B8">No employees found.</div>';
-      return;
-    }
-    container.innerHTML = list.slice(0, 25).map((e, idx) => {
-      const isChecked = selectedParticipantIds.has(e.ID);
-      return `
-        <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid #F1F5F9;background:${isChecked?'#EFF6FF':idx%2===0?'#fff':'#FAFAFA'}">
-          <input type="checkbox" style="width:16px;height:16px;cursor:pointer" ${isChecked?'checked':''} onchange="toggleParticipantSelection('${e.ID}', this.checked)">
-          <div style="flex:1">
-            <span style="font-family:monospace;font-size:11px;font-weight:700;color:#2563EB">${e.ID}</span>
-            <strong style="font-size:13px;color:#1E293B;margin-left:6px">${e.Name}</strong>
-          </div>
-          <span class="badge-th badge-blue">${e.Department}</span>
-        </div>
-      `;
-    }).join('');
-  }
-
-  function toggleParticipantSelection(id, checked) {
-    if (checked) selectedParticipantIds.add(id);
-    else selectedParticipantIds.delete(id);
-  }
-
-  function toggleSelectAllParticipants(checked) {
-    currentFilteredEmployees.forEach(e => {
-      if (checked) selectedParticipantIds.add(e.ID);
-      else selectedParticipantIds.delete(e.ID);
-    });
-    renderParticipantModalList(currentFilteredEmployees);
-  }
-
-  function confirmAddSelectedParticipants() {
-    selectedParticipantIds.forEach(id => {
-      const emp = allEmployeesList.find(e => e.ID === id);
-      if (emp) addRecordRow(emp);
-    });
-    closeModal('modal-select-participants');
-  }
-
-  async function saveDayAttendance() {
-    if (!currentTraining) { showToast('Select a training first.', 'error'); return; }
-    const sessionName = document.getElementById('add-day').value || 'Day 1';
-
-    const records = [];
-    document.querySelectorAll('[id^="rrow-"]').forEach(row => {
-      const i = row.id.replace('rrow-','');
-      records.push({
-        EmployeeNo:   document.getElementById('r-empid-'+i).value,
-        EmployeeName: document.getElementById('r-name-' +i).value,
-        Department:   document.getElementById('r-dept-' +i).value,
-        Status:       document.getElementById('r-stat-' +i).value
-      });
-    });
-
-    try {
-      for (const r of records) {
-        if (r.EmployeeNo) {
-          await callServer('submitAttendance', {
-            sessionId: sessionName,
-            employeeNo: r.EmployeeNo,
-            employeeName: r.EmployeeName,
-            department: r.Department
-          });
-        }
-      }
-      showToast('Attendance records saved!', 'success');
-      loadAttendance();
-    } catch(e) { showToast(e.message, 'error'); }
-  }
 
   async function exportAtt() {
     const id = document.getElementById('sel-training').value;

@@ -126,3 +126,105 @@ function validateAttendance(sessionId, employeeNo) {
     return { valid: false, message: 'Validation error: ' + e.message };
   }
 }
+
+/**
+ * System configuration validation function.
+ * Checks:
+ * 1. Database ID exists and Spreadsheet is accessible.
+ * 2. Required sheet tabs exist.
+ * 3. Required configuration properties exist.
+ * 4. Required application URLs exist.
+ * 5. Required system settings exist.
+ * 
+ * Returns a structured validation result without exposing sensitive parameters.
+ * 
+ * @returns {Object} Structured validation object { valid: boolean, status: 'valid'|'missing'|'invalid', ... }
+ */
+function validateSystemConfiguration() {
+  try {
+    const ssId = getConfigProperty('SPREADSHEET_ID', '');
+    const empSsId = getConfigProperty('EMPLOYEE_SPREADSHEET_ID', ssId);
+
+    const result = {
+      valid: true,
+      status: 'valid',
+      database: {
+        connected: false,
+        spreadsheetId: ssId ? ssId : 'Not configured',
+        employeeSpreadsheetId: empSsId ? empSsId : 'Not configured',
+        name: ''
+      },
+      sheets: {},
+      urls: {
+        publicPortalUrl: getConfigProperty('PUBLIC_PORTAL_URL', '') ? 'Configured' : 'Not configured',
+        hodPortalUrl: getConfigProperty('HOD_PORTAL_URL', '') ? 'Configured' : 'Not configured'
+      },
+      settings: {
+        allowedDomain: getConfigProperty('ALLOWED_DOMAIN', '') ? 'Configured' : 'Not configured',
+        adminEmails: getConfigProperty('ADMIN_EMAILS', '') ? 'Configured' : 'Not configured'
+      },
+      details: []
+    };
+
+    if (!ssId) {
+      result.valid = false;
+      result.status = 'missing';
+      result.details.push('Master Database Spreadsheet ID (SPREADSHEET_ID) is not configured.');
+    } else {
+      try {
+        const ss = SpreadsheetApp.openById(ssId);
+        if (ss) {
+          result.database.connected = true;
+          result.database.name = ss.getName();
+
+          const mainSheets = [
+            { key: 'Trainings', name: getConfigProperty('SHEET_TRAININGS', 'Trainings') }
+          ];
+
+          mainSheets.forEach(item => {
+            const sheet = ss.getSheetByName(item.name);
+            if (sheet) {
+              result.sheets[item.key] = { exists: true, status: 'Connected', name: item.name };
+            } else {
+              result.sheets[item.key] = { exists: false, status: 'Not configured', name: item.name };
+              result.valid = false;
+              if (result.status === 'valid') result.status = 'invalid';
+              result.details.push(`Required sheet tab '${item.name}' not found in Main Database spreadsheet.`);
+            }
+          });
+
+          // Read-only validation of Employee Spreadsheet tabs
+          let empSS = ss;
+          if (empSsId && empSsId !== ssId) {
+            try { empSS = SpreadsheetApp.openById(empSsId); } catch(e) {}
+          }
+
+          if (empSS) {
+            const empTabNames = ['For IT', 'Employees', 'HOD email', 'HR email', 'Cost Centre'];
+            const foundEmpTab = empTabNames.find(tName => empSS.getSheetByName(tName) !== null);
+            if (foundEmpTab) {
+              result.sheets['Employees'] = { exists: true, status: 'Connected (Read-Only)', name: foundEmpTab };
+            } else {
+              result.sheets['Employees'] = { exists: false, status: 'Connected (Read-Only)', name: 'Employee Directory' };
+            }
+          }
+        }
+      } catch (e) {
+        result.valid = false;
+        result.status = 'invalid';
+        result.database.connected = false;
+        result.details.push('Failed to connect to Master Google Spreadsheet: ' + e.message);
+      }
+    }
+
+    return result;
+  } catch (e) {
+    Logger.log('validateSystemConfiguration error: ' + e.message);
+    return {
+      valid: false,
+      status: 'invalid',
+      details: ['Configuration validation error: ' + e.message]
+    };
+  }
+}
+

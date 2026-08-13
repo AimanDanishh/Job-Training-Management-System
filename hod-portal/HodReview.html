@@ -44,19 +44,18 @@
     <!-- Main Dashboard View Container -->
     <main id="mainDashboardContent">
 
-      
       <!-- 4 Dashboard Summary Stat Cards -->
       <div class="stats-grid">
-        <div class="stat-card stat-pending">
+        <div class="stat-card stat-pending" onclick="switchNavTab('pending')" style="cursor:pointer;" title="Click to view Pending Requests">
           <div class="stat-card-label">
-            <span>Pending Approval</span>
+            <span>MY APPROVALS</span>
             <span>⏳</span>
           </div>
           <div class="stat-card-value" id="statPendingCount">0</div>
-          <div class="stat-card-sub">Requires action</div>
+          <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;" id="statPendingBreakdown">HOD: 0 • C-Suite: 0 • HOHR: 0</div>
         </div>
 
-        <div class="stat-card stat-approved">
+        <div class="stat-card stat-approved" onclick="switchNavTab('history'); setHistoryFilter('APPROVED')" style="cursor:pointer;" title="Click to view Approved Requests">
           <div class="stat-card-label">
             <span>Approved</span>
             <span>✅</span>
@@ -65,7 +64,7 @@
           <div class="stat-card-sub">Completed approvals</div>
         </div>
 
-        <div class="stat-card stat-rejected">
+        <div class="stat-card stat-rejected" onclick="switchNavTab('history'); setHistoryFilter('REJECTED')" style="cursor:pointer;" title="Click to view Rejected / Returned Requests">
           <div class="stat-card-label">
             <span>Rejected / Returned</span>
             <span>❌</span>
@@ -74,7 +73,7 @@
           <div class="stat-card-sub">Closed or returned</div>
         </div>
 
-        <div class="stat-card stat-total">
+        <div class="stat-card stat-total" onclick="switchNavTab('history'); setHistoryFilter('ALL')" style="cursor:pointer;" title="Click to view All Supervised Requests">
           <div class="stat-card-label">
             <span>Total Requests</span>
             <span>📊</span>
@@ -121,7 +120,7 @@
         <h3 style="font-size:18px;font-weight:800;color:var(--text-primary);" id="sectionTitleHeader">
           Requests Requiring Your Approval
         </h3>
-        <span style="font-size:12px;color:var(--text-secondary);" id="requestCountSubtitle">Showing 0 requests</span>
+        <span style="font-size:12px;color:var(--text-secondary);" id="requestCountSubtitle"></span>
       </div>
 
       <!-- Requests Cards Container -->
@@ -131,11 +130,11 @@
 
       <!-- No Pending Request Empty State Card -->
       <div id="noPendingStateCard" class="empty-state-card" style="display:none;">
-        <div class="empty-state-icon">🎉</div>
-        <h3 class="empty-state-title">All caught up!</h3>
+        <div class="empty-state-icon">📌</div>
+        <h3 class="empty-state-title">No Pending Requests</h3>
         <p class="empty-state-msg">
           There are currently no training requests requiring your approval.<br>
-          <strong style="color:var(--success);">✓ No pending requests</strong>
+          <strong style="color:var(--success);">✓ All caught up</strong>
         </p>
         <button class="btn btn-primary-action" onclick="openEmployeePortal()">
           <span>📝</span> New Request
@@ -312,7 +311,7 @@
     <div id="loadingOverlay" class="loading-overlay">
       <div class="loading-card">
         <div class="spinner"></div>
-        <div style="font-size:14px;font-weight:700;color:var(--text-primary);" id="loadingText">Loading Approval Portal...</div>
+        <div style="font-size:14px;font-weight:700;color:var(--text-primary);" id="loadingMsg">Loading Approval Portal...</div>
       </div>
     </div>
   </div>
@@ -327,6 +326,12 @@
     let historyRequestsList = [];
     let allSupervisedList = [];
     let employeePortalUrl = '';
+
+    try {
+      window.INITIAL_DASHBOARD_DATA = <?!= getInitialDashboardDataJson(activeEmail) ?>;
+    } catch(e) {
+      window.INITIAL_DASHBOARD_DATA = null;
+    }
 
     let activeTab = 'pending'; // 'pending' | 'history'
     let currentHistoryFilter = 'ALL';
@@ -365,14 +370,6 @@
     }
 
 
-    function showLoading(msg) {
-      document.getElementById('loadingText').innerText = msg || 'Loading...';
-      document.getElementById('loadingOverlay').style.display = 'flex';
-    }
-
-    function hideLoading() {
-      document.getElementById('loadingOverlay').style.display = 'none';
-    }
 
     function openEmployeePortal() {
       if (employeePortalUrl && employeePortalUrl.trim()) {
@@ -387,54 +384,87 @@
     }
 
     function initApprovalPortal() {
-      showLoading('Loading Approval Portal...');
+      let loadedFromInitial = false;
+      if (window.INITIAL_DASHBOARD_DATA && window.INITIAL_DASHBOARD_DATA.success) {
+        processDashboardData(window.INITIAL_DASHBOARD_DATA);
+        loadedFromInitial = true;
+      }
+
+      if (!loadedFromInitial) {
+        showLoading('Loading Approval Portal...');
+      }
 
       google.script.run
         .withSuccessHandler(resStr => {
           hideLoading();
-          const res = JSON.parse(resStr);
-
-          if (!res.success) {
-            showAccessDeniedScreen(res.message);
-            return;
-          }
-
-          const data = res.data;
-          currentApprover = data.approver || null;
-          dashboardMetrics = data.metrics || { pending: 0, approved: 0, rejected: 0, total: 0 };
-          pendingRequestsList = data.pendingRequests || [];
-          historyRequestsList = data.historyRequests || [];
-          allSupervisedList = data.allSupervisedRequests || [];
-          employeePortalUrl = data.employeePortalUrl || '';
-
-          renderApproverIdentity(currentApprover);
-          renderDashboardMetrics(dashboardMetrics);
-
-          if (employeePortalUrl) {
-            document.getElementById('employeePortalHeaderBtn').style.display = 'inline-flex';
-          }
-
-          document.getElementById('mainDashboardContent').style.display = 'block';
-          renderActiveView();
-
-          // Auto-open specific request if 'id' parameter is in URL
-          const urlParams = new URLSearchParams(window.location.search);
-          const reqIdParam = urlParams.get('id') || urlParams.get('req');
-          if (reqIdParam) {
-            const found = allSupervisedList.find(r => {
-              const tid = String(r.ID || r.Code || '').toLowerCase();
-              return tid === reqIdParam.toLowerCase();
-            });
-            if (found) {
-              viewRequestDetails(found.ID || found.Code);
-            }
-          }
+          processDashboardData(resStr);
         })
         .withFailureHandler(err => {
           hideLoading();
-          showAccessDeniedScreen('Unable to connect to backend server: ' + err.message);
+          if (!loadedFromInitial) {
+            showAccessDeniedScreen('Unable to connect to backend server: ' + err.message);
+          }
         })
         .getApproverDashboardData('');
+    }
+
+    function processDashboardData(resInput) {
+      hideLoading();
+      let res;
+      try {
+        res = typeof resInput === 'string' ? JSON.parse(resInput) : resInput;
+      } catch (e) {
+        res = { success: false, message: 'Data parse error: ' + e.message };
+      }
+
+      if (!res || !res.success) {
+        showAccessDeniedScreen(res ? res.message : 'Failed to load dashboard data.');
+        return;
+      }
+
+      const data = res.data || {};
+      currentApprover = data.approver || null;
+      dashboardMetrics = data.metrics || { pending: 0, approved: 0, rejected: 0, total: 0 };
+      allSupervisedList = data.allSupervisedRequests || [];
+      historyRequestsList = data.historyRequests || [];
+
+      const isPendingStatus = (r) => {
+        const st = String(r.ApprovalStatus || r.Status || '').toLowerCase();
+        return !st.includes('approved') && !st.includes('reject') && !st.includes('return') && !st.includes('cancel') && !st.includes('closed');
+      };
+
+      if (Array.isArray(data.pendingRequests) && data.pendingRequests.length > 0) {
+        pendingRequestsList = data.pendingRequests.filter(isPendingStatus);
+      } else if (allSupervisedList.length > 0) {
+        pendingRequestsList = allSupervisedList.filter(isPendingStatus);
+      } else {
+        pendingRequestsList = [];
+      }
+
+      employeePortalUrl = data.employeePortalUrl || '';
+
+      renderApproverIdentity(currentApprover);
+      renderDashboardMetrics(dashboardMetrics);
+
+      if (employeePortalUrl) {
+        document.getElementById('employeePortalHeaderBtn').style.display = 'inline-flex';
+      }
+
+      document.getElementById('mainDashboardContent').style.display = 'block';
+      switchNavTab('pending');
+
+      // Auto-open specific request if 'id' parameter is in URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const reqIdParam = urlParams.get('id') || urlParams.get('req');
+      if (reqIdParam) {
+        const found = allSupervisedList.find(r => {
+          const tid = String(r.ID || r.Code || '').toLowerCase();
+          return tid === reqIdParam.toLowerCase();
+        });
+        if (found) {
+          viewRequestDetails(found.ID || found.Code);
+        }
+      }
     }
 
     function renderApproverIdentity(appr) {
@@ -457,6 +487,10 @@
 
     function renderDashboardMetrics(m) {
       document.getElementById('statPendingCount').innerText = m.pending || 0;
+      const breakdownEl = document.getElementById('statPendingBreakdown');
+      if (breakdownEl) {
+        breakdownEl.innerText = `HOD: ${m.pendingHod || 0} • C-Suite: ${m.pendingCsuite || 0} • HOHR: ${m.pendingHohr || 0}`;
+      }
       document.getElementById('statApprovedCount').innerText = m.approved || 0;
       document.getElementById('statRejectedCount').innerText = m.rejected || 0;
       document.getElementById('statTotalCount').innerText = m.total || 0;
@@ -481,7 +515,12 @@
     function setHistoryFilter(filterName, btnEl) {
       currentHistoryFilter = filterName;
       document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('active'));
-      if (btnEl) btnEl.classList.add('active');
+      if (btnEl) {
+        btnEl.classList.add('active');
+      } else {
+        const targetBtn = document.querySelector(`.filter-pill[data-filter="${filterName}"]`);
+        if (targetBtn) targetBtn.classList.add('active');
+      }
       renderActiveView();
     }
 
@@ -513,7 +552,15 @@
       const subtitle = document.getElementById('requestCountSubtitle');
 
       if (activeTab === 'pending') {
-        const filteredPending = filterRequests(pendingRequestsList);
+        let sourceList = pendingRequestsList;
+        if ((!sourceList || sourceList.length === 0) && Array.isArray(allSupervisedList) && allSupervisedList.length > 0) {
+          sourceList = allSupervisedList.filter(r => {
+            const st = String(r.ApprovalStatus || r.Status || '').toLowerCase();
+            return !st.includes('approved') && !st.includes('reject') && !st.includes('return') && !st.includes('cancel') && !st.includes('closed');
+          });
+        }
+
+        const filteredPending = filterRequests(sourceList || []);
         subtitle.innerText = `Showing ${filteredPending.length} pending request(s)`;
 
         if (filteredPending.length === 0) {
@@ -530,13 +577,16 @@
         let list = historyRequestsList;
 
         if (currentHistoryFilter === 'PENDING') {
-          list = historyRequestsList.filter(r => (r.ApprovalStatus || '').toLowerCase().includes('pending'));
+          list = historyRequestsList.filter(r => {
+            const st = (r.ApprovalStatus || '').toLowerCase();
+            return !st.includes('approved') && !st.includes('reject') && !st.includes('return') && !st.includes('cancel') && !st.includes('closed');
+          });
         } else if (currentHistoryFilter === 'APPROVED') {
           list = historyRequestsList.filter(r => (r.ApprovalStatus || '').toLowerCase().includes('approved'));
         } else if (currentHistoryFilter === 'REJECTED') {
           list = historyRequestsList.filter(r => {
             const st = (r.ApprovalStatus || '').toLowerCase();
-            return st.includes('reject') || st.includes('returned');
+            return st.includes('reject') || st.includes('return') || st.includes('closed');
           });
         }
 
@@ -554,7 +604,7 @@
     }
 
     function renderRequestCardHtml(r, isPendingAction) {
-      const status = r.ApprovalStatus || 'Pending HOD Approval';
+      const status = r.DisplayStatus || r.ApprovalStatus || 'Pending HOD Approval';
       const badgeClass = getBadgeClassForStatus(status);
       const reqDate = r.RequestedDate ? formatDateStr(r.RequestedDate) : 'N/A';
       const trainDate = r.StartDate ? formatDateStr(r.StartDate) : 'N/A';
@@ -659,7 +709,9 @@
 
       // Specifications
       document.getElementById('modalCategory').innerText = t.Category || 'General';
-      document.getElementById('modalTrainer').innerText = t.Trainer || 'TBD';
+      const trainerStr = t.Trainer || 'TBD';
+      const providerStr = t.TrainingProvider || t.Provider || t.Vendor || '';
+      document.getElementById('modalTrainer').innerText = providerStr ? `${trainerStr} (${providerStr})` : trainerStr;
       document.getElementById('modalSchedule').innerText = `${formatDateStr(t.StartDate) || 'N/A'} to ${formatDateStr(t.EndDate || t.StartDate) || 'N/A'}`;
       document.getElementById('modalHours').innerText = `${t.Duration || 1} Days (${t.TotalHours || 8} Total Hours)`;
       document.getElementById('modalVenue').innerText = t.Venue || 'TBD';
@@ -693,8 +745,20 @@
         `).join('');
       }
 
-      // Remarks input
+      // Remarks input & Action buttons visibility
       document.getElementById('modalRemarksInput').value = '';
+
+      const isActionable = data.isActionableForUser !== undefined ? Boolean(data.isActionableForUser) : false;
+      const actionButtons = document.getElementById('modalActionButtons');
+      const remarksSection = document.getElementById('modalRemarksSection');
+
+      if (isActionable) {
+        if (actionButtons) actionButtons.style.display = 'flex';
+        if (remarksSection) remarksSection.style.display = 'block';
+      } else {
+        if (actionButtons) actionButtons.style.display = 'none';
+        if (remarksSection) remarksSection.style.display = 'none';
+      }
 
       // Digital Stamp preview if already approved/stamped
       const stampBox = document.getElementById('modalDigitalStampBox');

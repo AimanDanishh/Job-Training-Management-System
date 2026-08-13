@@ -6,7 +6,7 @@
 // ─── Web App Entry Point ───────────────────────────────────────────────────────
 function doGet(e) {
   const page = (e && e.parameter && e.parameter.page) ? e.parameter.page : 'index';
-  const allowedPages = ['index', 'dashboard', 'training', 'attendance', 'evaluation', 'report', 'session'];
+  const allowedPages = ['index', 'dashboard', 'training', 'attendance', 'evaluation', 'report', 'session', 'settings'];
 
   const safePage = allowedPages.includes(page) ? page : 'index';
   const appTitle = getConfigProperty('APP_TITLE', 'TrainHub — Training Management System');
@@ -121,3 +121,35 @@ function getCurrentUser() {
 function getAppUrl() {
   return ScriptApp.getService().getUrl();
 }
+
+// ─── Settings API Services ─────────────────────────────────────────────────────
+/**
+ * Returns structured configuration and system validation for the Settings UI.
+ */
+function getSettingsData() {
+  const validation = validateSystemConfiguration();
+  const diagnostics = getSystemConfigurationDiagnostics();
+  return ok({
+    validation: validation,
+    diagnostics: diagnostics,
+    databaseId: getConfigProperty('SPREADSHEET_ID', ''),
+    employeeSpreadsheetId: getConfigProperty('EMPLOYEE_SPREADSHEET_ID', ''),
+    publicPortalUrl: getConfigProperty('PUBLIC_PORTAL_URL', ''),
+    hodPortalUrl: getConfigProperty('HOD_PORTAL_URL', ''),
+    allowedDomain: getConfigProperty('ALLOWED_DOMAIN', ''),
+    adminEmails: getConfigProperty('ADMIN_EMAILS', ''),
+    appTitle: getConfigProperty('APP_TITLE', '')
+  });
+}
+
+/**
+ * Runs database setup safely from frontend Settings page.
+ */
+function runDatabaseSetup(spreadsheetId, employeeSpreadsheetId) {
+  const result = setupDatabase(spreadsheetId, employeeSpreadsheetId);
+  if (result.success) {
+    return ok(result);
+  }
+  return err(result.message);
+}
+

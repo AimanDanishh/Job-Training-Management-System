@@ -55,14 +55,17 @@
         </select>
       </div>
 
-      <!-- Pending Participants under HOD selection box -->
+      <!-- Pending Evaluations Grouped by Training Programme -->
+      <div id="groupedTrainingsContainer" style="margin-bottom:20px;"></div>
+
+      <!-- Pending Participants selection box -->
       <div style="margin-bottom:20px;">
-        <label class="data-label" style="font-size:13px;color:#60a5fa;">Select Participant To Evaluate (UNDER YOUR COST CENTRE ONLY)</label>
+        <label class="data-label" style="font-size:13px;color:#60a5fa;">Select Participant To Evaluate (Assigned / Under your Cost Centre)</label>
         <select id="participantSelect" class="form-control" onchange="onParticipantSelectChange()" style="font-size:15px;padding:12px;">
           <option value="">-- Loading pending participants... --</option>
         </select>
         <div style="font-size:12px;color:var(--text-secondary);margin-top:6px;" id="pendingStatsInfo">
-          List shows participants under your cost centre who have not been evaluated yet.
+          List shows participants assigned to you for post evaluation.
         </div>
       </div>
 
@@ -259,13 +262,44 @@
         }
       }
 
-      document.getElementById('badgeHodName').innerText = `${currentHOD.Name} (${currentHOD.CostCentre})`;
-      document.getElementById('evalTrainingTitle').innerText = t.Name || 'Training Programme';
-      document.getElementById('evalTrainingCode').innerText = `Training Code: ${t.Code || t.ID} | Venue: ${t.Venue || 'N/A'}`;
+      // Render Grouped Trainings Cards Breakdown
+      const groupContainer = document.getElementById('groupedTrainingsContainer');
+      if (groupContainer && data.groupedTrainings && data.groupedTrainings.length > 0) {
+        groupContainer.innerHTML = `
+          <div style="font-size:13px; font-weight:700; color:#60a5fa; margin-bottom:8px;">
+            📋 Pending Evaluations Grouped by Training Programme (${data.totalPendingOverall || pendingParticipants.length} total pending)
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:10px;">
+            ${data.groupedTrainings.map(g => {
+              const trn = g.training;
+              const tid = getObjId(trn);
+              const isSelected = currentTrainingId && tid && String(tid).toLowerCase() === String(currentTrainingId).toLowerCase();
+              return `
+                <div style="background:${isSelected ? '#1e293b' : '#0f172a'}; border:1.5px solid ${isSelected ? '#3b82f6' : '#334155'}; border-radius:8px; padding:10px 12px; cursor:pointer; transition:all 0.15s;" onclick="onPostEvalTrainingSelectChange('${tid}')">
+                  <div style="font-size:13px; font-weight:700; color:#f8fafc; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${trn.Name || trn.Code}</div>
+                  <div style="font-size:11px; color:#94a3b8; margin-top:2px;">Code: ${trn.Code || tid}</div>
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+                    <span style="font-size:11px; padding:2px 8px; border-radius:99px; background:${g.pendingCount > 0 ? 'rgba(245,158,11,0.2)' : 'rgba(34,197,94,0.2)'}; color:${g.pendingCount > 0 ? '#fbbf24' : '#4ade80'}; font-weight:700;">
+                      ${g.pendingCount} Pending / ${g.totalParticipants} Total
+                    </span>
+                    <span style="font-size:11.5px; color:#60a5fa; font-weight:600;">Select →</span>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+      } else if (groupContainer) {
+        groupContainer.innerHTML = '';
+      }
+
+      document.getElementById('badgeHodName').innerText = `${currentHOD.Name || currentHOD.Email} (${currentHOD.CostCentre || 'Supervisor'})`;
+      document.getElementById('evalTrainingTitle').innerText = t ? (t.Name || 'Training Programme') : 'No Training Selected';
+      document.getElementById('evalTrainingCode').innerText = t ? `Training Code: ${t.Code || t.ID} | Venue: ${t.Venue || 'N/A'}` : '';
 
       pendingParticipants = data.pendingParticipants || [];
       document.getElementById('evalCountBadge').innerText = `${pendingParticipants.length} REMAINING TO EVALUATE`;
-      document.getElementById('pendingStatsInfo').innerText = `Displaying participants under Cost Centre: "${currentHOD.CostCentre}". ${data.completedCount} evaluated, ${pendingParticipants.length} pending.`;
+      document.getElementById('pendingStatsInfo').innerText = `Displaying participants assigned for evaluation. ${data.completedCount || 0} evaluated, ${pendingParticipants.length} pending.`;
 
       const select = document.getElementById('participantSelect');
       select.innerHTML = '';

@@ -157,14 +157,60 @@ function getEmployeeSubmittedRequests(employeeId) {
 
     const list = matchedRequests.map(r => {
       const tId = String(r.ID || r.TrainingID || '').trim();
-      const reqParticipants = allParticipants.filter(p => String(p.TrainingID || p.TrainingId || '').trim() === tId);
+      const tCode = String(r.Code || '').trim();
+      const cleanTId = tId.toLowerCase();
+      const cleanTCode = tCode.toLowerCase();
+
+      const rawParticipants = allParticipants.filter(p => {
+        const pTId = String(p.TrainingID || p.TrainingId || p.TrainingCode || '').trim().toLowerCase();
+        if (!pTId) return false;
+        return (cleanTId && pTId === cleanTId) || (cleanTCode && pTId === cleanTCode);
+      });
+
+      let reqParticipants = rawParticipants.map(p => ({
+        ID: String(p.EmployeeID || p.EmployeeNo || (p.ID && !String(p.ID).startsWith('TP-') ? p.ID : '') || '').trim(),
+        EmployeeID: String(p.EmployeeID || p.EmployeeNo || (p.ID && !String(p.ID).startsWith('TP-') ? p.ID : '') || '').trim(),
+        Name: String(p.EmployeeName || p.Name || '').trim(),
+        EmployeeName: String(p.EmployeeName || p.Name || '').trim(),
+        Department: String(p.Department || p.CostCentre || '').trim(),
+        Position: String(p.Position || p.JobTitle || '').trim()
+      }));
+
+      // Level 3 Fallback: Read from AP-HRD-F01-01 Requisition Form Google Sheet if Master list is empty
+      if (reqParticipants.length === 0 && r.RequisitionFormFileID) {
+        try {
+          const formSs = SpreadsheetApp.openById(r.RequisitionFormFileID);
+          const formSheet = formSs.getSheetByName('Training Form') || formSs.getSheets()[0];
+          const formRows = formSheet.getRange('A15:I38').getValues();
+          formRows.forEach(fr => {
+            const empId = String(fr[0] || '').trim();
+            const name = String(fr[2] || '').trim();
+            const dept = String(fr[3] || '').trim();
+            const pos = String(fr[7] || '').trim();
+            if (empId || name) {
+              reqParticipants.push({
+                ID: empId,
+                EmployeeID: empId,
+                Name: name,
+                EmployeeName: name,
+                Department: dept,
+                Position: pos
+              });
+            }
+          });
+        } catch(eForm) {}
+      }
+
+      const dbPax = parseInt(r.Participants || r.TotalPax || r['Total Pax'] || r['TotalPax'] || r['Total Participants'] || r['TotalParticipant'] || 0, 10) || 0;
+      const totalPaxVal = Math.max(dbPax, reqParticipants.length);
 
       return {
         ID: tId,
-        Code: String(r.Code || '').trim(),
+        Code: tCode,
         Name: String(r.Name || r.TrainingName || '').trim(),
         Category: String(r.Category || 'General').trim(),
         Trainer: String(r.Trainer || 'TBD').trim(),
+        TrainingProvider: String(r.TrainingProvider || r.Provider || r.Vendor || '').trim(),
         Venue: String(r.Venue || 'TBD').trim(),
         StartDate: String(r.StartDate || '').trim(),
         EndDate: String(r.EndDate || r.StartDate || '').trim(),
@@ -172,6 +218,8 @@ function getEmployeeSubmittedRequests(employeeId) {
         TotalHours: r.TotalHours || 8,
         CourseFee: String(r.CourseFee || '0.00').trim(),
         Department: String(r.Department || 'N/A').trim(),
+        ExpiryDate: String(r.ExpiryDate || r.CertExpiryDate || r.CertificateExpiryDate || '').trim(),
+        CertExpiryDate: String(r.CertExpiryDate || r.ExpiryDate || r.CertificateExpiryDate || '').trim(),
         Objectives: String(r.Objectives || '').trim(),
         ApprovalStatus: String(r.ApprovalStatus || r.Status || 'Pending HOD Approval').trim(),
         ApprovalRemarks: String(r.ApprovalRemarks || '').trim(),
@@ -180,6 +228,8 @@ function getEmployeeSubmittedRequests(employeeId) {
         BrochureURL: String(r.BrochureURL || r.BrochureUrl || '').trim(),
         RequisitionFormFileID: String(r.RequisitionFormFileID || '').trim(),
         FolderID: String(r.FolderID || '').trim(),
+        Participants: totalPaxVal,
+        TotalPax: totalPaxVal,
         participants: reqParticipants
       };
     }).reverse();
@@ -438,8 +488,8 @@ function submitEmployeeRequisition(data) {
         setTemplateValue('A11:I12', objectivesVal || '');
 
         if (participantsList.length > 0) {
-          shForm.getRange('A15:I39').clearContent();
-          participantsList.slice(0, 25).forEach((p, index) => {
+          shForm.getRange('A15:I38').clearContent();
+          participantsList.slice(0, 24).forEach((p, index) => {
             const r = 15 + index;
             setTemplateValue(`A${r}:B${r}`, p.EmployeeID || p.ID || p.EmployeeNo || '');
             setTemplateValue(`C${r}`, p.EmployeeName || p.Name || '');
@@ -525,17 +575,26 @@ function submitEmployeeRequisition(data) {
     setCol('Name', data.TrainingName);
     setCol('Category', data.Category || 'General');
     setCol('Trainer', data.Trainer || 'TBD');
+    setCol('TrainingProvider', data.TrainingProvider || data.Provider || '');
     setCol('Venue', data.Venue || 'TBD');
     setCol('StartDate', data.StartDate);
     setCol('EndDate', data.EndDate || data.StartDate);
     setCol('Duration', data.Duration || 1);
     setCol('TotalHours', data.TotalHours || 8);
-    setCol('Department', emp.Department || data.Department || 'N/A');
+    setCol('Department', data.Department || emp.Department || 'N/A');
+    setCol('ExpiryDate', data.CertExpiryDate || data.ExpiryDate || '');
+    setCol('CertExpiryDate', data.CertExpiryDate || data.ExpiryDate || '');
     setCol('Objectives', objectivesVal);
     setCol('Participants', data.TotalPax || participantsList.length || 0);
     setCol('CourseFee', data.CourseFee || '0.00');
     setCol('UpdatedDate', timeNow);
     setCol('ApprovalStatus', currentApprovalStatus);
+    setCol('HOD', hodName || 'Pending');
+    setCol('HODStatus', 'Pending');
+    setCol('Csuite', csuiteName || 'N/A');
+    setCol('CsuiteStatus', 'N/A');
+    setCol('HOHR', hohrName || 'N/A');
+    setCol('HOHRStatus', 'N/A');
     setCol('ApprovedBy', approvedByVal);
     setCol('ApprovedCostCentre', approvedCostCentreVal);
     setCol('ApprovedAt', approvedAtVal);

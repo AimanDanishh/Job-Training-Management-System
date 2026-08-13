@@ -32,13 +32,13 @@ function getValidEmployee(employeeId) {
   if (!employeeId || String(employeeId).trim() === '') {
     return { valid: false, message: 'Employee ID is required.' };
   }
-  const cleanEmpId = String(employeeId).trim().toLowerCase();
+  const cleanEmpId = String(employeeId).trim();
   
   // 1. Primary Lookup: Master Employees Sheet
   const empSheet = getSheet(SHEET_NAMES.employees);
   if (empSheet) {
     const rows = sheetToJson(empSheet);
-    const emp = rows.find(r => String(r.ID || r.EmployeeID || r.EmployeeNo || '').trim().toLowerCase() === cleanEmpId);
+    const emp = rows.find(r => isSameEmployeeId(r.ID || r.EmployeeID || r.EmployeeNo || '', cleanEmpId));
     if (emp) {
       return { valid: true, employee: emp };
     }
@@ -49,7 +49,7 @@ function getValidEmployee(employeeId) {
     const tpSheet = getSheet(SHEET_NAMES.trainingParticipants);
     if (tpSheet) {
       const tpRows = sheetToJson(tpSheet);
-      const tpEmp = tpRows.find(r => String(r.EmployeeID || r.EmployeeNo || r.ID || '').trim().toLowerCase() === cleanEmpId);
+      const tpEmp = tpRows.find(r => isSameEmployeeId(r.EmployeeID || r.EmployeeNo || r.ID || '', cleanEmpId));
       if (tpEmp) {
         return {
           valid: true,
@@ -75,7 +75,7 @@ function getValidEmployee(employeeId) {
 // ─── 3. Check Employee Enrollment for Training ──────────────────────────────────
 function validateParticipantEnrollment(trainingId, employeeId) {
   const cleanTId   = String(trainingId || '').trim();
-  const cleanEmpId = String(employeeId || '').trim().toLowerCase();
+  const cleanEmpId = String(employeeId || '').trim();
 
   const ss = getTrainingDataSpreadsheet(cleanTId);
   const tpSheet = ss ? ss.getSheetByName('TrainingParticipants') : null;
@@ -86,7 +86,7 @@ function validateParticipantEnrollment(trainingId, employeeId) {
 
   const tpRows = sheetToJson(tpSheet);
   const enrolled = tpRows.find(r => 
-    String(r.EmployeeID || r.EmployeeNo || r.ID || '').trim().toLowerCase() === cleanEmpId
+    isSameEmployeeId(r.EmployeeID || r.EmployeeNo || r.ID || '', cleanEmpId)
   );
 
   if (!enrolled) {
@@ -127,17 +127,18 @@ function validatePublicAttendance(sessionId, employeeId) {
       try {
         const currentDate = new Date();
         const endTimeStr = session.EndTime || '17:00';
-        const formattedDate = formatDate(new Date(session.SessionDate));
-        const [hours, minutes] = String(endTimeStr).split(':').map(Number);
-        const sessionEndDateTime = new Date(formattedDate);
-        sessionEndDateTime.setHours(hours || 17, minutes || 0, 0, 0);
+        const sDate = new Date(session.SessionDate);
+        if (!isNaN(sDate.getTime())) {
+          const [hours, minutes] = String(endTimeStr).split(':').map(Number);
+          sDate.setHours(hours || 17, minutes || 0, 0, 0);
 
-        if (currentDate > sessionEndDateTime) {
-          if (qrStatus === 'Active' && sSheet) {
-            const row = findRowById(sSheet, cleanSessionId);
-            if (row !== -1) sSheet.getRange(row, 9).setValue('Expired');
+          if (currentDate > sDate) {
+            if (qrStatus === 'Active' && sSheet) {
+              const row = findRowById(sSheet, cleanSessionId);
+              if (row !== -1) sSheet.getRange(row, 9).setValue('Expired');
+            }
+            return { valid: false, message: `Attendance registration for this session is closed. Session ended at ${endTimeStr} on ${formatDate(sDate)}.` };
           }
-          return { valid: false, message: `Attendance registration for this session is closed. Session ended at ${endTimeStr} on ${formattedDate}.` };
         }
       } catch (err) {
         Logger.log('Session time check error: ' + err.message);
@@ -175,8 +176,8 @@ function validatePublicAttendance(sessionId, employeeId) {
       const attRows = sheetToJson(attSheet);
       const duplicate = attRows.find(r => {
         const rSessionId = String(r.SessionID || '').trim();
-        const rEmpNo     = String(r.EmployeeNo || r.EmployeeID || '').trim().toLowerCase();
-        return rSessionId === cleanSessionId && rEmpNo === cleanEmpId.toLowerCase();
+        const rEmpNo     = String(r.EmployeeNo || r.EmployeeID || '').trim();
+        return rSessionId === cleanSessionId && isSameEmployeeId(rEmpNo, cleanEmpId);
       });
 
       if (duplicate) {
@@ -200,6 +201,249 @@ function validatePublicAttendance(sessionId, employeeId) {
   } catch (e) {
     Logger.log('validatePublicAttendance error: ' + e.message);
     return { valid: false, message: 'Attendance validation failure: ' + e.message };
+  }
+}
+
+// ─── 4.1 Attendance Eligibility Check for Evaluation ──────────────────────────────
+function checkEmployeeAttendanceEligibility(trainingId, employeeId) {
+  if (!trainingId || String(trainingId).trim() === '') {
+    return { eligible: false, message: 'Training ID is required.' };
+  }
+  if (!employeeId || String(employeeId).trim() === '') {
+    return { eligible: false, message: 'Employee ID is required.' };
+  }
+
+  const cleanTId   = String(trainingId).trim();
+  const cleanEmpId = String(employeeId).trim().toLowerCase();
+
+  const ss = getTrainingDataSpreadsheet(cleanTId);
+  if (!ss) {
+    return { eligible: false, message: 'Training data sheet is unavailable.' };
+  }
+
+  const attSheet = ss.getSheetByName('Attendance');
+  if (!attSheet) {
+    return {
+      eligible: false,
+      message: 'Our records show that you do not have an attendance record for this training.'
+    };
+  }
+
+  const attRows = sheetToJson(attSheet);
+  const validRecord = attRows.find(r => {
+    const rEmpNo = String(r.EmployeeNo || r.EmployeeID || r.ID || '').trim().toLowerCase();
+    const status = String(r.Status || 'Present').trim().toLowerCase();
+    return rEmpNo === cleanEmpId && status !== 'absent';
+  });
+
+  if (!validRecord) {
+    return {
+      eligible: false,
+      message: 'Our records show that you do not have an attendance record for this training.'
+    };
+  }
+
+  return { eligible: true, attendanceRecord: validRecord };
+}
+
+// ─── 4.2 Endpoint Verification Helpers ─────────────────────────────────────────
+function verifyEmployeeForAttendance(sessionId, employeeId) {
+  try {
+    const validation = validatePublicAttendance(sessionId, employeeId);
+    if (!validation.valid) {
+      if (validation.duplicate) {
+        return ok({
+          alreadyRecorded: true,
+          scanTime: validation.scanTime || 'Earlier',
+          employee: validation.employee,
+          session: validation.session,
+          message: `Attendance has already been recorded for ${validation.employee ? validation.employee.Name : employeeId} (${employeeId}) for this session.`
+        });
+      }
+      return err(validation.message);
+    }
+
+    return ok({
+      valid: true,
+      alreadyRecorded: false,
+      employee: validation.employee,
+      session: validation.session,
+      training: validation.training
+    });
+  } catch (e) {
+    return err('Verification failed: ' + e.message);
+  }
+}
+
+function verifyEmployeeForEvaluation(trainingId, employeeId) {
+  try {
+    if (!trainingId || String(trainingId).trim() === '') {
+      return err('Training ID parameter missing from URL link.');
+    }
+    if (!employeeId || String(employeeId).trim() === '') {
+      return err('Employee ID is required.');
+    }
+
+    const cleanTId   = String(trainingId).trim();
+    const cleanEmpId = String(employeeId).trim();
+
+    // A. Validate Training Existence
+    const tCheck = getValidTraining(cleanTId);
+    if (!tCheck.valid) return err(tCheck.message);
+
+    // B. Validate Employee Existence
+    const empCheck = getValidEmployee(cleanEmpId);
+    if (!empCheck.valid) return err(empCheck.message);
+
+    // C. Validate Employee Enrollment
+    const enrollCheck = validateParticipantEnrollment(cleanTId, cleanEmpId);
+    if (!enrollCheck.valid) return err(enrollCheck.message);
+
+    // D. Validate Attendance Eligibility (CRITICAL REQUIREMENT: Must have attended at least 1 session)
+    const attCheck = checkEmployeeAttendanceEligibility(cleanTId, cleanEmpId);
+    if (!attCheck.eligible) {
+      return ok({
+        eligible: false,
+        noAttendance: true,
+        message: attCheck.message,
+        training: tCheck.training,
+        employee: empCheck.employee
+      });
+    }
+
+    // E. Check if Evaluation Already Submitted
+    const ss = getTrainingDataSpreadsheet(cleanTId);
+    const evalSheet = ss ? ss.getSheetByName('TrainingEval') : null;
+    if (evalSheet) {
+      const evalRows = sheetToJson(evalSheet);
+      const duplicate = evalRows.find(r => 
+        String(r.EmployeeID || r.EmployeeNo || '').trim().toLowerCase() === cleanEmpId.toLowerCase()
+      );
+
+      if (duplicate) {
+        return ok({
+          eligible: false,
+          alreadySubmitted: true,
+          submittedAt: duplicate.SubmittedAt || 'Earlier',
+          message: 'You have already completed the evaluation for this training.',
+          training: tCheck.training,
+          employee: empCheck.employee
+        });
+      }
+    }
+
+    return ok({
+      eligible: true,
+      valid: true,
+      training: tCheck.training,
+      employee: empCheck.employee
+    });
+  } catch (e) {
+    return err('Evaluation verification failed: ' + e.message);
+  }
+}
+
+function verifyEvaluatorByEmployeeId(evaluatorEmployeeId, trainingId) {
+  try {
+    if (!evaluatorEmployeeId || String(evaluatorEmployeeId).trim() === '') {
+      return err('Supervisor / PIC Employee ID is required.');
+    }
+    const cleanEvalEmpId = String(evaluatorEmployeeId).trim();
+
+    // 1. Verify Evaluator Employee Record
+    const empCheck = getValidEmployee(cleanEvalEmpId);
+    if (!empCheck.valid) {
+      return err(`Evaluator Employee ID (${cleanEvalEmpId}) is not registered in the system.`);
+    }
+
+    const evaluator = empCheck.employee;
+    const evalName  = evaluator.Name || evaluator.EmployeeName || cleanEvalEmpId;
+    const evalDept  = evaluator.CostCentre || evaluator.Department || 'Supervisor / Manager';
+    const evalEmail = evaluator.Email || evaluator.EmailAddress || '';
+
+    // 2. Fetch pending participants needing 3-Month Post Evaluation
+    let trnIdFilter = String(trainingId || '').trim();
+    let pendingList = [];
+    let completedCount = 0;
+    let targetTraining = null;
+
+    if (trnIdFilter) {
+      const tCheck = getValidTraining(trnIdFilter);
+      if (tCheck.valid) targetTraining = tCheck.training;
+
+      const ss = getTrainingDataSpreadsheet(trnIdFilter);
+      if (ss) {
+        const tpSheet   = ss.getSheetByName('TrainingParticipants');
+        const postSheet = ss.getSheetByName('PostEval');
+
+        const tpRows   = tpSheet ? sheetToJson(tpSheet) : [];
+        const postRows = postSheet ? sheetToJson(postSheet) : [];
+        const completedEmpIds = postRows.map(r => String(r.EmployeeID || '').trim().toLowerCase());
+
+        tpRows.forEach(p => {
+          const empId = String(p.EmployeeID || p.ID || '').trim();
+          if (!empId) return;
+          if (completedEmpIds.includes(empId.toLowerCase())) {
+            completedCount++;
+          } else {
+            pendingList.push({
+              EmployeeID: empId,
+              Name: p.EmployeeName || p.Name || empId,
+              Department: p.CostCentre || p.Department || '',
+              Position: p.Position || p.JobTitle || 'Participant'
+            });
+          }
+        });
+      }
+    } else {
+      const tSheet = getSheet(SHEET_NAMES.trainings);
+      if (tSheet) {
+        const trainings = sheetToJson(tSheet);
+        if (trainings.length > 0) {
+          targetTraining = trainings[0];
+          trnIdFilter = targetTraining.ID;
+          const ss = getTrainingDataSpreadsheet(trnIdFilter);
+          if (ss) {
+            const tpSheet   = ss.getSheetByName('TrainingParticipants');
+            const postSheet = ss.getSheetByName('PostEval');
+
+            const tpRows   = tpSheet ? sheetToJson(tpSheet) : [];
+            const postRows = postSheet ? sheetToJson(postSheet) : [];
+            const completedEmpIds = postRows.map(r => String(r.EmployeeID || '').trim().toLowerCase());
+
+            tpRows.forEach(p => {
+              const empId = String(p.EmployeeID || p.ID || '').trim();
+              if (!empId) return;
+              if (completedEmpIds.includes(empId.toLowerCase())) {
+                completedCount++;
+              } else {
+                pendingList.push({
+                  EmployeeID: empId,
+                  Name: p.EmployeeName || p.Name || empId,
+                  Department: p.CostCentre || p.Department || '',
+                  Position: p.Position || p.JobTitle || 'Participant'
+                });
+              }
+            });
+          }
+        }
+      }
+    }
+
+    return ok({
+      evaluator: {
+        EmployeeID: cleanEvalEmpId,
+        Name: evalName,
+        Department: evalDept,
+        Email: evalEmail
+      },
+      training: targetTraining,
+      pendingParticipants: pendingList,
+      completedCount: completedCount
+    });
+
+  } catch (e) {
+    return err('Evaluator verification error: ' + e.message);
   }
 }
 
@@ -228,47 +472,17 @@ function validatePublicEvaluation(trainingId, employeeId) {
     const enrollCheck = validateParticipantEnrollment(cleanTId, cleanEmpId);
     if (!enrollCheck.valid) return enrollCheck;
 
-    // D. 2-Week Submission Deadline Enforcement (14 days post completion)
-    const endDateStr = tCheck.training.EndDate || tCheck.training.StartDate;
-    if (endDateStr) {
-      try {
-        const endDate = new Date(endDateStr);
-        if (!isNaN(endDate.getTime())) {
-          endDate.setHours(23, 59, 59, 999);
-          const now = new Date();
-          const diffMs = now.getTime() - endDate.getTime();
-          const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-          if (diffDays > 14) {
-            return {
-              valid: false,
-              message: `Participant evaluation must be submitted within 2 weeks (14 days) after course completion. The deadline for this training passed on ${formatDate(new Date(endDate.getTime() + 14 * 24 * 60 * 60 * 1000))}.`
-            };
-          }
-        }
-      } catch (errDate) {
-        Logger.log('Date validation check error: ' + errDate.message);
-      }
+    // D. Attendance Verification: Disallow evaluation for participants without attendance
+    const attCheck = checkEmployeeAttendanceEligibility(cleanTId, cleanEmpId);
+    if (!attCheck.eligible) {
+      return {
+        valid: false,
+        message: attCheck.message
+      };
     }
 
-    // E. Attendance Verification: Disallow evaluation for absent participants
+    // E. Prevent Duplicate Evaluation Submission
     const ss = getTrainingDataSpreadsheet(cleanTId);
-    const attSheet = ss ? ss.getSheetByName('Attendance') : null;
-    if (attSheet) {
-      const attRows = sheetToJson(attSheet);
-      const attRecord = attRows.find(r => 
-        String(r.EmployeeNo || r.EmployeeID || '').trim().toLowerCase() === cleanEmpId.toLowerCase()
-      );
-
-      // If record exists and status is Absent
-      if (attRecord && String(attRecord.Status || '').toLowerCase() === 'absent') {
-        return {
-          valid: false,
-          message: `Training evaluation is disallowed for participant (${cleanEmpId}) who was marked ABSENT for this training.`
-        };
-      }
-    }
-
-    // F. Prevent Duplicate Evaluation Submission
     const evalSheet = ss ? ss.getSheetByName('TrainingEval') : null;
     if (evalSheet) {
       const evalRows = sheetToJson(evalSheet);
@@ -279,7 +493,7 @@ function validatePublicEvaluation(trainingId, employeeId) {
       if (duplicate) {
         return {
           valid: false,
-          message: `You have already submitted an evaluation for this training programme (${tCheck.training.Code || cleanTId}).`
+          message: `You have already completed the evaluation for this training programme (${tCheck.training.Code || cleanTId}).`
         };
       }
     }

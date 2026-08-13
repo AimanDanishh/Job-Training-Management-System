@@ -4,18 +4,24 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <?!= include('style') ?>
-  <title>Attendance Check-In — TrainHub</title>
+  <title>Training Attendance — TrainHub</title>
 </head>
 <body>
+
+<!-- Fixed Top-Right Theme Toggle Button -->
+<button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle Light / Dark Theme">
+  <span id="themeToggleIcon">🌙</span>
+  <span id="themeToggleLabel">Dark</span>
+</button>
 
 <div class="portal-container">
   <div class="portal-card">
     
     <!-- Header -->
     <div class="brand-header">
-      <span class="badge-pillar" id="badge-session">Session Check-In</span>
+      <span class="badge-pillar" id="badge-session">TRAINING ATTENDANCE</span>
       <h1 class="portal-title" id="txt-training-title">Loading Training...</h1>
-      <p class="portal-subtitle" id="txt-session-name" style="color:#2563EB;">Verifying session details...</p>
+      <p class="portal-subtitle" id="txt-session-name" style="color:var(--primary);">Verifying session details...</p>
       
       <div class="meta-pills-row" id="meta-row" style="display:none;">
         <div>📅 <span id="txt-session-date">—</span></div>
@@ -24,74 +30,134 @@
     </div>
 
     <!-- Loading Spinner View -->
-    <div id="view-loading" style="text-align:center; padding: 20px 0;">
+    <div id="view-loading" style="text-align:center; padding: 24px 0;">
       <div class="spinner"></div>
-      <p style="color:#64748B; font-size:13px;">Validating QR session link...</p>
+      <p style="color:var(--text-secondary); font-size:13.5px; font-weight:600;">Validating session context...</p>
     </div>
 
-    <!-- Attendance Form View -->
-    <div id="view-form" style="display:none;">
-      <form onsubmit="handleAttendanceSubmit(event)">
+    <!-- Step 1: Employee ID Screen -->
+    <div id="view-step-id" style="display:none;">
+      <div style="text-align:center; margin-bottom: 20px;">
+        <h2 style="font-size: 16px; font-weight: 700; color: var(--text-primary);">Enter your Employee ID</h2>
+        <p style="font-size: 12.5px; color: var(--text-secondary); margin-top: 4px;">Please enter your registered Employee ID to verify attendance eligibility.</p>
+      </div>
+
+      <form onsubmit="handleVerifyEmployee(event)">
         <div class="form-group">
-          <label class="form-label">Employee ID / Number <span class="req">*</span></label>
-          <input type="text" id="inp-emp-id" class="form-control" placeholder="e.g. EMP-1001" required autocomplete="off">
-          <p style="font-size:11px; color:#94A3B8; margin-top:4px;">Enter your registered company Employee ID</p>
+          <label class="form-label">Employee ID <span class="req">*</span></label>
+          <input type="text" id="inp-emp-id" class="form-control" placeholder="00000" required autocomplete="off" oninput="onEmployeeIdTyping()">
+          <div id="emp-name-preview" style="display:none; margin-top:8px; padding:8px 12px; background:var(--primary-light, #EFF6FF); border:1px solid var(--primary, #2563EB); border-radius:8px; font-size:13px; font-weight:700; color:var(--primary, #2563EB);">
+            <span class="icon sm" style="margin-right:4px">person</span> Name: <span id="txt-preview-name">Lookup...</span>
+          </div>
         </div>
 
-        <div class="form-group">
-          <label class="form-label">Full Name <small style="color:#94A3B8; font-weight:400;">(Optional)</small></label>
-          <input type="text" id="inp-emp-name" class="form-control" placeholder="Your full name">
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Department / Cost Centre <small style="color:#94A3B8; font-weight:400;">(Optional)</small></label>
-          <input type="text" id="inp-emp-dept" class="form-control" placeholder="Department">
-        </div>
-
-        <button type="submit" id="btn-submit-att" class="btn-submit">
-          ✓ Record Attendance
+        <button type="submit" id="btn-verify-emp" class="btn-submit" style="margin-top:12px">
+          Continue →
         </button>
       </form>
     </div>
 
+    <!-- Step 2: Employee Verified Screen -->
+    <div id="view-step-confirm" style="display:none;">
+      <div style="text-align:center; margin-bottom: 20px;">
+        <span style="display:inline-block; padding: 4px 12px; background: var(--success-bg); color: var(--success); border: 1px solid rgba(52,211,153,0.3); border-radius: var(--radius-full); font-size: 12px; font-weight: 800; text-transform: uppercase; margin-bottom: 8px;">
+          Employee Verified ✓
+        </span>
+        <h2 style="font-size: 20px; font-weight: 800; color: var(--text-primary);" id="txt-verify-name">—</h2>
+      </div>
+
+      <div class="info-details-box">
+        <div class="info-row">
+          <span class="info-label">Employee ID</span>
+          <span class="info-value" id="txt-verify-empid">—</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Position / Job Title</span>
+          <span class="info-value" id="txt-verify-position">—</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Department / Cost Centre</span>
+          <span class="info-value" id="txt-verify-dept">—</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Training Programme</span>
+          <span class="info-value" id="txt-verify-training">—</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Session</span>
+          <span class="info-value" id="txt-verify-session">—</span>
+        </div>
+      </div>
+
+      <button type="button" id="btn-mark-att" class="btn-submit" onclick="handleMarkAttendance()">
+        ✓ Mark Attendance
+      </button>
+
+      <button type="button" class="btn-submit btn-secondary" style="margin-top: 10px;" onclick="resetToStepId()">
+        ← Change Employee ID
+      </button>
+    </div>
+
     <!-- Success Feedback View -->
-    <div id="view-success" style="display:none; text-align:center; padding: 16px 0;">
-      <div style="width: 56px; height: 56px; background: #F0FDF4; border-radius: 50%; color: #16A34A; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; font-size: 28px; font-weight: 800;">
+    <div id="view-success" style="display:none; text-align:center; padding: 20px 0;">
+      <div style="width: 64px; height: 64px; background: var(--success-bg); border: 2px solid var(--success); border-radius: 50%; color: var(--success); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 32px; font-weight: 800;">
         ✓
       </div>
-      <h3 style="font-size: 18px; font-weight: 800; color: #166534; margin-bottom: 6px;">Attendance Recorded!</h3>
-      <p style="font-size: 13.5px; color: #15803D; margin-bottom: 16px;" id="txt-success-msg">Your check-in has been successfully saved.</p>
+      <h3 style="font-size: 20px; font-weight: 800; color: var(--success); margin-bottom: 6px;">✓ Attendance Recorded</h3>
+      <p style="font-size: 14px; color: var(--text-primary); margin-bottom: 16px;" id="txt-success-msg">Thank you.</p>
       
-      <div style="font-size: 12.5px; color: #475569; background: #F8FAFC; padding: 10px; border-radius: 8px; border: 1px solid #E2E8F0;">
-        Check-In Time: <strong id="txt-success-time">—</strong>
+      <div class="info-details-box" style="text-align:left; margin-bottom: 20px;">
+        <div class="info-row">
+          <span class="info-label">Employee</span>
+          <span class="info-value" id="txt-success-emp-name">—</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Training</span>
+          <span class="info-value" id="txt-success-training-name">—</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Session / Day</span>
+          <span class="info-value" id="txt-success-session-name">—</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Recorded At</span>
+          <span class="info-value" id="txt-success-time">—</span>
+        </div>
       </div>
+
+      <p style="font-size: 13px; color: var(--text-secondary);">You may close this page.</p>
     </div>
 
     <!-- Already Recorded View -->
-    <div id="view-already-recorded" style="display:none; text-align:center; padding: 16px 0;">
-      <div style="width: 56px; height: 56px; background: #EFF6FF; border-radius: 50%; color: #2563EB; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; font-size: 26px; font-weight: 800;">
+    <div id="view-already-recorded" style="display:none; text-align:center; padding: 20px 0;">
+      <div style="width: 64px; height: 64px; background: var(--primary-light); border: 2px solid var(--primary); border-radius: 50%; color: var(--primary); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 30px; font-weight: 800;">
         ℹ
       </div>
-      <h3 style="font-size: 18px; font-weight: 800; color: #1E40AF; margin-bottom: 6px;">Attendance Already Recorded</h3>
-      <p style="font-size: 13.5px; color: #1E3A8A; margin-bottom: 16px;" id="txt-already-msg">You have already checked into this session.</p>
+      <h3 style="font-size: 19px; font-weight: 800; color: var(--primary); margin-bottom: 6px;">✓ Attendance Already Recorded</h3>
+      <p style="font-size: 13.5px; color: var(--text-secondary); margin-bottom: 18px;" id="txt-already-msg">You have already checked into this session.</p>
       
-      <div style="font-size: 12.5px; color: #334155; background: #F1F5F9; padding: 12px; border-radius: 8px; border: 1px solid #CBD5E1; text-align:left; line-height:1.6;">
-        <div>👤 Employee: <strong id="txt-already-emp">—</strong></div>
-        <div>⏰ Recorded At: <strong id="txt-already-time">—</strong></div>
-        <div style="font-size:11px; color:#64748B; margin-top:6px; border-top:1px solid #E2E8F0; padding-top:6px;">
-          ✓ Your check-in status for this session is already confirmed. No duplicate entry is created.
+      <div class="info-details-box" style="text-align:left; margin-bottom: 16px;">
+        <div class="info-row">
+          <span class="info-label">Employee</span>
+          <span class="info-value" id="txt-already-emp">—</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Recorded At</span>
+          <span class="info-value" id="txt-already-time">—</span>
         </div>
       </div>
+
+      <p style="font-size: 12.5px; color: var(--text-muted);">Your check-in status for this session is already confirmed. No duplicate entry is created.</p>
     </div>
 
     <!-- Error View -->
-    <div id="view-error" style="display:none; text-align:center; padding: 16px 0;">
-      <div style="width: 56px; height: 56px; background: #FEF2F2; border-radius: 50%; color: #DC2626; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; font-size: 26px; font-weight: 800;">
+    <div id="view-error" style="display:none; text-align:center; padding: 20px 0;">
+      <div style="width: 64px; height: 64px; background: var(--danger-bg); border: 2px solid var(--danger); border-radius: 50%; color: var(--danger); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 30px; font-weight: 800;">
         ✕
       </div>
-      <h3 style="font-size: 18px; font-weight: 800; color: #991B1B; margin-bottom: 6px;">Check-In Rejected</h3>
-      <p style="font-size: 13.5px; color: #B91C1C; margin-bottom: 16px;" id="txt-error-msg">Failed to validate attendance submission.</p>
-      <button class="btn-submit" style="background:#64748B; box-shadow:none; padding:8px 16px; font-size:13px; max-width:140px; margin:0 auto;" onclick="resetForm()">Try Again</button>
+      <h3 style="font-size: 19px; font-weight: 800; color: var(--danger); margin-bottom: 6px;">Check-In Rejected</h3>
+      <p style="font-size: 13.5px; color: var(--text-secondary); margin-bottom: 20px;" id="txt-error-msg">Failed to validate attendance submission.</p>
+      <button class="btn-submit btn-secondary" style="max-width:180px; margin:0 auto;" onclick="resetToStepId()">Try Again</button>
     </div>
 
   </div>
@@ -102,49 +168,59 @@
 
 <script>
   let activeSessionId = '';
+  let verifiedEmployee = null;
+  let activeSessionObj = null;
 
   document.addEventListener('DOMContentLoaded', async () => {
     activeSessionId = getQueryParam('session') || "<?= (params && params.session) ? params.session : '' ?>";
     
     if (!activeSessionId) {
-      const tid = getQueryParam('id') || "<?= (params && params.id) ? params.id : '' ?>";
-      if (tid) {
-        showErrorState('Specific Session ID is required for QR attendance check-in.');
-        return;
-      }
       showErrorState('Missing session parameter. Please scan a valid session QR code.');
       return;
     }
 
     try {
       const session = await callServer('getSessionInfo', activeSessionId);
-      
+      activeSessionObj = session;
+
       const formatAppDate = (val) => {
         if (!val) return '—';
         const str = String(val).trim();
         if (/^\d{2}\/\d{2}\/\d{4}/.test(str)) return str;
         const ymdMatch = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
         if (ymdMatch) {
-          const year = ymdMatch[1];
-          const month = ymdMatch[2].padStart(2, '0');
-          const day = ymdMatch[3].padStart(2, '0');
-          return `${day}/${month}/${year}`;
+          return `${ymdMatch[3].padStart(2, '0')}/${ymdMatch[2].padStart(2, '0')}/${ymdMatch[1]}`;
         }
         const d = new Date(str);
         if (!isNaN(d.getTime())) {
-          const day = String(d.getDate()).padStart(2, '0');
-          const month = String(d.getMonth() + 1).padStart(2, '0');
-          const year = d.getFullYear();
-          return `${day}/${month}/${year}`;
+          return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
         }
         return str;
       };
 
-      document.getElementById('badge-session').textContent = session.SessionID || 'Session Check-In';
+      const formatTimeOnly = (val, defaultTime = '09:00') => {
+        if (!val) return defaultTime;
+        const str = String(val).replace(/GMT.*$/, '').replace(/\(.*\)$/, '').trim();
+        const simpleMatch = str.match(/^(\d{1,2}:\d{2}(?::\d{2})?)/);
+        if (simpleMatch && !str.includes('1899') && !str.includes('Singapore') && !str.includes('Standard')) {
+          return simpleMatch[1];
+        }
+        const d = new Date(str);
+        if (!isNaN(d.getTime())) {
+          return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+        }
+        const match = str.match(/(\d{2}:\d{2})/);
+        if (match) return match[1];
+        return defaultTime;
+      };
+
       document.getElementById('txt-training-title').textContent = session.TrainingTitle || 'Training Programme';
       document.getElementById('txt-session-name').textContent = session.SessionName || 'Attendance Registration';
       document.getElementById('txt-session-date').textContent = formatAppDate(session.SessionDate);
-      document.getElementById('txt-session-time').textContent = `${session.StartTime || '09:00'} - ${session.EndTime || '17:00'}`;
+      
+      const sTime = formatTimeOnly(session.StartTime, '09:00');
+      const eTime = formatTimeOnly(session.EndTime, '17:00');
+      document.getElementById('txt-session-time').textContent = `${sTime} - ${eTime}`;
 
       document.getElementById('meta-row').style.display = 'flex';
       document.getElementById('view-loading').style.display = 'none';
@@ -154,87 +230,150 @@
         return;
       }
 
-      document.getElementById('view-form').style.display = 'block';
-
-      // Attach real-time employee lookup listener on Employee ID input
-      const empIdInp = document.getElementById('inp-emp-id');
-      let lookupTimeout = null;
-      empIdInp.addEventListener('input', () => {
-        clearTimeout(lookupTimeout);
-        const val = empIdInp.value.trim();
-        if (val.length >= 2) {
-          lookupTimeout = setTimeout(async () => {
-            try {
-              const info = await callServer('lookupEmployeeInfo', val);
-              if (info && info.Name) {
-                document.getElementById('inp-emp-name').value = info.Name;
-                if (info.Department) document.getElementById('inp-emp-dept').value = info.Department;
-                showToast(`Employee verified: ${info.Name}`, 'success');
-              }
-            } catch(e) {}
-          }, 400);
-        }
-      });
+      document.getElementById('view-step-id').style.display = 'block';
     } catch(e) {
-      document.getElementById('view-loading').style.display = 'none';
       showErrorState(e.message || 'Failed to verify session link.');
     }
   });
 
-  async function handleAttendanceSubmit(e) {
+  let _typingTimer = null;
+  function onEmployeeIdTyping() {
+    clearTimeout(_typingTimer);
+    const empId = document.getElementById('inp-emp-id').value.trim();
+    const previewBox = document.getElementById('emp-name-preview');
+    const previewName = document.getElementById('txt-preview-name');
+    if (!empId) {
+      previewBox.style.display = 'none';
+      return;
+    }
+    _typingTimer = setTimeout(async () => {
+      try {
+        const res = await callServer('verifyEmployeeForAttendance', activeSessionId, empId);
+        if (res && res.employee && res.employee.Name) {
+          previewName.textContent = res.employee.Name;
+          previewBox.style.display = 'block';
+        } else {
+          previewBox.style.display = 'none';
+        }
+      } catch(e) {
+        previewBox.style.display = 'none';
+      }
+    }, 350);
+  }
+
+  function formatCleanTime(val) {
+    if (!val) return '—';
+    const str = String(val).replace(/GMT.*$/, '').replace(/\(.*\)$/, '').trim();
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) {
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      let hours = d.getHours();
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12;
+      hours = hours ? hours : 12;
+      return `${day}/${month}/${year} ${String(hours).padStart(2, '0')}:${minutes} ${ampm}`;
+    }
+    return str;
+  }
+
+  async function handleVerifyEmployee(e) {
     e.preventDefault();
     const empId = document.getElementById('inp-emp-id').value.trim();
-    const empName = document.getElementById('inp-emp-name').value.trim();
-    const empDept = document.getElementById('inp-emp-dept').value.trim();
 
     if (!empId) {
       showToast('Please enter your Employee ID.', 'error');
       return;
     }
 
-    const btn = document.getElementById('btn-submit-att');
-    setBtnLoading(btn, true, 'Verifying & Saving...');
+    const btn = document.getElementById('btn-verify-emp');
+    setBtnLoading(btn, true, 'Verifying Employee...');
 
     try {
-      const res = await callServer('submitAttendance', {
-        sessionId: activeSessionId,
-        employeeNo: empId,
-        employeeName: empName,
-        department: empDept
-      });
+      const res = await callServer('verifyEmployeeForAttendance', activeSessionId, empId);
 
-      document.getElementById('view-form').style.display = 'none';
+      document.getElementById('view-step-id').style.display = 'none';
 
       if (res.alreadyRecorded) {
         document.getElementById('view-already-recorded').style.display = 'block';
         document.getElementById('txt-already-msg').textContent = res.message || 'You have already checked into this session.';
-        document.getElementById('txt-already-emp').textContent = `${res.employeeName || empName || empId} (${empId})`;
-        document.getElementById('txt-already-time').textContent = res.scanTime || 'Earlier';
+        document.getElementById('txt-already-emp').textContent = `${res.employee ? res.employee.Name : empId} (${empId})`;
+        document.getElementById('txt-already-time').textContent = formatCleanTime(res.scanTime);
+      } else if (res.valid) {
+        verifiedEmployee = res.employee;
+        document.getElementById('txt-verify-name').textContent = res.employee.Name || empId;
+        document.getElementById('txt-verify-empid').textContent = res.employee.ID || empId;
+        document.getElementById('txt-verify-position').textContent = res.employee.Position || res.employee.JobTitle || 'Employee';
+        document.getElementById('txt-verify-dept').textContent = res.employee.CostCentre || res.employee.Department || '—';
+        document.getElementById('txt-verify-training').textContent = activeSessionObj ? activeSessionObj.TrainingTitle : 'Training';
+        document.getElementById('txt-verify-session').textContent = activeSessionObj ? activeSessionObj.SessionName : 'Session';
+
+        document.getElementById('view-step-confirm').style.display = 'block';
       } else {
-        document.getElementById('view-success').style.display = 'block';
-        document.getElementById('txt-success-msg').textContent = res.message || 'Check-in recorded successfully!';
-        document.getElementById('txt-success-time').textContent = res.scanTime || new Date().toLocaleString();
+        showErrorState(res.message || 'Employee verification failed.');
       }
     } catch(err) {
-      showToast(err.message, 'error');
       showErrorState(err.message);
     } finally {
       setBtnLoading(btn, false);
     }
   }
 
+  async function handleMarkAttendance() {
+    if (!verifiedEmployee) {
+      showToast('No verified employee selected.', 'error');
+      return;
+    }
+
+    const btn = document.getElementById('btn-mark-att');
+    setBtnLoading(btn, true, 'Recording Attendance...');
+
+    try {
+      const res = await callServer('submitAttendance', {
+        sessionId: activeSessionId,
+        employeeNo: verifiedEmployee.ID,
+        employeeName: verifiedEmployee.Name,
+        department: verifiedEmployee.CostCentre || verifiedEmployee.Department || ''
+      });
+
+      document.getElementById('view-step-confirm').style.display = 'none';
+
+      if (res.alreadyRecorded) {
+        document.getElementById('view-already-recorded').style.display = 'block';
+        document.getElementById('txt-already-emp').textContent = `${verifiedEmployee.Name} (${verifiedEmployee.ID})`;
+        document.getElementById('txt-already-time').textContent = formatCleanTime(res.scanTime);
+      } else {
+        document.getElementById('view-success').style.display = 'block';
+        document.getElementById('txt-success-msg').textContent = `Your attendance for ${res.trainingTitle || 'this training'} has been recorded successfully.`;
+        document.getElementById('txt-success-emp-name').textContent = `${verifiedEmployee.Name} (${verifiedEmployee.ID})`;
+        document.getElementById('txt-success-training-name').textContent = res.trainingTitle || (activeSessionObj ? activeSessionObj.TrainingTitle : '—');
+        document.getElementById('txt-success-session-name').textContent = res.sessionName || (activeSessionObj ? activeSessionObj.SessionName : '—');
+        document.getElementById('txt-success-time').textContent = formatCleanTime(res.scanTime);
+      }
+    } catch(err) {
+      showErrorState(err.message);
+    } finally {
+      setBtnLoading(btn, false);
+    }
+  }
+
+  function resetToStepId() {
+    document.getElementById('view-loading').style.display = 'none';
+    document.getElementById('view-step-confirm').style.display = 'none';
+    document.getElementById('view-already-recorded').style.display = 'none';
+    document.getElementById('view-error').style.display = 'none';
+    document.getElementById('view-step-id').style.display = 'block';
+  }
+
   function showErrorState(msg) {
     document.getElementById('view-loading').style.display = 'none';
-    document.getElementById('view-form').style.display = 'none';
+    document.getElementById('view-step-id').style.display = 'none';
+    document.getElementById('view-step-confirm').style.display = 'none';
     document.getElementById('view-already-recorded').style.display = 'none';
     document.getElementById('view-error').style.display = 'block';
     document.getElementById('txt-error-msg').textContent = msg;
-  }
-
-  function resetForm() {
-    document.getElementById('view-error').style.display = 'none';
-    document.getElementById('view-already-recorded').style.display = 'none';
-    document.getElementById('view-form').style.display = 'block';
   }
 </script>
 

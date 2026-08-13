@@ -78,4 +78,40 @@
       }
     }
   }
+
+  /**
+   * Theme Manager (Dark / Light Theme Toggle)
+   */
+  function initTheme() {
+    const savedTheme = localStorage.getItem('portal_theme') || 'dark';
+    applyTheme(savedTheme);
+  }
+
+  function toggleTheme() {
+    const isLight = document.body.classList.contains('theme-light');
+    const newTheme = isLight ? 'dark' : 'light';
+    applyTheme(newTheme);
+    localStorage.setItem('portal_theme', newTheme);
+  }
+
+  function applyTheme(theme) {
+    const icon = document.getElementById('themeToggleIcon');
+    const label = document.getElementById('themeToggleLabel');
+
+    if (theme === 'light') {
+      document.body.classList.remove('theme-dark');
+      document.body.classList.add('theme-light');
+      if (icon) icon.innerText = '☀️';
+      if (label) label.innerText = 'Light';
+    } else {
+      document.body.classList.remove('theme-light');
+      document.body.classList.add('theme-dark');
+      if (icon) icon.innerText = '🌙';
+      if (label) label.innerText = 'Dark';
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    initTheme();
+  });
 </script>

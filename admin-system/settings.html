@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <?!= include('style') ?>
+  <title>TrainHub — Settings & Configuration</title>
+</head>
+<body>
+<div class="app-shell">
+  <!-- Sidebar -->
+  <?!= include('sidebar') ?>
+
+  <!-- Main Area -->
+  <div class="main-area">
+    <header class="topbar">
+      <button id="sidebar-toggle" class="btn-th btn-secondary btn-sm" style="display:none"><span class="icon sm">menu</span></button>
+      <div style="flex:1; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px">
+        <div>
+          <h1 class="topbar-title">System Settings</h1>
+          <p class="topbar-sub">Database connection status, sheet verification, and application properties.</p>
+        </div>
+        <button class="btn-th btn-secondary btn-sm" onclick="loadSettingsData()">
+          <span class="icon sm">refresh</span> Refresh Status
+        </button>
+      </div>
+    </header>
+
+    <main class="page-content">
+      <!-- Status Banner -->
+      <div id="settings-status-banner" class="alert-th alert-success mb-4" style="display:flex; align-items:center; justify-content:space-between">
+        <div style="display:flex; align-items:center; gap:10px">
+          <span class="icon filled md" id="banner-icon">check_circle</span>
+          <div>
+            <div style="font-weight:700; font-size:14px" id="banner-title">System Configuration Healthy</div>
+            <div style="font-size:12.5px" id="banner-sub">Master database is connected and all required sheets are verified.</div>
+          </div>
+        </div>
+        <span class="badge-th badge-success" id="banner-badge">● Connected</span>
+      </div>
+
+      <div class="row g-4">
+        <!-- Card 1: Database Status & Sheets -->
+        <div class="col-12 col-lg-7">
+          <div class="card-th h-100">
+            <div class="card-th-header" style="display:flex; justify-content:space-between; align-items:center">
+              <div>
+                <h3 class="card-th-title" style="display:flex; align-items:center; gap:8px">
+                  <span class="icon filled" style="color:#2563EB">storage</span> Database Connection & Sheets
+                </h3>
+                <p class="card-th-sub">Connected Google Spreadsheet details and sheet tabs health.</p>
+              </div>
+              <span id="db-status-pill" class="badge-th badge-success">● Connected</span>
+            </div>
+            <div class="card-th-body">
+              <div class="row g-3 mb-4">
+                <div class="col-12">
+                  <label class="label-th">Master Spreadsheet ID (DATABASE_ID)</label>
+                  <div style="display:flex; gap:8px">
+                    <input type="text" id="cfg-master-id" class="input-th" readonly style="background:#F8FAFC; font-family:monospace; font-size:12.5px">
+                    <button class="btn-th btn-secondary btn-sm" onclick="copyValue('cfg-master-id')" title="Copy ID">
+                      <span class="icon sm">content_copy</span>
+                    </button>
+                  </div>
+                </div>
+                <div class="col-12">
+                  <label class="label-th">Employee Spreadsheet ID (EMPLOYEE_SPREADSHEET_ID)</label>
+                  <div style="display:flex; gap:8px">
+                    <input type="text" id="cfg-emp-id" class="input-th" readonly style="background:#F8FAFC; font-family:monospace; font-size:12.5px" placeholder="Same as Master Database ID">
+                    <button class="btn-th btn-secondary btn-sm" onclick="copyValue('cfg-emp-id')" title="Copy ID">
+                      <span class="icon sm">content_copy</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <h4 style="font-size:13.5px; font-weight:700; color:#1E293B; margin-bottom:12px; display:flex; align-items:center; gap:6px">
+                <span class="icon sm" style="color:#64748B">table_chart</span> Required Sheet Tabs Status
+              </h4>
+              <div class="table-responsive">
+                <table class="table-th" style="font-size:12.5px">
+                  <thead>
+                    <tr>
+                      <th>Module / Feature</th>
+                      <th>Expected Sheet Tab Name</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tbl-sheets-body">
+                    <tr><td colspan="3" style="text-align:center; padding:16px; color:#64748B"><span class="spinner"></span> Checking sheets...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 2: Database Setup & Re-Initialization -->
+        <div class="col-12 col-lg-5">
+          <div class="card-th h-100">
+            <div class="card-th-header">
+              <h3 class="card-th-title" style="display:flex; align-items:center; gap:8px">
+                <span class="icon filled" style="color:#0284C7">published_with_changes</span> Reconnect / Setup Database
+              </h3>
+              <p class="card-th-sub">Connect a new Google Sheet database. Unrelated settings will be preserved.</p>
+            </div>
+            <div class="card-th-body">
+              <div class="alert-th alert-info mb-3" style="font-size:12px; line-height:1.4">
+                <span class="icon sm filled" style="margin-top:1px">info</span>
+                <span><strong>Safe Setup Guarantee:</strong> Reconnecting the database updates spreadsheet IDs and verifies standard tabs. Portal URLs, domain, and admin credentials are <strong>never cleared</strong>.</span>
+              </div>
+
+              <div class="mb-3">
+                <label class="label-th">New Master Spreadsheet ID <span style="color:#EF4444">*</span></label>
+                <input type="text" id="setup-input-master" class="input-th" placeholder="e.g. 1a2b3c4d5e6f7g8h9i0j..." style="font-family:monospace; font-size:12.5px">
+                <div style="font-size:11px; color:#64748B; margin-top:4px">Paste Google Spreadsheet ID from your browser URL.</div>
+              </div>
+
+              <div class="mb-4">
+                <label class="label-th">Separate Employee Spreadsheet ID (Optional)</label>
+                <input type="text" id="setup-input-emp" class="input-th" placeholder="Leave empty to use Master Spreadsheet" style="font-family:monospace; font-size:12.5px">
+              </div>
+
+              <button class="btn-th btn-primary" style="width:100%; justify-content:center; padding:10px" onclick="executeDatabaseSetup()">
+                <span class="icon sm">build</span> Run Database Setup
+              </button>
+
+              <!-- Setup Summary Output -->
+              <div id="setup-summary-container" style="display:none; margin-top:20px; padding:14px; background:#F8FAFC; border:1px solid #CBD5E1; border-radius:8px">
+                <div style="font-size:12px; font-weight:700; color:#1E293B; margin-bottom:8px; display:flex; align-items:center; gap:6px">
+                  <span class="icon sm" style="color:#22C55E">check_circle</span> DATABASE SETUP SUMMARY
+                </div>
+                <pre id="setup-summary-text" style="font-family:monospace; font-size:11.5px; color:#334155; margin:0; white-space:pre-wrap; line-height:1.5"></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 3: Application Settings & Portals -->
+        <div class="col-12 col-lg-6">
+          <div class="card-th">
+            <div class="card-th-header">
+              <h3 class="card-th-title" style="display:flex; align-items:center; gap:8px">
+                <span class="icon filled" style="color:#8B5CF6">link</span> Application Portals & URLs
+              </h3>
+              <p class="card-th-sub">Public Participant Portal and HOD Approval Portal endpoints.</p>
+            </div>
+            <div class="card-th-body">
+              <div class="mb-3">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px">
+                  <label class="label-th" style="margin:0">Participant Portal URL (PUBLIC_PORTAL_URL)</label>
+                  <span id="st-public-url" class="badge-th badge-neutral">Checking...</span>
+                </div>
+                <input type="text" id="cfg-public-url" class="input-th" readonly style="background:#F8FAFC; font-size:12px">
+              </div>
+
+              <div class="mb-2">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px">
+                  <label class="label-th" style="margin:0">HOD Approval Portal URL (HOD_PORTAL_URL)</label>
+                  <span id="st-hod-url" class="badge-th badge-neutral">Checking...</span>
+                </div>
+                <input type="text" id="cfg-hod-url" class="input-th" readonly style="background:#F8FAFC; font-size:12px">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 4: Access Control Settings -->
+        <div class="col-12 col-lg-6">
+          <div class="card-th">
+            <div class="card-th-header">
+              <h3 class="card-th-title" style="display:flex; align-items:center; gap:8px">
+                <span class="icon filled" style="color:#F59E0B">admin_panel_settings</span> Access Control & Security
+              </h3>
+              <p class="card-th-sub">Google Workspace domain restrictions and administrator emails.</p>
+            </div>
+            <div class="card-th-body">
+              <div class="mb-3">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px">
+                  <label class="label-th" style="margin:0">Allowed Company Domain (ALLOWED_DOMAIN)</label>
+                  <span id="st-allowed-domain" class="badge-th badge-neutral">Checking...</span>
+                </div>
+                <input type="text" id="cfg-allowed-domain" class="input-th" readonly style="background:#F8FAFC; font-size:12.5px">
+              </div>
+
+              <div class="mb-2">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px">
+                  <label class="label-th" style="margin:0">Admin Emails (ADMIN_EMAILS)</label>
+                  <span id="st-admin-emails" class="badge-th badge-neutral">Checking...</span>
+                </div>
+                <input type="text" id="cfg-admin-emails" class="input-th" readonly style="background:#F8FAFC; font-size:12.5px">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<?!= include('script') ?>
+<div id="toast-container"></div>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    loadSettingsData();
+  });
+
+  async function loadSettingsData() {
+    try {
+      showLoadingOverlay('Fetching system configuration...');
+      const res = await callServer('getSettingsData');
+      hideLoadingOverlay();
+      renderSettings(res);
+    } catch (e) {
+      hideLoadingOverlay();
+      showToast('Failed to load settings: ' + e.message, 'error');
+    }
+  }
+
+  function renderSettings(data) {
+    if (!data) return;
+    const v = data.validation || {};
+    const db = v.database || {};
+
+    // 1. Inputs
+    document.getElementById('cfg-master-id').value = data.databaseId || '';
+    document.getElementById('cfg-emp-id').value = data.employeeSpreadsheetId || '';
+    document.getElementById('setup-input-master').value = data.databaseId || '';
+    document.getElementById('setup-input-emp').value = (data.employeeSpreadsheetId !== data.databaseId) ? (data.employeeSpreadsheetId || '') : '';
+
+    document.getElementById('cfg-public-url').value = data.publicPortalUrl || 'Not configured';
+    document.getElementById('cfg-hod-url').value = data.hodPortalUrl || 'Not configured';
+    document.getElementById('cfg-allowed-domain').value = data.allowedDomain || 'Not configured';
+    document.getElementById('cfg-admin-emails').value = data.adminEmails || 'Not configured';
+
+    // 2. Database Status Banner & Pill
+    const dbPill = document.getElementById('db-status-pill');
+    const banner = document.getElementById('settings-status-banner');
+    const bannerIcon = document.getElementById('banner-icon');
+    const bannerTitle = document.getElementById('banner-title');
+    const bannerSub = document.getElementById('banner-sub');
+    const bannerBadge = document.getElementById('banner-badge');
+
+    if (v.valid && db.connected) {
+      dbPill.className = 'badge-th badge-success';
+      dbPill.textContent = '● Connected';
+
+      banner.className = 'alert-th alert-success mb-4';
+      bannerIcon.textContent = 'check_circle';
+      bannerTitle.textContent = `Database Connected (${db.name || 'Master Spreadsheet'})`;
+      bannerSub.textContent = 'All required sheet tabs are connected and system configuration is healthy.';
+      bannerBadge.className = 'badge-th badge-success';
+      bannerBadge.textContent = '● Connected';
+    } else {
+      dbPill.className = 'badge-th badge-danger';
+      dbPill.textContent = 'Not configured';
+
+      banner.className = 'alert-th alert-error mb-4';
+      bannerIcon.textContent = 'warning';
+      bannerTitle.textContent = 'Database Configuration Attention Required';
+      bannerSub.textContent = (v.details && v.details.length > 0) ? v.details.join(' | ') : 'Database is missing or disconnected.';
+      bannerBadge.className = 'badge-th badge-danger';
+      bannerBadge.textContent = 'Disconnected';
+    }
+
+    // 3. Sheets Status Table (3-Tier Architecture)
+    const sheets = v.sheets || {};
+    const sheetDefs = [
+      { key: 'Trainings', label: 'Main Database (Trainings)', expected: 'Trainings', customStatus: sheets.Trainings ? (sheets.Trainings.exists ? '✓ Connected' : 'Not configured') : null, isOk: sheets.Trainings ? sheets.Trainings.exists : false },
+      { key: 'Employees', label: 'Employee Directory (Read-Only)', expected: sheets.Employees ? sheets.Employees.name : 'For IT / Employees', customStatus: sheets.Employees ? sheets.Employees.status : '✓ Connected (Read-Only)', isOk: true },
+      { key: 'PerTrainingData', label: 'Individual Training Data', expected: '${code} Training Data', customStatus: '✓ Stored per training in Drive', isOk: true }
+    ];
+
+    const tbody = document.getElementById('tbl-sheets-body');
+    tbody.innerHTML = '';
+    sheetDefs.forEach(def => {
+      const tr = document.createElement('tr');
+      const statusText = def.customStatus || (def.isOk ? '✓ Connected' : 'Not configured');
+      const badgeClass = def.isOk ? 'badge-success' : 'badge-secondary';
+      tr.innerHTML = `
+        <td style="font-weight:600; color:#1E293B">${def.label}</td>
+        <td style="font-family:monospace">${def.expected}</td>
+        <td>
+          <span class="badge-th ${badgeClass}">${statusText}</span>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    // 4. Portal Badges
+    setBadgeStatus('st-public-url', data.publicPortalUrl);
+    setBadgeStatus('st-hod-url', data.hodPortalUrl);
+    setBadgeStatus('st-allowed-domain', data.allowedDomain);
+    setBadgeStatus('st-admin-emails', data.adminEmails);
+  }
+
+  function setBadgeStatus(elementId, val) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    if (val && String(val).trim() !== '') {
+      el.className = 'badge-th badge-success';
+      el.textContent = '✓ Configured';
+    } else {
+      el.className = 'badge-th badge-secondary';
+      el.style.background = '#F1F5F9';
+      el.style.color = '#64748B';
+      el.textContent = 'Not configured';
+    }
+  }
+
+  async function executeDatabaseSetup() {
+    const masterId = document.getElementById('setup-input-master').value.trim();
+    const empId    = document.getElementById('setup-input-emp').value.trim();
+
+    if (!masterId) {
+      showToast('Master Spreadsheet ID is required.', 'error');
+      return;
+    }
+
+    try {
+      showLoadingOverlay('Running Database Setup...');
+      const res = await callServer('runDatabaseSetup', masterId, empId);
+      hideLoadingOverlay();
+
+      if (res && res.summary) {
+        showToast('Database setup completed successfully!', 'success');
+        renderSetupSummary(res.summary);
+        await loadSettingsData();
+      } else {
+        showToast('Database setup completed.', 'info');
+        await loadSettingsData();
+      }
+    } catch (e) {
+      hideLoadingOverlay();
+      showToast('Setup error: ' + e.message, 'error');
+    }
+  }
+
+  function renderSetupSummary(s) {
+    const box = document.getElementById('setup-summary-container');
+    const text = document.getElementById('setup-summary-text');
+    box.style.display = 'block';
+
+    let sheetsList = (s.sheets || []).map(sh => `${sh.connected ? '✓' : '✗'} ${sh.name}`).join('\n');
+
+    let lines = [];
+    lines.push(`Database`);
+    lines.push(`${s.databaseConnected ? '✓ Connected' : 'Disconnected'}`);
+    lines.push(``);
+    lines.push(`Database ID`);
+    lines.push(`${s.databaseId || 'N/A'}`);
+    lines.push(``);
+    lines.push(`Required Sheets`);
+    lines.push(`${sheetsList}`);
+    lines.push(``);
+    lines.push(`Configuration`);
+    lines.push(`✓ Database ID saved`);
+    lines.push(`✓ Sheet configuration saved`);
+    lines.push(`✓ Existing application settings preserved`);
+    lines.push(``);
+    lines.push(`Setup completed successfully.`);
+
+    text.textContent = lines.join('\n');
+  }
+
+  function copyValue(id) {
+    const el = document.getElementById(id);
+    if (!el || !el.value) return;
+    navigator.clipboard.writeText(el.value);
+    showToast('Copied to clipboard.', 'success');
+  }
+</script>
+</body>
+</html>

@@ -21,11 +21,20 @@ const SHEET_NAMES = {
   get employees()            { return getConfigProperty('SHEET_EMPLOYEES', 'Employees'); },
   get trainings()            { return getConfigProperty('SHEET_TRAININGS', 'Trainings'); },
   get trainingSessions()     { return getConfigProperty('SHEET_TRAINING_SESSIONS', 'TrainingSessions'); },
-  get attendance()           { return getConfigProperty('SHEET_ATTENDANCE', 'Attendance'); },
-  get trainingEval()         { return getConfigProperty('SHEET_TRAINING_EVAL', 'TrainingEval'); },
-  get postEval()             { return getConfigProperty('SHEET_POST_EVAL', 'PostEval'); },
   get trainingParticipants() { return getConfigProperty('SHEET_TRAINING_PARTICIPANTS', 'TrainingParticipants'); }
 };
+
+function isSameEmployeeId(id1, id2) {
+  if (id1 === null || id1 === undefined || id2 === null || id2 === undefined) return false;
+  const s1 = String(id1).trim().toLowerCase();
+  const s2 = String(id2).trim().toLowerCase();
+  if (s1 === s2) return true;
+  const z1 = s1.replace(/^0+/, '');
+  const z2 = s2.replace(/^0+/, '');
+  if (z1 !== '' && z1 === z2) return true;
+  if (s1.replace(/0/g, '') === '' && s2.replace(/0/g, '') === '') return true;
+  return false;
+}
 
 // ─── Spreadsheet Access ────────────────────────────────────────────────────────
 let _cachedSpreadsheet = null;
@@ -61,7 +70,20 @@ function getEmployeeSpreadsheet() {
 }
 
 function getSheet(name) {
-  const ss = (name === SHEET_NAMES.employees) ? getEmployeeSpreadsheet() : getSpreadsheet();
+  const cleanNameLower = String(name || '').toLowerCase().trim();
+  const isEmployeeSpreadsheetSheet = (
+    cleanNameLower === 'employees' ||
+    cleanNameLower === 'for it' ||
+    cleanNameLower === 'hr email' ||
+    cleanNameLower === 'hod email' ||
+    cleanNameLower === 'csuite email' ||
+    cleanNameLower === 'c-suite email' ||
+    cleanNameLower === 'hohr email' ||
+    cleanNameLower === 'cost centre' ||
+    cleanNameLower === 'costcentre'
+  );
+
+  const ss = isEmployeeSpreadsheetSheet ? getEmployeeSpreadsheet() : getSpreadsheet();
   if (!ss) return null;
   
   let sheet = ss.getSheetByName(name);
@@ -75,11 +97,8 @@ function getSheet(name) {
              sClean + 's' === targetClean;
     });
 
-    if (!sheet && name === SHEET_NAMES.employees && ss !== getSpreadsheet() && allSheets.length > 0) {
-      sheet = allSheets[0];
-    }
-    if (!sheet && name === SHEET_NAMES.employees && allSheets.length > 0) {
-      sheet = allSheets.find(s => s.getName().toLowerCase().includes('emp') || s.getName().toLowerCase().includes('staff'));
+    if (!sheet && isEmployeeSpreadsheetSheet && allSheets.length > 0) {
+      sheet = allSheets.find(s => s.getName().toLowerCase().includes('for it') || s.getName().toLowerCase().includes('emp') || s.getName().toLowerCase().includes('staff')) || allSheets[0];
     }
   }
 
@@ -158,8 +177,7 @@ function getOrCreateSingleTrainingSheet(folder, code) {
     } else {
       ss = SpreadsheetApp.create(fileName);
       file = DriveApp.getFileById(ss.getId());
-      folder.addFile(file);
-      try { DriveApp.getRootFolder().removeFile(file); } catch(rErr) {}
+      file.moveTo(folder);
     }
   }
 

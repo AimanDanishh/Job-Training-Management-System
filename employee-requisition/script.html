@@ -443,7 +443,9 @@
       else if (isReturned) badgeClass = 'status-returned';
       else if (isRejected) badgeClass = 'status-rejected';
 
-      const paxCount = r.participants ? r.participants.length : (r.Participants || 0);
+      const dbPax = parseInt(r.Participants || r.TotalPax || r.totalPax || 0, 10) || 0;
+      const listPax = (Array.isArray(r.participants) && r.participants.length > 0) ? r.participants.length : 0;
+      const paxCount = Math.max(dbPax, listPax);
 
       return `
         <div class="neo-card-sm" style="cursor:pointer;border-left:4px solid ${isReturned ? 'var(--warning)' : (isApproved ? 'var(--success)' : 'var(--primary)')};" onclick="openRequestDetailsModal('${r.ID}')">
@@ -532,8 +534,18 @@
         </div>
         <div class="detail-item">
           <div class="detail-label">Trainer / Provider</div>
-          <div class="detail-val">${req.Trainer || 'N/A'}</div>
+          <div class="detail-val">${req.Trainer || 'N/A'}${req.TrainingProvider ? ' / ' + req.TrainingProvider : ''}</div>
         </div>
+        <div class="detail-item">
+          <div class="detail-label">Department / Cost Centre</div>
+          <div class="detail-val">${req.Department || 'N/A'}</div>
+        </div>
+        ${req.CertExpiryDate || req.ExpiryDate ? `
+          <div class="detail-item">
+            <div class="detail-label">Cert Expiry Date</div>
+            <div class="detail-val">${toDisplayDateStr(req.CertExpiryDate || req.ExpiryDate)}</div>
+          </div>
+        ` : ''}
       </div>
 
       ${req.Objectives ? `
@@ -615,6 +627,8 @@
     document.getElementById('reqFee').value = req.CourseFee || '';
     document.getElementById('reqVenue').value = req.Venue || '';
     document.getElementById('reqTrainer').value = req.Trainer || '';
+    document.getElementById('reqProvider').value = req.TrainingProvider || req.Provider || req.Vendor || '';
+    document.getElementById('reqCertExpiry').value = toInputDateStr(req.CertExpiryDate || req.ExpiryDate || req.CertificateExpiryDate);
     document.getElementById('reqReason').value = req.Objectives || '';
     if (req.BrochureURL) {
       document.getElementById('reqBrochureUrl').value = req.BrochureURL;
@@ -632,13 +646,17 @@
 
     // Populate Participants
     if (Array.isArray(req.participants) && req.participants.length > 0) {
-      selectedParticipants = req.participants.map((p, idx) => ({
-        _uid: p.ID || p.EmployeeID || p.EmployeeNo || `EXP-${idx}`,
-        ID: p.ID || p.EmployeeID || p.EmployeeNo || '',
-        Name: p.Name || p.EmployeeName || '',
-        Department: p.Department || p.CostCentre || '',
-        Position: p.Position || p.JobTitle || ''
-      }));
+      selectedParticipants = req.participants.map((p, idx) => {
+        const empId = String(p.EmployeeID || p.EmployeeNo || (p.ID && !String(p.ID).startsWith('TP-') ? p.ID : '') || '').trim();
+        const empName = String(p.EmployeeName || p.Name || '').trim();
+        return {
+          _uid: empId || `EXP-${idx}`,
+          ID: empId,
+          Name: empName,
+          Department: p.Department || p.CostCentre || '',
+          Position: p.Position || p.JobTitle || ''
+        };
+      });
     } else {
       selectedParticipants = [];
     }
@@ -656,11 +674,15 @@
     switchMainTab('form');
   }
 
-  function cancelEditResubmit() {
+  function cancelEditResubmit(shouldSwitchTab = true) {
     editingTrainingId = '';
     document.getElementById('editingTrainingId').value = '';
     document.getElementById('editResubmitBanner').style.display = 'none';
     document.getElementById('btnSubmitRequisition').innerHTML = '<span>📤</span> Submit Training Requisition for HOD Approval';
+    clearFormFields();
+    if (shouldSwitchTab) {
+      switchMainTab('history');
+    }
   }
 
 
@@ -749,7 +771,7 @@
         const reqId = (res.data && res.data.trainingId) ? res.data.trainingId : 'TRN-SUCCESS';
         document.getElementById('successRequestId').innerText = reqId;
 
-        cancelEditResubmit();
+        cancelEditResubmit(false);
         clearFormFields();
 
         document.getElementById('mainPortalScreen').style.display = 'none';
@@ -771,6 +793,7 @@
     document.getElementById('reqBrochureUrl').value = '';
     document.getElementById('reqTrainer').value = '';
     document.getElementById('reqProvider').value = '';
+    document.getElementById('reqCertExpiry').value = '';
     selectedCostCentres = [];
     renderCostCentreChips();
     selectedParticipants = [];

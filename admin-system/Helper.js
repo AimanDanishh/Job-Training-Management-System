@@ -27,9 +27,18 @@ function setConfigProperty(key, value) {
 }
 
 /**
- * Run initDefaultScriptProperties() once from Apps Script editor to auto-populate default Script Properties.
+ * Safely populates default Script Properties without overwriting existing configured properties.
+ * If overwriteExisting is true, non-empty default values will update existing keys, but empty defaults are never saved.
  */
-function initDefaultScriptProperties() {
+function initDefaultScriptProperties(overwriteExisting) {
+  const isOverwrite = overwriteExisting === true;
+  let existingProps = {};
+  try {
+    existingProps = PropertiesService.getScriptProperties().getProperties() || {};
+  } catch (e) {
+    Logger.log('Warning: Could not fetch existing script properties: ' + e.message);
+  }
+
   const defaults = {
     'SPREADSHEET_ID':          '',
     'EMPLOYEE_SPREADSHEET_ID': '',
@@ -41,26 +50,199 @@ function initDefaultScriptProperties() {
     'SHEET_EMPLOYEES':         'Employees',
     'SHEET_HR_EMAIL':          'HR email',
     'SHEET_TRAININGS':         'Trainings',
-    'SHEET_ATTENDANCE':        'Attendance',
-    'SHEET_TRAINING_EVAL':     'TrainingEval',
-    'SHEET_POST_EVAL':         'PostEval',
     'ROOT_FOLDER_ID':          '',
     'TEMPLATE_FOLDER_ID':      '',
     'ATTENDANCE_TEMPLATE_ID':  '',
     'EVALUATION_TEMPLATE_ID':  '',
     'CERTIFICATE_TEMPLATE_ID': '',
     'REPORT_TEMPLATE_ID':      '',
-    // Google Sheets master copy of AP-HRD-F01-01. Every new programme gets a populated copy.
     'TRAINING_REQUISITION_TEMPLATE_ID': '',
-    // Company logo Drive link or public image URL to embed in center of session QR codes
     'COMPANY_LOGO_URL':        '',
-    // Public Participant Portal Apps Script Web App Deployment URL
     'PUBLIC_PORTAL_URL':       '',
-    // Separate HOD Portal Web App Deployment URL
     'HOD_PORTAL_URL':          ''
   };
-  PropertiesService.getScriptProperties().setProperties(defaults, false);
-  Logger.log('Default Script Properties successfully initialized in Project Settings.');
+
+  const toUpdate = {};
+  for (const key in defaults) {
+    const existingVal = existingProps[key];
+    const defaultVal = defaults[key];
+
+    if (isOverwrite) {
+      if (defaultVal !== '') {
+        toUpdate[key] = defaultVal;
+      }
+    } else {
+      if ((existingVal === undefined || existingVal === null || String(existingVal).trim() === '') && defaultVal !== '') {
+        toUpdate[key] = defaultVal;
+      }
+    }
+  }
+
+  if (Object.keys(toUpdate).length > 0) {
+    PropertiesService.getScriptProperties().setProperties(toUpdate, false);
+    Logger.log('Safely updated missing Script Properties: ' + Object.keys(toUpdate).join(', '));
+  } else {
+    Logger.log('No Script Properties needed initialization. Existing settings preserved.');
+  }
+}
+
+/**
+ * Safely updates database-dependent configuration without modifying unrelated properties.
+ */
+function updateDatabaseConfiguration(spreadsheetId, employeeSpreadsheetId) {
+  if (!spreadsheetId || String(spreadsheetId).trim() === '') {
+    throw new Error('Spreadsheet ID is required.');
+  }
+  const cleanSsId = String(spreadsheetId).trim();
+  setConfigProperty('SPREADSHEET_ID', cleanSsId);
+
+  if (employeeSpreadsheetId && String(employeeSpreadsheetId).trim() !== '') {
+    setConfigProperty('EMPLOYEE_SPREADSHEET_ID', String(employeeSpreadsheetId).trim());
+  }
+
+  // Invalidate in-memory spreadsheet handle caches so newly configured IDs take effect immediately
+  _cachedSpreadsheet = null;
+  _cachedEmployeeSpreadsheet = null;
+
+  Logger.log('Database configuration safely updated. SPREADSHEET_ID: ' + cleanSsId);
+  return true;
+}
+
+/**
+ * Diagnostic utility to return status of all system properties without revealing secrets.
+ */
+function getSystemConfigurationDiagnostics() {
+  let props = {};
+  try {
+    props = PropertiesService.getScriptProperties().getProperties() || {};
+  } catch (e) {}
+
+  const keys = [
+    'SPREADSHEET_ID',
+    'EMPLOYEE_SPREADSHEET_ID',
+    'ALLOWED_DOMAIN',
+    'ADMIN_EMAILS',
+    'APP_TITLE',
+    'SHEET_EMPLOYEES',
+    'SHEET_HR_EMAIL',
+    'SHEET_TRAININGS',
+    'COMPANY_LOGO_URL',
+    'PUBLIC_PORTAL_URL',
+    'HOD_PORTAL_URL'
+  ];
+
+  const result = {};
+  keys.forEach(k => {
+    const val = props[k];
+    result[k] = (val !== undefined && val !== null && String(val).trim() !== '') ? '✓ Configured' : 'Not configured';
+  });
+  return result;
+}
+
+/**
+ * Database setup and initialization function.
+ * Connects to a new/existing database, validates the Spreadsheet ID, creates missing standard sheets,
+ * updates database settings, and preserves all unrelated configuration.
+ */
+function setupDatabase(spreadsheetId, employeeSpreadsheetId) {
+  if (!spreadsheetId || String(spreadsheetId).trim() === '') {
+    return {
+      success: false,
+      message: 'Spreadsheet ID is required for Database Setup.'
+    };
+  }
+
+  const cleanSsId = String(spreadsheetId).trim();
+  const cleanEmpSsId = employeeSpreadsheetId ? String(employeeSpreadsheetId).trim() : cleanSsId;
+
+  try {
+    // 1. Connect and validate main Spreadsheet
+    const ss = SpreadsheetApp.openById(cleanSsId);
+    if (!ss) {
+      return { success: false, message: 'Failed to access Google Spreadsheet with ID: ' + cleanSsId };
+    }
+
+    // 2. Connect optional separate Employee Spreadsheet
+    let empSS = ss;
+    if (cleanEmpSsId && cleanEmpSsId !== cleanSsId) {
+      try {
+        empSS = SpreadsheetApp.openById(cleanEmpSsId);
+      } catch (e) {
+        return { success: false, message: 'Failed to access separate Employee Spreadsheet with ID: ' + cleanEmpSsId };
+      }
+    }
+
+    // 3. Main Database contains ONLY 'Trainings' tab
+    const mainSheets = [
+      {
+        name: getConfigProperty('SHEET_TRAININGS', 'Trainings'),
+        targetSS: ss,
+        headers: ['ID', 'Code', 'Name', 'Type', 'Organizer', 'StartDate', 'EndDate', 'Location', 'Status', 'ApprovalStatus', 'FolderID', 'ParticipantsSheetID', 'SessionsSheetID', 'AttendanceSheetID', 'EvaluationSheetID', 'PostSheetID', 'RequisitionFormFileID']
+      }
+    ];
+
+    const sheetStatuses = [];
+    mainSheets.forEach(def => {
+      let sheet = def.targetSS.getSheetByName(def.name);
+      if (!sheet) {
+        sheet = def.targetSS.insertSheet(def.name);
+        if (def.headers && def.headers.length > 0) {
+          sheet.getRange(1, 1, 1, def.headers.length).setValues([def.headers]).setFontWeight('bold');
+        }
+        sheetStatuses.push({ name: def.name, status: 'Created', connected: true });
+      } else {
+        sheetStatuses.push({ name: def.name, status: 'Connected', connected: true });
+      }
+    });
+
+    // 4. Employee Spreadsheet READ-ONLY Connection Check (never modify or insert sheets)
+    if (empSS) {
+      ['For IT', 'HOD email', 'Csuite email', 'HOHR email', 'HR email', 'Cost Centre'].forEach(tabName => {
+        const foundTab = empSS.getSheetByName(tabName);
+        sheetStatuses.push({
+          name: tabName,
+          status: foundTab ? 'Connected (Read-Only)' : 'Not found (Optional)',
+          connected: !!foundTab
+        });
+      });
+    }
+
+    // 5. Note per-training Drive Sheets
+    sheetStatuses.push({
+      name: 'Individual Training Data (${code} Training Data)',
+      status: 'Managed in Drive per training (Attendance & Evals)',
+      connected: true
+    });
+
+    // 4. Update ONLY database properties without wiping unrelated configuration
+    updateDatabaseConfiguration(cleanSsId, cleanEmpSsId);
+
+    // 5. Initialize defaults safely (filling missing keys only)
+    initDefaultScriptProperties(false);
+
+    // 6. Validate configuration
+    const validation = (typeof validateSystemConfiguration === 'function') ? validateSystemConfiguration() : null;
+
+    return {
+      success: true,
+      message: 'Database setup completed successfully.',
+      summary: {
+        databaseConnected: true,
+        databaseId: cleanSsId,
+        databaseName: ss.getName(),
+        sheets: sheetStatuses,
+        configSaved: true,
+        unrelatedConfigPreserved: true,
+        validation: validation
+      }
+    };
+  } catch (e) {
+    Logger.log('setupDatabase error: ' + e.message);
+    return {
+      success: false,
+      message: 'Database Setup failed: ' + e.message
+    };
+  }
 }
 
 function getSpreadsheetId() {
@@ -71,14 +253,30 @@ function getEmployeeSpreadsheetId() {
   return getConfigProperty('EMPLOYEE_SPREADSHEET_ID', getSpreadsheetId());
 }
 
+const DEFAULT_APOLLO_LOGO_URL = 'https://www.apollofood.com.my/wp-content/uploads/2021/04/apollo-logo.png';
+
 function getCompanyLogoUrl() {
-  return getConfigProperty('COMPANY_LOGO_URL', '');
+  const url = getConfigProperty('COMPANY_LOGO_URL', '');
+  if (url && String(url).trim() !== '') return String(url).trim();
+  return DEFAULT_APOLLO_LOGO_URL;
 }
 
 function setCompanyLogoUrl(url) {
   setConfigProperty('COMPANY_LOGO_URL', url);
   Logger.log('COMPANY_LOGO_URL updated in Project Settings: ' + url);
   return 'COMPANY_LOGO_URL set to: ' + url;
+}
+
+function isSameEmployeeId(id1, id2) {
+  if (id1 === null || id1 === undefined || id2 === null || id2 === undefined) return false;
+  const s1 = String(id1).trim().toLowerCase();
+  const s2 = String(id2).trim().toLowerCase();
+  if (s1 === s2) return true;
+  const z1 = s1.replace(/^0+/, '');
+  const z2 = s2.replace(/^0+/, '');
+  if (z1 !== '' && z1 === z2) return true;
+  if (s1.replace(/0/g, '') === '' && s2.replace(/0/g, '') === '') return true;
+  return false;
 }
 
 function getPublicPortalUrl() {
@@ -169,15 +367,19 @@ function getEmployeeSpreadsheet() {
 }
 
 function getSheet(name) {
+  const cleanNameLower = String(name || '').toLowerCase().trim();
   const isEmployeeSpreadsheetSheet = (
-    name === SHEET_NAMES.employees ||
-    name === SHEET_NAMES.hrEmail ||
-    name === 'HR email' ||
-    name === 'HR Email' ||
-    name === 'HOD email' ||
-    name === 'HOD Email' ||
-    name === 'For IT'
+    cleanNameLower === 'employees' ||
+    cleanNameLower === 'for it' ||
+    cleanNameLower === 'hr email' ||
+    cleanNameLower === 'hod email' ||
+    cleanNameLower === 'csuite email' ||
+    cleanNameLower === 'c-suite email' ||
+    cleanNameLower === 'hohr email' ||
+    cleanNameLower === 'cost centre' ||
+    cleanNameLower === 'costcentre'
   );
+
   const ss = isEmployeeSpreadsheetSheet ? getEmployeeSpreadsheet() : getSpreadsheet();
   if (!ss) return null;
   let sheet = ss.getSheetByName(name);
@@ -192,8 +394,11 @@ function getSheet(name) {
     });
 
     if (!sheet) {
-      if (name === SHEET_NAMES.employees && ss !== getSpreadsheet() && allSheets.length > 0) {
-        sheet = allSheets[0];
+      if (isEmployeeSpreadsheetSheet) {
+        // Employee spreadsheet is READ-ONLY — do not modify or insert sheets
+        if (allSheets.length > 0) {
+          sheet = allSheets.find(s => s.getName().toLowerCase().includes('for it') || s.getName().toLowerCase().includes('employee')) || allSheets[0];
+        }
       } else {
         sheet = ss.insertSheet(name);
         initSheetHeaders(sheet, name);
@@ -241,7 +446,7 @@ function initSheetHeaders(sheet, name) {
     PostEval:         ['ID', 'TrainingID', 'EmployeeID', 'EvaluatorName', 'EvaluatorID',
                        'CompetencyBefore', 'CompetencyAfter', 'Improvement', 'CanApply',
                        'FurtherTraining', 'Comments', 'SubmittedAt'],
-    TrainingParticipants: ['ID', 'TrainingID', 'EmployeeID', 'EmployeeName', 'Department', 'Position', 'AddedAt']
+    TrainingParticipants: ['ID', 'TrainingID', 'EmployeeID', 'EmployeeName', 'Department', 'Position', 'AddedAt', 'SupervisorID', 'SupervisorEmail', 'SupervisorName']
   };
 
   const headerKey = Object.keys(headers).find(k => k === name || getConfigProperty('SHEET_' + k.toUpperCase(), k) === name);
@@ -379,7 +584,9 @@ function ensureTrainingSheetColumns(sheet) {
     'FolderID', 'ParticipantsSheetID', 'SessionsSheetID', 'AttendanceSheetID',
     'EvaluationSheetID', 'PostSheetID', 'RequisitionFormFileID',
     'CreatedDate', 'UpdatedDate', 'CourseFee',
-    'ApprovalStatus', 'RequestedBy', 'RequestedByName', 'RequestedByEmail', 'RequestedDate', 'ApprovedBy', 'ApprovedCostCentre', 'ApprovedAt', 'ApprovalRemarks', 'RescheduledDate', 'BrochureURL'
+    'ApprovalStatus', 'RequestedBy', 'RequestedByName', 'RequestedByEmail', 'RequestedDate', 'ApprovedBy', 'ApprovedCostCentre', 'ApprovedAt', 'ApprovalRemarks', 'RescheduledDate', 'BrochureURL',
+    'TrainingProvider', 'ExpiryDate', 'CertExpiryDate',
+    'HOD', 'Csuite', 'HOHR', 'HODStatus', 'CsuiteStatus', 'HOHRStatus'
   ];
   const lastCol = Math.max(sheet.getLastColumn(), 1);
   const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h).trim());
@@ -639,38 +846,6 @@ function getFormattedCurrentDate(date) {
   return Utilities.formatDate(d, Session.getScriptTimeZone(), 'dd/MM/yyyy');
 }
 
-/**
- * Reusable employee lookup function by Employee No / ID.
- * Searches the existing Employees sheet in EMPLOYEE_SPREADSHEET_ID.
- * Matches Employee No exactly (case-insensitive, trimmed).
- * Returns employee details object or null if not found.
- */
-function getEmployeeById(employeeNo) {
-  if (!employeeNo || String(employeeNo).trim() === '') return null;
-  const cleanId = String(employeeNo).trim().toLowerCase();
-
-  const empSheet = getSheet(SHEET_NAMES.employees);
-  if (!empSheet) return null;
-
-  const rows = sheetToJson(empSheet);
-  const emp = rows.find(r => {
-    const idVal = String(
-      r.ID || r.EmployeeID || r.EmployeeNo || r.EmpID || r.StaffID || 
-      r['Employee ID'] || r['Employee No'] || r['Staff ID'] || ''
-    ).trim().toLowerCase();
-    return idVal === cleanId;
-  });
-
-  if (!emp) return null;
-
-  return {
-    ID: String(emp.ID || emp.EmployeeID || emp.EmployeeNo || String(employeeNo).trim()).trim(),
-    Name: String(emp.Name || emp.EmployeeName || emp['Employee Name'] || emp['Staff Name'] || '').trim(),
-    Department: String(emp.Department || emp.CostCentre || emp['Cost Centre'] || 'N/A').trim(),
-    Position: String(emp.Position || emp.JobTitle || emp.PositionTitle || emp['Position Title'] || emp['Job Title'] || 'Staff').trim(),
-    Email: String(emp.Email || emp['Email Address'] || '').trim()
-  };
-}
 
 function now() {
   return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm');

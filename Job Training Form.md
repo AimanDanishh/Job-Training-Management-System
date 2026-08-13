@@ -410,10 +410,10 @@ No | Training Title | Training Category | TNA Source | Training Mode | Training 
 2. overall UI enhancement
 3. Admin login (no option to change email)
 4. HOD portal (remove profile switcher), lock status after submit
-5. Participant UI: employee ID only
-6. Only allow view \& fill attendance and evaluation, after training got full approval only
+5. ~~Participant UI: employee ID only~~
+6. ~~Only allow view \& fill attendance and evaluation, after training got full approval only~~
 7. Goldenscoop access to all website
-8. Auto update sheets when employee request training
+8. ~~Auto update sheets when employee request training~~
 
 
 
@@ -421,7 +421,7 @@ No | Training Title | Training Category | TNA Source | Training Mode | Training 
 
 1. TNA Source: Training Requisition Form
 
-2\. Training Mode: In-house or Public 
+2\. Training Mode: In-house or Public
 
 3\. Position: Name list (hyperlink to list of participant in another sheets just for training participant for the specific training)
 
@@ -435,4 +435,42 @@ No | Training Title | Training Category | TNA Source | Training Mode | Training 
 TNA Source: "Training Requisition Form" and "Training Procedure"
 
 Training Type: add "On-Job Training"
+
+**Training Request Form (edit):**
+1. missing department/ cost centre when select multiple (not saved/shown all)
+
+2\. missing training provider 
+
+3\. missing cert expiry date
+4. missing participants list
+
+
+
+**Admin:**
+1. Returned is count as fully approve in admin dashboard
+
+2\. Training Programmes detail is not detailed enough
+
+3\. QR attendance does not have Apollo logo in the middle
+
+4\. All date and time should remove timezone, keep it simple
+
+
+
+**Attendance:**
+
+1. Date and time is incorrect, too messy
+2. Just Date and time (no time zone)
+3. Enter employee ID should display name first then can click continue
+4. When click continue, it says check in rejected eventhough the employee already in the participant list
+5. Employee ID example should be "00000"
+
+
+
+**Post evaluation:**
+1. Admin assign/select employee for post evaluation to supervisor or person in charge
+
+2\. System check supervisor email or employee ID
+
+3\. System display pending evaluation (list of employee to be evaluate under the supervisor, separate by training)
 

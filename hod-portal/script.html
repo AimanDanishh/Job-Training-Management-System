@@ -8,7 +8,10 @@
       overlay.innerHTML = '<div class="spinner"></div><div id="loadingMsg" style="font-weight:600;color:#fff;">Processing...</div>';
       document.body.appendChild(overlay);
     }
-    document.getElementById('loadingMsg').innerText = msg || 'Processing...';
+    const msgEl = document.getElementById('loadingMsg') || document.getElementById('loadingText');
+    if (msgEl) {
+      msgEl.innerText = msg || 'Processing...';
+    }
     overlay.style.display = 'flex';
   }
 

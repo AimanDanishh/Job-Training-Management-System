@@ -60,14 +60,19 @@ function getDashboardReport() {
     let pendingHohrCount = 0;
     let approvedCount = 0;
     let rejectedCount = 0;
+    let returnedCount = 0;
 
     tRows.forEach(r => {
       const appStatus = String(r.ApprovalStatus || '').trim();
+      const appStatusLower = appStatus.toLowerCase();
       if (appStatus === 'Pending HOD Approval') pendingHodCount++;
       else if (appStatus === 'Pending C-Suite Approval') pendingCsuiteCount++;
       else if (appStatus === 'Pending HOHR Approval') pendingHohrCount++;
-      else if (appStatus === 'Rejected') rejectedCount++;
-      else approvedCount++; // 'Approved', 'Auto-Approved', or default
+      else if (appStatus === 'Rejected' || appStatusLower.includes('reject')) rejectedCount++;
+      else if (appStatusLower.includes('return')) returnedCount++;
+      else if (appStatusLower === 'approved' || appStatusLower === 'auto-approved' || appStatusLower === 'fully approved' || (!appStatus && String(r.Status || '').toLowerCase().includes('approved'))) {
+        approvedCount++;
+      }
     });
 
     const approvalSummary = {
@@ -76,6 +81,7 @@ function getDashboardReport() {
       pendingHohr:   pendingHohrCount,
       approved:      approvedCount,
       rejected:      rejectedCount,
+      returned:      returnedCount,
       total:         tRows.length
     };
 
@@ -192,14 +198,6 @@ function cleanNum(val, fallback) {
   return isNaN(parsed) ? fallback : parsed;
 }
 
-// ─── Real Data Helper (Returns empty arrays when sheet rows are absent) ─────────
-function getFallbackTrainingsList() {
-  return [];
-}
-
-function getFallbackEmployeesList() {
-  return [];
-}
 
 // ─── 1. Training Hours Report Data Builder (Cost Centre vs Month) ─────────────
 function buildHoursReportData(trainingsInput, employeesInput, year, selectedDept) {
@@ -549,6 +547,7 @@ function getCanonicalTrainingStatus(t) {
   if (typeof t === 'string') {
     const s = t.toLowerCase();
     if (s.includes('reject')) return 'Rejected';
+    if (s.includes('return')) return 'Returned';
     if (s.includes('pending') || s.includes('review') || s.includes('draft') || s.includes('plan')) return 'Pending Approval';
     if (s.includes('completed') || s.includes('complete') || s.includes('closed')) return 'Completed';
     if (s.includes('progress') || s.includes('ongoing') || s.includes('going') || s.includes('active') || s.includes('attendance')) return 'Ongoing';
@@ -563,6 +562,11 @@ function getCanonicalTrainingStatus(t) {
   // 1. Rejected
   if (appStatus.includes('reject') || statusStr.includes('reject')) {
     return 'Rejected';
+  }
+
+  // 1b. Returned
+  if (appStatus.includes('return') || statusStr.includes('return') || stageStr.includes('return')) {
+    return 'Returned';
   }
 
   // 2. Pending Approval
@@ -779,64 +783,6 @@ function exportFilteredReportExcel(reportType, filters) {
  * 4. Employee Report
  * 5. Annual Training Plan (ATP)
  */
-function exportAllInOneMasterReportExcel(filters) {
-  try {
-    const year = (filters && filters.year) ? filters.year : '2026';
-    const timestamp = Date.now();
-    const fileName = `Master_Annual_Training_Report_${year}_${timestamp}`;
-
-    const repFolder = getOrCreateReportsFolder();
-    const ss = SpreadsheetApp.create(fileName);
-    const file = DriveApp.getFileById(ss.getId());
-    repFolder.addFile(file);
-    try { DriveApp.getRootFolder().removeFile(file); } catch (e) {}
-
-    // Tab 1: Training Hours
-    const sHours = ss.getActiveSheet();
-    sHours.setName('Training Hours');
-    const hoursRes = parseServerRes(getFilteredReportData('hours', filters));
-    if (hoursRes.success && hoursRes.data) formatHoursReportSheet(sHours, hoursRes.data, year);
-
-    // Tab 2: Training Cost
-    const sCost = ss.insertSheet('Training Cost');
-    const costRes = parseServerRes(getFilteredReportData('cost', filters));
-    if (costRes.success && costRes.data) formatCostReportSheet(sCost, costRes.data, year);
-
-    // Tab 3: Training Title
-    const sTitle = ss.insertSheet('Training Title');
-    const titleRes = parseServerRes(getFilteredReportData('title', filters));
-    if (titleRes.success && titleRes.data) formatTitleReportSheet(sTitle, titleRes.data);
-
-    // Tab 4: Employee Report
-    const sEmp = ss.insertSheet('Employee Report');
-    const empRes = parseServerRes(getFilteredReportData('employee', filters));
-    if (empRes.success && empRes.data) formatEmployeeReportSheet(sEmp, empRes.data);
-
-    // Tab 5: Annual Training Plan (ATP)
-    const sAtp = ss.insertSheet('Annual Training Plan (ATP)');
-    const atpRes = parseServerRes(getFilteredReportData('atp', filters));
-    if (atpRes.success && atpRes.data) formatAtpReportSheet(sAtp, atpRes.data);
-
-    SpreadsheetApp.flush();
-
-    const fileId = ss.getId();
-    const sheetUrl = ss.getUrl();
-    const downloadUrl = `https://docs.google.com/spreadsheets/d/${fileId}/export?format=xlsx`;
-
-    return ok({
-      fileId: fileId,
-      fileName: `${fileName}.xlsx`,
-      sheetUrl: sheetUrl,
-      downloadUrl: downloadUrl,
-      folderId: repFolder.getId(),
-      folderName: repFolder.getName(),
-      folderUrl: repFolder.getUrl(),
-      message: `Master All-in-One Report Workbook created and saved in Google Drive "Reports" folder!`
-    });
-  } catch (e) {
-    return err('Failed to export Master Report Workbook: ' + e.message);
-  }
-}
 
 // ─── Non-Destructive Report Synchronization & Admin Edit Protection Engine ──────
 
@@ -2221,154 +2167,6 @@ function exportReportExcel(trainingId) {
   }
 }
 
-// ─── Export Full Report to PDF (.pdf) ──────────────────────────────────────────
-function exportReportPdf(trainingId) {
-  try {
-    const reportRes = JSON.parse(generateReport(trainingId));
-    if (!reportRes.success) return err(reportRes.message);
-    const rep = reportRes.data;
-    const t = rep.training;
-
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <style>
-          body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #1E293B; margin: 20px; line-height: 1.5; font-size: 12px; }
-          .header { border-bottom: 2px solid #2563EB; padding-bottom: 12px; margin-bottom: 20px; }
-          .title { font-size: 20px; font-weight: bold; color: #1E293B; margin: 0 0 4px; }
-          .subtitle { font-size: 12px; color: #64748B; margin: 0; }
-          .section { margin-bottom: 20px; }
-          .section-title { font-size: 14px; font-weight: bold; color: #2563EB; border-bottom: 1px solid #E2E8F0; padding-bottom: 4px; margin-bottom: 10px; }
-          .grid { display: table; width: 100%; margin-bottom: 10px; }
-          .row { display: table-row; }
-          .cell { display: table-cell; padding: 4px 8px; font-size: 11px; }
-          .cell-label { font-weight: bold; color: #64748B; width: 30%; }
-          .kpi-container { width: 100%; margin-bottom: 15px; }
-          .kpi-card { display: inline-block; width: 18%; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 8px; text-align: center; margin-right: 1.5%; box-sizing: border-box; }
-          .kpi-value { font-size: 16px; font-weight: bold; color: #2563EB; }
-          .kpi-label { font-size: 9px; color: #64748B; margin-top: 2px; }
-          table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 10px; }
-          th { background: #2563EB; color: white; padding: 6px; text-align: left; font-size: 10px; }
-          td { border-bottom: 1px solid #E2E8F0; padding: 6px; text-align: left; }
-          tr:nth-child(even) { background: #F8FAFC; }
-          .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: bold; background: #EFF6FF; color: #2563EB; }
-          .footer { margin-top: 30px; font-size: 9px; color: #94A3B8; border-top: 1px solid #E2E8F0; padding-top: 8px; text-align: right; }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <div class="subtitle">JOB TRAINING MANAGEMENT SYSTEM</div>
-          <div class="title">${t.Name} [${t.Code}]</div>
-          <div class="subtitle">Generated on ${rep.generatedAt}</div>
-        </div>
-
-        <div class="section">
-          <div class="section-title">Programme Overview</div>
-          <div class="grid">
-            <div class="row"><div class="cell cell-label">Category:</div><div class="cell">${t.Category}</div><div class="cell cell-label">Trainer:</div><div class="cell">${t.Trainer}</div></div>
-            <div class="row"><div class="cell cell-label">Start Date:</div><div class="cell">${t.StartDate}</div><div class="cell cell-label">End Date:</div><div class="cell">${t.EndDate || '—'}</div></div>
-            <div class="row"><div class="cell cell-label">Duration:</div><div class="cell">${t.Duration} Day(s) (${t.TotalHours || 8} Hours)</div><div class="cell cell-label">Venue:</div><div class="cell">${t.Venue || '—'}</div></div>
-            <div class="row"><div class="cell cell-label">Department:</div><div class="cell">${t.Department || 'All'}</div><div class="cell cell-label">Status / Stage:</div><div class="cell"><span class="badge">${t.Status}</span> (${t.Stage || 'Created'})</div></div>
-            <div class="row"><div class="cell cell-label">Course Fee:</div><div class="cell">RM ${t.CourseFee || '0.00'}</div><div class="cell cell-label">Enrolled Pax:</div><div class="cell">${t.Participants || 0}</div></div>
-          </div>
-          ${t.Objectives ? `<div style="margin-top:6px;font-size:11px"><strong>Objectives:</strong> ${t.Objectives}</div>` : ''}
-        </div>
-
-        <div class="section">
-          <div class="section-title">Key Performance Indicators</div>
-          <div class="kpi-container">
-            <div class="kpi-card"><div class="kpi-value">${rep.attendance.summary.pct || 0}%</div><div class="kpi-label">Attendance Rate</div></div>
-            <div class="kpi-card"><div class="kpi-value">${rep.attendance.summary.present || 0}</div><div class="kpi-label">Present Count</div></div>
-            <div class="kpi-card"><div class="kpi-value">${rep.attendance.summary.absent || 0}</div><div class="kpi-label">Absent Count</div></div>
-            <div class="kpi-card"><div class="kpi-value">${rep.evaluation.summary.evalCompleted || 0}</div><div class="kpi-label">Evaluations Done</div></div>
-            <div class="kpi-card"><div class="kpi-value">${rep.evaluation.summary.avgScore || 'N/A'}</div><div class="kpi-label">Avg Eval Score</div></div>
-          </div>
-        </div>
-
-        <div class="section">
-          <div class="section-title">Attendance Summary by Day</div>
-          <table>
-            <thead>
-              <tr><th>Day</th><th>Date</th><th>Total Records</th><th>Present</th><th>Absent</th><th>Late</th><th>Rate (%)</th></tr>
-            </thead>
-            <tbody>
-              ${(rep.attendance.days || []).map(d => {
-                const recs = d.records || [];
-                const pres = recs.filter(r => r.Status === 'Present').length;
-                const abs  = recs.filter(r => r.Status === 'Absent').length;
-                const late = recs.filter(r => r.Status === 'Late').length;
-                const rate = recs.length ? Math.round(pres / recs.length * 100) : 0;
-                return `<tr>
-                  <td>Day ${d.day}</td>
-                  <td>${d.date}</td>
-                  <td>${recs.length}</td>
-                  <td style="color:#16A34A;font-weight:bold">${pres}</td>
-                  <td style="color:#DC2626;font-weight:bold">${abs}</td>
-                  <td style="color:#D97706">${late}</td>
-                  <td><strong>${rate}%</strong></td>
-                </tr>`;
-              }).join('') || '<tr><td colspan="7">No attendance records registered.</td></tr>'}
-            </tbody>
-          </table>
-        </div>
-
-        <div class="section">
-          <div class="section-title">Evaluation & Post-Training Overview</div>
-          <div class="grid">
-            <div class="row">
-              <div class="cell cell-label">Evaluations Submitted:</div>
-              <div class="cell">${rep.evaluation.summary.evalCompleted || 0} participant(s)</div>
-              <div class="cell cell-label">Average Score:</div>
-              <div class="cell"><strong>${rep.evaluation.summary.avgScore || 'N/A'} / 5.0</strong></div>
-            </div>
-            <div class="row">
-              <div class="cell cell-label">3-Month Post Evaluations:</div>
-              <div class="cell">${rep.evaluation.summary.postCompleted || 0} completed</div>
-              <div class="cell cell-label">Workspace Folder ID:</div>
-              <div class="cell">${t.FolderID || 'N/A'}</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="footer">
-          TrainHub Job Training Management System &bull; Official Programme Summary PDF
-        </div>
-      </body>
-      </html>
-    `;
-
-    const blob = HtmlService.createHtmlOutput(htmlContent).getAs('application/pdf');
-    blob.setName(`${t.Code}_Training_Report.pdf`);
-
-    let pdfUrl = '';
-    let fileId = '';
-    if (t.FolderID) {
-      try {
-        const folder = DriveApp.getFolderById(t.FolderID);
-        const pdfFile = folder.createFile(blob);
-        pdfUrl = pdfFile.getUrl();
-        fileId = pdfFile.getId();
-      } catch (e) {
-        Logger.log('Could not save PDF to training folder: ' + e.message);
-      }
-    }
-
-    const base64Data = Utilities.base64Encode(blob.getBytes());
-    const dataUri = 'data:application/pdf;base64,' + base64Data;
-
-    return ok({
-      fileId: fileId,
-      fileName: `${t.Code}_Training_Report.pdf`,
-      pdfUrl: pdfUrl,
-      dataUri: dataUri,
-      message: 'PDF report generated successfully.'
-    });
-  } catch (e) {
-    return err('Failed to export PDF report: ' + e.message);
-  }
-}
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────
 function buildMonthlyData(rows) {

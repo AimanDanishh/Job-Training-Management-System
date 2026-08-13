@@ -189,6 +189,98 @@ function getEvaluationSummary(trainingId) {
   }
 }
 
+/**
+ * API: Admin assign a Supervisor or Person in Charge for an employee's post evaluation.
+ * Validates supervisor Email or Employee ID against the Employees sheet database.
+ * 
+ * @param {string} trainingId - Unique training programme ID
+ * @param {string} employeeId - Participant employee ID
+ * @param {string} supervisorInput - Supervisor Email or Employee ID
+ */
+function assignPostEvalSupervisor(trainingId, employeeId, supervisorInput) {
+  try {
+    if (!trainingId || !employeeId || !supervisorInput) {
+      return err('Training ID, Employee ID, and Supervisor Email/ID are required.');
+    }
+
+    const cleanTId = String(trainingId).trim();
+    const cleanEmpId = String(employeeId).trim();
+    const cleanSupInput = String(supervisorInput).trim().toLowerCase();
+
+    // 1. System check supervisor email or employee ID
+    let supervisor = null;
+    const empSheet = getSheet(SHEET_NAMES.employees);
+    if (empSheet) {
+      const employees = sheetToJson(empSheet);
+      supervisor = employees.find(e => 
+        isSameEmployeeId(e.ID || e.EmployeeID || e.EmployeeNo || '', cleanSupInput) ||
+        String(e.Email || '').trim().toLowerCase() === cleanSupInput
+      );
+    }
+
+    // Fallback lookup if not found in Employees sheet
+    if (!supervisor) {
+      if (cleanSupInput.includes('@')) {
+        supervisor = {
+          ID: cleanSupInput.split('@')[0],
+          Name: cleanSupInput.split('@')[0],
+          Email: cleanSupInput
+        };
+      } else {
+        return err(`Supervisor with Email or Employee ID '${supervisorInput}' was not found in employee records.`);
+      }
+    }
+
+    // 2. Open per-training spreadsheet and update TrainingParticipants
+    const ss = getTrainingDataSpreadsheet(cleanTId);
+    if (!ss) return err('Could not open training database.');
+
+    let tpSheet = ss.getSheetByName('TrainingParticipants');
+    if (!tpSheet) return err('TrainingParticipants sheet not found for this training.');
+
+    ensureTrainingParticipantsColumns(tpSheet);
+    const tpRows = sheetToJson(tpSheet);
+    const headerRow = tpSheet.getRange(1, 1, 1, tpSheet.getLastColumn()).getValues()[0];
+    
+    const findColIdx = (colName) => headerRow.findIndex(h => String(h || '').trim().toLowerCase() === colName.toLowerCase());
+    const supIdIdx = findColIdx('SupervisorID');
+    const supEmailIdx = findColIdx('SupervisorEmail');
+    const supNameIdx = findColIdx('SupervisorName');
+
+    const targetRowIndex = tpRows.findIndex(r => isSameEmployeeId(r.EmployeeID || r.EmployeeNo || r.ID || '', cleanEmpId));
+    if (targetRowIndex === -1) {
+      return err(`Employee (${cleanEmpId}) is not enrolled in this training programme.`);
+    }
+
+    const rowNum = targetRowIndex + 2;
+    if (supIdIdx !== -1) tpSheet.getRange(rowNum, supIdIdx + 1).setValue(supervisor.ID || supervisor.EmployeeID || '');
+    if (supEmailIdx !== -1) tpSheet.getRange(rowNum, supEmailIdx + 1).setValue(supervisor.Email || '');
+    if (supNameIdx !== -1) tpSheet.getRange(rowNum, supNameIdx + 1).setValue(supervisor.Name || supervisor.EmployeeName || '');
+
+    return ok({
+      message: `Supervisor ${supervisor.Name || supervisor.Email} successfully assigned to ${cleanEmpId} for post evaluation.`,
+      supervisor: supervisor
+    });
+
+  } catch (e) {
+    Logger.log('assignPostEvalSupervisor error: ' + e.message);
+    return err('Failed to assign supervisor: ' + e.message);
+  }
+}
+
+function ensureTrainingParticipantsColumns(sheet) {
+  if (!sheet) return;
+  const headers = sheet.getRange(1, 1, 1, Math.max(1, sheet.getLastColumn())).getValues()[0];
+  const required = ['SupervisorID', 'SupervisorEmail', 'SupervisorName'];
+  required.forEach(req => {
+    const exists = headers.some(h => String(h || '').trim().toLowerCase() === req.toLowerCase());
+    if (!exists) {
+      const nextCol = sheet.getLastColumn() + 1;
+      sheet.getRange(1, nextCol).setValue(req).setFontWeight('bold');
+    }
+  });
+}
+
 // ─── Internal: auto-advance stage ──────────────────────────────────────────────
 function tryAdvanceToEvaluationCompleted(trainingId) {
   try {

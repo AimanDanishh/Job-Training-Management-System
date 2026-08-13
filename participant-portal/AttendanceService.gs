@@ -18,13 +18,27 @@ function getSessionInfo(sessionId) {
     const session  = found.session;
     const training = found.training;
 
+    const formatTimeClean = (val, defaultVal) => {
+      if (!val) return defaultVal;
+      const str = String(val).replace(/GMT.*$/, '').replace(/\(.*\)$/, '').trim();
+      const simpleMatch = str.match(/^(\d{1,2}:\d{2})/);
+      if (simpleMatch && !str.includes('1899') && !str.includes('Singapore') && !str.includes('Standard')) return simpleMatch[1];
+      const d = new Date(str);
+      if (!isNaN(d.getTime())) {
+        return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+      }
+      const match = str.match(/(\d{2}:\d{2})/);
+      if (match) return match[1];
+      return defaultVal;
+    };
+
     return ok({
       SessionID:     session.SessionID,
       TrainingID:    session.TrainingID,
       SessionName:   session.SessionName || 'Session Check-In',
       SessionDate:   session.SessionDate || '—',
-      StartTime:     session.StartTime || '09:00',
-      EndTime:       session.EndTime || '17:00',
+      StartTime:     formatTimeClean(session.StartTime, '09:00'),
+      EndTime:       formatTimeClean(session.EndTime, '17:00'),
       QRStatus:      session.QRStatus || 'Active',
       TrainingTitle: training ? (training.Name || training.TrainingTitle || 'Training Programme') : 'Training Programme',
       TrainingCode:  training ? (training.Code || '') : ''
@@ -132,9 +146,3 @@ function submitAttendance(arg1, arg2, arg3, arg4) {
   }
 }
 
-/**
- * Real-time employee lookup for attendance check-in
- */
-function lookupEmployeeInfo(employeeNo) {
-  return getEmployeeDetails(employeeNo);
-}

@@ -6,28 +6,21 @@
 const SUBFOLDER_NAMES = [];
 
 /**
- * Gets or creates the root directory for training workspaces.
- * Uses ROOT_FOLDER_ID from Script Properties, or defaults to "Job Training System/Training" in Google Drive.
+ * Gets or creates the Training directory under the configured ROOT_FOLDER_ID.
+ *
+ * ROOT_FOLDER_ID is always the system root.  Training workspaces are always
+ * stored in ROOT_FOLDER_ID/Training/<training code + name>; never in My Drive
+ * or directly in the system root.
  */
 function getOrCreateRootFolder() {
-  const rootFolderId = getConfigProperty('TRAINING_FOLDER_ID', '') || getConfigProperty('ROOT_FOLDER_ID', '') || getConfigProperty('DRIVE_ROOT_FOLDER_ID', '');
-
-  if (rootFolderId) {
-    try {
-      return DriveApp.getFolderById(rootFolderId);
-    } catch (e) {
-      Logger.log('Could not open configured folder (' + rootFolderId + '): ' + e.message);
-    }
+  const rootFolderId = getConfigProperty('ROOT_FOLDER_ID', '');
+  if (!rootFolderId) {
+    throw new Error('ROOT_FOLDER_ID is required. Configure the system root folder before creating a training.');
   }
 
-  // Fallback: Create or retrieve "Job Training System/Training" hierarchy in Google Drive
-  let sysFolderIter = DriveApp.getRootFolder().getFoldersByName('Job Training System');
-  let sysFolder = sysFolderIter.hasNext() ? sysFolderIter.next() : DriveApp.createFolder('Job Training System');
-
-  let trainFolderIter = sysFolder.getFoldersByName('Training');
-  let trainFolder = trainFolderIter.hasNext() ? trainFolderIter.next() : sysFolder.createFolder('Training');
-
-  return trainFolder;
+  const systemRoot = DriveApp.getFolderById(rootFolderId);
+  const trainingFolders = systemRoot.getFoldersByName('Training');
+  return trainingFolders.hasNext() ? trainingFolders.next() : systemRoot.createFolder('Training');
 }
 
 /**
@@ -123,6 +116,52 @@ function createTrainingWorkspace(code, name) {
 }
 
 /**
+ * One-time repair for legacy workspaces created outside ROOT_FOLDER_ID/Training.
+ * Only folders referenced by the master Trainings sheet are moved, so unrelated
+ * Drive folders are never touched. Run this manually from the Apps Script editor
+ * after ROOT_FOLDER_ID has been configured.
+ */
+function migrateTrainingWorkspacesToConfiguredRoot() {
+  const result = { moved: 0, alreadyCorrect: 0, skipped: 0, errors: [] };
+  try {
+    const trainingRoot = getOrCreateRootFolder();
+    const trainingRootId = trainingRoot.getId();
+    const sheet = getSheet(SHEET_NAMES.trainings);
+    const trainings = sheet ? sheetToJson(sheet) : [];
+
+    trainings.forEach(training => {
+      const folderId = String(training.FolderID || '').trim();
+      if (!folderId) {
+        result.skipped++;
+        return;
+      }
+      try {
+        const folder = DriveApp.getFolderById(folderId);
+        const parents = folder.getParents();
+        let isAlreadyCorrect = false;
+        while (parents.hasNext()) {
+          if (parents.next().getId() === trainingRootId) {
+            isAlreadyCorrect = true;
+            break;
+          }
+        }
+        if (isAlreadyCorrect) {
+          result.alreadyCorrect++;
+        } else {
+          folder.moveTo(trainingRoot);
+          result.moved++;
+        }
+      } catch (e) {
+        result.errors.push(`${training.ID || folderId}: ${e.message}`);
+      }
+    });
+    return ok(result);
+  } catch (e) {
+    return err('Workspace migration failed: ' + e.message);
+  }
+}
+
+/**
  * Gets or creates the single Google Sheet file for a training workspace,
  * ensuring tabs exist for TrainingParticipants, TrainingSessions, Attendance, TrainingEval, PostEval, and Summary.
  */
@@ -144,8 +183,9 @@ function getOrCreateSingleTrainingSheet(folder, code) {
     } else {
       ss = SpreadsheetApp.create(fileName);
       file = DriveApp.getFileById(ss.getId());
-      folder.addFile(file);
-      try { DriveApp.getRootFolder().removeFile(file); } catch(rErr) {}
+      // SpreadsheetApp creates a file in My Drive first. Move it immediately
+      // so the final (and only) location is the training workspace.
+      file.moveTo(folder);
     }
   }
 
@@ -534,7 +574,7 @@ function syncTrainingRequisitionParticipants(trainingId) {
       if (chunkFile) {
         const formSpreadsheet = SpreadsheetApp.openById(chunkFile.getId());
         const sheet = formSpreadsheet.getSheetByName('Training Form') || formSpreadsheet.getSheets()[0];
-        sheet.getRange('A15:I39').clearContent();
+        sheet.getRange('A15:I38').clearContent();
 
         chunk.forEach((participant, index) => {
           const r = 15 + index;
@@ -775,9 +815,4 @@ function syncParticipantsToTrainingDriveSheet(trainingId, directParticipantsList
   } catch (e) {
     Logger.log('syncParticipantsToTrainingDriveSheet error: ' + e.message);
   }
-}
-
-function testDrivePermissions() {
-  const root = getOrCreateRootFolder();
-  Logger.log('Root folder ID: ' + (root ? root.getId() : 'None'));
 }

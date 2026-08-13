@@ -199,8 +199,11 @@ function canonicalizeTrainingParticipants(participants) {
   const seen = {};
 
   (Array.isArray(participants) ? participants : []).forEach(participant => {
-    const rawId = String(participant.ID || participant.EmployeeID || participant.EmployeeNo || participant.EmpID || participant['Employee ID'] || participant['Employee No'] || '').trim();
-    const rawName = String(participant.Name || participant.EmployeeName || participant['Employee Name'] || '').trim();
+    let rawId = String(participant.EmployeeID || participant.EmployeeNo || participant.EmpID || participant['Employee ID'] || participant['Employee No'] || '').trim();
+    if (!rawId && participant.ID && !String(participant.ID).startsWith('TP-')) {
+      rawId = String(participant.ID).trim();
+    }
+    const rawName = String(participant.EmployeeName || participant.Name || participant['Employee Name'] || '').trim();
     const employee = (rawId && directory.byId[rawId.toLowerCase()]) || (rawName && directory.byName[rawName.toLowerCase()]);
 
     if (!employee) {
@@ -247,14 +250,14 @@ function extractCleanDriveId(val) {
 
 /** Google Drive Workspace & Requisition Form Helpers */
 function getSystemRootFolder() {
-  const rootFolderId = extractCleanDriveId(getConfigProperty('TRAINING_FOLDER_ID', '') || getConfigProperty('ROOT_FOLDER_ID', '') || getConfigProperty('DRIVE_ROOT_FOLDER_ID', ''));
-  if (rootFolderId) {
-    try { return DriveApp.getFolderById(rootFolderId); } catch(e) {
-      Logger.log('Could not open configured folder (' + rootFolderId + '): ' + e.message);
-    }
+  const rootFolderId = extractCleanDriveId(getConfigProperty('ROOT_FOLDER_ID', ''));
+  if (!rootFolderId) {
+    throw new Error('ROOT_FOLDER_ID is required. Configure the system root folder before submitting a requisition.');
   }
-  let sysFolderIter = DriveApp.getRootFolder().getFoldersByName('Job Training System');
-  return sysFolderIter.hasNext() ? sysFolderIter.next() : DriveApp.createFolder('Job Training System');
+
+  const systemRoot = DriveApp.getFolderById(rootFolderId);
+  const trainingFolders = systemRoot.getFoldersByName('Training');
+  return trainingFolders.hasNext() ? trainingFolders.next() : systemRoot.createFolder('Training');
 }
 
 function createTrainingWorkspace(code, trainingName) {
@@ -303,8 +306,9 @@ function getOrCreateSingleTrainingSheet(folder, code) {
     } else {
       ss = SpreadsheetApp.create(fileName);
       file = DriveApp.getFileById(ss.getId());
-      folder.addFile(file);
-      try { DriveApp.getRootFolder().removeFile(file); } catch(rErr) {}
+      // SpreadsheetApp creates the file in My Drive first; move it into the
+      // training workspace so no data file is left at a random Drive location.
+      file.moveTo(folder);
     }
   }
 
@@ -545,7 +549,7 @@ function syncAllTrainingDataSheets() {
 }
 
 function createTrainingRequisitionForm(code, training, targetFolderId, requesterSigData) {
-  let rawFolderId = extractCleanDriveId(targetFolderId || getConfigProperty('TRAINING_FOLDER_ID', '') || getConfigProperty('ROOT_FOLDER_ID', ''));
+  let rawFolderId = extractCleanDriveId(targetFolderId);
   let targetFolder = null;
 
   if (rawFolderId) {
@@ -554,7 +558,7 @@ function createTrainingRequisitionForm(code, training, targetFolderId, requester
     }
   }
   if (!targetFolder) {
-    targetFolder = getSystemRootFolder();
+    return { message: 'Requisition form skipped: the dedicated training workspace is unavailable.' };
   }
 
   const rawTemplateId = extractCleanDriveId(getConfigProperty('TRAINING_REQUISITION_TEMPLATE_ID', ''));
@@ -564,21 +568,7 @@ function createTrainingRequisitionForm(code, training, targetFolderId, requester
   if (rawTemplateId) {
     try {
       const templateFile = DriveApp.getFileById(rawTemplateId);
-      try {
-        copiedFile = templateFile.makeCopy(fileName);
-        if (targetFolder) {
-          try {
-            copiedFile.moveTo(targetFolder);
-          } catch(moveErr) {
-            try {
-              targetFolder.addFile(copiedFile);
-              DriveApp.getRootFolder().removeFile(copiedFile);
-            } catch(fallbackMoveErr) {}
-          }
-        }
-      } catch(copyErr1) {
-        copiedFile = templateFile.makeCopy(fileName, targetFolder);
-      }
+      copiedFile = templateFile.makeCopy(fileName, targetFolder);
       Logger.log(`Successfully copied template ID (${rawTemplateId}) into target folder`);
     } catch (tmplErr) {
       Logger.log('Template copy error from ID (' + rawTemplateId + '): ' + tmplErr.message);
@@ -590,16 +580,7 @@ function createTrainingRequisitionForm(code, training, targetFolderId, requester
     try {
       const newSs = SpreadsheetApp.create(fileName);
       copiedFile = DriveApp.getFileById(newSs.getId());
-      if (targetFolder) {
-        try {
-          copiedFile.moveTo(targetFolder);
-        } catch(moveErr2) {
-          try {
-            targetFolder.addFile(copiedFile);
-            DriveApp.getRootFolder().removeFile(copiedFile);
-          } catch(fallbackMoveErr2) {}
-        }
-      }
+      copiedFile.moveTo(targetFolder);
       Logger.log(`Created new clean form Google Sheet in target folder`);
     } catch(createErr) {
       Logger.log('SpreadsheetApp.create error: ' + createErr.message);
@@ -643,8 +624,8 @@ function createTrainingRequisitionForm(code, training, targetFolderId, requester
     const partList = Array.isArray(tData.ParticipantList) ? tData.ParticipantList : (Array.isArray(tData.participants) ? tData.participants : []);
     if (partList.length > 0) {
       try {
-        sheet.getRange('A15:I39').clearContent();
-        partList.slice(0, 25).forEach((p, index) => {
+        sheet.getRange('A15:I38').clearContent();
+        partList.slice(0, 24).forEach((p, index) => {
           const r = 15 + index;
           setTemplateValue(`A${r}:B${r}`, p.EmployeeID || p.ID || p.EmployeeNo || '');
           setTemplateValue(`C${r}`, p.EmployeeName || p.Name || '');
@@ -844,8 +825,8 @@ function syncTrainingRequisitionParticipants(trainingId) {
 
     const formSpreadsheet = SpreadsheetApp.openById(formId);
     const sheet = formSpreadsheet.getSheetByName('Training Form') || formSpreadsheet.getSheets()[0];
-    const rowCount = 25;
-    sheet.getRange('A15:I39').clearContent();
+    const rowCount = 24;
+    sheet.getRange('A15:I38').clearContent();
 
     resolved.participants.slice(0, rowCount).forEach((p, index) => {
       const r = 15 + index;
@@ -872,7 +853,9 @@ function ensureTrainingSheetColumns(sheet) {
     'FolderID', 'ParticipantsSheetID', 'SessionsSheetID', 'AttendanceSheetID',
     'EvaluationSheetID', 'PostSheetID', 'RequisitionFormFileID',
     'CreatedDate', 'UpdatedDate', 'CourseFee',
-    'ApprovalStatus', 'RequestedBy', 'RequestedByName', 'RequestedByEmail', 'RequestedDate', 'ApprovedBy', 'ApprovedCostCentre', 'ApprovedAt', 'ApprovalRemarks', 'RescheduledDate', 'BrochureURL'
+    'ApprovalStatus', 'RequestedBy', 'RequestedByName', 'RequestedByEmail', 'RequestedDate', 'ApprovedBy', 'ApprovedCostCentre', 'ApprovedAt', 'ApprovalRemarks', 'RescheduledDate', 'BrochureURL',
+    'TrainingProvider', 'ExpiryDate', 'CertExpiryDate',
+    'HOD', 'Csuite', 'HOHR', 'HODStatus', 'CsuiteStatus', 'HOHRStatus'
   ];
   const lastCol = Math.max(sheet.getLastColumn(), 1);
   const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h).trim());
@@ -887,19 +870,6 @@ function ensureTrainingSheetColumns(sheet) {
   return headers;
 }
 
-function testDrivePermissions() {
-  const root = getSystemRootFolder();
-  Logger.log('Root folder ID: ' + (root ? root.getId() : 'None'));
-  const templateId = extractCleanDriveId(getConfigProperty('TRAINING_REQUISITION_TEMPLATE_ID', ''));
-  if (templateId) {
-    try {
-      const file = DriveApp.getFileById(templateId);
-      Logger.log('Template file accessible: ' + file.getName());
-    } catch(e) {
-      Logger.log('Template test error: ' + e.message);
-    }
-  }
-}
 
 function findRowById(sheet, id) {
   if (!sheet || id === null || id === undefined) return -1;
@@ -935,12 +905,7 @@ function resetRequisitionFormApprovals(formId) {
     const ss = SpreadsheetApp.openById(formId);
     const sheet = ss.getSheetByName('Training Form') || ss.getSheets()[0];
 
-    // Ensure template sign headers in Row 40 remain intact
-    sheet.getRange('A40').setValue('REQUEST BY');
-    sheet.getRange('C40').setValue('VERIFIED BY HEAD OF DEPARTMENT');
-    sheet.getRange('D40').setValue('APPROVED BY C-SUITE');
-    sheet.getRange('F40').setValue('APPROVED BY HOHR');
-    sheet.getRange('H40').setValue('ACKNOWLEDGED BY HR DEPARTMENT');
+    // Preserve original template header rows 39 and 40 (columns A to I) completely untouched
 
     // Reset HOD (Col C), C-Suite (Col D/E), HOHR (Col F/G) signature cells
     sheet.getRange('C41:C46').clearContent();

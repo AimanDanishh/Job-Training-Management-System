@@ -7,9 +7,9 @@
  */
 
 function doGet(e) {
-  const pageParam = (e && e.parameter && e.parameter.page) ? String(e.parameter.page).toLowerCase().trim() : 'attendance';
+  const modeParam = (e && e.parameter && (e.parameter.mode || e.parameter.page)) ? String(e.parameter.mode || e.parameter.page).toLowerCase().trim() : 'attendance';
   
-  // Page Mapping
+  // Context Page Mapping
   const pageMap = {
     'attendance': 'Attendance',
     'evaluation': 'TrainingEvaluation',
@@ -18,7 +18,7 @@ function doGet(e) {
     'error':      'Error'
   };
 
-  const templateName = pageMap[pageParam] || 'Attendance';
+  const templateName = pageMap[modeParam] || 'Attendance';
   const appTitle = getConfigProperty('APP_TITLE', 'TrainHub — Participant Portal');
 
   try {
@@ -26,7 +26,8 @@ function doGet(e) {
     
     // Pass raw query parameters into client template context
     template.params = (e && e.parameter) ? e.parameter : {};
-    template.page = pageParam;
+    template.mode = modeParam;
+    template.page = modeParam;
 
     return template.evaluate()
       .setTitle(appTitle)
@@ -53,13 +54,3 @@ function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
 
-/**
- * Returns current Web App Deployment URL
- */
-function getAppUrl() {
-  try {
-    return ScriptApp.getService().getUrl();
-  } catch(e) {
-    return '';
-  }
-}

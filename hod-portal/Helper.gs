@@ -153,38 +153,6 @@ function getFormattedCurrentDate(date) {
   return Utilities.formatDate(d, Session.getScriptTimeZone(), 'dd/MM/yyyy');
 }
 
-/**
- * Reusable employee lookup function by Employee No / ID.
- * Searches the existing Employees sheet in EMPLOYEE_SPREADSHEET_ID.
- * Matches Employee No exactly (case-insensitive, trimmed).
- * Returns employee details object or null if not found.
- */
-function getEmployeeById(employeeNo) {
-  if (!employeeNo || String(employeeNo).trim() === '') return null;
-  const cleanId = String(employeeNo).trim().toLowerCase();
-
-  const empSheet = getSheet('Employees');
-  if (!empSheet) return null;
-
-  const rows = sheetToJson(empSheet);
-  const emp = rows.find(r => {
-    const idVal = String(
-      r.ID || r.EmployeeID || r.EmployeeNo || r.EmpID || r.StaffID || 
-      r['Employee ID'] || r['Employee No'] || r['Staff ID'] || ''
-    ).trim().toLowerCase();
-    return idVal === cleanId;
-  });
-
-  if (!emp) return null;
-
-  return {
-    ID: String(emp.ID || emp.EmployeeID || emp.EmployeeNo || String(employeeNo).trim()).trim(),
-    Name: String(emp.Name || emp.EmployeeName || emp['Employee Name'] || emp['Staff Name'] || '').trim(),
-    Department: String(emp.Department || emp.CostCentre || emp['Cost Centre'] || 'N/A').trim(),
-    Position: String(emp.Position || emp.JobTitle || emp.PositionTitle || emp['Position Title'] || emp['Job Title'] || 'Staff').trim(),
-    Email: String(emp.Email || emp['Email Address'] || '').trim()
-  };
-}
 
 function formatDateTime(date) {
   if (!date) return '';
@@ -258,8 +226,7 @@ function getOrCreateSingleTrainingSheet(folder, code) {
     } else {
       ss = SpreadsheetApp.create(fileName);
       file = DriveApp.getFileById(ss.getId());
-      folder.addFile(file);
-      try { DriveApp.getRootFolder().removeFile(file); } catch(rErr) {}
+      file.moveTo(folder);
     }
   }
 
@@ -368,12 +335,7 @@ function updateTrainingRequisitionSignatures(trainingId, step, sigData, targetFo
     const ss = SpreadsheetApp.openById(formId);
     const sheet = ss.getSheetByName('Training Form') || ss.getSheets()[0];
 
-    // Ensure template sign headers in Row 40 remain intact
-    sheet.getRange('A40').setValue('REQUEST BY');
-    sheet.getRange('C40').setValue('VERIFIED BY HEAD OF DEPARTMENT');
-    sheet.getRange('D40').setValue('APPROVED BY C-SUITE');
-    sheet.getRange('F40').setValue('APPROVED BY HOHR');
-    sheet.getRange('H40').setValue('ACKNOWLEDGED BY HR DEPARTMENT');
+    // Preserve original template header rows 39 and 40 (columns A to I) completely untouched
 
     const empNo    = sigData.employeeNo || sigData.EmployeeNo || sigData.EmployeeID || sigData.ID || '';
     const empName  = sigData.name || sigData.EmployeeName || sigData.Name || '';

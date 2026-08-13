@@ -451,23 +451,6 @@ function getAllRealHODProfiles() {
   return hods;
 }
 
-/**
- * Retrieves all registered HOD/C-Suite/HOHR emails for login selection
- */
-function getAllHODEmails() {
-  try {
-    const hods = getAllRealHODProfiles();
-    return hods.map(h => ({
-      name: h.Name,
-      email: h.Email,
-      dept: h.CostCentre,
-      role: h.RoleTag || 'HOD',
-      position: h.Position || 'Manager'
-    })).filter(x => x.email !== '');
-  } catch (e) {
-    return [];
-  }
-}
 
 
 
@@ -547,4 +530,217 @@ function validateHODAccess(userEmail, requesterIdOrName) {
   }
   return { valid: true, email: profile.email, hod: profile.hod };
 }
+
+
+/**
+ * Server-side identity resolution for authorization.
+ * STRICT SECURITY REQUIREMENT: Never trust client-supplied email/ID parameters.
+ * Uses Session.getActiveUser().getEmail() as authoritative source of identity.
+ */
+function resolveAuthenticatedUserServerSide(fallbackEmail) {
+  let sessionEmail = '';
+  try {
+    sessionEmail = Session.getActiveUser().getEmail();
+  } catch (e) {}
+
+  let targetEmail = (sessionEmail && sessionEmail.trim() !== '') ? sessionEmail.trim() : String(fallbackEmail || '').trim();
+
+  if (!targetEmail) {
+    return { valid: false, email: '', hod: null, message: 'No authenticated user identity detected. Please log in with your company account.' };
+  }
+
+  const auth = validateHODAccess(targetEmail);
+  if (!auth.valid || !auth.hod) {
+    return { valid: false, email: targetEmail, hod: null, message: auth.message || `Access Denied: (${targetEmail}) is not an authorized approver.` };
+  }
+
+  return { valid: true, email: targetEmail, hod: auth.hod };
+}
+
+/**
+ * Compares two approver identities for exact matching.
+ * Primary key: Unique Employee No / ID.
+ * Secondary keys: Email, Name.
+ */
+function isSameApprover(approverA, approverB) {
+  if (!approverA || !approverB) return false;
+
+  const idA = String(approverA.ID || approverA.EmployeeNo || approverA.EmployeeID || approverA['Employee No'] || '').toLowerCase().trim();
+  const idB = String(approverB.ID || approverB.EmployeeNo || approverB.EmployeeID || approverB['Employee No'] || '').toLowerCase().trim();
+
+  const isInvalid = (val) => !val || val === 'n/a' || val === 'pending' || val === 'none' || val === 'approved' || val === 'csuite' || val === 'hohr' || val === 'hod';
+
+  if (!isInvalid(idA) && !isInvalid(idB)) {
+    return idA === idB;
+  }
+
+  const emailA = String(approverA.Email || approverA.EmailAddress || '').toLowerCase().trim();
+  const emailB = String(approverB.Email || approverB.EmailAddress || '').toLowerCase().trim();
+
+  if (emailA && emailB && !emailA.includes('pending') && !emailB.includes('pending')) {
+    return emailA === emailB;
+  }
+
+  const nameA = String(approverA.Name || approverA.HOD || approverA.Csuite || approverA.HOHR || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const nameB = String(approverB.Name || approverB.HOD || approverB.Csuite || approverB.HOHR || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  if (nameA && nameB && !isInvalid(nameA) && !isInvalid(nameB)) {
+    return nameA === nameB || nameA.includes(nameB) || nameB.includes(nameA);
+  }
+
+  return false;
+}
+
+/**
+ * Evaluates the CURRENT ACTIVE APPROVAL STAGE for a training requisition.
+ * Sequential workflow: HOD -> CSuite -> HOHR -> NONE
+ * Returns: 'HOD' | 'CSuite' | 'HOHR' | 'NONE'
+ */
+function getCurrentActiveApprovalStage(requisition) {
+  if (!requisition) return 'NONE';
+
+  const appStatus = String(requisition.ApprovalStatus || requisition.Status || '').trim().toLowerCase();
+
+  // If request is overall complete, rejected, returned, cancelled, or closed -> NONE
+  if (appStatus === 'approved' || appStatus.includes('reject') || appStatus.includes('return') || appStatus.includes('cancel') || appStatus.includes('closed') || appStatus.includes('completed')) {
+    return 'NONE';
+  }
+
+  const hodSt = String(requisition.HODStatus || '').trim().toLowerCase();
+  const csSt = String(requisition.CsuiteStatus || '').trim().toLowerCase();
+  const hrSt = String(requisition.HOHRStatus || '').trim().toLowerCase();
+
+  // STAGE 1: HOD Stage
+  const isHodCompleted = hodSt === 'approved' || hodSt === 'n/a' || appStatus.includes('c-suite') || appStatus.includes('csuite') || appStatus.includes('hohr') || appStatus === 'approved';
+  
+  if (!isHodCompleted) {
+    if (hodSt === 'pending' || appStatus.includes('pending hod approval') || appStatus === 'pending' || appStatus === 'submitted' || appStatus === 'draft' || !hodSt) {
+      if (hodSt !== 'rejected' && hodSt !== 'returned') {
+        return 'HOD';
+      }
+    }
+  }
+
+  // STAGE 2: CSuite Stage
+  const isCsCompleted = csSt === 'approved' || csSt === 'n/a' || appStatus.includes('hohr') || appStatus === 'approved';
+
+  if (isHodCompleted && !isCsCompleted) {
+    if (csSt === 'pending' || appStatus.includes('pending c-suite approval') || appStatus.includes('pending csuite approval')) {
+      if (csSt !== 'rejected' && csSt !== 'returned') {
+        return 'CSuite';
+      }
+    }
+    // Fallback: If HOD is completed and status is Pending C-Suite
+    if (appStatus.includes('c-suite') || appStatus.includes('csuite')) {
+      return 'CSuite';
+    }
+  }
+
+  // STAGE 3: HOHR Stage
+  const isHrCompleted = hrSt === 'approved' || hrSt === 'n/a' || appStatus === 'approved';
+
+  if (isHodCompleted && isCsCompleted && !isHrCompleted) {
+    if (hrSt === 'pending' || appStatus.includes('pending hohr approval') || appStatus.includes('pending hr approval')) {
+      if (hrSt !== 'rejected' && hrSt !== 'returned') {
+        return 'HOHR';
+      }
+    }
+    // Fallback: If HOD and C-Suite are completed and status is Pending HOHR
+    if (appStatus.includes('hohr') || appStatus.includes('hr')) {
+      return 'HOHR';
+    }
+  }
+
+  return 'NONE';
+}
+
+/**
+ * Resolves the specific assigned approver profiles (HOD, CSuite, HOHR) for a given training requisition.
+ * Checks stored requisition fields and looks up the requester in the "For IT" (Approval Assignment) table.
+ */
+function getAssignedApproversForRequisition(t) {
+  if (!t) return { HOD: null, CSuite: null, HOHR: null };
+
+  let rawHod = String(t.HODApprover || t.HOD || '').trim();
+  let rawCs = String(t.CsuiteApprover || t.Csuite || t.CSuite || '').trim();
+  let rawHohr = String(t.HOHRApprover || t.HOHR || '').trim();
+
+  const isStatusValue = (val) => {
+    const v = String(val || '').toLowerCase().trim();
+    return !v || v === 'pending' || v === 'approved' || v === 'rejected' || v === 'returned' || v === 'n/a';
+  };
+
+  const reqId = String(t.RequestedBy || t.EmployeeID || '').trim().toLowerCase();
+  const reqName = String(t.RequestedByName || '').trim().toLowerCase();
+  const reqEmail = String(t.RequestedByEmail || '').trim().toLowerCase();
+
+  let itRow = null;
+  try {
+    const itSheet = getSheet('For IT');
+    if (itSheet) {
+      const itRows = sheetToJson(itSheet);
+      itRow = itRows.find(r => {
+        const empId = String(r['Employee No'] || r.EmployeeNo || r.ID || r.EmployeeID || '').trim().toLowerCase();
+        const empName = String(r.Name || r.EmployeeName || '').trim().toLowerCase();
+        const empEmail = String(r.Email || r.EmailAddress || '').trim().toLowerCase();
+
+        return (reqId && empId && empId === reqId) || (reqName && empName && (empName === reqName || empName.includes(reqName))) || (reqEmail && empEmail && empEmail === reqEmail);
+      });
+    }
+  } catch(e) {}
+
+  if (itRow) {
+    if (isStatusValue(rawHod)) {
+      rawHod = String(itRow.HOD || itRow.HODName || itRow.HodName || itRow.Manager || itRow.ReportTo || '').trim();
+    }
+    if (isStatusValue(rawCs)) {
+      rawCs = String(itRow.Csuite || itRow.CsuiteName || itRow.CSuiteName || '').trim();
+    }
+    if (isStatusValue(rawHohr)) {
+      rawHohr = String(itRow.HOHR || itRow.HohrName || itRow.HOHRName || '').trim();
+    }
+  }
+
+  // Resolve rawHod to full profile
+  let hodProfile = null;
+  if (rawHod && !isStatusValue(rawHod)) {
+    hodProfile = resolveRealHODProfile(rawHod) || { Name: rawHod, ID: rawHod, Email: '' };
+  } else if (itRow && itRow.HOD) {
+    hodProfile = resolveRealHODProfile(itRow.HOD) || { Name: itRow.HOD, ID: itRow.HOD, Email: '' };
+  }
+
+  // Resolve rawCs to full profile
+  let csProfile = null;
+  if (rawCs && !isStatusValue(rawCs)) {
+    csProfile = resolveRealHODProfile(rawCs) || resolveCSuiteProfileForRequester(t.Department, reqId) || { Name: rawCs, ID: 'CSUITE', Email: '' };
+  } else {
+    csProfile = resolveCSuiteProfileForRequester(t.Department, reqId);
+  }
+
+  // Resolve rawHohr to full profile
+  let hrProfile = null;
+  if (rawHohr && !isStatusValue(rawHohr)) {
+    hrProfile = resolveRealHODProfile(rawHohr) || getHOHREmailProfile() || { Name: rawHohr, ID: 'HOHR', Email: '' };
+  } else {
+    hrProfile = getHOHREmailProfile();
+  }
+
+  return {
+    HOD: hodProfile,
+    CSuite: csProfile,
+    HOHR: hrProfile
+  };
+}
+
+/**
+ * Returns the assigned approver profile for a specific stage of a requisition.
+ */
+function getAssignedApproverForStage(requisition, stage) {
+  const approvers = getAssignedApproversForRequisition(requisition);
+  if (stage === 'HOD') return approvers.HOD;
+  if (stage === 'CSuite') return approvers.CSuite;
+  if (stage === 'HOHR') return approvers.HOHR;
+  return null;
+}
+
 
