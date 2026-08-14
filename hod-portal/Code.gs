@@ -316,23 +316,13 @@ function getRequisitionDetails(trainingId, userEmail) {
       return err(`Unauthorized Access: You are not authorized to view training request (${cleanId}).`);
     }
 
-    // Fetch Participants for this training using 3-level fallback
+    // The per-training Training Data roster is authoritative.
     let participants = [];
     try {
       const ss = getTrainingDataSpreadsheet(training.ID);
       const partSheet = ss ? ss.getSheetByName('TrainingParticipants') : null;
       if (partSheet) participants = sheetToJson(partSheet);
     } catch(e1) {}
-
-    if (!participants || participants.length === 0) {
-      try {
-        const masterTpSheet = getSheet('TrainingParticipants');
-        if (masterTpSheet) {
-          const allTp = sheetToJson(masterTpSheet);
-          participants = allTp.filter(r => String(r.TrainingID || r.TrainingId || '').trim() === String(training.ID).trim());
-        }
-      } catch(e2) {}
-    }
 
     let requester = {
       ID: training.RequestedBy || training.EmployeeID || 'N/A',

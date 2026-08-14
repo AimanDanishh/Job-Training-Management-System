@@ -1,5 +1,27 @@
 <script>
-window.__PUBLIC_PORTAL_URL__ = "<?!= (typeof publicPortalUrl !== 'undefined') ? publicPortalUrl : '' ?>";
+function safeExternalUrl(domainAndPath) {
+  if (!domainAndPath) return '';
+  const clean = String(domainAndPath).replace(/^https?:\/\//i, '').replace(/^\/+/, '');
+  return 'ht' + 'tps://' + clean;
+}
+
+window.__PUBLIC_PORTAL_URL__ = (function() {
+  const b64 = "<?!= (typeof publicPortalUrl !== 'undefined') ? publicPortalUrl : '' ?>";
+  try {
+    return b64 ? atob(b64) : '';
+  } catch(e) {
+    return '';
+  }
+})();
+
+window.__COMPANY_LOGO_URL__ = (function() {
+  const b64 = "<?!= (typeof companyLogoUrl !== 'undefined') ? companyLogoUrl : '' ?>";
+  try {
+    return b64 ? atob(b64) : '';
+  } catch(e) {
+    return '';
+  }
+})();
 // Bootstrap's CSS is used for layout utilities; its JavaScript bundle is not
 // required by this app. Keeping it out avoids Apps Script's document.write
 // parser corrupting the external script URL during page rendering.
@@ -53,7 +75,7 @@ function callServer(fnName, ...args) {
 
     if (typeof google === 'undefined' || !google.script || !google.script.run) {
       cleanup();
-      reject(new Error('Google Apps Script runtime environment not detected.'));
+      reject(new Error('Google Apps Script runtime environment not detected. Please run this web application from your deployed Apps Script URL.'));
       return;
     }
 
@@ -144,9 +166,14 @@ function navTo(page, params) {
     const cleanBase = String(base || '').split('?')[0];
     let url = cleanBase + '?page=' + page;
     if (params) Object.entries(params).forEach(([k,v]) => url += '&' + k + '=' + encodeURIComponent(v));
+
+    // HtmlService renders inside a Google-owned iframe.  Assigning to
+    // window.location only replaces that iframe, while touching top.location
+    // can be rejected after an asynchronous Apps Script call.  Opening the
+    // destination in _top is the supported navigation mechanism and works
+    // for both the first navigation and subsequent sidebar links.
     try {
-      if (window.top) window.top.location.href = url;
-      else window.location.href = url;
+      window.open(url, '_top');
     } catch(e) {
       window.location.href = url;
     }
@@ -161,10 +188,18 @@ function navTo(page, params) {
     navigate(currentUrl);
     return;
   }
-  google.script.run.withSuccessHandler(base => {
-    _cachedBaseUrl = base;
-    navigate(base);
-  }).getAppUrl();
+  google.script.run
+    .withSuccessHandler(base => {
+      _cachedBaseUrl = base;
+      navigate(base);
+    })
+    .withFailureHandler(() => {
+      // Keep navigation usable if the URL lookup itself fails.  This is also
+      // useful in embedded previews where the current URL is the only URL
+      // available to the client.
+      navigate(currentUrl);
+    })
+    .getAppUrl();
 }
 
 // ─── Modal helpers ───────────────────────────────────────────────────────────
@@ -177,6 +212,94 @@ document.addEventListener('click', e => {
     e.target.style.display = 'none';
   }
 });
+
+// ─── QR Code Logo Helpers (Robust Overlay & Canvas Download Engine) ───────────
+const DEFAULT_FALLBACK_LOGO = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="22" fill="%232563EB"/><circle cx="50" cy="50" r="28" fill="%23FFFFFF"/><text x="50" y="61" font-family="Arial, sans-serif" font-weight="900" font-size="32" fill="%232563EB" text-anchor="middle">A</text></svg>';
+
+function getApolloLogoUrl() {
+  return window.__COMPANY_LOGO_URL__ || DEFAULT_FALLBACK_LOGO;
+}
+
+function getQuickChartBaseUrl(attUrl) {
+  const cleanUrl = String(attUrl || '').trim();
+  return safeExternalUrl(`quickchart.io/qr?size=400&ecLevel=H&text=${encodeURIComponent(cleanUrl)}`);
+}
+
+function ensureQRLogoUrl(existingQrUrl, attUrl) {
+  return getQuickChartBaseUrl(attUrl);
+}
+
+function renderQRWithLogoHtml(attUrl, imgSize = 140, logoSize = 32) {
+  const qrSrc = getQuickChartBaseUrl(attUrl);
+  const logoSrc = getApolloLogoUrl();
+
+  return `
+    <div class="qr-logo-wrapper" style="position:relative;display:inline-block;background:#fff;padding:6px;border-radius:8px;border:1px solid #CBD5E1;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
+      <img src="${qrSrc}" alt="QR Code" style="width:${imgSize}px;height:${imgSize}px;display:block;border-radius:4px" onerror="this.onerror=null;this.src='${qrSrc}';">
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:${logoSize}px;height:${logoSize}px;background:#fff;border-radius:6px;padding:2px;box-shadow:0 2px 5px rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;overflow:hidden;z-index:2">
+        <img src="${logoSrc}" alt="Logo" style="max-width:100%;max-height:100%;object-fit:contain" onerror="this.onerror=null;this.src='${DEFAULT_FALLBACK_LOGO}'">
+      </div>
+    </div>
+  `;
+}
+
+function downloadQRWithLogo(attUrl, filename = 'QR_Code.png') {
+  const qrSrc = getQuickChartBaseUrl(attUrl);
+  const logoSrc = getApolloLogoUrl();
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 400;
+  canvas.height = 400;
+  const ctx = canvas.getContext('2d');
+
+  const drawLogoOnCanvas = (targetLogoSrc) => {
+    const logoImg = new Image();
+    if (!targetLogoSrc.startsWith('data:')) logoImg.crossOrigin = 'Anonymous';
+    logoImg.onload = () => {
+      const lSize = 88;
+      const x = (400 - lSize) / 2;
+      const y = (400 - lSize) / 2;
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      if (ctx.roundRect) {
+        ctx.roundRect(x - 5, y - 5, lSize + 10, lSize + 10, 8);
+      } else {
+        ctx.fillRect(x - 5, y - 5, lSize + 10, lSize + 10);
+      }
+      ctx.fill();
+
+      ctx.drawImage(logoImg, x, y, lSize, lSize);
+
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    };
+    logoImg.onerror = () => {
+      if (targetLogoSrc !== DEFAULT_FALLBACK_LOGO) {
+        drawLogoOnCanvas(DEFAULT_FALLBACK_LOGO);
+      } else {
+        const link = document.createElement('a');
+        link.download = filename;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      }
+    };
+    logoImg.src = targetLogoSrc;
+  };
+
+  const qrImg = new Image();
+  qrImg.crossOrigin = 'Anonymous';
+  qrImg.onload = () => {
+    ctx.drawImage(qrImg, 0, 0, 400, 400);
+    drawLogoOnCanvas(logoSrc);
+  };
+  qrImg.onerror = () => {
+    window.open(qrSrc, '_blank');
+  };
+  qrImg.src = qrSrc;
+}
 
 // ─── Status badge helper ─────────────────────────────────────────────────────
 function statusBadge(status) {
@@ -240,8 +363,8 @@ function getApprovalRoleText(status) {
 }
 
 function formatMinimalistDate(dateVal) {
-  if (!dateVal) return '';
-  const str = String(dateVal).trim();
+  if (!dateVal) return '—';
+  const str = String(dateVal).replace(/GMT.*$/, '').replace(/\(.*\)$/, '').trim();
   if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) return str;
   const dmyMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
   if (dmyMatch) return `${dmyMatch[1].padStart(2, '0')}/${dmyMatch[2].padStart(2, '0')}/${dmyMatch[3]}`;
@@ -254,7 +377,39 @@ function formatMinimalistDate(dateVal) {
     const year = d.getFullYear();
     return `${day}/${month}/${year}`;
   }
-  return str.split('T')[0];
+  return str.split('T')[0] || '—';
+}
+
+function formatDisplayTime(val, defaultTime = '09:00 AM') {
+  if (!val) return defaultTime;
+  const str = String(val).replace(/GMT.*$/, '').replace(/\(.*\)$/, '').trim();
+  
+  const ampmMatch = str.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+  if (ampmMatch && !str.includes('1899') && !str.includes('Singapore') && !str.includes('Standard') && !str.includes('GMT')) {
+    let hh = parseInt(ampmMatch[1], 10);
+    const mm = ampmMatch[2];
+    const ampm = ampmMatch[3] ? ampmMatch[3].toUpperCase() : (hh >= 12 ? 'PM' : 'AM');
+    if (hh > 12) hh = hh % 12;
+    if (hh === 0) hh = 12;
+    return `${String(hh).padStart(2, '0')}:${mm} ${ampm}`;
+  }
+
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) {
+    let hours = d.getHours();
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    return `${String(hours).padStart(2, '0')}:${minutes} ${ampm}`;
+  }
+  return defaultTime;
+}
+
+function formatSessionTimeRange(startVal, endVal) {
+  const sTime = formatDisplayTime(startVal, '09:00 AM');
+  const eTime = formatDisplayTime(endVal, '05:00 PM');
+  return `${sTime} - ${eTime}`;
 }
 
 function formatMinimalistDateTime(dateVal) {
@@ -274,7 +429,6 @@ function formatMinimalistDateTime(dateVal) {
   }
   return str;
 }
-
 
 // ─── Lifecycle Timeline ──────────────────────────────────────────────────────
 const LIFECYCLE_STAGES = [
@@ -324,6 +478,7 @@ function avatar(name, size = 30, index = 0) {
   const bg = AVATAR_COLORS[index % AVATAR_COLORS.length];
   return `<div class="avatar" style="width:${size}px;height:${size}px;background:${bg};font-size:${size*0.38}px">${initials}</div>`;
 }
+
 
 // ─── Sidebar minimizable collapse & real profile helpers ─────────────────────
 function toggleSidebarCollapse() {
@@ -410,4 +565,34 @@ document.addEventListener('DOMContentLoaded', () => {
     toggleBtn.addEventListener('click', () => sidebar.classList.toggle('open'));
   }
 });
+
+// Explicitly bind utility functions to global window object
+window.navTo = navTo;
+window.callServer = callServer;
+window.showToast = showToast;
+window.setBtnLoading = setBtnLoading;
+window.getQueryParam = getQueryParam;
+window.showLoadingOverlay = showLoadingOverlay;
+window.hideLoadingOverlay = hideLoadingOverlay;
+window.openModal = openModal;
+window.closeModal = closeModal;
+window.getApolloLogoUrl = getApolloLogoUrl;
+window.getQuickChartBaseUrl = getQuickChartBaseUrl;
+window.ensureQRLogoUrl = ensureQRLogoUrl;
+window.renderQRWithLogoHtml = renderQRWithLogoHtml;
+window.downloadQRWithLogo = downloadQRWithLogo;
+window.statusBadge = statusBadge;
+window.approvalStatusBadge = approvalStatusBadge;
+window.isTrainingApproved = isTrainingApproved;
+window.getApprovalRoleText = getApprovalRoleText;
+window.formatMinimalistDate = formatMinimalistDate;
+window.formatDisplayTime = formatDisplayTime;
+window.formatSessionTimeRange = formatSessionTimeRange;
+window.formatMinimalistDateTime = formatMinimalistDateTime;
+window.renderLifecycle = renderLifecycle;
+window.progressBar = progressBar;
+window.avatar = avatar;
+window.toggleSidebarCollapse = toggleSidebarCollapse;
+window.initSidebarState = initSidebarState;
+window.loadRealUserProfile = loadRealUserProfile;
 </script>

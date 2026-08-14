@@ -445,12 +445,7 @@
   }
 
   function quickChartUrl(value) {
-    let url = 'https://quickchart.io/qr?size=400&ecLevel=H&text=' + encodeURIComponent(value);
-    const logo = window.__COMPANY_LOGO_URL__ || 'https://www.apollofood.com.my/wp-content/uploads/2021/04/apollo-logo.png';
-    if (logo) {
-      url += '&centerImageUrl=' + encodeURIComponent(logo) + '&centerImageSizeRatio=0.22';
-    }
-    return url;
+    return externalUrl('quickchart.io/qr?size=400&ecLevel=H&text=' + encodeURIComponent(value));
   }
 
 
@@ -506,10 +501,12 @@
             </div>
             ` : ''}
             <!-- Actions -->
-            <div style="display:flex;gap:6px;border-top:1px solid #F1F5F9;padding-top:12px">
+            <div style="display:flex;gap:6px;border-top:1px solid #F1F5F9;padding-top:12px;flex-wrap:wrap">
               <button class="btn-th btn-primary btn-sm" style="flex:1;justify-content:center" onclick="openDetail('${t.ID}')"><span class="icon sm">open_in_new</span>Open</button>
               <button class="btn-th btn-secondary btn-sm" onclick="openParticipantManager('${t.ID}')" title="Manage Participants"><span class="icon sm">group_add</span></button>
-              ${t.FolderID ? `<a class="btn-th btn-secondary btn-sm" href="${driveFolderUrl(t.FolderID)}" target="_blank" title="Open Google Drive Workspace" style="text-decoration:none"><span class="icon sm">folder</span></a>` : ''}
+              ${t.trainingDataSheetUrl ? `<a class="btn-th btn-sm" style="background:#059669;color:#fff;border:none;text-decoration:none;display:inline-flex;align-items:center;gap:4px" href="${t.trainingDataSheetUrl}" target="_blank" title="Open Training Data Sheet"><span class="icon sm">table_chart</span>Data Sheet</a>` : (t.ParticipantsSheetID ? `<a class="btn-th btn-sm" style="background:#059669;color:#fff;border:none;text-decoration:none;display:inline-flex;align-items:center;gap:4px" href="https://docs.google.com/spreadsheets/d/${t.ParticipantsSheetID}/edit" target="_blank" title="Open Training Data Sheet"><span class="icon sm">table_chart</span>Data Sheet</a>` : '')}
+              ${t.requisitionFormUrl ? `<a class="btn-th btn-secondary btn-sm" href="${t.requisitionFormUrl}" target="_blank" title="Open Requisition Form" style="text-decoration:none"><span class="icon sm">description</span>Form</a>` : (t.RequisitionFormFileID ? `<a class="btn-th btn-secondary btn-sm" href="https://docs.google.com/spreadsheets/d/${t.RequisitionFormFileID}/edit" target="_blank" title="Open Requisition Form" style="text-decoration:none"><span class="icon sm">description</span>Form</a>` : '')}
+              ${t.folderUrl ? `<a class="btn-th btn-secondary btn-sm" href="${t.folderUrl}" target="_blank" title="Open Google Drive Workspace" style="text-decoration:none"><span class="icon sm">folder</span>Folder</a>` : (t.FolderID ? `<a class="btn-th btn-secondary btn-sm" href="${driveFolderUrl(t.FolderID)}" target="_blank" title="Open Google Drive Workspace" style="text-decoration:none"><span class="icon sm">folder</span>Folder</a>` : '')}
               <button class="btn-th btn-secondary btn-sm" onclick="editTraining('${t.ID}')"><span class="icon sm">edit</span></button>
               <button class="btn-th btn-danger btn-sm" onclick="confirmDeleteT('${t.ID}')"><span class="icon sm">archive</span></button>
             </div>
@@ -654,19 +651,21 @@
     document.getElementById('training-list-section').style.display = 'none';
     const detailSection = document.getElementById('training-detail-section');
     const content = document.getElementById('detail-full-content');
-    content.innerHTML = '<div class="text-center py-5" style="color:#94A3B8"><div class="spinner mb-2"></div><br>Loading programme details...</div>';
+    content.innerHTML = '<div class="text-center py-5" style="color:#94A3B8"><div class="spinner mb-2"></div><br>Loading programme details from Training Data sheet...</div>';
     detailSection.style.display = 'block';
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
     try {
-      const [t, participants, sessions, attendance, evalQrs] = await Promise.all([
+      const [t, participants, sessions, attendance, evalQrs, evals, postEvals] = await Promise.all([
         callServer('getTrainingById', id),
         callServer('getTrainingParticipants', id).catch(() => []),
         callServer('getSessions', id).catch(() => []),
         callServer('getAttendance', id).catch(() => []),
-        callServer('getEvaluationQRCodes', id).catch(() => null)
+        callServer('getEvaluationQRCodes', id).catch(() => null),
+        callServer('getTrainingEvaluations', id).catch(() => []),
+        callServer('getPostEvaluations', id).catch(() => [])
       ]);
-      renderFullDetail(t, participants || [], sessions || [], attendance || [], evalQrs);
+      renderFullDetail(t, participants || [], sessions || [], attendance || [], evalQrs, evals || [], postEvals || []);
       loadTrainingSyncStatusUI(id);
     } catch(e) {
       showToast(e.message, 'error');
@@ -679,18 +678,23 @@
     document.getElementById('training-list-section').style.display = 'block';
   }
 
-  function renderFullDetail(t, participants, sessions, attendance, evalQrs) {
+  function renderFullDetail(t, participants, sessions, attendance, evalQrs, evals, postEvals) {
     const cc = CAT_COLORS[t.Category] || '#2563EB';
     const isApproved = isTrainingApproved(t);
     const appStatusStr = t.ApprovalStatus || 'Approved';
+
+    const dataSheetUrl = t.trainingDataSheetUrl || (t.ParticipantsSheetID ? `https://docs.google.com/spreadsheets/d/${t.ParticipantsSheetID}/edit` : '');
+    const reqUrl       = t.requisitionFormUrl   || (t.RequisitionFormFileID ? `https://docs.google.com/spreadsheets/d/${t.RequisitionFormFileID}/edit` : (t.RequisitionUrl || t.BrochureURL || ''));
+    const folderUrl    = t.folderUrl            || (t.FolderID ? driveFolderUrl(t.FolderID) : '');
 
     const topActions = document.getElementById('detail-top-actions');
     topActions.innerHTML = `
       <button class="btn-th btn-primary" ${!isApproved ? 'disabled style="opacity:0.65;cursor:not-allowed"' : ''} onclick="${isApproved ? `openCreateSessionForTraining('${t.ID}')` : `showToast('Cannot add session: Training approval status is ${appStatusStr}.', 'error')`}"><span class="icon sm">${isApproved ? 'add' : 'lock'}</span>Add Session</button>
       <button class="btn-th btn-primary" style="background:#059669;border-color:#059669" onclick="navTo('attendance', {id:'${t.ID}'})"><span class="icon sm">fact_check</span>View Attendance</button>
       <button class="btn-th btn-secondary" onclick="navTo('evaluation', {id:'${t.ID}'})"><span class="icon sm">rate_review</span>View Evaluations</button>
-      <button class="btn-th btn-secondary" onclick="navTo('report', {id:'${t.ID}'})"><span class="icon sm">bar_chart</span>Reports</button>
-      ${t.FolderID ? `<a class="btn-th btn-secondary" href="${driveFolderUrl(t.FolderID)}" target="_blank" style="text-decoration:none"><span class="icon sm">folder</span>Drive Workspace</a>` : ''}
+      ${dataSheetUrl ? `<a class="btn-th" style="background:#059669;color:#fff;border:none;text-decoration:none;display:inline-flex;align-items:center;gap:4px" href="${dataSheetUrl}" target="_blank"><span class="icon sm">table_chart</span>Training Data Sheet</a>` : ''}
+      ${reqUrl ? `<a class="btn-th btn-secondary" href="${reqUrl}" target="_blank" style="text-decoration:none;display:inline-flex;align-items:center;gap:4px"><span class="icon sm">description</span>Requisition Form</a>` : ''}
+      ${folderUrl ? `<a class="btn-th btn-secondary" href="${folderUrl}" target="_blank" style="text-decoration:none;display:inline-flex;align-items:center;gap:4px"><span class="icon sm">folder</span>Drive Workspace</a>` : ''}
       <button class="btn-th btn-secondary" onclick="editTraining('${t.ID}')"><span class="icon sm">edit</span>Edit</button>
     `;
 
@@ -743,7 +747,7 @@
         </div>
 
         <!-- Meta Grid -->
-        <div class="row g-3">
+        <div class="row g-3 mb-3">
           ${[
             ['Trainer / Facilitator', t.Trainer, 'person'],
             ['Venue', t.Venue || '—', 'location_on'],
@@ -765,12 +769,25 @@
           `).join('')}
         </div>
 
+        <!-- Google Workspace & Training Data Sheets Card -->
+        <div style="background:#ECFDF5;border:1px solid #A7F3D0;border-radius:10px;padding:14px 16px;margin-top:14px">
+          <div style="font-size:13px;font-weight:700;color:#065F46;margin-bottom:8px;display:flex;align-items:center;gap:6px">
+            <span class="icon sm" style="color:#059669">table_chart</span> Google Workspace & Training Data Sheets
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            ${dataSheetUrl ? `<a href="${dataSheetUrl}" target="_blank" class="btn-th btn-sm" style="background:#059669;color:#fff;border:none;text-decoration:none;display:inline-flex;align-items:center;gap:4px"><span class="icon sm">table_chart</span> Open Training Data Sheet (6 Tabs)</a>` : ''}
+            ${reqUrl ? `<a href="${reqUrl}" target="_blank" class="btn-th btn-secondary btn-sm" style="background:#fff;text-decoration:none;display:inline-flex;align-items:center;gap:4px"><span class="icon sm">description</span> Open Requisition Form (AP-HRD-F01-01)</a>` : ''}
+            ${folderUrl ? `<a href="${folderUrl}" target="_blank" class="btn-th btn-secondary btn-sm" style="background:#fff;text-decoration:none;display:inline-flex;align-items:center;gap:4px"><span class="icon sm">folder</span> Open Drive Workspace Folder</a>` : ''}
+          </div>
+        </div>
+
         ${rawObj ? `
           <div style="margin-top:16px;padding-top:16px;border-top:1px solid #F1F5F9">
             <div class="section-label" style="margin-bottom:4px">Programme Objectives</div>
             <p style="font-size:13px;color:#374151;line-height:1.6;margin:0">${rawObj}</p>
           </div>
         ` : ''}
+
 
         ${brochureUrl ? `
           <div style="margin-top:16px;padding-top:16px;border-top:1px solid #F1F5F9">
@@ -852,7 +869,7 @@
         <div class="row g-3">
           ${sessions.length ? sessions.map(s => {
             const attUrl = s.AttendanceURL || `${baseUrl}?page=attendance&session=${encodeURIComponent(s.SessionID)}`;
-            const qrUrl  = s.QRCodeURL || quickChartUrl(attUrl);
+            const qrUrl  = ensureQRLogoUrl(s.QRCodeURL, attUrl);
             const status = s.QRStatus || 'Active';
             return `
               <div class="col-md-6 col-lg-4">
@@ -865,12 +882,12 @@
                     ${statusBadge(status)}
                   </div>
                   <div style="font-size:11.5px;color:#64748B;margin-bottom:12px;display:flex;gap:12px">
-                    <div><span class="icon sm" style="color:#94A3B8">calendar_today</span> ${s.SessionDate || '—'}</div>
-                    <div><span class="icon sm" style="color:#94A3B8">schedule</span> ${s.StartTime || '09:00'} - ${s.EndTime || '17:00'}</div>
+                    <div><span class="icon sm" style="color:#94A3B8">calendar_today</span> ${formatMinimalistDate(s.SessionDate)}</div>
+                    <div><span class="icon sm" style="color:#94A3B8">schedule</span> ${formatSessionTimeRange(s.StartTime, s.EndTime)}</div>
                   </div>
 
-                  <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:12px;text-align:center;margin-bottom:12px">
-                    <img src="${qrUrl}" alt="Session QR Code" style="width:150px;height:150px;border-radius:6px;background:#fff;padding:4px;border:1px solid #CBD5E1">
+                  <div style="text-align:center;margin-bottom:12px">
+                    ${renderQRWithLogoHtml(attUrl, 140, 32)}
                     <div style="font-size:10px;color:#64748B;margin-top:6px;word-break:break-all;font-family:monospace">${attUrl}</div>
                   </div>
 
@@ -878,9 +895,9 @@
                     <button class="btn-th btn-secondary btn-xs" onclick="navigator.clipboard.writeText('${attUrl}').then(()=>showToast('Attendance link copied!','success'))">
                       <span class="icon sm">content_copy</span> Copy Link
                     </button>
-                    <a class="btn-th btn-primary btn-xs" style="text-decoration:none;text-align:center" href="${qrUrl}" download="${s.SessionID}_QR.png" target="_blank">
+                    <button class="btn-th btn-primary btn-xs" onclick="downloadQRWithLogo('${attUrl}', '${s.SessionID}_QR.png')">
                       <span class="icon sm">download</span> Download QR
-                    </a>
+                    </button>
                     <button class="btn-th btn-secondary btn-xs" style="grid-column:span 2" onclick="navTo('attendance', {session:'${s.SessionID}'})">
                       <span class="icon sm">fact_check</span> View Session Attendance
                     </button>
@@ -918,19 +935,18 @@
               ${(() => {
                 const evalObj = (evalQrs && evalQrs.participantEval) ? evalQrs.participantEval : null;
                 const evalUrl = evalObj ? evalObj.url : `${baseUrl}?page=evaluation&id=${encodeURIComponent(t.ID)}`;
-                const evalQr  = evalObj ? evalObj.qrCodeUrl : quickChartUrl(evalUrl);
                 return `
-                  <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:12px;text-align:center;margin-bottom:12px">
-                    <img src="${evalQr}" alt="Participant Evaluation QR" style="width:140px;height:140px;border-radius:6px;background:#fff;padding:4px;border:1px solid #CBD5E1">
+                  <div style="text-align:center;margin-bottom:12px">
+                    ${renderQRWithLogoHtml(evalUrl, 140, 32)}
                     <div style="font-size:10px;color:#64748B;margin-top:6px;word-break:break-all;font-family:monospace">${evalUrl}</div>
                   </div>
                   <div style="margin-top:auto;display:grid;grid-template-columns:1fr 1fr;gap:6px">
                     <button class="btn-th btn-secondary btn-xs" onclick="navigator.clipboard.writeText('${evalUrl}').then(()=>showToast('Participant Eval link copied!','success'))">
                       <span class="icon sm">content_copy</span> Copy Link
                     </button>
-                    <a class="btn-th btn-primary btn-xs" style="text-decoration:none;text-align:center" href="${evalQr}" download="${t.ID}_ParticipantEval_QR.png" target="_blank">
+                    <button class="btn-th btn-primary btn-xs" onclick="downloadQRWithLogo('${evalUrl}', '${t.ID}_ParticipantEval_QR.png')">
                       <span class="icon sm">download</span> Download QR
-                    </a>
+                    </button>
                   </div>
                 `;
               })()}
@@ -949,19 +965,18 @@
               ${(() => {
                 const postObj = (evalQrs && evalQrs.supervisorPostEval) ? evalQrs.supervisorPostEval : null;
                 const postUrl = postObj ? postObj.url : `${baseUrl}?page=post&id=${encodeURIComponent(t.ID)}`;
-                const postQr  = postObj ? postObj.qrCodeUrl : quickChartUrl(postUrl);
                 return `
-                  <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:12px;text-align:center;margin-bottom:12px">
-                    <img src="${postQr}" alt="Supervisor Post Evaluation QR" style="width:140px;height:140px;border-radius:6px;background:#fff;padding:4px;border:1px solid #CBD5E1">
+                  <div style="text-align:center;margin-bottom:12px">
+                    ${renderQRWithLogoHtml(postUrl, 140, 32)}
                     <div style="font-size:10px;color:#64748B;margin-top:6px;word-break:break-all;font-family:monospace">${postUrl}</div>
                   </div>
                   <div style="margin-top:auto;display:grid;grid-template-columns:1fr 1fr;gap:6px">
                     <button class="btn-th btn-secondary btn-xs" onclick="navigator.clipboard.writeText('${postUrl}').then(()=>showToast('Supervisor Post Eval link copied!','success'))">
                       <span class="icon sm">content_copy</span> Copy Link
                     </button>
-                    <a class="btn-th btn-primary btn-xs" style="text-decoration:none;text-align:center" href="${postQr}" download="${t.ID}_SupervisorPostEval_QR.png" target="_blank">
+                    <button class="btn-th btn-primary btn-xs" onclick="downloadQRWithLogo('${postUrl}', '${t.ID}_SupervisorPostEval_QR.png')">
                       <span class="icon sm">download</span> Download QR
-                    </a>
+                    </button>
                   </div>
                 `;
               })()}
@@ -1080,6 +1095,69 @@
               })()}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <!-- Submitted Level 1 & Level 3 Evaluation Records Card (Training Data Sheet) -->
+      <div class="card-th mt-4">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+          <div>
+            <h3 style="font-size:16px;font-weight:700;color:#1E293B;margin:0 0 2px">Submitted Evaluation Records (Training Data Sheet)</h3>
+            <p style="font-size:12px;color:#64748B;margin:0">Level 1 Participant Evaluations & Level 3 Supervisor Post-Evaluations</p>
+          </div>
+          <button class="btn-th btn-secondary btn-sm" onclick="navTo('evaluation', {id:'${t.ID}'})">
+            <span class="icon sm">rate_review</span> Open Full Evaluation Module
+          </button>
+        </div>
+
+        <div class="row g-3">
+          <!-- Level 1 Participant Evaluations Table -->
+          <div class="col-md-6">
+            <div style="border:1px solid #E2E8F0;border-radius:8px;padding:12px;background:#fff">
+              <div style="font-size:13px;font-weight:700;color:#1E293B;margin-bottom:8px">Level 1: Submitted Participant Evaluations (${(evals || []).length})</div>
+              <div style="overflow-x:auto">
+                <table class="table-th" style="font-size:12px">
+                  <thead>
+                    <tr><th>Participant</th><th>Dept</th><th>Avg Score</th><th>Date</th></tr>
+                  </thead>
+                  <tbody>
+                    ${(evals || []).length ? (evals || []).map(e => `
+                      <tr>
+                        <td style="font-weight:600">${e.EmployeeName || e.EmployeeID || '—'}</td>
+                        <td style="color:#64748B">${e.Department || '—'}</td>
+                        <td style="font-weight:700;color:#2563EB">${e.AvgScore ? e.AvgScore + ' / 5' : '—'}</td>
+                        <td style="color:#64748B;font-size:11px">${toDisplayDateStr(e.Timestamp || e.Date) || '—'}</td>
+                      </tr>
+                    `).join('') : '<tr><td colspan="4" style="text-align:center;color:#94A3B8;padding:20px">No Level 1 evaluations submitted yet.</td></tr>'}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Level 3 Supervisor 3-Month Post Evaluations Table -->
+          <div class="col-md-6">
+            <div style="border:1px solid #E2E8F0;border-radius:8px;padding:12px;background:#fff">
+              <div style="font-size:13px;font-weight:700;color:#1E293B;margin-bottom:8px">Level 3: Submitted Supervisor Post-Evaluations (${(postEvals || []).length})</div>
+              <div style="overflow-x:auto">
+                <table class="table-th" style="font-size:12px">
+                  <thead>
+                    <tr><th>Participant</th><th>Supervisor</th><th>Competency (Pre → Post)</th><th>Date</th></tr>
+                  </thead>
+                  <tbody>
+                    ${(postEvals || []).length ? (postEvals || []).map(pe => `
+                      <tr>
+                        <td style="font-weight:600">${pe.EmployeeName || pe.EmployeeID || '—'}</td>
+                        <td style="color:#64748B">${pe.SupervisorName || pe.SupervisorID || '—'}</td>
+                        <td style="font-weight:700;color:#059669">${pe.CompetencyBefore || '—'} → ${pe.CompetencyAfter || '—'}</td>
+                        <td style="color:#64748B;font-size:11px">${toDisplayDateStr(pe.Timestamp || pe.Date) || '—'}</td>
+                      </tr>
+                    `).join('') : '<tr><td colspan="4" style="text-align:center;color:#94A3B8;padding:20px">No 3-month post-evaluations submitted yet.</td></tr>'}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     `;

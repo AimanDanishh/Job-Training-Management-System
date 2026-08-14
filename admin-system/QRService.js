@@ -32,19 +32,7 @@ function generateAttendanceURL(sessionId) {
 function generateQRCode(text, customLogoUrl) {
   if (!text) return '';
   const encodedText = encodeURIComponent(text);
-
-  // Retrieve logo URL from parameter or Script Property (COMPANY_LOGO_URL)
-  const rawLogo = customLogoUrl || getCompanyLogoUrl();
-  const directLogoUrl = convertDriveLinkToDirectImageUrl(rawLogo);
-
-  // ecLevel=H enables High Error Correction (30%) so center logo overlay doesn't affect scanning
-  let qrUrl = `https://quickchart.io/qr?size=400&ecLevel=H&text=${encodedText}`;
-
-  if (directLogoUrl) {
-    qrUrl += `&centerImageUrl=${encodeURIComponent(directLogoUrl)}&centerImageSizeRatio=0.22`;
-  }
-
-  return qrUrl;
+  return `https://quickchart.io/qr?size=400&ecLevel=H&text=${encodedText}`;
 }
 
 /**
@@ -71,53 +59,42 @@ function updateCompanyLogoAndRegenerateQRs(logoUrlOrDriveLink) {
  */
 function generateMissingQRCodes(forceRegenerate = false) {
   try {
-    const sheet = getSheet(SHEET_NAMES.trainingSessions);
-    if (!sheet) return err('TrainingSessions sheet not found.');
-
-    ensureTrainingSessionsSheetColumns(sheet);
-
-    const data = sheet.getDataRange().getValues();
-    if (data.length < 2) return ok({ message: 'No sessions found.', count: 0 });
-
-    const headers = data[0];
-
-    const findIndex = (possibleNames) => {
-      const cleans = possibleNames.map(n => n.toLowerCase().replace(/[^a-z0-9]/g, ''));
-      return headers.findIndex(h => cleans.includes(String(h || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '')));
-    };
-
-    const sessionIdx = findIndex(['SessionID', 'Session ID', 'Session_ID', 'ID']);
-    const attUrlIdx  = findIndex(['AttendanceURL', 'Attendance URL', 'Attendance_URL', 'AttURL']);
-    const qrUrlIdx   = findIndex(['QRCodeURL', 'QR Code URL', 'QR_Code_URL', 'QRCode', 'QRURL']);
-
-    if (sessionIdx === -1 || attUrlIdx === -1 || qrUrlIdx === -1) {
-      return err('Invalid header structure in TrainingSessions sheet.');
-    }
-
+    const trainingSheet = getSheet(SHEET_NAMES.trainings);
+    const trainings = trainingSheet ? sheetToJson(trainingSheet) : [];
     let updatedCount = 0;
-
-    for (let i = 1; i < data.length; i++) {
-      const sessionId = String(data[i][sessionIdx]).trim();
-      if (!sessionId) continue;
-
-      let attUrl = data[i][attUrlIdx];
-      let qrUrl  = data[i][qrUrlIdx];
-
-      let updated = false;
-      if (!attUrl || String(attUrl).trim() === '') {
-        attUrl = generateAttendanceURL(sessionId);
-        sheet.getRange(i + 1, attUrlIdx + 1).setValue(attUrl);
-        updated = true;
+    trainings.forEach(training => {
+      const ss = getTrainingDataSpreadsheet(training.ID || training.Code);
+      const sheet = ss ? ss.getSheetByName('TrainingSessions') : null;
+      if (!sheet || sheet.getLastRow() < 2) return;
+      ensureTrainingSessionsSheetColumns(sheet);
+      const data = sheet.getDataRange().getValues();
+      const headers = data[0];
+      const findIndex = possibleNames => {
+        const cleans = possibleNames.map(n => n.toLowerCase().replace(/[^a-z0-9]/g, ''));
+        return headers.findIndex(h => cleans.includes(String(h || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '')));
+      };
+      const sessionIdx = findIndex(['SessionID', 'Session ID', 'Session_ID', 'ID']);
+      const attUrlIdx = findIndex(['AttendanceURL', 'Attendance URL', 'Attendance_URL', 'AttURL']);
+      const qrUrlIdx = findIndex(['QRCodeURL', 'QR Code URL', 'QR_Code_URL', 'QRCode', 'QRURL']);
+      if (sessionIdx === -1 || attUrlIdx === -1 || qrUrlIdx === -1) return;
+      for (let i = 1; i < data.length; i++) {
+        const sessionId = String(data[i][sessionIdx]).trim();
+        if (!sessionId) continue;
+        let attUrl = data[i][attUrlIdx];
+        let qrUrl = data[i][qrUrlIdx];
+        let updated = false;
+        if (!attUrl || String(attUrl).trim() === '') {
+          attUrl = generateAttendanceURL(sessionId);
+          sheet.getRange(i + 1, attUrlIdx + 1).setValue(attUrl);
+          updated = true;
+        }
+        if (forceRegenerate || !qrUrl || String(qrUrl).trim() === '') {
+          sheet.getRange(i + 1, qrUrlIdx + 1).setValue(generateQRCode(attUrl || generateAttendanceURL(sessionId)));
+          updated = true;
+        }
+        if (updated) updatedCount++;
       }
-
-      if (forceRegenerate || !qrUrl || String(qrUrl).trim() === '') {
-        qrUrl = generateQRCode(attUrl || generateAttendanceURL(sessionId));
-        sheet.getRange(i + 1, qrUrlIdx + 1).setValue(qrUrl);
-        updated = true;
-      }
-
-      if (updated) updatedCount++;
-    }
+    });
 
     return ok({
       message: `Successfully generated QR codes for ${updatedCount} session(s).`,

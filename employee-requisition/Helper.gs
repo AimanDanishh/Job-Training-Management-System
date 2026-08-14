@@ -256,8 +256,11 @@ function getSystemRootFolder() {
   }
 
   const systemRoot = DriveApp.getFolderById(rootFolderId);
-  const trainingFolders = systemRoot.getFoldersByName('Training');
-  return trainingFolders.hasNext() ? trainingFolders.next() : systemRoot.createFolder('Training');
+  const trainingFolders = systemRoot.getFoldersByName('Training Folder');
+  if (!trainingFolders.hasNext()) {
+    throw new Error("Required folder 'Training Folder' was not found under ROOT_FOLDER_ID.");
+  }
+  return trainingFolders.next();
 }
 
 function createTrainingWorkspace(code, trainingName) {
@@ -391,16 +394,14 @@ function getTrainingDataSpreadsheet(trainingId) {
   const training = rows.find(r => String(r.ID || r.TrainingID || r.Code || '').trim() === String(trainingId).trim());
   if (!training) return null;
 
-  const storedSheetId = training.ParticipantsSheetID || training.AttendanceSheetID || training.SessionsSheetID || training.EvaluationSheetID || training.PostSheetID;
-  if (storedSheetId) {
-    try { return SpreadsheetApp.openById(storedSheetId); } catch (e) {
-      Logger.log('Could not open Training Data sheet by ID: ' + e.message);
-    }
-  }
-  if (!training.FolderID) return null;
   try {
-    const file = getOrCreateSingleTrainingSheet(DriveApp.getFolderById(training.FolderID), training.Code || training.ID);
-    return SpreadsheetApp.openById(file.getId());
+    const trainingRoot = getSystemRootFolder();
+    const code = training.Code || training.ID;
+    const folders = trainingRoot.getFoldersByName(`${code} ${training.Name || ''}`.trim());
+    if (!folders.hasNext()) return null;
+    const folder = folders.next();
+    const fileIter = folder.getFilesByName(`${code} Training Data`);
+    return fileIter.hasNext() ? SpreadsheetApp.openById(fileIter.next().getId()) : null;
   } catch (e) {
     Logger.log('Could not open Training Data sheet from folder: ' + e.message);
     return null;
@@ -437,35 +438,6 @@ function syncParticipantsToTrainingDriveSheet(trainingId, directParticipantsList
         Position: p.Position || p.JobTitle || p.PositionTitle || '',
         AddedAt: p.AddedAt || now()
       }));
-    } else {
-      const tpSheet = getSheet('TrainingParticipants');
-      if (tpSheet && tpSheet.getLastRow() > 1) {
-        const tpValues = tpSheet.getDataRange().getValues();
-        const tpHeaders = tpValues[0].map(h => String(h).trim());
-        const tIdIdx = tpHeaders.indexOf('TrainingID');
-        const empIdIdx = tpHeaders.indexOf('EmployeeID');
-        const empNameIdx = tpHeaders.indexOf('EmployeeName');
-        const deptIdx = tpHeaders.indexOf('Department');
-        const posIdx = tpHeaders.indexOf('Position');
-        const addedIdx = tpHeaders.indexOf('AddedAt');
-        const idIdx = tpHeaders.indexOf('ID');
-
-        for (let i = 1; i < tpValues.length; i++) {
-          const r = tpValues[i];
-          const rTrainId = String(tIdIdx >= 0 ? r[tIdIdx] : r[1]).trim();
-          if (rTrainId === String(trainingId).trim()) {
-            participantsToSync.push({
-              ID: idIdx >= 0 ? r[idIdx] : r[0],
-              TrainingID: trainingId,
-              EmployeeID: empIdIdx >= 0 ? r[empIdIdx] : r[2],
-              EmployeeName: empNameIdx >= 0 ? r[empNameIdx] : r[3],
-              Department: deptIdx >= 0 ? r[deptIdx] : r[4],
-              Position: posIdx >= 0 ? r[posIdx] : r[5],
-              AddedAt: addedIdx >= 0 ? r[addedIdx] : r[6]
-            });
-          }
-        }
-      }
     }
 
     // Always rebuild Training Data from the Employee-sheet source of truth.
@@ -809,15 +781,10 @@ function syncTrainingRequisitionParticipants(trainingId) {
     const formId = formCol ? trainingSheet.getRange(row, formCol).getValue() : '';
     if (!formId) return;
 
-    // Prefer the per-training Training Data sheet. Fall back to the legacy
-    // master participant tab only for older requests.
+    // The per-training Training Data sheet is the sole participant source.
     const trainingData = getTrainingDataSpreadsheet(trainingId);
     const dataParticipantSheet = trainingData ? trainingData.getSheetByName('TrainingParticipants') : null;
-    let tpRows = dataParticipantSheet ? sheetToJson(dataParticipantSheet) : [];
-    if (tpRows.length === 0) {
-      const tpSheet = getSheet('TrainingParticipants');
-      tpRows = tpSheet ? sheetToJson(tpSheet).filter(r => String(r.TrainingID || r.TrainingId || '').trim() === String(trainingId).trim()) : [];
-    }
+    const tpRows = dataParticipantSheet ? sheetToJson(dataParticipantSheet) : [];
     const resolved = canonicalizeTrainingParticipants(tpRows);
     if (resolved.rejected.length > 0) {
       Logger.log('Skipped participant rows not found in Employees for ' + trainingId + ': ' + resolved.rejected.join(', '));
@@ -1318,19 +1285,12 @@ function generateSyncId() {
 }
 
 function getOrCreateReportsFolder() {
-  let rootFolder = null;
-  try {
-    if (typeof getSystemRootFolder === 'function') {
-      rootFolder = getSystemRootFolder();
-    } else {
-      rootFolder = DriveApp.getRootFolder();
-    }
-  } catch(e) {
-    rootFolder = DriveApp.getRootFolder();
-  }
+  const rootFolderId = extractCleanDriveId(getConfigProperty('ROOT_FOLDER_ID', ''));
+  if (!rootFolderId) throw new Error('ROOT_FOLDER_ID is required.');
+  const rootFolder = DriveApp.getFolderById(rootFolderId);
   let folderIter = rootFolder.getFoldersByName('Reports');
   if (folderIter.hasNext()) return folderIter.next();
-  return rootFolder.createFolder('Reports');
+  throw new Error("Required folder 'Reports' was not found under ROOT_FOLDER_ID.");
 }
 
 function getOrCreateSyncHistorySheet(ss) {

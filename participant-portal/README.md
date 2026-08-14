@@ -1,6 +1,6 @@
 # Public Participant Portal — Google Apps Script Setup Guide
 
-This Google Apps Script project serves as the **Public Participant Portal** for the Job Training Management System. It allows participants to check in via QR code, submit training evaluations, and allows supervisors to submit 6-month post-training evaluations without requiring Google sign-in.
+This Google Apps Script project serves as the **Public Participant Portal** for the Job Training Management System. It allows participants to check in via QR code, submit training evaluations, and allows supervisors to submit 3-month post-training evaluations without requiring Google sign-in.
 
 ---
 

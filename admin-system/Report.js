@@ -2,18 +2,28 @@
  * Report.gs — Comprehensive Report Generation & Excel Export Engine
  */
 
+function safeParseObj(val) {
+  if (!val) return {};
+  if (typeof val === 'object') return val;
+  try {
+    return JSON.parse(val);
+  } catch(e) {
+    return {};
+  }
+}
+
 // ─── Full Programme Report (Single Training) ──────────────────────────────────
 function generateReport(trainingId) {
   try {
-    const tResult  = JSON.parse(getTrainingById(trainingId));
+    const tResult  = safeParseObj(getTrainingById(trainingId));
     if (!tResult.success) return err('Training not found.');
     const training = tResult.data;
 
-    const attSummary  = JSON.parse(getAttendanceSummary(trainingId)).data  || {};
-    const evalSummary = JSON.parse(getEvaluationSummary(trainingId)).data  || {};
-    const attData     = JSON.parse(getAttendance(trainingId)).data         || [];
-    const evalData    = JSON.parse(getTrainingEvaluations(trainingId)).data || [];
-    const postData    = JSON.parse(getPostEvaluations(trainingId)).data    || [];
+    const attSummary  = safeParseObj(getAttendanceSummary(trainingId)).data  || {};
+    const evalSummary = safeParseObj(getEvaluationSummary(trainingId)).data  || {};
+    const attData     = safeParseObj(getAttendance(trainingId)).data         || [];
+    const evalData    = safeParseObj(getTrainingEvaluations(trainingId)).data || [];
+    const postData    = safeParseObj(getPostEvaluations(trainingId)).data    || [];
 
     let requisitionFormUrl = '';
     if (training.RequisitionFormFileID) {
@@ -36,7 +46,7 @@ function generateReport(trainingId) {
 // ─── Dashboard Overview Report ──────────────────────────────────────────────────
 function getDashboardReport() {
   try {
-    const trainingSummary = JSON.parse(getTrainingSummary()).data || {};
+    const trainingSummary = safeParseObj(getTrainingSummary()).data || {};
     const tSheet = getSheet(SHEET_NAMES.trainings);
     const tRows  = tSheet ? sheetToJson(tSheet) : [];
 
@@ -616,12 +626,14 @@ function buildAnnualTrainingPlanData(trainingsInput, selectedDept) {
     const duration = cleanNum(t.TotalHours || (cleanNum(t.Duration, 1) * 8), 0);
     const pax = cleanNum(t.Participants, 0);
 
-    let reqUrl = t.RequisitionUrl || t.RequisitionFormUrl || '';
+    let reqUrl = t.requisitionFormUrl || t.RequisitionUrl || t.BrochureURL || '';
     if (!reqUrl && t.RequisitionFormFileID) {
       reqUrl = `https://docs.google.com/spreadsheets/d/${encodeURIComponent(t.RequisitionFormFileID)}/edit`;
     }
-    if (!reqUrl) {
-      reqUrl = `https://docs.google.com/spreadsheets/d/sample-requisition-form-${t.Code || t.ID || (idx+1)}/edit`;
+
+    let dataSheetUrl = t.trainingDataSheetUrl || '';
+    if (!dataSheetUrl && t.ParticipantsSheetID) {
+      dataSheetUrl = `https://docs.google.com/spreadsheets/d/${encodeURIComponent(t.ParticipantsSheetID)}/edit`;
     }
 
     return {
@@ -635,6 +647,7 @@ function buildAnnualTrainingPlanData(trainingsInput, selectedDept) {
       department: t.Department || 'All Departments',
       positionEmpNo: 'Name List',
       requisitionFormUrl: reqUrl,
+      trainingDataSheetUrl: dataSheetUrl,
       totalPax: pax,
       plannedDate: formatOrdinalDate(t.StartDate),
       actualDateFrom: formatOrdinalDate(t.StartDate),
@@ -707,6 +720,85 @@ function ensureSheetDimensions(sheet, minRows, minCols) {
     if (curRows < minRows) sheet.insertRowsAfter(curRows, minRows - curRows);
     if (curCols < minCols) sheet.insertColumnsAfter(curCols, minCols - curCols);
   } catch (e) {}
+}
+
+function getOrCreateStandingReportSpreadsheet(reportName) {
+  const repFolder = getOrCreateReportsFolder();
+  let fileIter = repFolder.getFilesByName(reportName);
+  let file;
+  if (fileIter.hasNext()) {
+    file = fileIter.next();
+  } else {
+    const files = repFolder.getFiles();
+    while (files.hasNext()) {
+      const f = files.next();
+      if (f.getName().toLowerCase().trim() === reportName.toLowerCase().trim()) {
+        file = f;
+        break;
+      }
+    }
+  }
+
+  if (file) {
+    return SpreadsheetApp.openById(file.getId());
+  }
+
+  const ss = SpreadsheetApp.create(reportName);
+  file = DriveApp.getFileById(ss.getId());
+  file.moveTo(repFolder);
+  return ss;
+}
+
+function exportReportToSpreadsheet(reportType, year) {
+  try {
+    let reportName = 'Employee Report';
+    if (reportType === 'hours') reportName = 'Training Hours';
+    else if (reportType === 'cost') reportName = 'Training Cost';
+    else if (reportType === 'title') reportName = 'Training Title';
+    else if (reportType === 'employee') reportName = 'Employee Report';
+    else if (reportType === 'atp') reportName = 'Annual Training Plan';
+
+    const filters = { year: year || 'All' };
+    const res = parseServerRes(getFilteredReportData(reportType, filters));
+    if (!res.success) return err(res.message);
+    const data = res.data;
+
+    const ss = getOrCreateStandingReportSpreadsheet(reportName);
+    const sheet = ss.getActiveSheet();
+    sheet.setName(reportName);
+
+    if (reportType === 'hours') {
+      formatHoursReportSheet(sheet, data, year);
+    } else if (reportType === 'cost') {
+      formatCostReportSheet(sheet, data, year);
+    } else if (reportType === 'title') {
+      formatTitleReportSheet(sheet, data);
+    } else if (reportType === 'employee') {
+      formatEmployeeReportSheet(sheet, data);
+    } else if (reportType === 'atp') {
+      formatAtpReportSheet(sheet, data);
+    }
+
+    SpreadsheetApp.flush();
+
+    const fileId = ss.getId();
+    const sheetUrl = ss.getUrl();
+    const downloadUrl = `https://docs.google.com/spreadsheets/d/${fileId}/export?format=xlsx`;
+    const repFolder = getOrCreateReportsFolder();
+
+    return ok({
+      fileId: fileId,
+      fileName: `${reportName}.xlsx`,
+      sheetUrl: sheetUrl,
+      downloadUrl: downloadUrl,
+      folderId: repFolder.getId(),
+      folderName: repFolder.getName(),
+      folderUrl: repFolder.getUrl(),
+      message: `Report updated in standing spreadsheet '${reportName}'.`
+    });
+  } catch (e) {
+    return err('Failed to export Excel report: ' + e.message);
+  }
 }
 
 // ─── Export Filtered Report to Excel / Google Sheets ──────────────────────────
@@ -1587,54 +1679,37 @@ function syncAllTrainings(targetYear) {
 function syncLiveMasterReportSheet(targetYear) {
   try {
     const year = (targetYear && targetYear !== '2026') ? targetYear : 'All';
-    const displayYear = (targetYear && targetYear !== 'All') ? targetYear : '2026';
-    const repFolder = getOrCreateReportsFolder();
-    const fileName = `Master Annual Training Report (${displayYear})`;
-
-    let fileIter = repFolder.getFilesByName(fileName);
-    let ss;
-    let file;
-
-    if (fileIter.hasNext()) {
-      file = fileIter.next();
-      ss = SpreadsheetApp.openById(file.getId());
-    } else {
-      ss = SpreadsheetApp.create(fileName);
-      file = DriveApp.getFileById(ss.getId());
-      repFolder.addFile(file);
-      try { DriveApp.getRootFolder().removeFile(file); } catch (e) {}
-    }
-
     const filters = { year: 'All' };
 
-    // Tab 1: Training Hours
+    // Update Standing Report Files
     const hoursRes = parseServerRes(getFilteredReportData('hours', filters));
     if (hoursRes.success && hoursRes.data) {
-      syncReportSheetIncrementally(ss, 'Training Hours', hoursRes.data, { year: displayYear });
+      const ssHours = getOrCreateStandingReportSpreadsheet('Training Hours');
+      syncReportSheetIncrementally(ssHours, 'Training Hours', hoursRes.data, { year: displayYear });
     }
 
-    // Tab 2: Training Cost
     const costRes = parseServerRes(getFilteredReportData('cost', filters));
     if (costRes.success && costRes.data) {
-      syncReportSheetIncrementally(ss, 'Training Cost', costRes.data, { year: displayYear });
+      const ssCost = getOrCreateStandingReportSpreadsheet('Training Cost');
+      syncReportSheetIncrementally(ssCost, 'Training Cost', costRes.data, { year: displayYear });
     }
 
-    // Tab 3: Training Title
     const titleRes = parseServerRes(getFilteredReportData('title', filters));
     if (titleRes.success && titleRes.data) {
-      syncReportSheetIncrementally(ss, 'Training Title', titleRes.data);
+      const ssTitle = getOrCreateStandingReportSpreadsheet('Training Title');
+      syncReportSheetIncrementally(ssTitle, 'Training Title', titleRes.data);
     }
 
-    // Tab 4: Employee Report
     const empRes = parseServerRes(getFilteredReportData('employee', filters));
     if (empRes.success && empRes.data) {
-      syncReportSheetIncrementally(ss, 'Employee Report', empRes.data);
+      const ssEmp = getOrCreateStandingReportSpreadsheet('Employee Report');
+      syncReportSheetIncrementally(ssEmp, 'Employee Report', empRes.data);
     }
 
-    // Tab 5: Annual Training Plan (ATP)
     const atpRes = parseServerRes(getFilteredReportData('atp', filters));
     if (atpRes.success && atpRes.data) {
-      syncReportSheetIncrementally(ss, 'Annual Training Plan (ATP)', atpRes.data);
+      const ssAtp = getOrCreateStandingReportSpreadsheet('Annual Training Plan');
+      syncReportSheetIncrementally(ssAtp, 'Annual Training Plan', atpRes.data);
     }
 
     // Clean up default empty sheet if present
@@ -2050,11 +2125,11 @@ function formatAtpReportSheet(sheet, data) {
 // ─── Export Single Attendance Sheet ───────────────────────────────────────────
 function exportAttendanceSheet(trainingId) {
   try {
-    const tResult = JSON.parse(getTrainingById(trainingId));
+    const tResult = safeParseObj(getTrainingById(trainingId));
     if (!tResult.success) return err('Training not found.');
     const training = tResult.data;
 
-    const attData = JSON.parse(getAttendance(trainingId)).data || [];
+    const attData = safeParseObj(getAttendance(trainingId)).data || [];
 
     const ss    = getSpreadsheet();
     const name  = 'Attendance_' + training.Code + '_' + new Date().getTime();
@@ -2085,13 +2160,29 @@ function exportAttendanceSheet(trainingId) {
 // ─── Export Single Training Full Report to Excel (.xlsx / Sheet) ──────────────
 function exportReportExcel(trainingId) {
   try {
-    const reportRes = JSON.parse(generateReport(trainingId));
+    const reportRes = safeParseObj(generateReport(trainingId));
     if (!reportRes.success) return err(reportRes.message);
     const rep = reportRes.data;
     const t = rep.training;
 
-    const ssName = `${t.Code}_Full_Report_${Date.now()}`;
+    const ssName = `${t.Code}_Full_Report`;
     const ss = SpreadsheetApp.create(ssName);
+    const file = DriveApp.getFileById(ss.getId());
+
+    try {
+      const trainingRoot = getOrCreateTrainingRootFolder();
+      const folderName = `${t.Code} ${t.Name}`.trim();
+      let folderIter = trainingRoot.getFoldersByName(folderName);
+      let targetFolder = folderIter.hasNext() ? folderIter.next() : null;
+      if (!targetFolder && t.FolderID) {
+        try { targetFolder = DriveApp.getFolderById(t.FolderID); } catch(e) {}
+      }
+      if (targetFolder) {
+        file.moveTo(targetFolder);
+      }
+    } catch (mErr) {
+      Logger.log('Error moving single training report file: ' + mErr.message);
+    }
 
     const sSummary = ss.getActiveSheet();
     sSummary.setName('Programme Overview');

@@ -437,9 +437,10 @@ TNA Source: "Training Requisition Form" and "Training Procedure"
 Training Type: add "On-Job Training"
 
 **Training Request Form (edit):**
+
 1. missing department/ cost centre when select multiple (not saved/shown all)
 
-2\. missing training provider 
+2\. missing training provider
 
 3\. missing cert expiry date
 4. missing participants list
@@ -447,6 +448,7 @@ Training Type: add "On-Job Training"
 
 
 **Admin:**
+
 1. Returned is count as fully approve in admin dashboard
 
 2\. Training Programmes detail is not detailed enough
@@ -468,9 +470,77 @@ Training Type: add "On-Job Training"
 
 
 **Post evaluation:**
+
 1. Admin assign/select employee for post evaluation to supervisor or person in charge
 
 2\. System check supervisor email or employee ID
 
 3\. System display pending evaluation (list of employee to be evaluate under the supervisor, separate by training)
+
+
+
+**Evaluation Form:**
+
+1. did not use employee ID example "00000"
+
+
+
+**Admin System (New Programme/Training Form):**
+1. TNA Source: Training Requisition Form and Training Procedure only
+
+2\. Remove lifecycle stage
+
+3\. Ensure all form are empty, no predefined answer/value
+
+
+
+**Admin System (3-month** **Post Evaluation):**
+1. For 3-month post evaluation, list all participants for the training (if they attend)
+
+2\. Admin can select/tick the participant and assign to the supervisor/PIC by selecting their employee name/ID and enter their email, they may assign to multiple supervisor (each of them need email)
+
+3\. The system will assign the selected participant to the supervisor/PIC and notify via email automatically after 3 month from the date the training is finished/completed
+
+4\. When supervisor enter their employee ID in the post evaluation system, the system will show the pending evaluation assigned to them and if the evaluation have not reach 3 months, the system will show countdown month:day:hour:minute before they can evaluate
+
+
+
+
+
+1. edit/change supervisor option
+2. notification
+
+
+
+**Database Structure (All are under Root Folder):**
+
+1. TrainHub Database (Sheets store Trainings)
+2. Training Folder (store individual training in independent folder)
+
+   * Training Data (Sheets, below are the tab list)
+
+     * Participants
+     * Sessions
+     * Attendance
+     * Evaluation
+     * Post Evaluation
+     * Summary
+   * Training Requisition Form
+   * Brochure
+3. Reports
+
+   * Annual Training Plan
+   * Training Cost
+   * Training Title
+   * Employee Report
+   * Training Hours
+   * Sync History
+4. Namelist (fixed list of employee)
+
+   * For IT (the list of employee)
+   * HOD email
+   * Csuite email
+   * HOHR email
+   * HR email
+   * Cost Centre
 

@@ -179,31 +179,26 @@ function getTrainingDataSpreadsheet(trainingId) {
   const t = trainings.find(r => String(r.ID || r.TrainingID || r.Code || '').trim() === cleanId);
   if (!t) return null;
 
-  // 1. Try sheet ID stored in ParticipantsSheetID, SessionsSheetID, AttendanceSheetID, etc.
-  const sheetId = t.ParticipantsSheetID || t.AttendanceSheetID || t.SessionsSheetID || t.EvaluationSheetID || t.PostSheetID;
-  if (sheetId) {
-    try {
-      return SpreadsheetApp.openById(sheetId);
-    } catch (e) {
-      Logger.log('Error opening per-training sheet by ID (' + sheetId + '): ' + e.message);
-    }
-  }
-
-  // 2. Try FolderID
-  if (t.FolderID) {
-    try {
-      const folder = DriveApp.getFolderById(t.FolderID);
-      const code = t.Code || t.ID;
+  // Resolve only from ROOT_FOLDER_ID/Training Folder/<code + name>.
+  try {
+      const rootId = getConfigProperty('ROOT_FOLDER_ID', '');
+      if (!rootId) throw new Error('ROOT_FOLDER_ID is required.');
+      const root = DriveApp.getFolderById(rootId);
+      const trainingRoots = root.getFoldersByName('Training Folder');
+      if (!trainingRoots.hasNext()) throw new Error("Required folder 'Training Folder' was not found under ROOT_FOLDER_ID.");
+      const trainingRoot = trainingRoots.next();
+      const code = t.Code || t.ID || cleanId;
+      const folderName = `${code} ${t.Name || ''}`.trim();
+      const folders = trainingRoot.getFoldersByName(folderName);
+      if (!folders.hasNext()) return null;
+      const folder = folders.next();
       const fileIter = folder.getFilesByName(`${code} Training Data`);
       if (fileIter.hasNext()) {
         return SpreadsheetApp.openById(fileIter.next().getId());
-      } else {
-        const file = getOrCreateSingleTrainingSheet(folder, code);
-        return SpreadsheetApp.openById(file.getId());
       }
-    } catch (e) {
-      Logger.log('Error opening per-training sheet from FolderID: ' + e.message);
-    }
+      Logger.log('Training Data file not found for ' + cleanId + '. HOD reads do not create replacement files.');
+  } catch (e) {
+    Logger.log('Error resolving per-training sheet from ROOT_FOLDER_ID: ' + e.message);
   }
 
   return null;
@@ -822,19 +817,12 @@ function generateSyncId() {
 }
 
 function getOrCreateReportsFolder() {
-  let rootFolder = null;
-  try {
-    if (typeof getSystemRootFolder === 'function') {
-      rootFolder = getSystemRootFolder();
-    } else {
-      rootFolder = DriveApp.getRootFolder();
-    }
-  } catch(e) {
-    rootFolder = DriveApp.getRootFolder();
-  }
+  const rootFolderId = getConfigProperty('ROOT_FOLDER_ID', '');
+  if (!rootFolderId) throw new Error('ROOT_FOLDER_ID is required.');
+  const rootFolder = DriveApp.getFolderById(rootFolderId);
   let folderIter = rootFolder.getFoldersByName('Reports');
   if (folderIter.hasNext()) return folderIter.next();
-  return rootFolder.createFolder('Reports');
+  throw new Error("Required folder 'Reports' was not found under ROOT_FOLDER_ID.");
 }
 
 function getOrCreateSyncHistorySheet(ss) {

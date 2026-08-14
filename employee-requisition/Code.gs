@@ -144,12 +144,6 @@ function getEmployeeSubmittedRequests(employeeId) {
 
     const rows = sheetToJson(sheet);
 
-    let allParticipants = [];
-    try {
-      const tpSheet = getSheet('TrainingParticipants');
-      if (tpSheet) allParticipants = sheetToJson(tpSheet);
-    } catch(tpErr) {}
-
     const matchedRequests = rows.filter(r => {
       const reqId = String(r.RequestedBy || r.EmployeeID || r.EmployeeNo || '').trim().toLowerCase();
       return reqId === cleanId;
@@ -161,11 +155,9 @@ function getEmployeeSubmittedRequests(employeeId) {
       const cleanTId = tId.toLowerCase();
       const cleanTCode = tCode.toLowerCase();
 
-      const rawParticipants = allParticipants.filter(p => {
-        const pTId = String(p.TrainingID || p.TrainingId || p.TrainingCode || '').trim().toLowerCase();
-        if (!pTId) return false;
-        return (cleanTId && pTId === cleanTId) || (cleanTCode && pTId === cleanTCode);
-      });
+      const trainingData = getTrainingDataSpreadsheet(tId || tCode);
+      const participantSheet = trainingData ? trainingData.getSheetByName('TrainingParticipants') : null;
+      const rawParticipants = participantSheet ? sheetToJson(participantSheet) : [];
 
       let reqParticipants = rawParticipants.map(p => ({
         ID: String(p.EmployeeID || p.EmployeeNo || (p.ID && !String(p.ID).startsWith('TP-') ? p.ID : '') || '').trim(),
@@ -613,35 +605,6 @@ function submitEmployeeRequisition(data) {
     setCol('BrochureURL', brochureUrl);
 
     SpreadsheetApp.flush();
-
-    // Reset & update participants in TrainingParticipants master sheet
-    try {
-      const tpMasterSheet = getSheet('TrainingParticipants');
-      if (tpMasterSheet) {
-        if (isEditing) {
-          const tpData = tpMasterSheet.getDataRange().getValues();
-          for (let i = tpData.length - 1; i >= 1; i--) {
-            if (String(tpData[i][1]).trim() === id) {
-              tpMasterSheet.deleteRow(i + 1);
-            }
-          }
-        }
-        if (participantsList.length > 0) {
-          const tpRows = participantsList.map(p => [
-            generateId('TP'),
-            id,
-            p.ID || p.EmployeeID || p.EmployeeNo || '',
-            p.Name || p.EmployeeName || '',
-            p.Department || p.CostCentre || emp.Department || '',
-            p.Position || p.JobTitle || '',
-            timeNow
-          ]);
-          tpMasterSheet.getRange(tpMasterSheet.getLastRow() + 1, 1, tpRows.length, 7).setValues(tpRows);
-        }
-      }
-    } catch(pErr) {
-      Logger.log('Error saving participants in submitEmployeeRequisition: ' + pErr.message);
-    }
 
     if (participantsList.length > 0) {
       try {

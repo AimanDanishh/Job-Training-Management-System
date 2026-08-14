@@ -111,6 +111,56 @@
     }
   }
 
+  function formatMinimalistDate(dateVal) {
+    if (!dateVal) return '—';
+    const str = String(dateVal).replace(/GMT.*$/, '').replace(/\(.*\)$/, '').trim();
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) return str;
+    const dmyMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+    if (dmyMatch) return `${dmyMatch[1].padStart(2, '0')}/${dmyMatch[2].padStart(2, '0')}/${dmyMatch[3]}`;
+    const ymdMatch = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+    if (ymdMatch) return `${ymdMatch[3].padStart(2, '0')}/${ymdMatch[2].padStart(2, '0')}/${ymdMatch[1]}`;
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) {
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      return `${day}/${month}/${year}`;
+    }
+    return str.split('T')[0] || '—';
+  }
+
+  function formatDisplayTime(val, defaultTime = '09:00 AM') {
+    if (!val) return defaultTime;
+    const str = String(val).replace(/GMT.*$/, '').replace(/\(.*\)$/, '').trim();
+    
+    const ampmMatch = str.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+    if (ampmMatch && !str.includes('1899') && !str.includes('Singapore') && !str.includes('Standard') && !str.includes('GMT')) {
+      let hh = parseInt(ampmMatch[1], 10);
+      const mm = ampmMatch[2];
+      const ampm = ampmMatch[3] ? ampmMatch[3].toUpperCase() : (hh >= 12 ? 'PM' : 'AM');
+      if (hh > 12) hh = hh % 12;
+      if (hh === 0) hh = 12;
+      return `${String(hh).padStart(2, '0')}:${mm} ${ampm}`;
+    }
+
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) {
+      let hours = d.getHours();
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12;
+      hours = hours ? hours : 12;
+      return `${String(hours).padStart(2, '0')}:${minutes} ${ampm}`;
+    }
+    return defaultTime;
+  }
+
+  function formatSessionTimeRange(startVal, endVal) {
+    const sTime = formatDisplayTime(startVal, '09:00 AM');
+    const eTime = formatDisplayTime(endVal, '05:00 PM');
+    return `${sTime} - ${eTime}`;
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     initTheme();
   });

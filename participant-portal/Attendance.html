@@ -216,11 +216,8 @@
 
       document.getElementById('txt-training-title').textContent = session.TrainingTitle || 'Training Programme';
       document.getElementById('txt-session-name').textContent = session.SessionName || 'Attendance Registration';
-      document.getElementById('txt-session-date').textContent = formatAppDate(session.SessionDate);
-      
-      const sTime = formatTimeOnly(session.StartTime, '09:00');
-      const eTime = formatTimeOnly(session.EndTime, '17:00');
-      document.getElementById('txt-session-time').textContent = `${sTime} - ${eTime}`;
+      document.getElementById('txt-session-date').textContent = formatMinimalistDate(session.SessionDate);
+      document.getElementById('txt-session-time').textContent = formatSessionTimeRange(session.StartTime, session.EndTime);
 
       document.getElementById('meta-row').style.display = 'flex';
       document.getElementById('view-loading').style.display = 'none';

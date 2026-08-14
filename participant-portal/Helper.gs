@@ -17,6 +17,86 @@ function getConfigProperty(key, defaultValue) {
   return defaultValue;
 }
 
+const DEFAULT_APOLLO_LOGO_URL = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="22" fill="%232563EB"/><circle cx="50" cy="50" r="28" fill="%23FFFFFF"/><text x="50" y="61" font-family="Arial, sans-serif" font-weight="900" font-size="32" fill="%232563EB" text-anchor="middle">A</text></svg>';
+
+function getCompanyLogoUrl() {
+  const url = getConfigProperty('COMPANY_LOGO_URL', '');
+  if (url && String(url).trim() !== '') return String(url).trim();
+  return DEFAULT_APOLLO_LOGO_URL;
+}
+
+function convertDriveLinkToDirectImageUrl(input) {
+  if (!input) return '';
+  const str = String(input).trim();
+  if (!str.includes('drive.google.com') && str.startsWith('http')) {
+    return str;
+  }
+  let fileId = '';
+  const fileIdMatch = str.match(/\/d\/([a-zA-Z0-9_-]{25,})/);
+  if (fileIdMatch && fileIdMatch[1]) {
+    fileId = fileIdMatch[1];
+  } else {
+    const idParamMatch = str.match(/id=([a-zA-Z0-9_-]{25,})/);
+    if (idParamMatch && idParamMatch[1]) {
+      fileId = idParamMatch[1];
+    } else if (/^[a-zA-Z0-9_-]{25,}$/.test(str)) {
+      fileId = str;
+    }
+  }
+  if (fileId) {
+    return `https://lh3.googleusercontent.com/d/${fileId}`;
+  }
+  return str;
+}
+
+function formatMinimalistDate(dateVal) {
+  if (!dateVal) return '';
+  const str = String(dateVal).replace(/GMT.*$/, '').replace(/\(.*\)$/, '').trim();
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) return str;
+  const dmyMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  if (dmyMatch) return `${dmyMatch[1].padStart(2, '0')}/${dmyMatch[2].padStart(2, '0')}/${dmyMatch[3]}`;
+  const ymdMatch = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+  if (ymdMatch) return `${ymdMatch[3].padStart(2, '0')}/${ymdMatch[2].padStart(2, '0')}/${ymdMatch[1]}`;
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) {
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
+  }
+  return str.split('T')[0] || '';
+}
+
+function formatDisplayTime(val, defaultTime = '09:00 AM') {
+  if (!val) return defaultTime;
+  const str = String(val).replace(/GMT.*$/, '').replace(/\(.*\)$/, '').trim();
+  const ampmMatch = str.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+  if (ampmMatch && !str.includes('1899') && !str.includes('Singapore') && !str.includes('Standard') && !str.includes('GMT')) {
+    let hh = parseInt(ampmMatch[1], 10);
+    const mm = ampmMatch[2];
+    const ampm = ampmMatch[3] ? ampmMatch[3].toUpperCase() : (hh >= 12 ? 'PM' : 'AM');
+    if (hh > 12) hh -= 12;
+    if (hh === 0) hh = 12;
+    return `${String(hh).padStart(2, '0')}:${mm} ${ampm}`;
+  }
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) {
+    let hh = d.getHours();
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    const ampm = hh >= 12 ? 'PM' : 'AM';
+    if (hh > 12) hh -= 12;
+    if (hh === 0) hh = 12;
+    return `${String(hh).padStart(2, '0')}:${mm} ${ampm}`;
+  }
+  return defaultTime;
+}
+
+function formatSessionTimeRange(startVal, endVal) {
+  const start = formatDisplayTime(startVal, '09:00 AM');
+  const end = formatDisplayTime(endVal, '05:00 PM');
+  return `${start} - ${end}`;
+}
+
 const SHEET_NAMES = {
   get employees()            { return getConfigProperty('SHEET_EMPLOYEES', 'Employees'); },
   get trainings()            { return getConfigProperty('SHEET_TRAININGS', 'Trainings'); },
@@ -130,31 +210,31 @@ function getTrainingDataSpreadsheet(trainingId) {
   const t = trainings.find(r => String(r.ID || r.TrainingID || r.Code || '').trim() === cleanId);
   if (!t) return null;
 
-  // 1. Try sheet ID stored in ParticipantsSheetID, SessionsSheetID, AttendanceSheetID, etc.
-  const sheetId = t.ParticipantsSheetID || t.AttendanceSheetID || t.SessionsSheetID || t.EvaluationSheetID || t.PostSheetID;
-  if (sheetId) {
-    try {
-      return SpreadsheetApp.openById(sheetId);
-    } catch (e) {
-      Logger.log('Error opening per-training sheet by ID (' + sheetId + '): ' + e.message);
-    }
-  }
+  // Resolve from the configured Root Folder, never from a stored file ID.
+  try {
+    const rootId = getConfigProperty('ROOT_FOLDER_ID', '');
+    if (!rootId) throw new Error('ROOT_FOLDER_ID is required.');
+    const systemRoot = DriveApp.getFolderById(rootId);
+    let trainingRootIter = systemRoot.getFoldersByName('Training Folder');
+    if (!trainingRootIter.hasNext()) throw new Error("Required folder 'Training Folder' was not found under ROOT_FOLDER_ID.");
+    const trainingRoot = trainingRootIter.next();
 
-  // 2. Try FolderID
-  if (t.FolderID) {
-    try {
-      const folder = DriveApp.getFolderById(t.FolderID);
-      const code = t.Code || t.ID;
-      const fileIter = folder.getFilesByName(`${code} Training Data`);
+    const code = t.Code || t.ID || cleanId;
+    const folderName = `${code} ${t.Name || ''}`.trim();
+    let targetFolder = null;
+
+    let folderIter = trainingRoot.getFoldersByName(folderName);
+    if (folderIter.hasNext()) targetFolder = folderIter.next();
+
+    if (targetFolder) {
+      const fileIter = targetFolder.getFilesByName(`${code} Training Data`);
       if (fileIter.hasNext()) {
         return SpreadsheetApp.openById(fileIter.next().getId());
-      } else {
-        const file = getOrCreateSingleTrainingSheet(folder, code);
-        return SpreadsheetApp.openById(file.getId());
       }
-    } catch (e) {
-      Logger.log('Error opening per-training sheet from FolderID: ' + e.message);
+      Logger.log('Training Data file not found for ' + cleanId + '. Public reads do not create replacement files.');
     }
+  } catch (e) {
+    Logger.log('Error opening per-training sheet: ' + e.message);
   }
 
   return null;

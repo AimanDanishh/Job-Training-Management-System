@@ -94,13 +94,26 @@
   <script>
     let activeGoogleUser = null;
 
+    function safeNavTo(page, params) {
+      if (typeof window.navTo === 'function') {
+        window.navTo(page, params);
+      } else if (typeof navTo === 'function') {
+        navTo(page, params);
+      } else {
+        const currentUrl = String(window.location.href || '').split('?')[0];
+        let url = currentUrl + '?page=' + page;
+        if (params) Object.entries(params).forEach(([k,v]) => url += '&' + k + '=' + encodeURIComponent(v));
+        try { window.open(url, '_top'); } catch(e) { window.location.href = url; }
+      }
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
       checkCurrentUser();
     });
 
     document.getElementById('btn-google-signin').addEventListener('click', () => {
       if (activeGoogleUser && activeGoogleUser.success) {
-        navTo('dashboard');
+        safeNavTo('dashboard');
       } else {
         checkCurrentUser(true);
       }
@@ -157,7 +170,7 @@
         btn.innerHTML = `<span class="icon filled sm">login</span> Continue to Dashboard (${res.name})`;
 
         if (autoRedirect) {
-          navTo('dashboard');
+          safeNavTo('dashboard');
         }
       } else {
         const errorText = (res && res.message) || 'Access denied. Please ensure you log in with your company Google Account.';
@@ -185,6 +198,12 @@
       btn.disabled = true;
       btn.innerHTML = `<span class="icon filled sm">lock</span> Access Denied`;
     }
+
+    window.safeNavTo = safeNavTo;
+    window.checkCurrentUser = checkCurrentUser;
+    window.verifyEmail = verifyEmail;
+    window.handleAuthResponse = handleAuthResponse;
+    window.showAuthError = showAuthError;
   </script>
 </body>
 </html>

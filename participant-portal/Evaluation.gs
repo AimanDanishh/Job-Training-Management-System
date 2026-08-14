@@ -25,8 +25,8 @@ function getTrainingInfo(trainingId) {
       Name: t.Name || '',
       Category: t.Category || '',
       Trainer: t.Trainer || '',
-      StartDate: t.StartDate || '',
-      EndDate: t.EndDate || ''
+      StartDate: formatMinimalistDate(t.StartDate),
+      EndDate: formatMinimalistDate(t.EndDate)
     });
   } catch (e) {
     Logger.log('getTrainingInfo error: ' + e.message);
@@ -75,29 +75,29 @@ function saveTrainingEvaluation(data) {
     }
 
     const evalRow = [
-      generateId('EVL'),
+      'EVAL-' + Date.now(),
       trainingId,
       employeeId,
       empName,
-      data.Q1, data.Q2, data.Q3,
-      data.Q4, data.Q5, data.Q6, data.Q7,
+      scores[0], scores[1], scores[2], scores[3], scores[4], scores[5], scores[6],
       data.SectionB1 || '',
       data.SectionB2 || '',
       data.SectionB3 || '',
       avg,
-      now()
+      new Date().toISOString()
     ];
+
     sheet.appendRow(evalRow);
 
-    return ok({ 
-      message: 'Training evaluation submitted successfully!',
-      avgScore: avg,
-      trainingTitle: training.Name || ''
+    return ok({
+      message: 'Evaluation submitted successfully!',
+      trainingTitle: training ? training.Name : trainingId,
+      avgScore: avg
     });
 
   } catch (e) {
     Logger.log('saveTrainingEvaluation error: ' + e.message);
-    return err('Failed to save evaluation: ' + e.message);
+    return err('Failed to save training evaluation: ' + e.message);
   }
 }
 
@@ -119,8 +119,8 @@ function savePostEvaluation(data) {
       return err('Evaluator (Supervisor) Name is required.');
     }
 
-    const cb = Number(data.CompetencyBefore);
-    const ca = Number(data.CompetencyAfter);
+    const cb = Number(data.CompetencyBefore || data.CompBefore);
+    const ca = Number(data.CompetencyAfter || data.CompAfter);
     if (isNaN(cb) || cb < 1 || cb > 5 || isNaN(ca) || ca < 1 || ca > 5) {
       return err('Competency levels before and after training (scale 1-5) are required.');
     }
@@ -131,8 +131,8 @@ function savePostEvaluation(data) {
       return err(validation.message);
     }
 
-    const finalTId   = validation.trainingId;
-    const finalEmpId = validation.employeeId;
+    const finalTId   = validation.trainingId || trainingId;
+    const finalEmpId = validation.employeeId || employeeId;
 
     const ss = getTrainingDataSpreadsheet(finalTId);
     if (!ss) return err('Could not open per-training sheet for ID: ' + finalTId);
@@ -146,7 +146,7 @@ function savePostEvaluation(data) {
     }
 
     const postRow = [
-      generateId('PEV'),
+      'PEV-' + Date.now(),
       finalTId,
       finalEmpId,
       String(evaluatorName).trim(),
@@ -157,7 +157,7 @@ function savePostEvaluation(data) {
       data.CanApply           || '',
       data.FurtherTraining    || '',
       data.Comments           || '',
-      now()
+      new Date().toISOString()
     ];
     sheet.appendRow(postRow);
 

@@ -12,24 +12,24 @@ const SUBFOLDER_NAMES = [];
  * stored in ROOT_FOLDER_ID/Training/<training code + name>; never in My Drive
  * or directly in the system root.
  */
-function getOrCreateRootFolder() {
+function getOrCreateSystemRootFolder() {
   const rootFolderId = getConfigProperty('ROOT_FOLDER_ID', '');
-  if (!rootFolderId) {
-    throw new Error('ROOT_FOLDER_ID is required. Configure the system root folder before creating a training.');
-  }
-
-  const systemRoot = DriveApp.getFolderById(rootFolderId);
-  const trainingFolders = systemRoot.getFoldersByName('Training');
-  return trainingFolders.hasNext() ? trainingFolders.next() : systemRoot.createFolder('Training');
+  if (!rootFolderId) throw new Error('ROOT_FOLDER_ID is required.');
+  return DriveApp.getFolderById(rootFolderId);
 }
 
-/**
- * Gets or creates the dedicated "Reports" directory in Google Drive.
- * Automatically respects the root folder defined in project settings (ROOT_FOLDER_ID / TRAINING_FOLDER_ID / DRIVE_ROOT_FOLDER_ID).
- * Creates the "Reports" subfolder directly inside your configured project root folder.
- */
+function getOrCreateRootFolder() {
+  return getOrCreateTrainingRootFolder();
+}
+
+function getOrCreateTrainingRootFolder() {
+  const systemRoot = getOrCreateSystemRootFolder();
+  let iter = systemRoot.getFoldersByName('Training Folder');
+  if (iter.hasNext()) return iter.next();
+  throw new Error("Required folder 'Training Folder' was not found under ROOT_FOLDER_ID.");
+}
+
 function getOrCreateReportsFolder() {
-  // 1. Check if an explicit REPORTS_FOLDER_ID is set in Script Properties
   const configuredReportsId = getConfigProperty('REPORTS_FOLDER_ID', '');
   if (configuredReportsId) {
     try {
@@ -39,55 +39,34 @@ function getOrCreateReportsFolder() {
     }
   }
 
-  // 2. Fetch the project root folder defined in Script Properties
-  let parentFolder;
-  const rootFolderId = getConfigProperty('ROOT_FOLDER_ID', '') || getConfigProperty('TRAINING_FOLDER_ID', '') || getConfigProperty('DRIVE_ROOT_FOLDER_ID', '');
-
-  if (rootFolderId) {
-    try {
-      parentFolder = DriveApp.getFolderById(rootFolderId);
-    } catch (e) {
-      Logger.log('Could not open project root folder (' + rootFolderId + '): ' + e.message);
-    }
-  }
-
-  // Fallback to getOrCreateRootFolder() or root drive if no specific ID matched
-  if (!parentFolder) {
-    try {
-      parentFolder = getOrCreateRootFolder();
-    } catch(e) {
-      parentFolder = DriveApp.getRootFolder();
-    }
-  }
-
-  // 3. Find or create the "Reports" folder inside the project root folder
-  let repFolderIter = parentFolder.getFoldersByName('Reports');
-  let repFolder = repFolderIter.hasNext() ? repFolderIter.next() : parentFolder.createFolder('Reports');
-
-  return repFolder;
+  const systemRoot = getOrCreateSystemRootFolder();
+  let repFolderIter = systemRoot.getFoldersByName('Reports');
+  if (repFolderIter.hasNext()) return repFolderIter.next();
+  throw new Error("Required folder 'Reports' was not found under ROOT_FOLDER_ID.");
 }
 
+function getOrCreateNamelistFolder() {
+  const systemRoot = getOrCreateSystemRootFolder();
+  let nameFolderIter = systemRoot.getFoldersByName('Namelist');
+  if (nameFolderIter.hasNext()) return nameFolderIter.next();
+  throw new Error("Required folder 'Namelist' was not found under ROOT_FOLDER_ID.");
+}
 
-/**
- * Automatically creates a dedicated Google Drive workspace for a training programme.
- * Creates per-training sheets directly in the training folder (1 folder per training).
- * 
- * @param {string} code - Training Code (e.g. TR-2026-001)
- * @param {string} name - Training Name (e.g. Safety Induction)
- * @return {Object} Workspace folder IDs and URL dictionary
- */
 function createTrainingWorkspace(code, name) {
   try {
-    const parentFolder = getOrCreateRootFolder();
+    const parentFolder = getOrCreateTrainingRootFolder();
     const folderName = `${code} ${name}`.trim();
 
-    // Check if training workspace folder already exists
     let existingIter = parentFolder.getFoldersByName(folderName);
     let mainFolder = existingIter.hasNext() ? existingIter.next() : parentFolder.createFolder(folderName);
 
-    // Create 1 single Google Sheet containing all tabs for this training
     let singleSheetFile = getOrCreateSingleTrainingSheet(mainFolder, code);
     const singleSheetId = singleSheetFile.getId();
+
+    let brochureFolder = mainFolder.getFoldersByName('Brochure');
+    if (!brochureFolder.hasNext()) {
+      mainFolder.createFolder('Brochure');
+    }
 
     return {
       folderId:            mainFolder.getId(),
@@ -166,8 +145,9 @@ function migrateTrainingWorkspacesToConfiguredRoot() {
  * ensuring tabs exist for TrainingParticipants, TrainingSessions, Attendance, TrainingEval, PostEval, and Summary.
  */
 function getOrCreateSingleTrainingSheet(folder, code) {
-  const fileName = `${code} Training Data`;
+  const fileName = 'Training Data';
   let fileIter = folder.getFilesByName(fileName);
+  if (!fileIter.hasNext()) fileIter = folder.getFilesByName(`${code} Training Data`);
   let file;
   let ss;
 
@@ -738,35 +718,6 @@ function syncParticipantsToTrainingDriveSheet(trainingId, directParticipantsList
         Position: p.Position || p.JobTitle || p.PositionTitle || '',
         AddedAt: p.AddedAt || now()
       }));
-    } else {
-      const tpSheet = getSheet(SHEET_NAMES.trainingParticipants);
-      if (tpSheet && tpSheet.getLastRow() > 1) {
-        const tpValues = tpSheet.getDataRange().getValues();
-        const tpHeaders = tpValues[0].map(h => String(h).trim());
-        const tIdIdx = tpHeaders.indexOf('TrainingID');
-        const empIdIdx = tpHeaders.indexOf('EmployeeID');
-        const empNameIdx = tpHeaders.indexOf('EmployeeName');
-        const deptIdx = tpHeaders.indexOf('Department');
-        const posIdx = tpHeaders.indexOf('Position');
-        const addedIdx = tpHeaders.indexOf('AddedAt');
-        const idIdx = tpHeaders.indexOf('ID');
-
-        for (let i = 1; i < tpValues.length; i++) {
-          const r = tpValues[i];
-          const rTrainId = String(tIdIdx >= 0 ? r[tIdIdx] : r[1]).trim();
-          if (rTrainId === String(trainingId).trim()) {
-            participantsToSync.push({
-              ID: idIdx >= 0 ? r[idIdx] : r[0],
-              TrainingID: trainingId,
-              EmployeeID: empIdIdx >= 0 ? r[empIdIdx] : r[2],
-              EmployeeName: empNameIdx >= 0 ? r[empNameIdx] : r[3],
-              Department: deptIdx >= 0 ? r[deptIdx] : r[4],
-              Position: posIdx >= 0 ? r[posIdx] : r[5],
-              AddedAt: addedIdx >= 0 ? r[addedIdx] : r[6]
-            });
-          }
-        }
-      }
     }
 
     // Training Data must contain canonical Employee-sheet details even when

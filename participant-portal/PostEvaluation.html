@@ -71,6 +71,14 @@
           <span class="info-label">Email Address</span>
           <span class="info-value" id="txt-evaluator-email" style="color:var(--primary);">Auto-Retrieved ✓</span>
         </div>
+        <div class="info-row" id="row-post-training-info" style="display:none;">
+          <span class="info-label">Training Programme</span>
+          <span class="info-value" id="txt-post-training-name">—</span>
+        </div>
+        <div class="info-row" id="row-post-training-date" style="display:none;">
+          <span class="info-label">Training Date</span>
+          <span class="info-value" id="txt-post-training-date">—</span>
+        </div>
       </div>
 
       <!-- Training & Participant Selector -->
@@ -82,6 +90,18 @@
         <p style="font-size:12px; color:var(--text-secondary); margin-top:6px;" id="txt-pending-stats">
           Loading assigned pending evaluations...
         </p>
+      </div>
+
+      <!-- Live 3-Month Countdown Lock Card -->
+      <div id="card-countdown-lock" style="display:none; background: linear-gradient(135deg, rgba(239,68,68,0.08), rgba(245,158,11,0.08)); border: 1.5px solid #F59E0B; border-radius: var(--radius-md); padding: 18px; margin-bottom: 20px; text-align: center;">
+        <div style="font-size: 24px; margin-bottom: 6px;">⏱️</div>
+        <h4 style="font-size: 15px; font-weight: 800; color: #D97706; margin-bottom: 6px;">3-Month Post-Training Review Period In Progress</h4>
+        <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 12px;">
+          To accurately measure on-the-job skill application, evaluations unlock 3 months after course completion (<span id="txt-unlock-target-date" style="font-weight:700;">—</span>).
+        </p>
+        <div style="font-family: monospace; font-size: 18px; font-weight: 800; color: #B45309; background: var(--bg-card); padding: 10px 16px; border-radius: 8px; border: 1px solid var(--border-color); display: inline-block;" id="txt-countdown-timer">
+          00m : 00d : 00h : 00m : 00s
+        </div>
       </div>
 
       <!-- Form Container -->
@@ -270,6 +290,17 @@
       document.getElementById('txt-evaluator-dept').textContent = res.evaluator.Department || '—';
       document.getElementById('txt-evaluator-email').textContent = res.evaluator.Email ? `${res.evaluator.Email} ✓` : 'Verified ✓';
 
+      if (res.training) {
+        document.getElementById('row-post-training-info').style.display = 'flex';
+        document.getElementById('row-post-training-date').style.display = 'flex';
+        document.getElementById('txt-post-training-name').textContent = `[${res.training.Code || res.training.ID}] ${res.training.Name}`;
+        const sD = formatMinimalistDate(res.training.StartDate);
+        const eD = formatMinimalistDate(res.training.EndDate);
+        document.getElementById('txt-post-training-date').textContent = sD ? (eD && eD !== sD ? `${sD} - ${eD}` : sD) : '—';
+      }
+
+      setupPostEvalLockCountdown(res.lockInfo);
+
       pendingParticipants = res.pendingParticipants || [];
       const sel = document.getElementById('sel-participant');
       sel.innerHTML = '<option value="">-- Select Pending Participant --</option>';
@@ -387,6 +418,64 @@
     document.getElementById('view-success').style.display = 'none';
     document.getElementById('view-error').style.display = 'block';
     document.getElementById('txt-error-msg').textContent = msg;
+  }
+  let countdownInterval = null;
+
+  function setupPostEvalLockCountdown(lockInfo) {
+    const lockCard = document.getElementById('card-countdown-lock');
+    const submitBtn = document.getElementById('btn-submit-post');
+    
+    if (countdownInterval) clearInterval(countdownInterval);
+
+    if (!lockInfo || lockInfo.isUnlocked) {
+      if (lockCard) lockCard.style.display = 'none';
+      if (submitBtn) submitBtn.disabled = false;
+      setFormFieldsDisabled(false);
+      return;
+    }
+
+    if (lockCard) lockCard.style.display = 'block';
+    if (submitBtn) submitBtn.disabled = true;
+    setFormFieldsDisabled(true);
+    document.getElementById('txt-unlock-target-date').textContent = lockInfo.unlockTargetDateFormatted || '—';
+
+    const targetTime = new Date(lockInfo.unlockTargetIso).getTime();
+
+    function updateTimer() {
+      const now = new Date().getTime();
+      const diff = targetTime - now;
+
+      if (diff <= 0) {
+        clearInterval(countdownInterval);
+        if (lockCard) lockCard.style.display = 'none';
+        if (submitBtn) submitBtn.disabled = false;
+        setFormFieldsDisabled(false);
+        showToast('3-Month Milestone Reached! Form Unlocked.', 'success');
+        return;
+      }
+
+      const months = Math.floor(diff / (1000 * 60 * 60 * 24 * 30.4375));
+      const days = Math.floor((diff % (1000 * 60 * 60 * 24 * 30.4375)) / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+      const timerStr = `${String(months).padStart(2, '0')}m : ${String(days).padStart(2, '0')}d : ${String(hours).padStart(2, '0')}h : ${String(minutes).padStart(2, '0')}m : ${String(seconds).padStart(2, '0')}s`;
+      const timerElem = document.getElementById('txt-countdown-timer');
+      if (timerElem) timerElem.textContent = timerStr;
+    }
+
+    updateTimer();
+    countdownInterval = setInterval(updateTimer, 1000);
+  }
+
+  function setFormFieldsDisabled(disabled) {
+    const form = document.querySelector('#form-container form');
+    if (!form) return;
+    const inputs = form.querySelectorAll('input, select, textarea');
+    inputs.forEach(i => {
+      i.disabled = disabled;
+    });
   }
 </script>
 

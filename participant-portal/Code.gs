@@ -28,6 +28,13 @@ function doGet(e) {
     template.params = (e && e.parameter) ? e.parameter : {};
     template.mode = modeParam;
     template.page = modeParam;
+    try {
+      const rawLogo = getCompanyLogoUrl();
+      const directLogo = convertDriveLinkToDirectImageUrl(rawLogo);
+      template.companyLogoUrl = directLogo ? Utilities.base64Encode(directLogo, Utilities.Charset.UTF_8) : '';
+    } catch(logoErr) {
+      template.companyLogoUrl = '';
+    }
 
     return template.evaluate()
       .setTitle(appTitle)

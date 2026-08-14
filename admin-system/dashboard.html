@@ -301,18 +301,23 @@
       const endFormatted   = formatMinimalistDate(p.EndDate) || p.EndDate || '';
       const dateDisplay    = endFormatted && endFormatted !== startFormatted ? `${startFormatted} — ${endFormatted}` : startFormatted;
 
+      const dataSheetUrl = p.trainingDataSheetUrl || (p.ParticipantsSheetID ? `https://docs.google.com/spreadsheets/d/${p.ParticipantsSheetID}/edit` : '');
+      const reqUrl       = p.requisitionFormUrl   || (p.RequisitionFormFileID ? `https://docs.google.com/spreadsheets/d/${p.RequisitionFormFileID}/edit` : (p.RequisitionUrl || p.BrochureURL || ''));
+
       return `
-        <div style="display:flex;gap:12px;align-items:center;padding:12px 20px;border-bottom:${i < list.length - 1 ? '1px solid #F1F5F9' : 'none'};cursor:pointer;transition:background 0.12s"
-             onclick="navTo('training', {id:'${p.ID}'})" onmouseover="this.style.background='#F8FAFC'" onmouseout="this.style.background='transparent'">
+        <div style="display:flex;gap:12px;align-items:center;padding:12px 20px;border-bottom:${i < list.length - 1 ? '1px solid #F1F5F9' : 'none'};transition:background 0.12s"
+             onmouseover="this.style.background='#F8FAFC'" onmouseout="this.style.background='transparent'">
           <div style="width:36px;height:36px;border-radius:10px;background:${p.Status==='In Progress'?'#EFF6FF':p.Status==='Upcoming'?'#FFFBEB':'#F8FAFC'};
-                      display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                      display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer" onclick="navTo('training', {id:'${p.ID}'})">
             <span class="icon" style="color:${p.Status==='In Progress'?'#2563EB':p.Status==='Upcoming'?'#D97706':'#64748B'}">school</span>
           </div>
-          <div style="flex:1;min-width:0">
+          <div style="flex:1;min-width:0;cursor:pointer" onclick="navTo('training', {id:'${p.ID}'})">
             <div style="font-size:13px;font-weight:700;color:#1E293B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.Name}</div>
             <div style="font-size:11.5px;color:#64748B;margin-top:2px">${p.Code} · ${dateDisplay}</div>
           </div>
           <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;flex-wrap:wrap">
+            ${dataSheetUrl ? `<a href="${dataSheetUrl}" target="_blank" onclick="event.stopPropagation()" class="btn-th btn-xs" style="background:#059669;color:#fff;border:none;text-decoration:none;display:inline-flex;align-items:center;gap:3px" title="Open Training Data Sheet"><span class="icon sm">table_chart</span>Sheet</a>` : ''}
+            ${reqUrl ? `<a href="${reqUrl}" target="_blank" onclick="event.stopPropagation()" class="btn-th btn-secondary btn-xs" style="text-decoration:none;display:inline-flex;align-items:center;gap:3px" title="Open Requisition Form"><span class="icon sm">description</span>Form</a>` : ''}
             <span style="font-size:11.5px;font-weight:600;color:#64748B">${p.Participants || 0} pax</span>
             ${statusBadge(p.Status)}
             ${approvalStatusBadge(p.ApprovalStatus || 'Approved')}

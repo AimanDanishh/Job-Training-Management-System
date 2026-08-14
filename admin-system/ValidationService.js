@@ -54,7 +54,8 @@ function validateAttendance(sessionId, employeeNo) {
           const parentT = trainings.find(t => String(t.ID || '').trim() === String(session.TrainingID).trim());
           if (parentT) {
             const appStatus = String(parentT.ApprovalStatus || '').trim().toLowerCase();
-            if (appStatus && appStatus !== 'approved' && appStatus !== 'auto-approved') {
+            const isApproved = !appStatus || appStatus === 'approved' || appStatus === 'auto-approved' || appStatus === 'fully approved' || appStatus === 'completed' || appStatus === 'in progress' || appStatus === 'active' || appStatus === 'on going';
+            if (!isApproved) {
               return {
                 valid: false,
                 message: `Attendance is locked. Training programme approval status is '${parentT.ApprovalStatus}'. Approval from HOD / C-Suite / HOHR is required first.`,
@@ -105,10 +106,28 @@ function validateAttendance(sessionId, employeeNo) {
     // 5. Look up employee details (if available) to complement submission
     let empDetails = null;
     try {
-      const empSheet = getSheet(SHEET_NAMES.employees);
-      if (empSheet) {
-        const empRows = sheetToJson(empSheet);
-        empDetails = empRows.find(e => String(e.ID || '').toLowerCase() === cleanEmpNo.toLowerCase());
+      if (session.TrainingID) {
+        const ss = getTrainingDataSpreadsheet(session.TrainingID);
+        const tpSheet = ss ? ss.getSheetByName('TrainingParticipants') : null;
+        if (tpSheet) {
+          const tpRows = sheetToJson(tpSheet);
+          const tpEmp = tpRows.find(e => isSameEmployeeId(e.EmployeeID || e.EmployeeNo || e.ID || '', cleanEmpNo));
+          if (tpEmp) {
+            empDetails = {
+              ID: tpEmp.EmployeeID || tpEmp.ID || cleanEmpNo,
+              Name: tpEmp.EmployeeName || tpEmp.Name || cleanEmpNo,
+              Department: tpEmp.Department || tpEmp.CostCentre || '',
+              Position: tpEmp.Position || tpEmp.JobTitle || ''
+            };
+          }
+        }
+      }
+      if (!empDetails) {
+        const empSheet = getSheet(SHEET_NAMES.employees);
+        if (empSheet) {
+          const empRows = sheetToJson(empSheet);
+          empDetails = empRows.find(e => isSameEmployeeId(e.ID || e.EmployeeID || e.EmployeeNo || '', cleanEmpNo));
+        }
       }
     } catch (e) {
       Logger.log('Employee lookup non-fatal error: ' + e.message);

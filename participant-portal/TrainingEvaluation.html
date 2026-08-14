@@ -260,7 +260,9 @@
         document.getElementById('txt-form-emp-name').textContent = res.employee.Name || empId;
         document.getElementById('txt-form-emp-id').textContent = res.employee.ID || empId;
 
-        const dateStr = (res.training && res.training.StartDate) ? `${res.training.StartDate}${res.training.EndDate ? ' - ' + res.training.EndDate : ''}` : '—';
+        const startD = (res.training && res.training.StartDate) ? formatMinimalistDate(res.training.StartDate) : '';
+        const endD = (res.training && res.training.EndDate) ? formatMinimalistDate(res.training.EndDate) : '';
+        const dateStr = startD ? (endD && endD !== startD ? `${startD} - ${endD}` : startD) : '—';
         document.getElementById('txt-form-training-date').textContent = dateStr;
 
         document.getElementById('view-form').style.display = 'block';

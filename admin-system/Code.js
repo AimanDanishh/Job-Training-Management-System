@@ -5,8 +5,16 @@
 
 // ─── Web App Entry Point ───────────────────────────────────────────────────────
 function doGet(e) {
-  const page = (e && e.parameter && e.parameter.page) ? e.parameter.page : 'index';
-  const allowedPages = ['index', 'dashboard', 'training', 'attendance', 'evaluation', 'report', 'session', 'settings'];
+  // Normalise the query value before routing.  Apps Script passes query
+  // parameters as strings, but links copied from email can contain mixed case
+  // or surrounding whitespace.  Without this normalisation those links were
+  // silently sent back to the sign-in page.
+  const requestedPage = (e && e.parameter && e.parameter.page) ? e.parameter.page : 'index';
+  const page = String(requestedPage || 'index').toLowerCase().trim();
+  const allowedPages = [
+    'index', 'dashboard', 'training', 'attendance', 'evaluation',
+    'report', 'session', 'settings', 'employee'
+  ];
 
   const safePage = allowedPages.includes(page) ? page : 'index';
   const appTitle = getConfigProperty('APP_TITLE', 'TrainHub — Training Management System');
@@ -17,7 +25,15 @@ function doGet(e) {
     template.currentPage = safePage;
     template.sessionParam = (e && e.parameter && e.parameter.session) ? e.parameter.session : '';
     template.queryParams = (e && e.parameter) ? JSON.stringify(e.parameter) : '{}';
-    template.publicPortalUrl = getPublicPortalUrl();
+    const rawPublicUrl = getPublicPortalUrl() || '';
+    template.publicPortalUrl = Utilities.base64Encode(rawPublicUrl, Utilities.Charset.UTF_8);
+    try {
+      const rawLogo = getCompanyLogoUrl();
+      const directLogo = convertDriveLinkToDirectImageUrl(rawLogo);
+      template.companyLogoUrl = directLogo ? Utilities.base64Encode(directLogo, Utilities.Charset.UTF_8) : '';
+    } catch(logoErr) {
+      template.companyLogoUrl = '';
+    }
 
     return template.evaluate()
       .setTitle(appTitle)

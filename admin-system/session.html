@@ -281,7 +281,7 @@
     const trainingTitle = s.TrainingTitle || parentT.Name || 'Training Programme';
 
     const attUrl = s.AttendanceURL || generateClientAttendanceURL(s.SessionID);
-    const qrUrl  = s.QRCodeURL || `https://quickchart.io/qr?size=400&text=${encodeURIComponent(attUrl)}`;
+    const qrUrl  = ensureQRLogoUrl(s.QRCodeURL, attUrl);
     const status = s.QRStatus || 'Active';
 
     return `
@@ -299,13 +299,13 @@
           </div>
 
           <div style="display:flex;gap:12px;font-size:12px;color:#475569;margin-top:10px;padding:8px 10px;background:#F8FAFC;border-radius:6px">
-            <div><span class="icon sm" style="color:#64748B">calendar_today</span> ${s.SessionDate || '—'}</div>
-            <div><span class="icon sm" style="color:#64748B">schedule</span> ${s.StartTime || '09:00'} - ${s.EndTime || '17:00'}</div>
+            <div><span class="icon sm" style="color:#64748B">calendar_today</span> ${formatMinimalistDate(s.SessionDate)}</div>
+            <div><span class="icon sm" style="color:#64748B">schedule</span> ${formatSessionTimeRange(s.StartTime, s.EndTime)}</div>
           </div>
 
-          <div class="qr-container">
-            <img class="qr-img" src="${qrUrl}" alt="Session QR Code" onerror="this.src='https://via.placeholder.com/170?text=QR+Error'">
-            <div class="url-box">${attUrl}</div>
+          <div style="text-align:center;margin:12px 0">
+            ${renderQRWithLogoHtml(attUrl, 160, 36)}
+            <div class="url-box" style="margin-top:6px">${attUrl}</div>
           </div>
 
           <div style="margin-top:auto;display:flex;flex-direction:column;gap:6px">
@@ -313,9 +313,9 @@
               <button class="btn-th btn-secondary btn-sm" style="flex:1" onclick="copyAttendanceLink('${attUrl}')">
                 <span class="icon sm">content_copy</span>Copy Link
               </button>
-              <a class="btn-th btn-primary btn-sm" style="flex:1;text-decoration:none;text-align:center" href="${qrUrl}" download="${s.SessionID}_QR.png" target="_blank">
+              <button class="btn-th btn-primary btn-sm" style="flex:1" onclick="downloadQRWithLogo('${attUrl}', '${s.SessionID}_QR.png')">
                 <span class="icon sm">download</span>Download QR
-              </a>
+              </button>
             </div>
             <div style="display:flex;gap:6px">
               <button class="btn-th btn-secondary btn-sm" style="flex:1" onclick="navTo('attendance', {session:'${s.SessionID}'})">
@@ -325,6 +325,7 @@
                 <span class="icon sm">${status==='Active'?'block':'check_circle'}</span>
               </button>
             </div>
+            ${parentT.trainingDataSheetUrl || parentT.ParticipantsSheetID ? `<a class="btn-th btn-sm" style="background:#059669;color:#fff;border:none;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:4px;width:100%" href="${parentT.trainingDataSheetUrl || 'https://docs.google.com/spreadsheets/d/' + parentT.ParticipantsSheetID + '/edit'}" target="_blank" title="Open Training Data Sheet"><span class="icon sm">table_chart</span>Open Training Data Sheet</a>` : ''}
           </div>
         </div>
       </div>`;

@@ -61,6 +61,9 @@
                     <button class="btn-th btn-secondary btn-sm" onclick="copyValue('cfg-master-id')" title="Copy ID">
                       <span class="icon sm">content_copy</span>
                     </button>
+                    <a id="btn-open-master-sheet" href="#" target="_blank" class="btn-th btn-sm" style="display:none; background:#059669; color:#fff; border:none; text-decoration:none; align-items:center; gap:4px; padding:6px 12px" title="Open Master Spreadsheet in Google Sheets">
+                      <span class="icon sm">open_in_new</span> Open Sheet
+                    </a>
                   </div>
                 </div>
                 <div class="col-12">
@@ -70,6 +73,9 @@
                     <button class="btn-th btn-secondary btn-sm" onclick="copyValue('cfg-emp-id')" title="Copy ID">
                       <span class="icon sm">content_copy</span>
                     </button>
+                    <a id="btn-open-emp-sheet" href="#" target="_blank" class="btn-th btn-sm" style="display:none; background:#059669; color:#fff; border:none; text-decoration:none; align-items:center; gap:4px; padding:6px 12px" title="Open Employee Spreadsheet in Google Sheets">
+                      <span class="icon sm">open_in_new</span> Open Sheet
+                    </a>
                   </div>
                 </div>
               </div>
@@ -227,6 +233,21 @@
     document.getElementById('cfg-emp-id').value = data.employeeSpreadsheetId || '';
     document.getElementById('setup-input-master').value = data.databaseId || '';
     document.getElementById('setup-input-emp').value = (data.employeeSpreadsheetId !== data.databaseId) ? (data.employeeSpreadsheetId || '') : '';
+
+    if (data.databaseId) {
+      const openMasterBtn = document.getElementById('btn-open-master-sheet');
+      if (openMasterBtn) {
+        openMasterBtn.href = `https://docs.google.com/spreadsheets/d/${data.databaseId}/edit`;
+        openMasterBtn.style.display = 'inline-flex';
+      }
+    }
+    if (data.employeeSpreadsheetId) {
+      const openEmpBtn = document.getElementById('btn-open-emp-sheet');
+      if (openEmpBtn) {
+        openEmpBtn.href = `https://docs.google.com/spreadsheets/d/${data.employeeSpreadsheetId}/edit`;
+        openEmpBtn.style.display = 'inline-flex';
+      }
+    }
 
     document.getElementById('cfg-public-url').value = data.publicPortalUrl || 'Not configured';
     document.getElementById('cfg-hod-url').value = data.hodPortalUrl || 'Not configured';

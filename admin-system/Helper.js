@@ -44,8 +44,6 @@ function initDefaultScriptProperties(overwriteExisting) {
     'EMPLOYEE_SPREADSHEET_ID': '',
     'ALLOWED_DOMAIN':          'company.com',
     'ADMIN_EMAILS':            'admin@company.com',
-    'ADMIN_USER':              'admin',
-    'ADMIN_PASS':              'admin123',
     'APP_TITLE':               'TrainHub — Training Management System',
     'SHEET_EMPLOYEES':         'Employees',
     'SHEET_HR_EMAIL':          'HR email',
@@ -84,6 +82,9 @@ function initDefaultScriptProperties(overwriteExisting) {
   } else {
     Logger.log('No Script Properties needed initialization. Existing settings preserved.');
   }
+
+  PropertiesService.getScriptProperties().deleteProperty('ADMIN_USER');
+  PropertiesService.getScriptProperties().deleteProperty('ADMIN_PASS');
 }
 
 /**
@@ -253,7 +254,7 @@ function getEmployeeSpreadsheetId() {
   return getConfigProperty('EMPLOYEE_SPREADSHEET_ID', getSpreadsheetId());
 }
 
-const DEFAULT_APOLLO_LOGO_URL = 'https://www.apollofood.com.my/wp-content/uploads/2021/04/apollo-logo.png';
+const DEFAULT_APOLLO_LOGO_URL = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="22" fill="%232563EB"/><circle cx="50" cy="50" r="28" fill="%23FFFFFF"/><text x="50" y="61" font-family="Arial, sans-serif" font-weight="900" font-size="32" fill="%232563EB" text-anchor="middle">A</text></svg>';
 
 function getCompanyLogoUrl() {
   const url = getConfigProperty('COMPANY_LOGO_URL', '');
@@ -463,8 +464,59 @@ function initSheetHeaders(sheet, name) {
 }
 
 function seedInitialSheetData(sheet, name) {
+  if (!sheet) return;
   if (sheet.getLastRow() === 0) {
     initSheetHeaders(sheet, name);
+  }
+
+  const cleanName = String(name).toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (cleanName === 'trainings' && sheet.getLastRow() <= 1) {
+    const headers = ensureTrainingSheetColumns(sheet);
+    const timeNow = now();
+    const initialTrainings = [
+      {
+        ID: 'TRN-101', Code: 'TRN-101', Name: 'Leadership & Executive Strategy 2026', Category: 'Behavioral Skills',
+        TrainingMode: 'In-house training', TnaSource: 'Training Requisition Form', Trainer: 'Dr. Robert Chen',
+        Venue: 'Apollo Grand Ballroom & Virtual', StartDate: '2026-09-01', EndDate: '2026-09-03',
+        Duration: 3, TotalHours: 24, Department: 'Management / Executive', Objectives: 'Enhance strategic decision-making, executive communication, and team leadership across business units.',
+        Status: 'Upcoming', Stage: 'Participants Imported', Participants: 15, CourseFee: '1500.00', ApprovalStatus: 'Approved',
+        CreatedDate: timeNow, UpdatedDate: timeNow, RequestedBy: 'ADMIN', RequestedByName: 'Administrator', RequestedDate: timeNow,
+        ApprovedBy: 'Sarah Jenkins (C-Suite)', ApprovedAt: timeNow, ApprovedCostCentre: 'Executive'
+      },
+      {
+        ID: 'TRN-102', Code: 'TRN-102', Name: 'Cybersecurity Compliance & ISO 27001', Category: 'Compliance Training',
+        TrainingMode: 'In-house training', TnaSource: 'Training Procedure', Trainer: 'Alan Walker',
+        Venue: 'IT Training Suite B', StartDate: '2026-08-10', EndDate: '2026-08-12',
+        Duration: 3, TotalHours: 24, Department: 'Information Technology', Objectives: 'Comprehensive information security compliance, data privacy, and ISO 27001 audit readiness.',
+        Status: 'In Progress', Stage: 'Attendance In Progress', Participants: 25, CourseFee: '2800.00', ApprovalStatus: 'Approved',
+        CreatedDate: timeNow, UpdatedDate: timeNow, RequestedBy: 'ADMIN', RequestedByName: 'Administrator', RequestedDate: timeNow,
+        ApprovedBy: 'Michael Tan (HOHR)', ApprovedAt: timeNow, ApprovedCostCentre: 'IT'
+      },
+      {
+        ID: 'TRN-103', Code: 'TRN-103', Name: 'Agile & Scrum Master Certification', Category: 'Technical Skills',
+        TrainingMode: 'Public', TnaSource: 'Training Requisition Form', Trainer: 'Scrum Alliance Certified Institute',
+        Venue: 'Kuala Lumpur Convention Centre', StartDate: '2026-05-15', EndDate: '2026-05-17',
+        Duration: 3, TotalHours: 24, Department: 'Software Engineering', Objectives: 'Agile project delivery, sprint planning, backlog grooming, and Scrum Master certification.',
+        Status: 'Completed', Stage: 'Waiting for 3-Month Review', Participants: 10, CourseFee: '1200.00', ApprovalStatus: 'Approved',
+        CreatedDate: timeNow, UpdatedDate: timeNow, RequestedBy: 'ADMIN', RequestedByName: 'Administrator', RequestedDate: timeNow,
+        ApprovedBy: 'David Lee (HOD)', ApprovedAt: timeNow, ApprovedCostCentre: 'Engineering'
+      },
+      {
+        ID: 'TRN-104', Code: 'TRN-104', Name: 'Project Management Fundamentals', Category: 'Business Skills',
+        TrainingMode: 'On-Job Training', TnaSource: 'Training Procedure', Trainer: 'Internal HRD Facilitators',
+        Venue: 'Main Conference Room A', StartDate: '2026-10-05', EndDate: '2026-10-06',
+        Duration: 2, TotalHours: 16, Department: 'Operations & Supply Chain', Objectives: 'Fundamental project planning, budgeting, risk management, and milestone tracking.',
+        Status: 'Upcoming', Stage: 'Created', Participants: 18, CourseFee: '2200.00', ApprovalStatus: 'Pending HOD Approval',
+        CreatedDate: timeNow, UpdatedDate: timeNow, RequestedBy: 'ADMIN', RequestedByName: 'Administrator', RequestedDate: timeNow,
+        ApprovedBy: 'Pending HOD Approval', ApprovedAt: '', ApprovedCostCentre: 'Operations'
+      }
+    ];
+
+    initialTrainings.forEach(t => {
+      const rowValues = headers.map(h => t[h] !== undefined ? t[h] : '');
+      sheet.appendRow(rowValues);
+    });
+    SpreadsheetApp.flush();
   }
 }
 
@@ -651,34 +703,122 @@ function getTrainingDataSpreadsheet(trainingId) {
   if (!tSheet) return null;
 
   const trainings = sheetToJson(tSheet);
-  const t = trainings.find(r => String(r.ID || r.TrainingID || r.Code || '').trim() === cleanId);
+  const t = trainings.find(r => 
+    String(r.ID || '').trim() === cleanId ||
+    String(r.Code || '').trim() === cleanId ||
+    String(r.TrainingID || '').trim() === cleanId ||
+    (r.Name && String(r.Name).trim().toLowerCase() === cleanId.toLowerCase())
+  );
   if (!t) return null;
 
-  // 1. Try sheet ID stored in ParticipantsSheetID, SessionsSheetID, AttendanceSheetID, etc.
-  const sheetId = t.ParticipantsSheetID || t.AttendanceSheetID || t.SessionsSheetID || t.EvaluationSheetID || t.PostSheetID;
-  if (sheetId) {
+  // 1. Direct Resolution: Open by stored ParticipantsSheetID first if available
+  const storedSheetId = String(t.ParticipantsSheetID || t.singleSheetId || t.TrainingDataSheetID || '').trim();
+  if (storedSheetId) {
     try {
-      return SpreadsheetApp.openById(sheetId);
-    } catch (e) {
-      Logger.log('Error opening per-training sheet by ID (' + sheetId + '): ' + e.message);
+      const ss = SpreadsheetApp.openById(storedSheetId);
+      if (ss) return ss;
+    } catch(e) {
+      Logger.log('Could not open spreadsheet directly via stored ParticipantsSheetID (' + storedSheetId + '): ' + e.message);
     }
   }
 
-  // 2. Try FolderID
-  if (t.FolderID) {
-    try {
-      const folder = DriveApp.getFolderById(t.FolderID);
-      const code = t.Code || t.ID;
-      if (typeof getOrCreateSingleTrainingSheet === 'function') {
-        const file = getOrCreateSingleTrainingSheet(folder, code);
-        return SpreadsheetApp.openById(file.getId());
-      }
-    } catch (e) {
-      Logger.log('Error opening per-training sheet from FolderID: ' + e.message);
+  // 2. Drive Workspace Resolution: Search via FolderID or Root Folder
+  try {
+    let targetFolder = null;
+
+    if (t.FolderID) {
+      try {
+        targetFolder = DriveApp.getFolderById(String(t.FolderID).trim());
+      } catch(e) {}
     }
+
+    if (!targetFolder && typeof getOrCreateTrainingRootFolder === 'function') {
+      try {
+        const trainingRoot = getOrCreateTrainingRootFolder();
+        if (trainingRoot) {
+          const code = t.Code || t.ID || cleanId;
+          const folderName = `${code} ${t.Name || ''}`.trim();
+          let folderIter = trainingRoot.getFoldersByName(folderName);
+          if (folderIter.hasNext()) targetFolder = folderIter.next();
+        }
+      } catch(fErr) {}
+    }
+
+    if (targetFolder) {
+      const code = t.Code || t.ID || cleanId;
+      let fileIter = targetFolder.getFilesByName('Training Data');
+      if (!fileIter.hasNext()) fileIter = targetFolder.getFilesByName(`${code} Training Data`);
+      if (fileIter.hasNext()) {
+        const file = fileIter.next();
+        const ss = SpreadsheetApp.openById(file.getId());
+        if (ss) {
+          // Auto-persist resolved ParticipantsSheetID to row if missing
+          try {
+            if (t._row) {
+              const headers = ensureTrainingSheetColumns(tSheet);
+              const colIdx = headers.indexOf('ParticipantsSheetID') + 1;
+              if (colIdx > 0) tSheet.getRange(t._row, colIdx).setValue(file.getId());
+            }
+          } catch(persistErr) {}
+          return ss;
+        }
+      }
+    }
+  } catch (e) {
+    Logger.log('Error opening per-training sheet for ' + cleanId + ': ' + e.message);
   }
 
   return null;
+}
+
+/**
+ * Enriches a training object with direct URLs to its Google Sheets & Drive folders:
+ * - trainingDataSheetUrl: Direct link to per-training 'Training Data' spreadsheet
+ * - requisitionFormUrl: Direct link to AP-HRD-F01-01 requisition sheet
+ * - folderUrl: Direct link to Google Drive workspace folder
+ *
+ * @param {Object} t - Training record object
+ * @returns {Object} Enriched training object
+ */
+function enrichTrainingWithUrls(t) {
+  if (!t || typeof t !== 'object') return t;
+
+  let partSheetId = String(t.ParticipantsSheetID || t.singleSheetId || '').trim();
+  let reqFileId   = String(t.RequisitionFormFileID || t.RequisitionFormId || '').trim();
+  let folderId    = String(t.FolderID || '').trim();
+
+  // If partSheetId is missing, attempt to resolve via getTrainingDataSpreadsheet
+  if (!partSheetId && t.ID) {
+    try {
+      const ss = getTrainingDataSpreadsheet(t.ID);
+      if (ss) {
+        partSheetId = ss.getId();
+        t.ParticipantsSheetID = partSheetId;
+      }
+    } catch(e) {}
+  }
+
+  if (partSheetId) {
+    t.trainingDataSheetUrl = 'https://docs.google.com/spreadsheets/d/' + partSheetId + '/edit';
+  } else {
+    t.trainingDataSheetUrl = '';
+  }
+
+  if (reqFileId) {
+    t.requisitionFormUrl = 'https://docs.google.com/spreadsheets/d/' + reqFileId + '/edit';
+  } else if (t.RequisitionUrl || t.BrochureURL) {
+    t.requisitionFormUrl = t.RequisitionUrl || t.BrochureURL;
+  } else {
+    t.requisitionFormUrl = '';
+  }
+
+  if (folderId) {
+    t.folderUrl = 'https://drive.google.com/drive/folders/' + folderId;
+  } else {
+    t.folderUrl = '';
+  }
+
+  return t;
 }
 
 /**
@@ -803,11 +943,16 @@ function sheetToJson(sheet) {
       const normKey = normalizeEmployeeHeader(cleanH);
       const val = data[i][j] !== undefined ? String(data[i][j]) : '';
       obj[cleanH] = val;
-      if (normKey && !obj[normKey]) {
+      if (normKey) {
         obj[normKey] = val;
       }
     });
-    if (!obj.ID && data[i][0] !== undefined) obj.ID = String(data[i][0]);
+
+    // Only fallback obj.ID and obj.Name if column 0 isn't an ID for another entity (like AttendanceID or SessionID)
+    const firstHeaderClean = String(headers[0] || '').trim().toLowerCase();
+    if (!obj.ID && data[i][0] !== undefined && !firstHeaderClean.includes('attendance') && !firstHeaderClean.includes('session')) {
+      obj.ID = String(data[i][0]);
+    }
     if (!obj.Name && data[i][1] !== undefined) obj.Name = String(data[i][1]);
 
     obj._row = i + 1; // 1-indexed sheet row number

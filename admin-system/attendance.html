@@ -166,6 +166,9 @@
           <div class="col-md-3">
             <button class="btn-th btn-primary" style="width:100%" onclick="loadAttendance()"><span class="icon sm">search</span>Load Attendance</button>
           </div>
+          <div class="col-md-3">
+            <a id="btn-open-att-sheet" class="btn-th" style="display:none;width:100%;background:#059669;color:#fff;border:none;text-decoration:none;justify-content:center;align-items:center;gap:6px;padding:9px" target="_blank"><span class="icon sm">table_chart</span>Open Data Sheet</a>
+          </div>
         </div>
       </div>
 
@@ -294,10 +297,8 @@
       document.getElementById('p-session-badge').textContent = res.SessionID || 'Session';
       document.getElementById('p-training-title').textContent = res.TrainingTitle || 'Training Programme';
       document.getElementById('p-session-name').textContent = res.SessionName || 'Session Check-In';
-      document.getElementById('p-session-date').textContent = res.SessionDate || '—';
-      const sTime = formatTimeOnly(res.StartTime, '09:00');
-      const eTime = formatTimeOnly(res.EndTime, '17:00');
-      document.getElementById('p-session-time').textContent = `${sTime} - ${eTime}`;
+      document.getElementById('p-session-date').textContent = formatMinimalistDate(res.SessionDate);
+      document.getElementById('p-session-time').textContent = formatSessionTimeRange(res.StartTime, res.EndTime);
 
       document.getElementById('p-loading').style.display = 'none';
 
@@ -492,6 +493,17 @@
     currentTraining = t;
     currentTrainingParticipants = participants || [];
     document.getElementById('topbar-sub').textContent = t.Name;
+
+    const sheetUrl = t.trainingDataSheetUrl || (t.ParticipantsSheetID ? `https://docs.google.com/spreadsheets/d/${t.ParticipantsSheetID}/edit` : '');
+    const attSheetBtn = document.getElementById('btn-open-att-sheet');
+    if (attSheetBtn) {
+      if (sheetUrl) {
+        attSheetBtn.href = sheetUrl;
+        attSheetBtn.style.display = 'inline-flex';
+      } else {
+        attSheetBtn.style.display = 'none';
+      }
+    }
 
     const isApproved = isTrainingApproved(t);
     const appStr = t.ApprovalStatus || 'Pending Approval';

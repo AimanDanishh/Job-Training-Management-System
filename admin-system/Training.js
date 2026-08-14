@@ -183,11 +183,14 @@ function autoUpdateTrainingLifecycleStages() {
         }
       });
     }
+    rows.forEach(t => enrichTrainingWithUrls(t));
     return rows;
   } catch (e) {
     Logger.log('autoUpdateTrainingLifecycleStages error: ' + e.message);
     const sheet = getSheet(SHEET_NAMES.trainings);
-    return sheet ? sheetToJson(sheet) : [];
+    const fallbackRows = sheet ? sheetToJson(sheet) : [];
+    fallbackRows.forEach(t => enrichTrainingWithUrls(t));
+    return fallbackRows;
   }
 }
 
@@ -552,9 +555,7 @@ function getTrainingParticipants(trainingId) {
     if (!ss) return ok([]);
     const sheet = ss.getSheetByName('TrainingParticipants');
     if (!sheet) return ok([]);
-    const rows = sheetToJson(sheet);
-    const resolution = canonicalizeTrainingParticipants(rows);
-    return ok(resolution.participants);
+    return ok(sheetToJson(sheet));
   } catch (e) {
     return err('Failed to get training participants: ' + e.message);
   }
@@ -613,24 +614,6 @@ function addTrainingParticipants(trainingId, participants) {
 
     const totalCount = existingEmpIds.size;
     updateTrainingParticipantCount(trainingId, totalCount);
-
-    try {
-      const tpMasterSheet = getSheet(SHEET_NAMES.trainingParticipants);
-      if (tpMasterSheet) {
-        const tpMasterRows = resolution.participants.map(p => [
-          generateId('TP'),
-          trainingId,
-          p.ID,
-          p.Name,
-          p.Department,
-          p.Position,
-          addedAt
-        ]);
-        tpMasterSheet.getRange(tpMasterSheet.getLastRow() + 1, 1, tpMasterRows.length, 7).setValues(tpMasterRows);
-      }
-    } catch(mErr) {
-      Logger.log('Master TrainingParticipants update error: ' + mErr.message);
-    }
 
     try { syncTrainingRequisitionParticipants(trainingId); } catch(e) {}
 
