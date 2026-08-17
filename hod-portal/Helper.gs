@@ -176,9 +176,29 @@ function getTrainingDataSpreadsheet(trainingId) {
   if (!tSheet) return null;
 
   const trainings = sheetToJson(tSheet);
-  const t = trainings.find(r => String(r.ID || r.TrainingID || r.Code || '').trim() === cleanId);
+  const t = trainings.find(r => String(r.ID || r.TrainingID || r.Code || '').trim().toLowerCase() === cleanId.toLowerCase());
   if (!t) return null;
 
+  // 1. Direct open by ParticipantsSheetID / SpreadsheetID if present
+  if (t.ParticipantsSheetID) {
+    try {
+      return SpreadsheetApp.openById(String(t.ParticipantsSheetID).trim());
+    } catch(e) {}
+  }
+
+  // 2. Direct open from t.FolderID if present
+  if (t.FolderID) {
+    try {
+      const folder = DriveApp.getFolderById(String(t.FolderID).trim());
+      let fileIter = folder.getFilesByName('Training Data');
+      if (!fileIter.hasNext()) fileIter = folder.getFilesByName(`${t.Code || t.ID} Training Data`);
+      if (fileIter.hasNext()) {
+        return SpreadsheetApp.openById(fileIter.next().getId());
+      }
+    } catch(e) {}
+  }
+
+  // 3. Fallback: Drive search by folder name
   try {
       const configuredFolderId = getConfigProperty('TRAINING_FOLDER', '') || getConfigProperty('TRAINING_FOLDER_ID', '');
       let trainingRoot = null;
@@ -210,6 +230,184 @@ function getTrainingDataSpreadsheet(trainingId) {
   }
 
   return null;
+}
+
+/**
+ * Resolves participant list for a training requisition using robust multi-tier fallbacks:
+ * 1. Direct open of ParticipantsSheetID / Training Data Spreadsheet (Sheet: Participants or TrainingParticipants)
+ * 2. Requisition Form Google Spreadsheet (A15:I38 or A23:F46)
+ * 3. Central Database Participants sheet
+ * 4. Training record JSON participant list (ParticipantList or participants)
+ * 5. Full Employee Master Sheet enrichment (Name, Department, Job Position)
+ */
+function getParticipantsForRequisition(training, cleanId) {
+  let participants = [];
+  const tId = String((training && (training.ID || training.TrainingID || training.Code)) || cleanId || '').trim();
+  const tCode = String((training && training.Code) || '').trim();
+
+  // Tier 1: Try per-training Training Data Spreadsheet
+  try {
+    const ss = getTrainingDataSpreadsheet(tId || tCode);
+    if (ss) {
+      const partSheet = ss.getSheetByName('Participants') || 
+                        ss.getSheetByName('TrainingParticipants') || 
+                        ss.getSheetByName('ParticipantList') ||
+                        ss.getSheets()[0];
+      if (partSheet) {
+        const rows = sheetToJson(partSheet);
+        if (Array.isArray(rows) && rows.length > 0) {
+          participants = rows.map(p => ({
+            ID: String(p.EmployeeID || p.EmployeeNo || p['Employee No'] || p['Employee ID'] || (p.ID && !String(p.ID).startsWith('TP-') ? p.ID : '') || '').trim(),
+            EmployeeID: String(p.EmployeeID || p.EmployeeNo || p['Employee No'] || p['Employee ID'] || (p.ID && !String(p.ID).startsWith('TP-') ? p.ID : '') || '').trim(),
+            Name: String(p.EmployeeName || p.Name || p['Employee Name'] || p['Name'] || '').trim(),
+            EmployeeName: String(p.EmployeeName || p.Name || p['Employee Name'] || p['Name'] || '').trim(),
+            Department: String(p.Department || p.CostCentre || p['Cost Centre'] || p['Department'] || p.Dept || '').trim(),
+            Position: String(p.Position || p.JobTitle || p['Job Position'] || p['Position'] || p.Designation || '').trim(),
+            SupervisorID: String(p.SupervisorID || p.SupervisorId || '').trim(),
+            SupervisorName: String(p.SupervisorName || '').trim(),
+            SupervisorEmail: String(p.SupervisorEmail || '').trim()
+          })).filter(p => p.EmployeeID || p.EmployeeName);
+        }
+      }
+    }
+  } catch (e1) {
+    Logger.log('Error reading from Training Data spreadsheet: ' + e1.message);
+  }
+
+  // Tier 2: Try Requisition Form Spreadsheet (AP-HRD-F01-01)
+  if (participants.length === 0 && training && (training.RequisitionFormFileID || training.RequisitionFormId)) {
+    const formFileId = String(training.RequisitionFormFileID || training.RequisitionFormId).trim();
+    try {
+      const formSs = SpreadsheetApp.openById(formFileId);
+      const formSheet = formSs.getSheetByName('Training Form') || 
+                        formSs.getSheetByName('TRAINING REQUISITION FORM') || 
+                        formSs.getSheets()[0];
+      if (formSheet) {
+        const rangesToTry = ['A15:I38', 'A23:F46', 'A14:I40'];
+        for (let rIdx = 0; rIdx < rangesToTry.length; rIdx++) {
+          const rangeValues = formSheet.getRange(rangesToTry[rIdx]).getValues();
+          const extracted = [];
+          rangeValues.forEach(row => {
+            let empId = String(row[0] || '').trim();
+            let empName = String(row[2] || '').trim();
+            let dept = String(row[3] || '').trim();
+            let pos = String(row[7] || row[4] || '').trim();
+
+            if (/^\d{1,2}$/.test(empId) && row[1]) {
+              empId = String(row[1] || '').trim();
+              empName = String(row[2] || '').trim();
+              dept = String(row[3] || '').trim();
+              pos = String(row[4] || '').trim();
+            }
+
+            if (empId || empName) {
+              const lower = empId.toLowerCase();
+              if (lower !== 'employee no' && lower !== 'no' && lower !== 'employee id' && lower !== 'name' && lower !== 'bil') {
+                extracted.push({
+                  ID: empId,
+                  EmployeeID: empId,
+                  Name: empName,
+                  EmployeeName: empName,
+                  Department: dept,
+                  Position: pos
+                });
+              }
+            }
+          });
+
+          if (extracted.length > 0) {
+            participants = extracted;
+            break;
+          }
+        }
+      }
+    } catch (e2) {
+      Logger.log('Error reading participants from Requisition Form: ' + e2.message);
+    }
+  }
+
+  // Tier 3: Try Database sheet 'Participants' or 'TrainingParticipants'
+  if (participants.length === 0) {
+    try {
+      const dbPartSheet = getSheet('Participants') || getSheet('TrainingParticipants');
+      if (dbPartSheet) {
+        const allDbParts = sheetToJson(dbPartSheet);
+        const matched = allDbParts.filter(p => {
+          const pTid = String(p.TrainingID || p.TrainingCode || p.ID || '').trim().toLowerCase();
+          return pTid && (pTid === tId.toLowerCase() || pTid === tCode.toLowerCase());
+        });
+        if (matched.length > 0) {
+          participants = matched.map(p => ({
+            ID: String(p.EmployeeID || p.EmployeeNo || p['Employee No'] || (p.ID && !String(p.ID).startsWith('TP-') ? p.ID : '') || '').trim(),
+            EmployeeID: String(p.EmployeeID || p.EmployeeNo || p['Employee No'] || (p.ID && !String(p.ID).startsWith('TP-') ? p.ID : '') || '').trim(),
+            Name: String(p.EmployeeName || p.Name || p['Employee Name'] || '').trim(),
+            EmployeeName: String(p.EmployeeName || p.Name || p['Employee Name'] || '').trim(),
+            Department: String(p.Department || p.CostCentre || p['Cost Centre'] || '').trim(),
+            Position: String(p.Position || p.JobTitle || p['Job Position'] || '').trim(),
+            SupervisorID: String(p.SupervisorID || p.SupervisorId || '').trim(),
+            SupervisorName: String(p.SupervisorName || '').trim(),
+            SupervisorEmail: String(p.SupervisorEmail || '').trim()
+          })).filter(p => p.EmployeeID || p.EmployeeName);
+        }
+      }
+    } catch (e3) {
+      Logger.log('Error reading from central database Participants sheet: ' + e3.message);
+    }
+  }
+
+  // Tier 4: Try JSON fields on the training record (ParticipantList or participants)
+  if (participants.length === 0 && training) {
+    const rawList = training.ParticipantList || training.participants || training.ParticipantsList;
+    if (rawList) {
+      try {
+        const parsed = Array.isArray(rawList) ? rawList : (typeof rawList === 'string' ? JSON.parse(rawList) : null);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          participants = parsed.map(p => ({
+            ID: String(p.EmployeeID || p.EmployeeNo || p.ID || '').trim(),
+            EmployeeID: String(p.EmployeeID || p.EmployeeNo || p.ID || '').trim(),
+            Name: String(p.EmployeeName || p.Name || '').trim(),
+            EmployeeName: String(p.EmployeeName || p.Name || '').trim(),
+            Department: String(p.Department || p.CostCentre || '').trim(),
+            Position: String(p.Position || p.JobTitle || '').trim()
+          })).filter(p => p.EmployeeID || p.EmployeeName);
+        }
+      } catch (e4) {}
+    }
+  }
+
+  // Tier 5: Enrich participants with Employees master sheet to guarantee full details (Name, Dept, Position)
+  if (participants.length > 0) {
+    try {
+      const empSheet = getSheet('Employees');
+      if (empSheet) {
+        const employees = sheetToJson(empSheet);
+        participants = participants.map(p => {
+          const empId = p.EmployeeID || p.ID;
+          const matchedEmp = employees.find(e => {
+            const eId = String(e['Employee No'] || e.EmployeeNo || e.ID || e.EmployeeID || '').toLowerCase().trim();
+            return eId && eId === String(empId).toLowerCase().trim();
+          });
+          if (matchedEmp) {
+            return {
+              ID: empId,
+              EmployeeID: empId,
+              Name: p.EmployeeName || String(matchedEmp.Name || matchedEmp.EmployeeName || '').trim(),
+              EmployeeName: p.EmployeeName || String(matchedEmp.Name || matchedEmp.EmployeeName || '').trim(),
+              Department: p.Department || String(matchedEmp['Cost Centre'] || matchedEmp.Department || '').trim(),
+              CostCentre: p.Department || String(matchedEmp['Cost Centre'] || matchedEmp.Department || '').trim(),
+              Position: p.Position || String(matchedEmp['Job Position'] || matchedEmp.Position || 'Participant').trim(),
+              SupervisorID: p.SupervisorID || '',
+              SupervisorName: p.SupervisorName || '',
+              SupervisorEmail: p.SupervisorEmail || ''
+            };
+          }
+          return p;
+        });
+      }
+    } catch (e5) {}
+  }
+
+  return participants;
 }
 
 function getOrCreateSingleTrainingSheet(folder, code) {

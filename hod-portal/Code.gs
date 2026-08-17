@@ -316,13 +316,8 @@ function getRequisitionDetails(trainingId, userEmail) {
       return err(`Unauthorized Access: You are not authorized to view training request (${cleanId}).`);
     }
 
-    // The per-training Training Data roster is authoritative.
-    let participants = [];
-    try {
-      const ss = getTrainingDataSpreadsheet(training.ID);
-      const partSheet = ss ? ss.getSheetByName('TrainingParticipants') : null;
-      if (partSheet) participants = sheetToJson(partSheet);
-    } catch(e1) {}
+    // Resolve participants via multi-tier fallback (Training Data, Requisition Form, DB, JSON, enriched with Employees)
+    const participants = getParticipantsForRequisition(training, cleanId);
 
     let requester = {
       ID: training.RequestedBy || training.EmployeeID || 'N/A',
@@ -929,11 +924,9 @@ function getPendingPostEvalParticipants(trainingId, userEmail) {
 
     activeList.forEach(t => {
       const targetTId = getTrainingId(t);
+      const allParticipants = getParticipantsForRequisition(t, targetTId);
+      if (!allParticipants || allParticipants.length === 0) return;
       const ss = getTrainingDataSpreadsheet(targetTId);
-      if (!ss) return;
-
-      const partSheet = ss.getSheetByName('TrainingParticipants');
-      const allParticipants = partSheet ? sheetToJson(partSheet) : [];
 
       // Filter participants assigned to this supervisor/HOD (by SupervisorID, SupervisorEmail, or Cost Centre)
       let supParticipants = allParticipants.filter(p => {

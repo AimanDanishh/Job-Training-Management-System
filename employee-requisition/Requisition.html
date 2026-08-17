@@ -270,14 +270,15 @@
             </div>
 
             <div class="form-group">
-              <label class="form-label">Brochure Attachment / Link (Optional)</label>
+              <label for="reqBrochureFile" class="form-label">Brochure Attachment / Link (Optional)</label>
               <div class="grid-2">
                 <div>
-                  <input type="file" id="reqBrochureFile" class="form-control" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onchange="handleBrochureFileSelect(this)" style="padding:8px 12px;font-size:12.5px;">
+                  <input type="file" id="reqBrochureFile" class="form-control" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onchange="handleBrochureFileSelect(this)" style="padding:8px 12px;font-size:12.5px;" aria-label="Upload Brochure File">
                   <div id="fileUploadStatus" style="font-size:11.5px;color:var(--primary);margin-top:4px;font-weight:600;"></div>
                 </div>
                 <div>
-                  <input type="url" id="reqBrochureUrl" class="form-control" placeholder="Or paste link (https://...)">
+                  <label for="reqBrochureUrl" class="visually-hidden" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">Brochure Link URL</label>
+                  <input type="url" id="reqBrochureUrl" class="form-control" placeholder="Or paste link (https://...)" aria-label="Brochure Link URL">
                 </div>
               </div>
             </div>
@@ -332,7 +333,8 @@
           <!-- Search & Filter Controls -->
           <div style="margin-bottom:20px;">
             <div class="form-group" style="margin-bottom:12px;">
-              <input type="text" id="historySearchInput" class="form-control" placeholder="🔍 Search training title, ID, category..." oninput="filterHistoryList()">
+              <label for="historySearchInput" class="visually-hidden" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">Search training requests</label>
+              <input type="text" id="historySearchInput" class="form-control" placeholder="🔍 Search training title, ID, category..." oninput="filterHistoryList()" aria-label="Search training requests">
             </div>
 
             <div class="filter-bar">
@@ -431,7 +433,8 @@
           <!-- Search View -->
           <div id="paxViewSearch">
             <div class="form-group" style="margin-bottom:10px;">
-              <input type="text" id="paxSearchInput" class="form-control" placeholder="Search by Employee ID or Name..." oninput="filterPaxList()">
+              <label for="paxSearchInput" class="visually-hidden" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">Search by Employee ID or Name</label>
+              <input type="text" id="paxSearchInput" class="form-control" placeholder="Search by Employee ID or Name..." oninput="filterPaxList()" aria-label="Search by Employee ID or Name">
             </div>
             <div style="display:flex;gap:8px;margin-bottom:10px;">
               <button type="button" class="btn btn-neo" style="padding:6px 12px;font-size:12px;" onclick="selectAllMatchingPax()">Select All Matching</button>
@@ -444,10 +447,10 @@
 
           <!-- Bulk Paste View -->
           <div id="paxViewBulk" style="display:none;">
-            <p style="font-size:12.5px;color:var(--text-secondary);margin-bottom:8px;">
+            <label for="paxBulkInput" style="font-size:12.5px;color:var(--text-secondary);margin-bottom:8px;display:block;">
               Paste employee IDs separated by commas, spaces, or newlines:
-            </p>
-            <textarea id="paxBulkInput" class="form-control" rows="5" placeholder="00001&#10;00002&#10;00003" style="font-family:monospace;margin-bottom:12px;"></textarea>
+            </label>
+            <textarea id="paxBulkInput" class="form-control" rows="5" placeholder="00001&#10;00002&#10;00003" style="font-family:monospace;margin-bottom:12px;" aria-label="Paste Employee IDs"></textarea>
             <button type="button" class="btn btn-primary" style="padding:8px 16px;font-size:13px;" onclick="applyBulkPastePax()">Apply Bulk Paste</button>
             <div id="bulkPasteFeedback" style="font-size:12px;margin-top:6px;color:var(--primary);font-weight:600;"></div>
           </div>

@@ -1,5 +1,5 @@
 /**
- * Training.gs — Training Programme management
+ * Training.gs - Training Programme management
  */
 
 const LIFECYCLE_STAGES = [
@@ -12,7 +12,7 @@ const LIFECYCLE_STAGES = [
   'Programme Closed'
 ];
 
-// ─── Read ───────────────────────────────────────────────────────────────────────
+// --- Read -----------------------------------------------------------------------
 function getTrainings() {
   try {
     const rows = autoUpdateTrainingLifecycleStages();
@@ -234,7 +234,7 @@ function send3MonthPostEvalNotifications() {
   }
 }
 
-// ─── Create ─────────────────────────────────────────────────────────────────────
+// --- Create ---------------------------------------------------------------------
 function addTraining(data) {
   try {
     if (!data.Name || !data.Trainer || !data.StartDate)
@@ -343,7 +343,7 @@ function addTraining(data) {
   }
 }
 
-// ─── Update ─────────────────────────────────────────────────────────────────────
+// --- Update ---------------------------------------------------------------------
 function updateTraining(data) {
   try {
     if (!data.ID) return err('Training ID is required.');
@@ -468,7 +468,7 @@ function acknowledgeHRRequisition(trainingId, hrData) {
   }
 }
 
-// ─── Update Stage Only ──────────────────────────────────────────────────────────
+// --- Update Stage Only ----------------------------------------------------------
 function updateTrainingStage(trainingId, newStage) {
   try {
     if (!LIFECYCLE_STAGES.includes(newStage))
@@ -492,7 +492,7 @@ function updateTrainingStage(trainingId, newStage) {
   }
 }
 
-// ─── Delete ─────────────────────────────────────────────────────────────────────
+// --- Delete ---------------------------------------------------------------------
 function deleteTraining(id) {
   try {
     const sheet = getSheet(SHEET_NAMES.trainings);
@@ -521,7 +521,7 @@ function deleteTraining(id) {
   }
 }
 
-// ─── Dashboard Summary ──────────────────────────────────────────────────────────
+// --- Dashboard Summary ----------------------------------------------------------
 function getTrainingSummary() {
   try {
     const sheet = getSheet(SHEET_NAMES.trainings);
@@ -541,7 +541,7 @@ function getTrainingSummary() {
   }
 }
 
-// ─── Helpers ────────────────────────────────────────────────────────────────────
+// --- Helpers --------------------------------------------------------------------
 function generateTrainingCode(category) {
   const prefix = {
     'Behavioral Skills':       'BS',
@@ -600,7 +600,7 @@ function debugGetTrainings() {
   }
 }
 
-// ─── Training Participants Management ──────────────────────────────────────────
+// --- Training Participants Management ------------------------------------------
 function getTrainingParticipants(trainingId) {
   try {
     if (!trainingId) return ok([]);

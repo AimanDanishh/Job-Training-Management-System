@@ -3,12 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Apollo — Training Sessions & QR Codes</title>
-  <script>
-    window.__TRAINHUB_PAGE__ = '<?!= currentPage ?>';
-    window.__PUBLIC_PORTAL_URL__ = '<?!= (typeof publicPortalUrl !== "undefined" && publicPortalUrl) ? publicPortalUrl : "" ?>';
-    window.__COMPANY_LOGO_URL__ = '<?!= (typeof companyLogoUrl !== "undefined" && companyLogoUrl) ? companyLogoUrl : "" ?>';
-  </script>
+  <title>Apollo - Training Sessions & QR Codes</title>
   <?!= include('style') ?>
   <?!= include('script') ?>
   <style>
@@ -57,6 +52,7 @@
   </style>
 </head>
 <body>
+<div id="__trainhub_config__" style="display:none" data-config="<?!= encodeURIComponent(JSON.stringify({ page: currentPage || '', publicPortalUrl: (typeof publicPortalUrl !== 'undefined' && publicPortalUrl) ? publicPortalUrl : '', companyLogoUrl: (typeof companyLogoUrl !== 'undefined' && companyLogoUrl) ? companyLogoUrl : '' })) ?>"></div>
 <div class="app-shell">
   <!-- Sidebar -->
   <?!= include('sidebar') ?>
@@ -86,14 +82,14 @@
       <div class="card-th mb-4">
         <div class="row g-3 align-items-end">
           <div class="col-md-5">
-            <label class="label-th">Filter by Training Programme</label>
-            <select id="filter-training" class="input-th" onchange="loadSessions()">
+            <label for="filter-training" class="label-th">Filter by Training Programme</label>
+            <select id="filter-training" class="input-th" onchange="loadSessions()" aria-label="Filter by Training Programme">
               <option value="">All Training Programmes</option>
             </select>
           </div>
           <div class="col-md-3">
-            <label class="label-th">Filter by QR Status</label>
-            <select id="filter-status" class="input-th" onchange="loadSessions()">
+            <label for="filter-status" class="label-th">Filter by QR Status</label>
+            <select id="filter-status" class="input-th" onchange="loadSessions()" aria-label="Filter by QR Status">
               <option value="">All Statuses</option>
               <option value="Active">Active</option>
               <option value="Expired">Expired</option>
@@ -131,27 +127,27 @@
     </div>
     <div class="row g-3 mt-1">
       <div class="col-12">
-        <label class="label-th">Training Programme <span class="required">*</span></label>
-        <select id="s-training-id" class="input-th"></select>
+        <label for="s-training-id" class="label-th">Training Programme <span class="required">*</span></label>
+        <select id="s-training-id" class="input-th" aria-label="Training Programme"></select>
       </div>
       <div class="col-12">
-        <label class="label-th">Session Name <span class="required">*</span></label>
+        <label for="s-name" class="label-th">Session Name <span class="required">*</span></label>
         <input id="s-name" class="input-th" placeholder="e.g. Day 1, Morning, Day 2 Afternoon">
       </div>
       <div class="col-md-6">
-        <label class="label-th">Session Date <span class="required">*</span></label>
+        <label for="s-date" class="label-th">Session Date <span class="required">*</span></label>
         <input id="s-date" class="input-th" type="date">
       </div>
       <div class="col-md-3">
-        <label class="label-th">Start Time</label>
+        <label for="s-start-time" class="label-th">Start Time</label>
         <input id="s-start-time" class="input-th" type="time" value="09:00">
       </div>
       <div class="col-md-3">
-        <label class="label-th">End Time</label>
+        <label for="s-end-time" class="label-th">End Time</label>
         <input id="s-end-time" class="input-th" type="time" value="17:00">
       </div>
       <div class="col-12">
-        <label class="label-th">QR Status</label>
+        <label for="s-status" class="label-th">QR Status</label>
         <select id="s-status" class="input-th">
           <option value="Active">Active (Ready for check-in)</option>
           <option value="Expired">Expired (Check-in closed)</option>
@@ -166,6 +162,8 @@
       </button>
     </div>
   </div>
+</div>
+
 <!-- Company Logo QR Modal -->
 <div id="modal-logo" class="modal-overlay" style="display:none">
   <div class="modal-box" style="max-width:540px">
@@ -177,8 +175,8 @@
       <button class="modal-close" onclick="closeModal('modal-logo')"><span class="icon sm">close</span></button>
     </div>
     <div class="mt-2 mb-3">
-      <label class="label-th">Google Drive Logo Share Link or Image URL</label>
-      <input id="logo-url-input" class="input-th" placeholder="https://drive.google.com/file/d/FILE_ID/view?usp=sharing">
+      <label for="logo-url-input" class="label-th">Google Drive Logo Share Link or Image URL</label>
+      <input id="logo-url-input" class="input-th" placeholder="https://drive.google.com/file/d/FILE_ID/view?usp=sharing" aria-label="Google Drive Logo Share Link or Image URL">
       <div style="font-size:11.5px;color:#64748B;margin-top:6px;line-height:1.5;background:#F8FAFC;padding:10px;border-radius:6px;border:1px solid #E2E8F0">
         <span class="icon sm" style="color:#D97706">lightbulb</span> <strong>Tip:</strong> Paste your Google Drive logo share link. Make sure the file sharing setting in Google Drive is set to <em>"Anyone with the link can view"</em> so QuickChart can fetch the image.
       </div>
@@ -197,7 +195,7 @@
   let allTrainings = [];
   let allSessionsList = [];
 
-  document.addEventListener('DOMContentLoaded', async () => {
+  onReady(async () => {
     try {
       allTrainings = await callServer('getTrainings') || [];
       populateTrainingSelectors();
@@ -222,7 +220,7 @@
       return `<option value="${t.ID}">[${t.Code || t.ID}] ${t.Name} (${app})</option>`;
     }).join('');
     selFilter.innerHTML = '<option value="">All Training Programmes</option>' + opts;
-    selModal.innerHTML  = '<option value="">— Select Training —</option>' + opts;
+    selModal.innerHTML  = '<option value="">- Select Training -</option>' + opts;
   }
 
   async function loadSessions() {
@@ -329,7 +327,7 @@
                 <span class="icon sm">${status==='Active'?'block':'check_circle'}</span>
               </button>
             </div>
-            ${parentT.trainingDataSheetUrl || parentT.ParticipantsSheetID ? `<a class="btn-th btn-sm" style="background:#059669;color:#fff;border:none;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:4px;width:100%" href="${parentT.trainingDataSheetUrl || ('ht' + 'tps://docs.google.com/spreadsheets/d/' + parentT.ParticipantsSheetID + '/edit')}" target="_blank" title="Open Training Data Sheet"><span class="icon sm">table_chart</span>Open Training Data Sheet</a>` : ''}
+            ${parentT.trainingDataSheetUrl || parentT.ParticipantsSheetID ? `<a class="btn-th btn-sm" style="background:#059669;color:#fff;border:none;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:4px;width:100%" href="${parentT.trainingDataSheetUrl || ('https://docs.google.com/spreadsheets/d/' + parentT.ParticipantsSheetID + '/edit')}" target="_blank" title="Open Training Data Sheet"><span class="icon sm">table_chart</span>Open Training Data Sheet</a>` : ''}
           </div>
         </div>
       </div>`;

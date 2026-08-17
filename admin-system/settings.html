@@ -3,16 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Apollo — Settings & Configuration</title>
-  <script>
-    window.__TRAINHUB_PAGE__ = '<?!= currentPage ?>';
-    window.__PUBLIC_PORTAL_URL__ = '<?!= (typeof publicPortalUrl !== "undefined" && publicPortalUrl) ? publicPortalUrl : "" ?>';
-    window.__COMPANY_LOGO_URL__ = '<?!= (typeof companyLogoUrl !== "undefined" && companyLogoUrl) ? companyLogoUrl : "" ?>';
-  </script>
+  <title>Apollo - Settings & Configuration</title>
   <?!= include('style') ?>
   <?!= include('script') ?>
 </head>
 <body>
+<div id="__trainhub_config__" style="display:none" data-config="<?!= encodeURIComponent(JSON.stringify({ page: currentPage || '', publicPortalUrl: (typeof publicPortalUrl !== 'undefined' && publicPortalUrl) ? publicPortalUrl : '', companyLogoUrl: (typeof companyLogoUrl !== 'undefined' && companyLogoUrl) ? companyLogoUrl : '' })) ?>"></div>
 <div class="app-shell">
   <!-- Sidebar -->
   <?!= include('sidebar') ?>
@@ -66,9 +62,9 @@
             <div class="card-th-body">
               <div class="row g-3 mb-4">
                 <div class="col-12">
-                  <label class="label-th">Master Spreadsheet ID (SPREADSHEET_ID) <span style="color:#EF4444">*</span></label>
+                  <label for="cfg-master-id" class="label-th">Master Spreadsheet ID (SPREADSHEET_ID) <span style="color:#EF4444">*</span></label>
                   <div style="display:flex; gap:8px">
-                    <input type="text" id="cfg-master-id" class="input-th" style="font-family:monospace; font-size:12.5px" placeholder="Paste TrainHub Database Spreadsheet ID">
+                    <input type="text" id="cfg-master-id" class="input-th" style="font-family:monospace; font-size:12.5px" placeholder="Paste TrainHub Database Spreadsheet ID" aria-label="Master Spreadsheet ID">
                     <button class="btn-th btn-secondary btn-sm" onclick="copyValue('cfg-master-id')" title="Copy ID">
                       <span class="icon sm">content_copy</span>
                     </button>
@@ -78,9 +74,9 @@
                   </div>
                 </div>
                 <div class="col-12">
-                  <label class="label-th">Employee Spreadsheet ID / Namelist (EMPLOYEE_SPREADSHEET_ID)</label>
+                  <label for="cfg-emp-id" class="label-th">Employee Spreadsheet ID / Namelist (EMPLOYEE_SPREADSHEET_ID)</label>
                   <div style="display:flex; gap:8px">
-                    <input type="text" id="cfg-emp-id" class="input-th" style="font-family:monospace; font-size:12.5px" placeholder="Paste Namelist Employee Spreadsheet ID">
+                    <input type="text" id="cfg-emp-id" class="input-th" style="font-family:monospace; font-size:12.5px" placeholder="Paste Namelist Employee Spreadsheet ID" aria-label="Employee Spreadsheet ID">
                     <button class="btn-th btn-secondary btn-sm" onclick="copyValue('cfg-emp-id')" title="Copy ID">
                       <span class="icon sm">content_copy</span>
                     </button>
@@ -90,16 +86,16 @@
                   </div>
                 </div>
                 <div class="col-12 col-md-6">
-                  <label class="label-th">Root Workspace Folder ID (ROOT_FOLDER_ID)</label>
-                  <input type="text" id="cfg-root-folder-id" class="input-th" style="font-family:monospace; font-size:12.5px" placeholder="Google Drive Root Folder ID">
+                  <label for="cfg-root-folder-id" class="label-th">Root Workspace Folder ID (ROOT_FOLDER_ID)</label>
+                  <input type="text" id="cfg-root-folder-id" class="input-th" style="font-family:monospace; font-size:12.5px" placeholder="Google Drive Root Folder ID" aria-label="Root Workspace Folder ID">
                 </div>
                 <div class="col-12 col-md-6">
-                  <label class="label-th">Training Folder ID (TRAINING_FOLDER)</label>
-                  <input type="text" id="cfg-training-folder-id" class="input-th" style="font-family:monospace; font-size:12.5px" placeholder="Folder under ROOT_FOLDER_ID">
+                  <label for="cfg-training-folder-id" class="label-th">Training Folder ID (TRAINING_FOLDER)</label>
+                  <input type="text" id="cfg-training-folder-id" class="input-th" style="font-family:monospace; font-size:12.5px" placeholder="Folder under ROOT_FOLDER_ID" aria-label="Training Folder ID">
                 </div>
                 <div class="col-12">
-                  <label class="label-th">Requisition Form Template ID (TRAINING_REQUISITION_TEMPLATE_ID)</label>
-                  <input type="text" id="cfg-requisition-template-id" class="input-th" style="font-family:monospace; font-size:12.5px" placeholder="Google Sheets Template ID for Requisitions">
+                  <label for="cfg-requisition-template-id" class="label-th">Requisition Form Template ID (TRAINING_REQUISITION_TEMPLATE_ID)</label>
+                  <input type="text" id="cfg-requisition-template-id" class="input-th" style="font-family:monospace; font-size:12.5px" placeholder="Google Sheets Template ID for Requisitions" aria-label="Requisition Form Template ID">
                 </div>
               </div>
 
@@ -140,14 +136,14 @@
               </div>
 
               <div class="mb-3">
-                <label class="label-th">New Master Spreadsheet ID <span style="color:#EF4444">*</span></label>
-                <input type="text" id="setup-input-master" class="input-th" placeholder="e.g. 1a2b3c4d5e6f7g8h9i0j..." style="font-family:monospace; font-size:12.5px">
+                <label for="setup-input-master" class="label-th">New Master Spreadsheet ID <span style="color:#EF4444">*</span></label>
+                <input type="text" id="setup-input-master" class="input-th" placeholder="e.g. 1a2b3c4d5e6f7g8h9i0j..." style="font-family:monospace; font-size:12.5px" aria-label="New Master Spreadsheet ID">
                 <div style="font-size:11px; color:#64748B; margin-top:4px">Paste Google Spreadsheet ID from your browser URL.</div>
               </div>
 
               <div class="mb-4">
-                <label class="label-th">Separate Employee Spreadsheet ID (Optional)</label>
-                <input type="text" id="setup-input-emp" class="input-th" placeholder="Leave empty to use Master Spreadsheet" style="font-family:monospace; font-size:12.5px">
+                <label for="setup-input-emp" class="label-th">Separate Employee Spreadsheet ID (Optional)</label>
+                <input type="text" id="setup-input-emp" class="input-th" placeholder="Leave empty to use Master Spreadsheet" style="font-family:monospace; font-size:12.5px" aria-label="Separate Employee Spreadsheet ID">
               </div>
 
               <div style="display:flex; flex-direction:column; gap:10px">
@@ -182,18 +178,18 @@
             <div class="card-th-body">
               <div class="mb-3">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px">
-                  <label class="label-th" style="margin:0">Participant Portal URL (PUBLIC_PORTAL_URL)</label>
+                  <label for="cfg-public-url" class="label-th" style="margin:0">Participant Portal URL (PUBLIC_PORTAL_URL)</label>
                   <span id="st-public-url" class="badge-th badge-neutral">Checking...</span>
                 </div>
-                <input type="text" id="cfg-public-url" class="input-th" style="font-size:12px" placeholder="https://script.google.com/macros/s/.../exec">
+                <input type="text" id="cfg-public-url" class="input-th" style="font-size:12px" placeholder="https://script.google.com/macros/s/.../exec" aria-label="Participant Portal URL">
               </div>
 
               <div class="mb-2">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px">
-                  <label class="label-th" style="margin:0">HOD Approval Portal URL (HOD_PORTAL_URL)</label>
+                  <label for="cfg-hod-url" class="label-th" style="margin:0">HOD Approval Portal URL (HOD_PORTAL_URL)</label>
                   <span id="st-hod-url" class="badge-th badge-neutral">Checking...</span>
                 </div>
-                <input type="text" id="cfg-hod-url" class="input-th" style="font-size:12px" placeholder="https://script.google.com/macros/s/.../exec">
+                <input type="text" id="cfg-hod-url" class="input-th" style="font-size:12px" placeholder="https://script.google.com/macros/s/.../exec" aria-label="HOD Approval Portal URL">
               </div>
             </div>
           </div>
@@ -211,18 +207,18 @@
             <div class="card-th-body">
               <div class="mb-3">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px">
-                  <label class="label-th" style="margin:0">Allowed Company Domain (ALLOWED_DOMAIN)</label>
+                  <label for="cfg-allowed-domain" class="label-th" style="margin:0">Allowed Company Domain (ALLOWED_DOMAIN)</label>
                   <span id="st-allowed-domain" class="badge-th badge-neutral">Checking...</span>
                 </div>
-                <input type="text" id="cfg-allowed-domain" class="input-th" style="font-size:12.5px" placeholder="e.g. company.com (leave empty for any domain)">
+                <input type="text" id="cfg-allowed-domain" class="input-th" style="font-size:12.5px" placeholder="e.g. company.com (leave empty for any domain)" aria-label="Allowed Company Domain">
               </div>
 
               <div class="mb-2">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px">
-                  <label class="label-th" style="margin:0">Admin Emails (ADMIN_EMAILS)</label>
+                  <label for="cfg-admin-emails" class="label-th" style="margin:0">Admin Emails (ADMIN_EMAILS)</label>
                   <span id="st-admin-emails" class="badge-th badge-neutral">Checking...</span>
                 </div>
-                <input type="text" id="cfg-admin-emails" class="input-th" style="font-size:12.5px" placeholder="e.g. admin@company.com, hr@company.com">
+                <input type="text" id="cfg-admin-emails" class="input-th" style="font-size:12.5px" placeholder="e.g. admin@company.com, hr@company.com" aria-label="Admin Emails">
               </div>
             </div>
           </div>
@@ -242,10 +238,10 @@
                 <div class="col-12 col-md-8">
                   <div class="mb-2">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px">
-                      <label class="label-th" style="margin:0">Company Logo Image URL (COMPANY_LOGO_URL)</label>
+                      <label for="cfg-company-logo-url" class="label-th" style="margin:0">Company Logo Image URL (COMPANY_LOGO_URL)</label>
                       <span id="st-company-logo" class="badge-th badge-neutral">Checking...</span>
                     </div>
-                    <input type="url" id="cfg-company-logo-url" class="input-th" style="font-size:12px" placeholder="https://domain.com/path/to/company-logo.png" oninput="previewCompanyLogo(this.value)">
+                    <input type="url" id="cfg-company-logo-url" class="input-th" style="font-size:12px" placeholder="https://domain.com/path/to/company-logo.png" oninput="previewCompanyLogo(this.value)" aria-label="Company Logo Image URL">
                     <div style="font-size:11px; color:#64748B; margin-top:4px">Direct PNG, JPG, or SVG image URL. If unset, the default Apollo emblem is displayed with zero layout disruption.</div>
                   </div>
                 </div>
@@ -272,7 +268,7 @@
 
 <div id="toast-container"></div>
 <script>
-  document.addEventListener('DOMContentLoaded', () => {
+  onReady(() => {
     loadSettingsData();
   });
 
@@ -305,14 +301,14 @@
     if (data.databaseId) {
       const openMasterBtn = document.getElementById('btn-open-master-sheet');
       if (openMasterBtn) {
-        openMasterBtn.href = 'ht' + 'tps://docs.google.com/spreadsheets/d/' + data.databaseId + '/edit';
+        openMasterBtn.href = 'https://docs.google.com/spreadsheets/d/' + data.databaseId + '/edit';
         openMasterBtn.style.display = 'inline-flex';
       }
     }
     if (data.employeeSpreadsheetId) {
       const openEmpBtn = document.getElementById('btn-open-emp-sheet');
       if (openEmpBtn) {
-        openEmpBtn.href = 'ht' + 'tps://docs.google.com/spreadsheets/d/' + data.employeeSpreadsheetId + '/edit';
+        openEmpBtn.href = 'https://docs.google.com/spreadsheets/d/' + data.employeeSpreadsheetId + '/edit';
         openEmpBtn.style.display = 'inline-flex';
       }
     }
@@ -410,7 +406,7 @@
   function handleLogoPreviewError(img) {
     img.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0MCA0MCI+PHJlY3Qgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiByeD0iOCIgZmlsbD0iI0U5MUMyRCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTYlIiBmb250LWZhbWlseT0iQXJpYWwsc2Fucy1zZXJpZiIgZm9udC13ZWlnaHQ9IjkwMCIgZm9udC1zaXplPSIyMCIgZmlsbD0iI0ZGRjhDRiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSI+QTwvdGV4dD48L3N2Zz4=';
     const previewText = document.getElementById('company-logo-preview-text');
-    if (previewText) previewText.textContent = 'Logo URL unavailable — using default Apollo fallback.';
+    if (previewText) previewText.textContent = 'Logo URL unavailable - using default Apollo fallback.';
   }
 
   function setBadgeStatus(elementId, val) {

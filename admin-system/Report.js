@@ -1,5 +1,5 @@
 /**
- * Report.gs — Comprehensive Report Generation & Excel Export Engine
+ * Report.gs - Comprehensive Report Generation & Excel Export Engine
  */
 
 function safeParseObj(val) {
@@ -12,7 +12,7 @@ function safeParseObj(val) {
   }
 }
 
-// ─── Full Programme Report (Single Training) ──────────────────────────────────
+// --- Full Programme Report (Single Training) ----------------------------------
 function generateReport(trainingId) {
   try {
     const tResult  = safeParseObj(getTrainingById(trainingId));
@@ -43,7 +43,7 @@ function generateReport(trainingId) {
   }
 }
 
-// ─── Dashboard Overview Report ──────────────────────────────────────────────────
+// --- Dashboard Overview Report --------------------------------------------------
 function getDashboardReport() {
   try {
     const trainingSummary = safeParseObj(getTrainingSummary()).data || {};
@@ -106,7 +106,7 @@ function getDashboardReport() {
   }
 }
 
-// ─── Unified Filtered Reports Engine ──────────────────────────────────────────
+// --- Unified Filtered Reports Engine ------------------------------------------
 /**
  * Generates structured report data based on report type and filter parameters.
  * Types: 'hours', 'cost', 'title', 'employee', 'atp', 'single'
@@ -194,7 +194,7 @@ function getFilteredReportData(reportType, filters) {
   }
 }
 
-// ─── Numeric Cleaner Helper ───────────────────────────────────────────────────
+// --- Numeric Cleaner Helper ---------------------------------------------------
 function cleanNum(val, fallback) {
   if (fallback === undefined) fallback = 0;
   if (val === undefined || val === null || val === '') return fallback;
@@ -209,7 +209,7 @@ function cleanNum(val, fallback) {
 }
 
 
-// ─── 1. Training Hours Report Data Builder (Cost Centre vs Month) ─────────────
+// --- 1. Training Hours Report Data Builder (Cost Centre vs Month) -------------
 function buildHoursReportData(trainingsInput, employeesInput, year, selectedDept) {
   let trainings = (Array.isArray(trainingsInput)) ? trainingsInput : [];
   let employees = (Array.isArray(employeesInput)) ? employeesInput : [];
@@ -301,7 +301,7 @@ function buildHoursReportData(trainingsInput, employeesInput, year, selectedDept
   };
 }
 
-// ─── 2. Training Cost Report Data Builder ─────────────────────────────────────
+// --- 2. Training Cost Report Data Builder -------------------------------------
 function buildCostReportData(trainingsInput, year, selectedDept) {
   let trainings = (Array.isArray(trainingsInput)) ? trainingsInput : [];
   if (selectedDept) {
@@ -338,7 +338,7 @@ function buildCostReportData(trainingsInput, year, selectedDept) {
 }
 
 function formatMonthYear(dateStrOrObj) {
-  if (!dateStrOrObj) return '—';
+  if (!dateStrOrObj) return '-';
   const d = parseDateObj(dateStrOrObj);
   if (!d || isNaN(d.getTime())) return String(dateStrOrObj).toUpperCase();
   const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
@@ -347,7 +347,7 @@ function formatMonthYear(dateStrOrObj) {
   return `${mStr}-${yStr}`;
 }
 
-// ─── 3. Training Title Report Data Builder ────────────────────────────────────
+// --- 3. Training Title Report Data Builder ------------------------------------
 function buildTrainingTitleReportData(trainingsInput, employeesInput, selectedDept) {
   let trainings = (Array.isArray(trainingsInput)) ? trainingsInput : [];
   let employees = (Array.isArray(employeesInput)) ? employeesInput : [];
@@ -381,10 +381,10 @@ function buildTrainingTitleReportData(trainingsInput, employeesInput, selectedDe
         const resolvedEmpNo = (matchedEmp ? (matchedEmp.EmployeeID || matchedEmp.ID || matchedEmp.EmployeeNo) : null)
           || pEmpId
           || (p.ID && !String(p.ID).toUpperCase().startsWith('TP-') ? p.ID : '')
-          || '—';
+          || '-';
 
         const resolvedName = (matchedEmp ? matchedEmp.Name : null) || pName || 'Staff Member';
-        const resolvedDept = (matchedEmp ? (matchedEmp.CostCentre || matchedEmp.Department) : null) || p.Department || t.Department || '—';
+        const resolvedDept = (matchedEmp ? (matchedEmp.CostCentre || matchedEmp.Department) : null) || p.Department || t.Department || '-';
 
         rows.push({
           name: resolvedName,
@@ -396,8 +396,8 @@ function buildTrainingTitleReportData(trainingsInput, employeesInput, selectedDe
           dateUntil: formatOrdinalDate(t.EndDate || t.StartDate),
           month: monthFormatted,
           totalHours: totalHours,
-          trainer: t.Trainer || '—',
-          trainingProvider: t.Trainer || '—',
+          trainer: t.Trainer || '-',
+          trainingProvider: t.Trainer || '-',
           expiryDate: 'N/A'
         });
       });
@@ -412,7 +412,7 @@ function buildTrainingTitleReportData(trainingsInput, employeesInput, selectedDe
   return { rows: rows };
 }
 
-// ─── 4. Employee Report Data Builder ──────────────────────────────────────────
+// --- 4. Employee Report Data Builder ------------------------------------------
 function buildEmployeeReportData(trainingsInput, employeesInput, filterDept) {
   let trainings = (Array.isArray(trainingsInput)) ? trainingsInput : [];
   let employees = (Array.isArray(employeesInput)) ? employeesInput : [];
@@ -429,8 +429,8 @@ function buildEmployeeReportData(trainingsInput, employeesInput, filterDept) {
       no: idx + 1,
       empNo: id,
       name: e.Name || e.EmployeeName || id,
-      costCentre: e.CostCentre || e['Cost Centre'] || e.Department || '—',
-      position: e.Position || e.JobTitle || e.PositionTitle || '—',
+      costCentre: e.CostCentre || e['Cost Centre'] || e.Department || '-',
+      position: e.Position || e.JobTitle || e.PositionTitle || '-',
       totalTrainings: 0,
       totalHours: 0,
       attendedList: [],
@@ -508,7 +508,7 @@ function buildEmployeeReportData(trainingsInput, employeesInput, filterDept) {
   return { rows: list };
 }
 
-// ─── ATP Helper Functions ──────────────────────────────────────────────────
+// --- ATP Helper Functions --------------------------------------------------
 function getOrdinalSuffix(day) {
   const d = parseInt(day, 10);
   if (d >= 11 && d <= 13) return 'th';
@@ -533,7 +533,7 @@ function getOrdinalSuffix(day) {
 }
 
 function formatOrdinalDate(dateStrOrObj) {
-  if (!dateStrOrObj) return '—';
+  if (!dateStrOrObj) return '-';
   const d = parseDateObj(dateStrOrObj);
   if (!d || isNaN(d.getTime())) return String(dateStrOrObj);
 
@@ -620,7 +620,7 @@ function normalizeAtpStatus(statusStr, stageStr, appStatusStr) {
   return 'On planning';
 }
 
-// ─── 5. Annual Training Plan (ATP) Data Builder ───────────────────────────────
+// --- 5. Annual Training Plan (ATP) Data Builder -------------------------------
 function buildAnnualTrainingPlanData(trainingsInput, selectedDept) {
   let trainings = (Array.isArray(trainingsInput)) ? trainingsInput : [];
   if (selectedDept) {
@@ -667,7 +667,7 @@ function buildAnnualTrainingPlanData(trainingsInput, selectedDept) {
   return { rows: rows };
 }
 
-// ─── Helper to fetch participants for a training ──────────────────────────────
+// --- Helper to fetch participants for a training ------------------------------
 function getTrainingParticipantsList(trainingId) {
   try {
     const ss = getTrainingDataSpreadsheet(trainingId);
@@ -807,7 +807,7 @@ function exportReportToSpreadsheet(reportType, year) {
   }
 }
 
-// ─── Export Filtered Report to Excel / Google Sheets ──────────────────────────
+// --- Export Filtered Report to Excel / Google Sheets --------------------------
 /**
  * Creates formatted Google Sheet & returns XLSX download link matching user's exact header specs.
  * Supports single report exports as well as 'master' / 'all' multi-tab exports.
@@ -882,7 +882,7 @@ function exportFilteredReportExcel(reportType, filters) {
  * 5. Annual Training Plan (ATP)
  */
 
-// ─── Non-Destructive Report Synchronization & Admin Edit Protection Engine ──────
+// --- Non-Destructive Report Synchronization & Admin Edit Protection Engine ------
 
 const REPORT_CONFIG = {
   'Training Hours': {
@@ -1063,7 +1063,7 @@ function normalizeSyncValue(val) {
     return val.toISOString().slice(0, 10);
   }
   let str = String(val).trim();
-  if (str === '—' || str === 'N/A' || str === 'null' || str === 'undefined') {
+  if (str === '-' || str === 'N/A' || str === 'null' || str === 'undefined') {
     return '';
   }
   return str;
@@ -1307,7 +1307,7 @@ function syncReportSheetIncrementally(ss, reportKey, reportData, extraParams) {
   autoFitSheetColumns(sheet, config.columns.length);
 }
 
-// ─── Targeted Event-Based Incremental Synchronization Engine ──────────────────
+// --- Targeted Event-Based Incremental Synchronization Engine ------------------
 
 function generateSyncId() {
   return 'SYNC-' + String(Date.now()).slice(-6);
@@ -1618,9 +1618,9 @@ function getTrainingSyncStatus(trainingId) {
         trainingId: trainingId,
         status: 'UNSYNCED',
         lastSync: 'Never',
-        lastDuration: '—',
-        lastTrigger: '—',
-        lastAction: '—',
+        lastDuration: '-',
+        lastTrigger: '-',
+        lastAction: '-',
         lastError: '',
         reports: 'None'
       });
@@ -1795,9 +1795,9 @@ function getReportsFolderDetails(yearInput) {
   }
 }
 
-// ─── Header Formatters for Excel Export & Live Master Sheets ──────────────────
+// --- Header Formatters for Excel Export & Live Master Sheets ------------------
 
-// ─── Header Formatters for Excel Export & Live Master Sheets ──────────────────
+// --- Header Formatters for Excel Export & Live Master Sheets ------------------
 
 // 1. Hours Header Formatter:
 function formatHoursReportSheet(sheet, data, year) {
@@ -1974,17 +1974,17 @@ function formatTitleReportSheet(sheet, data) {
     .setFontWeight('bold').setBackground('#2563EB').setFontColor('#FFFFFF').setHorizontalAlignment('center');
 
   const rowsData = (data.rows || []).map(r => [
-    r.name || '—',
-    r.empNo || '—',
-    r.trainingTitle || '—',
-    r.costCentreDesc || '—',
+    r.name || '-',
+    r.empNo || '-',
+    r.trainingTitle || '-',
+    r.costCentreDesc || '-',
     r.trainingType || 'Public',
     r.dateFrom || '',
     r.dateUntil || '',
     r.month || '',
     r.totalHours || 8,
-    r.trainer || '—',
-    r.trainingProvider || '—',
+    r.trainer || '-',
+    r.trainingProvider || '-',
     r.expiryDate || 'N/A'
   ]);
 
@@ -2027,13 +2027,13 @@ function formatEmployeeReportSheet(sheet, data) {
 
   const rowsData = (data.rows || []).map(r => [
     r.no || 1,
-    r.empNo || '—',
-    r.name || '—',
-    r.costCentre || '—',
-    r.position || '—',
+    r.empNo || '-',
+    r.name || '-',
+    r.costCentre || '-',
+    r.position || '-',
     r.totalTrainings || 0,
     r.totalHours || 0,
-    Array.isArray(r.attendedList) ? r.attendedList.join(', ') : (r.attendedList || '—'),
+    Array.isArray(r.attendedList) ? r.attendedList.join(', ') : (r.attendedList || '-'),
     r.status || 'Active'
   ]);
 
@@ -2087,13 +2087,13 @@ function formatAtpReportSheet(sheet, data) {
 
     return [
       r.no || (i + 1),
-      r.trainingTitle || '—',
+      r.trainingTitle || '-',
       r.trainingCategory || 'General',
       r.tnaSource || 'Training Requisition Form',
       r.trainingMode || 'In-house',
       r.durationHours || 8,
-      r.trainer || '—',
-      r.department || '—',
+      r.trainer || '-',
+      r.department || '-',
       posFormula,
       r.totalPax || 0,
       r.plannedDate || '',
@@ -2128,7 +2128,7 @@ function formatAtpReportSheet(sheet, data) {
   autoFitSheetColumns(sheet, headers.length);
 }
 
-// ─── Export Single Attendance Sheet ───────────────────────────────────────────
+// --- Export Single Attendance Sheet -------------------------------------------
 function exportAttendanceSheet(trainingId) {
   try {
     const tResult = safeParseObj(getTrainingById(trainingId));
@@ -2163,7 +2163,7 @@ function exportAttendanceSheet(trainingId) {
   }
 }
 
-// ─── Export Single Training Full Report to Excel (.xlsx / Sheet) ──────────────
+// --- Export Single Training Full Report to Excel (.xlsx / Sheet) --------------
 function exportReportExcel(trainingId) {
   try {
     const reportRes = safeParseObj(generateReport(trainingId));
@@ -2199,7 +2199,7 @@ function exportReportExcel(trainingId) {
     sSummary.appendRow(['Programme Name', t.Name]);
     sSummary.appendRow(['Category', t.Category]);
     sSummary.appendRow(['Trainer / Facilitator', t.Trainer]);
-    sSummary.appendRow(['Venue', t.Venue || '—']);
+    sSummary.appendRow(['Venue', t.Venue || '-']);
     sSummary.appendRow(['Course Fee (RM)', t.CourseFee || '0.00']);
     sSummary.appendRow(['Department', t.Department || 'All Departments']);
     sSummary.appendRow(['Start Date', formatOrdinalDate(t.StartDate)]);
@@ -2209,7 +2209,7 @@ function exportReportExcel(trainingId) {
     sSummary.appendRow(['Status', t.Status]);
     sSummary.appendRow(['Lifecycle Stage', t.Stage]);
     sSummary.appendRow(['Enrolled Participants', t.Participants]);
-    sSummary.appendRow(['Objectives', t.Objectives || '—']);
+    sSummary.appendRow(['Objectives', t.Objectives || '-']);
     sSummary.appendRow([]);
     sSummary.appendRow(['KEY PERFORMANCE METRICS']);
     sSummary.appendRow(['Attendance Rate (%)', rep.attendance.summary.pct || 0]);
@@ -2265,7 +2265,7 @@ function exportReportExcel(trainingId) {
 }
 
 
-// ─── Helpers ────────────────────────────────────────────────────────────────────
+// --- Helpers --------------------------------------------------------------------
 function buildMonthlyData(rows) {
   const counts = {};
   rows.forEach(r => {

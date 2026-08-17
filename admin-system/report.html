@@ -3,12 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Apollo — Reports & Training Data Management</title>
-  <script>
-    window.__TRAINHUB_PAGE__ = '<?!= currentPage ?>';
-    window.__PUBLIC_PORTAL_URL__ = '<?!= (typeof publicPortalUrl !== "undefined" && publicPortalUrl) ? publicPortalUrl : "" ?>';
-    window.__COMPANY_LOGO_URL__ = '<?!= (typeof companyLogoUrl !== "undefined" && companyLogoUrl) ? companyLogoUrl : "" ?>';
-  </script>
+  <title>Apollo - Reports & Training Data Management</title>
   <?!= include('style') ?>
   <?!= include('script') ?>
   <style>
@@ -246,6 +241,7 @@
   </style>
 </head>
 <body>
+<div id="__trainhub_config__" style="display:none" data-config="<?!= encodeURIComponent(JSON.stringify({ page: currentPage || '', publicPortalUrl: (typeof publicPortalUrl !== 'undefined' && publicPortalUrl) ? publicPortalUrl : '', companyLogoUrl: (typeof companyLogoUrl !== 'undefined' && companyLogoUrl) ? companyLogoUrl : '' })) ?>"></div>
 <div class="app-shell">
   <!-- Sidebar -->
   <?!= include('sidebar') ?>
@@ -339,15 +335,15 @@
 
               <div id="col-picker-dropdown" class="col-picker-dropdown">
                 <div style="font-size:11px; font-weight:800; color:#64748B; text-transform:uppercase; margin-bottom:8px">Visible Columns</div>
-                <label style="display:block; font-size:12px; margin-bottom:4px"><input type="checkbox" checked onchange="toggleColumnVis('id', this.checked)"> Training ID</label>
-                <label style="display:block; font-size:12px; margin-bottom:4px"><input type="checkbox" checked onchange="toggleColumnVis('title', this.checked)"> Training Title</label>
-                <label style="display:block; font-size:12px; margin-bottom:4px"><input type="checkbox" checked onchange="toggleColumnVis('dept', this.checked)"> Department</label>
-                <label style="display:block; font-size:12px; margin-bottom:4px"><input type="checkbox" checked onchange="toggleColumnVis('date', this.checked)"> Date</label>
-                <label style="display:block; font-size:12px; margin-bottom:4px"><input type="checkbox" checked onchange="toggleColumnVis('status', this.checked)"> Status</label>
-                <label style="display:block; font-size:12px; margin-bottom:4px"><input type="checkbox" checked onchange="toggleColumnVis('pax', this.checked)"> Participants</label>
-                <label style="display:block; font-size:12px; margin-bottom:4px"><input type="checkbox" checked onchange="toggleColumnVis('cost', this.checked)"> Fee (RM)</label>
-                <label style="display:block; font-size:12px; margin-bottom:4px"><input type="checkbox" checked onchange="toggleColumnVis('trainer', this.checked)"> Trainer / Provider</label>
-                <label style="display:block; font-size:12px; margin-bottom:4px"><input type="checkbox" checked onchange="toggleColumnVis('sync', this.checked)"> Sync Status</label>
+                <label for="col-vis-id" style="display:block; font-size:12px; margin-bottom:4px"><input type="checkbox" id="col-vis-id" checked onchange="toggleColumnVis('id', this.checked)" aria-label="Toggle Training ID Column"> Training ID</label>
+                <label for="col-vis-title" style="display:block; font-size:12px; margin-bottom:4px"><input type="checkbox" id="col-vis-title" checked onchange="toggleColumnVis('title', this.checked)" aria-label="Toggle Training Title Column"> Training Title</label>
+                <label for="col-vis-dept" style="display:block; font-size:12px; margin-bottom:4px"><input type="checkbox" id="col-vis-dept" checked onchange="toggleColumnVis('dept', this.checked)" aria-label="Toggle Department Column"> Department</label>
+                <label for="col-vis-date" style="display:block; font-size:12px; margin-bottom:4px"><input type="checkbox" id="col-vis-date" checked onchange="toggleColumnVis('date', this.checked)" aria-label="Toggle Date Column"> Date</label>
+                <label for="col-vis-status" style="display:block; font-size:12px; margin-bottom:4px"><input type="checkbox" id="col-vis-status" checked onchange="toggleColumnVis('status', this.checked)" aria-label="Toggle Status Column"> Status</label>
+                <label for="col-vis-pax" style="display:block; font-size:12px; margin-bottom:4px"><input type="checkbox" id="col-vis-pax" checked onchange="toggleColumnVis('pax', this.checked)" aria-label="Toggle Participants Column"> Participants</label>
+                <label for="col-vis-cost" style="display:block; font-size:12px; margin-bottom:4px"><input type="checkbox" id="col-vis-cost" checked onchange="toggleColumnVis('cost', this.checked)" aria-label="Toggle Fee Column"> Fee (RM)</label>
+                <label for="col-vis-trainer" style="display:block; font-size:12px; margin-bottom:4px"><input type="checkbox" id="col-vis-trainer" checked onchange="toggleColumnVis('trainer', this.checked)" aria-label="Toggle Trainer Column"> Trainer / Provider</label>
+                <label for="col-vis-sync" style="display:block; font-size:12px; margin-bottom:4px"><input type="checkbox" id="col-vis-sync" checked onchange="toggleColumnVis('sync', this.checked)" aria-label="Toggle Sync Status Column"> Sync Status</label>
               </div>
             </div>
           </div>
@@ -355,17 +351,17 @@
           <div class="row g-3">
             <!-- Multi-field Search Bar -->
             <div class="col-md-4">
-              <label class="label-th">Search Training Records</label>
+              <label for="mgmt-search-input" class="label-th">Search Training Records</label>
               <div style="position:relative">
                 <span class="icon" style="position:absolute; left:10px; top:50%; transform:translateY(-50%); color:#94A3B8; font-size:16px">search</span>
-                <input id="mgmt-search-input" class="input-th" style="padding-left:32px" placeholder="Search ID, title, employee, dept, trainer..." oninput="onFilterChangeDebounced()">
+                <input id="mgmt-search-input" class="input-th" style="padding-left:32px" placeholder="Search ID, title, employee, dept, trainer..." oninput="onFilterChangeDebounced()" aria-label="Search Training Records">
               </div>
             </div>
 
             <!-- Status Filter -->
             <div class="col-md-2">
-              <label class="label-th">Status</label>
-              <select id="mgmt-filter-status" class="input-th" onchange="onFilterChange()">
+              <label for="mgmt-filter-status" class="label-th">Status</label>
+              <select id="mgmt-filter-status" class="input-th" onchange="onFilterChange()" aria-label="Status">
                 <option value="">All Statuses</option>
                 <option value="Pending">Pending Approval</option>
                 <option value="Approved">Approved</option>
@@ -377,16 +373,16 @@
 
             <!-- Department Filter -->
             <div class="col-md-2">
-              <label class="label-th">Department</label>
-              <select id="mgmt-filter-dept" class="input-th" onchange="onFilterChange()">
+              <label for="mgmt-filter-dept" class="label-th">Department</label>
+              <select id="mgmt-filter-dept" class="input-th" onchange="onFilterChange()" aria-label="Department">
                 <option value="">All Departments</option>
               </select>
             </div>
 
             <!-- Category Filter -->
             <div class="col-md-2">
-              <label class="label-th">Training Category</label>
-              <select id="mgmt-filter-category" class="input-th" onchange="onFilterChange()">
+              <label for="mgmt-filter-category" class="label-th">Training Category</label>
+              <select id="mgmt-filter-category" class="input-th" onchange="onFilterChange()" aria-label="Training Category">
                 <option value="">All Categories</option>
                 <option value="Behavioral Skills">Behavioral Skills</option>
                 <option value="Technical Skills">Technical Skills</option>
@@ -404,8 +400,8 @@
 
             <!-- Training Type / Mode Filter -->
             <div class="col-md-2">
-              <label class="label-th">Training Type</label>
-              <select id="mgmt-filter-mode" class="input-th" onchange="onFilterChange()">
+              <label for="mgmt-filter-mode" class="label-th">Training Type</label>
+              <select id="mgmt-filter-mode" class="input-th" onchange="onFilterChange()" aria-label="Training Type">
                 <option value="">All Training Types</option>
                 <option value="In-house training">In-house training</option>
                 <option value="Public">Public</option>
@@ -415,8 +411,8 @@
 
             <!-- Date Range Filter -->
             <div class="col-md-2">
-              <label class="label-th">Date Range / Year</label>
-              <select id="mgmt-filter-date" class="input-th" onchange="onFilterChange()">
+              <label for="mgmt-filter-date" class="label-th">Date Range / Year</label>
+              <select id="mgmt-filter-date" class="input-th" onchange="onFilterChange()" aria-label="Date Range / Year">
                 <option value="">All Dates & Years</option>
                 <option value="2026" selected>Year 2026</option>
                 <option value="2025">Year 2025</option>
@@ -448,8 +444,8 @@
               Showing 0 of 0 records
             </div>
             <div style="display:flex; align-items:center; gap:8px">
-              <label style="font-size:12px; color:#64748B; font-weight:600">Rows per page:</label>
-              <select id="mgmt-page-size" class="input-th" style="width:auto; font-size:12px; padding:4px 8px" onchange="onPageSizeChange()">
+              <label for="mgmt-page-size" style="font-size:12px; color:#64748B; font-weight:600">Rows per page:</label>
+              <select id="mgmt-page-size" class="input-th" style="width:auto; font-size:12px; padding:4px 8px" onchange="onPageSizeChange()" aria-label="Rows per page">
                 <option value="25" selected>25</option>
                 <option value="50">50</option>
                 <option value="100">100</option>
@@ -505,8 +501,8 @@
 
           <div class="row g-3">
             <div class="col-md-4">
-              <label class="label-th">Select Report Format <span class="required">*</span></label>
-              <select id="filter-report-type" class="input-th" onchange="onReportTypeChange()">
+              <label for="filter-report-type" class="label-th">Select Report Format <span class="required">*</span></label>
+              <select id="filter-report-type" class="input-th" onchange="onReportTypeChange()" aria-label="Select Report Format">
                 <option value="hours" selected>1. Training Hours (Cost Centre vs Month)</option>
                 <option value="cost">2. Training Cost Breakdown</option>
                 <option value="title">3. Training Title & Enrolled Participants</option>
@@ -518,8 +514,8 @@
 
             <!-- Filter by Year -->
             <div class="col-md-2">
-              <label class="label-th">Filter by Year</label>
-              <select id="filter-year" class="input-th">
+              <label for="filter-year" class="label-th">Filter by Year</label>
+              <select id="filter-year" class="input-th" aria-label="Filter by Year">
                 <option value="2026" selected>Year 2026</option>
                 <option value="2025">Year 2025</option>
                 <option value="2024">Year 2024</option>
@@ -534,36 +530,36 @@
 
             <!-- Filter by Month / Quarter -->
             <div class="col-md-3">
-              <label class="label-th">Filter by Month / Period</label>
-              <select id="filter-month" class="input-th">
-                <option value="All">All Months (Jan — Dec)</option>
+              <label for="filter-month" class="label-th">Filter by Month / Period</label>
+              <select id="filter-month" class="input-th" aria-label="Filter by Month / Period">
+                <option value="All">All Months (Jan - Dec)</option>
                 <optgroup label="Quarters">
-                  <option value="Q1">Q1 — First Quarter (Jan–Mar)</option>
-                  <option value="Q2">Q2 — Second Quarter (Apr–Jun)</option>
-                  <option value="Q3">Q3 — Third Quarter (Jul–Sep)</option>
-                  <option value="Q4">Q4 — Fourth Quarter (Oct–Dec)</option>
+                  <option value="Q1">Q1 - First Quarter (Jan-Mar)</option>
+                  <option value="Q2">Q2 - Second Quarter (Apr-Jun)</option>
+                  <option value="Q3">Q3 - Third Quarter (Jul-Sep)</option>
+                  <option value="Q4">Q4 - Fourth Quarter (Oct-Dec)</option>
                 </optgroup>
                 <optgroup label="Individual Months">
-                  <option value="01">01 — January</option>
-                  <option value="02">02 — February</option>
-                  <option value="03">03 — March</option>
-                  <option value="04">04 — April</option>
-                  <option value="05">05 — May</option>
-                  <option value="06">06 — June</option>
-                  <option value="07">07 — July</option>
-                  <option value="08">08 — August</option>
-                  <option value="09">09 — September</option>
-                  <option value="10">10 — October</option>
-                  <option value="11">11 — November</option>
-                  <option value="12">12 — December</option>
+                  <option value="01">01 - January</option>
+                  <option value="02">02 - February</option>
+                  <option value="03">03 - March</option>
+                  <option value="04">04 - April</option>
+                  <option value="05">05 - May</option>
+                  <option value="06">06 - June</option>
+                  <option value="07">07 - July</option>
+                  <option value="08">08 - August</option>
+                  <option value="09">09 - September</option>
+                  <option value="10">10 - October</option>
+                  <option value="11">11 - November</option>
+                  <option value="12">12 - December</option>
                 </optgroup>
               </select>
             </div>
 
             <!-- Filter by Status -->
             <div class="col-md-3">
-              <label class="label-th">Filter by Training Status</label>
-              <select id="filter-status" class="input-th">
+              <label for="filter-status" class="label-th">Filter by Training Status</label>
+              <select id="filter-status" class="input-th" aria-label="Filter by Training Status">
                 <option value="">All Statuses</option>
                 <option value="Pending">Pending Approval</option>
                 <option value="Approved">Approved</option>
@@ -575,16 +571,16 @@
 
             <!-- Filter by Cost Centre / Dept -->
             <div class="col-md-3">
-              <label class="label-th">Filter by Cost Centre / Dept</label>
-              <select id="filter-dept" class="input-th">
+              <label for="filter-dept" class="label-th">Filter by Cost Centre / Dept</label>
+              <select id="filter-dept" class="input-th" aria-label="Filter by Cost Centre / Dept">
                 <option value="">All Cost Centres / Departments</option>
               </select>
             </div>
 
             <!-- Filter by Category -->
             <div class="col-md-3">
-              <label class="label-th">Filter by Category</label>
-              <select id="filter-category" class="input-th">
+              <label for="filter-category" class="label-th">Filter by Category</label>
+              <select id="filter-category" class="input-th" aria-label="Filter by Category">
                 <option value="">All Categories</option>
                 <option value="Behavioral Skills">Behavioral Skills</option>
                 <option value="Technical Skills">Technical Skills</option>
@@ -602,8 +598,8 @@
 
             <!-- Filter by Training Type -->
             <div class="col-md-3">
-              <label class="label-th">Filter by Training Type</label>
-              <select id="filter-mode" class="input-th">
+              <label for="filter-mode" class="label-th">Filter by Training Type</label>
+              <select id="filter-mode" class="input-th" aria-label="Filter by Training Type">
                 <option value="">All Training Types</option>
                 <option value="In-house training">In-house training</option>
                 <option value="Public">Public</option>
@@ -613,9 +609,9 @@
 
             <!-- Filter / Search Training Title -->
             <div class="col-md-3" id="title-filter-container">
-              <label class="label-th">Type / Search Training Title</label>
+              <label for="filter-training-title" class="label-th">Type / Search Training Title</label>
               <div style="position:relative">
-                <input id="filter-training-title" class="input-th" list="training-title-datalist" placeholder="Type or select training title..." oninput="onTitleSearchInput()">
+                <input id="filter-training-title" class="input-th" list="training-title-datalist" placeholder="Type or select training title..." oninput="onTitleSearchInput()" aria-label="Type or Search Training Title">
                 <datalist id="training-title-datalist"></datalist>
               </div>
             </div>
@@ -665,10 +661,12 @@
           </div>
           <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center">
             <div style="position:relative">
+              <label for="sync-search-id" class="visually-hidden" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">Search Training ID</label>
               <span class="icon" style="position:absolute; left:8px; top:50%; transform:translateY(-50%); color:#94A3B8; font-size:14px">search</span>
-              <input id="sync-search-id" class="input-th" style="padding-left:28px; width:160px; font-size:12px" placeholder="Search Training ID..." onkeyup="filterSyncHistoryUI()">
+              <input id="sync-search-id" class="input-th" style="padding-left:28px; width:160px; font-size:12px" placeholder="Search Training ID..." onkeyup="filterSyncHistoryUI()" aria-label="Search Training ID">
             </div>
-            <select id="sync-filter-status" class="input-th" style="width:auto; font-size:12px" onchange="loadSyncHistoryUI()">
+            <label for="sync-filter-status" class="visually-hidden" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">Filter Status</label>
+            <select id="sync-filter-status" class="input-th" style="width:auto; font-size:12px" onchange="loadSyncHistoryUI()" aria-label="Filter Status">
               <option value="All">All Status</option>
               <option value="SUCCESS">Success</option>
               <option value="FAILED">Failed</option>
@@ -736,9 +734,9 @@
             <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:14px; margin-bottom:16px">
               <div style="font-size:11px; font-weight:800; color:#64748B; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px">Requester & Employee Details</div>
               <div class="row g-2">
-                <div class="col-6"><span style="color:#64748B; font-size:11.5px">Department:</span> <strong style="color:#1E293B; font-size:12px" id="drawer-dept">—</strong></div>
-                <div class="col-6"><span style="color:#64748B; font-size:11.5px">Training Mode:</span> <strong style="color:#1E293B; font-size:12px" id="drawer-mode">—</strong></div>
-                <div class="col-12"><span style="color:#64748B; font-size:11.5px">TNA Source:</span> <strong style="color:#1E293B; font-size:12px" id="drawer-tna">—</strong></div>
+                <div class="col-6"><span style="color:#64748B; font-size:11.5px">Department:</span> <strong style="color:#1E293B; font-size:12px" id="drawer-dept">-</strong></div>
+                <div class="col-6"><span style="color:#64748B; font-size:11.5px">Training Mode:</span> <strong style="color:#1E293B; font-size:12px" id="drawer-mode">-</strong></div>
+                <div class="col-12"><span style="color:#64748B; font-size:11.5px">TNA Source:</span> <strong style="color:#1E293B; font-size:12px" id="drawer-tna">-</strong></div>
               </div>
             </div>
 
@@ -746,11 +744,11 @@
             <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:14px; margin-bottom:16px">
               <div style="font-size:11px; font-weight:800; color:#64748B; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px">Training Specifications</div>
               <div class="row g-2">
-                <div class="col-6"><span style="color:#64748B; font-size:11.5px">Start Date:</span> <strong style="color:#1E293B; font-size:12px" id="drawer-start">—</strong></div>
-                <div class="col-6"><span style="color:#64748B; font-size:11.5px">End Date:</span> <strong style="color:#1E293B; font-size:12px" id="drawer-end">—</strong></div>
-                <div class="col-6"><span style="color:#64748B; font-size:11.5px">Duration:</span> <strong style="color:#1E293B; font-size:12px" id="drawer-duration">—</strong></div>
-                <div class="col-6"><span style="color:#64748B; font-size:11.5px">Total Hours:</span> <strong style="color:#1E293B; font-size:12px" id="drawer-hours">—</strong></div>
-                <div class="col-12"><span style="color:#64748B; font-size:11.5px">Trainer:</span> <strong style="color:#1E293B; font-size:12px" id="drawer-trainer">—</strong></div>
+                <div class="col-6"><span style="color:#64748B; font-size:11.5px">Start Date:</span> <strong style="color:#1E293B; font-size:12px" id="drawer-start">-</strong></div>
+                <div class="col-6"><span style="color:#64748B; font-size:11.5px">End Date:</span> <strong style="color:#1E293B; font-size:12px" id="drawer-end">-</strong></div>
+                <div class="col-6"><span style="color:#64748B; font-size:11.5px">Duration:</span> <strong style="color:#1E293B; font-size:12px" id="drawer-duration">-</strong></div>
+                <div class="col-6"><span style="color:#64748B; font-size:11.5px">Total Hours:</span> <strong style="color:#1E293B; font-size:12px" id="drawer-hours">-</strong></div>
+                <div class="col-12"><span style="color:#64748B; font-size:11.5px">Trainer:</span> <strong style="color:#1E293B; font-size:12px" id="drawer-trainer">-</strong></div>
               </div>
             </div>
 
@@ -758,8 +756,8 @@
             <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:14px; margin-bottom:16px">
               <div style="font-size:11px; font-weight:800; color:#64748B; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px">Financial & Pax Breakdown</div>
               <div class="row g-2">
-                <div class="col-6"><span style="color:#64748B; font-size:11.5px">Participants:</span> <strong style="color:#2563EB; font-size:13px" id="drawer-pax">—</strong></div>
-                <div class="col-6"><span style="color:#64748B; font-size:11.5px">Course Fee:</span> <strong style="color:#16A34A; font-size:13px" id="drawer-fee">—</strong></div>
+                <div class="col-6"><span style="color:#64748B; font-size:11.5px">Participants:</span> <strong style="color:#2563EB; font-size:13px" id="drawer-pax">-</strong></div>
+                <div class="col-6"><span style="color:#64748B; font-size:11.5px">Course Fee:</span> <strong style="color:#16A34A; font-size:13px" id="drawer-fee">-</strong></div>
               </div>
             </div>
 
@@ -775,8 +773,8 @@
 
             <!-- Admin Remarks Field -->
             <div style="margin-bottom:16px">
-              <label class="label-th">Admin Remarks & Notes <span style="font-weight:normal; color:#64748B">(Preserved during sync)</span></label>
-              <textarea id="drawer-remarks" class="input-th" style="height:70px; font-size:12px" placeholder="Enter admin notes or adjustments..."></textarea>
+              <label for="drawer-remarks" class="label-th">Admin Remarks & Notes <span style="font-weight:normal; color:#64748B">(Preserved during sync)</span></label>
+              <textarea id="drawer-remarks" class="input-th" style="height:70px; font-size:12px" placeholder="Enter admin notes or adjustments..." aria-label="Admin Remarks & Notes"></textarea>
             </div>
 
             <!-- Real-Time Sync Status Widget -->
@@ -789,7 +787,7 @@
                 Training data synchronized with Google Sheets report.
               </div>
               <div style="font-size:11px; color:#64748B; margin-top:4px" id="drawer-sync-time">
-                Last Sync: —
+                Last Sync: -
               </div>
             </div>
           </div>
@@ -855,7 +853,7 @@
     }
   }
 
-  document.addEventListener('DOMContentLoaded', async () => {
+  onReady(async () => {
     try {
       populateYearOptions();
 
@@ -896,7 +894,7 @@
     }
   });
 
-  // ─── View Switcher Mode Handler ─────────────────────────────────────────────
+  // --- View Switcher Mode Handler ---------------------------------------------
   function switchReportViewMode(mode) {
     activeViewMode = mode;
     const vTable  = document.getElementById('view-mode-table');
@@ -919,7 +917,7 @@
     }
   }
 
-  // ─── Canonical Status Synchronizer ──────────────────────────────────────────
+  // --- Canonical Status Synchronizer ------------------------------------------
   function getCanonicalTrainingStatus(t) {
     if (!t) return 'Pending Approval';
     if (typeof t === 'string') {
@@ -968,7 +966,7 @@
     return 'Pending Approval';
   }
 
-  // ─── KPI Metrics Compute & Render ───────────────────────────────────────────
+  // --- KPI Metrics Compute & Render -------------------------------------------
   function computeKpiMetrics(list) {
     const total = list.length;
     let pending = 0;
@@ -1003,9 +1001,9 @@
   }
 
   function formatOrdinalDateStr(val) {
-    if (!val) return '—';
+    if (!val) return '-';
     const s = String(val).trim();
-    if (!s || s === '—') return '—';
+    if (!s || s === '-') return '-';
 
     let d = null;
     const dmy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
@@ -1042,23 +1040,28 @@
     return `${dayNum}${suffix} ${monthStr} ${yearStr}`;
   }
 
-  // ─── Clickable KPI Card Filter ──────────────────────────────────────────────
+  // --- Clickable KPI Card Filter ----------------------------------------------
   function applyKpiFilter(statusVal) {
     activeKpiFilter = statusVal;
     const selStatus = document.getElementById('mgmt-filter-status');
     if (selStatus) selStatus.value = statusVal;
 
-    document.querySelectorAll('.kpi-card').forEach(card => card.classList.remove('active'));
-    if (statusVal === 'Pending') document.getElementById('kpi-card-pending')?.classList.add('active');
-    else if (statusVal === 'Approved') document.getElementById('kpi-card-approved')?.classList.add('active');
-    else if (statusVal === 'Ongoing') document.getElementById('kpi-card-ongoing')?.classList.add('active');
-    else if (statusVal === 'Completed') document.getElementById('kpi-card-completed')?.classList.add('active');
-    else document.getElementById('kpi-card-total')?.classList.add('active');
+    const kpiPending = document.getElementById('kpi-card-pending');
+    const kpiApproved = document.getElementById('kpi-card-approved');
+    const kpiOngoing = document.getElementById('kpi-card-ongoing');
+    const kpiCompleted = document.getElementById('kpi-card-completed');
+    const kpiTotal = document.getElementById('kpi-card-total');
+
+    if (statusVal === 'Pending' && kpiPending) kpiPending.classList.add('active');
+    else if (statusVal === 'Approved' && kpiApproved) kpiApproved.classList.add('active');
+    else if (statusVal === 'Ongoing' && kpiOngoing) kpiOngoing.classList.add('active');
+    else if (statusVal === 'Completed' && kpiCompleted) kpiCompleted.classList.add('active');
+    else if (kpiTotal) kpiTotal.classList.add('active');
 
     applyDataFilters();
   }
 
-  // ─── Filter & Search Engine ──────────────────────────────────────────────────
+  // --- Filter & Search Engine --------------------------------------------------
   let debounceTimer = null;
   function onFilterChangeDebounced() {
     clearTimeout(debounceTimer);
@@ -1087,18 +1090,26 @@
 
     activeKpiFilter = '';
     document.querySelectorAll('.kpi-card').forEach(card => card.classList.remove('active'));
-    document.getElementById('kpi-card-total')?.classList.add('active');
+    const kpiTotalEl = document.getElementById('kpi-card-total');
+    if (kpiTotalEl) kpiTotalEl.classList.add('active');
 
     applyDataFilters();
   }
 
   function applyDataFilters() {
-    const qSearch = (document.getElementById('mgmt-search-input')?.value || '').trim().toLowerCase();
-    const qStatus = (document.getElementById('mgmt-filter-status')?.value || '').trim().toLowerCase();
-    const qDept = (document.getElementById('mgmt-filter-dept')?.value || '').trim().toLowerCase();
-    const qCat = (document.getElementById('mgmt-filter-category')?.value || '').trim().toLowerCase();
-    const qMode = (document.getElementById('mgmt-filter-mode')?.value || '').trim().toLowerCase();
-    const qDate = (document.getElementById('mgmt-filter-date')?.value || '').trim().toLowerCase();
+    const elSearch = document.getElementById('mgmt-search-input');
+    const elStatus = document.getElementById('mgmt-filter-status');
+    const elDept   = document.getElementById('mgmt-filter-dept');
+    const elCat    = document.getElementById('mgmt-filter-category');
+    const elMode   = document.getElementById('mgmt-filter-mode');
+    const elDate   = document.getElementById('mgmt-filter-date');
+
+    const qSearch = (elSearch ? elSearch.value : '').trim().toLowerCase();
+    const qStatus = (elStatus ? elStatus.value : '').trim().toLowerCase();
+    const qDept   = (elDept   ? elDept.value   : '').trim().toLowerCase();
+    const qCat    = (elCat    ? elCat.value    : '').trim().toLowerCase();
+    const qMode   = (elMode   ? elMode.value   : '').trim().toLowerCase();
+    const qDate   = (elDate   ? elDate.value   : '').trim().toLowerCase();
 
     // Render Filter Chips
     renderFilterChips({ qSearch, qStatus, qDept, qCat, qMode, qDate });
@@ -1153,7 +1164,7 @@
       chipsList.innerHTML = chips.map(c => `
         <span class="filter-chip">
           ${c.label}
-          <span class="filter-chip-remove" onclick="removeSingleFilter('${c.type}')">×</span>
+          <span class="filter-chip-remove" onclick="removeSingleFilter('${c.type}')"> </span>
         </span>
       `).join('');
     } else {
@@ -1169,7 +1180,7 @@
     applyDataFilters();
   }
 
-  // ─── Sorting Engine ──────────────────────────────────────────────────────────
+  // --- Sorting Engine ----------------------------------------------------------
   function toggleSort(col) {
     if (sortColumn === col) {
       sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
@@ -1182,7 +1193,7 @@
     ['ID', 'Name', 'Department', 'StartDate', 'Status', 'CourseFee'].forEach(c => {
       const el = document.getElementById(`sort-icon-${c}`);
       if (el) {
-        if (c === sortColumn) el.textContent = sortDirection === 'asc' ? '▲' : '▼';
+        if (c === sortColumn) el.textContent = sortDirection === 'asc' ? '^' : 'v';
         else el.textContent = '';
       }
     });
@@ -1210,7 +1221,7 @@
     });
   }
 
-  // ─── Data Table & Pagination Render ──────────────────────────────────────────
+  // --- Data Table & Pagination Render ------------------------------------------
   function onPageSizeChange() {
     pageSize = parseInt(document.getElementById('mgmt-page-size').value, 10) || 25;
     currentPage = 1;
@@ -1264,14 +1275,14 @@
 
       return `
         <tr onclick="openTrainingDrawer('${t.ID}')">
-          <td class="col-id" style="font-weight:700; color:#2563EB; font-family:monospace">${t.ID || t.Code || '—'}</td>
-          <td class="col-title" style="font-weight:700; color:#1E293B">${t.Name || '—'}</td>
-          <td class="col-dept">${t.Department || '—'}</td>
+          <td class="col-id" style="font-weight:700; color:#2563EB; font-family:monospace">${t.ID || t.Code || '-'}</td>
+          <td class="col-title" style="font-weight:700; color:#1E293B">${t.Name || '-'}</td>
+          <td class="col-dept">${t.Department || '-'}</td>
           <td class="col-date" style="text-align:center">${formatOrdinalDateStr(t.StartDate)}</td>
           <td class="col-status" style="text-align:center">${renderStatusBadge(t)}</td>
           <td class="col-pax" style="text-align:center; font-weight:700; color:#2563EB">${t.Participants || 0} pax</td>
           <td class="col-cost" style="text-align:center; font-weight:700; color:#16A34A">${feeFormatted}</td>
-          <td class="col-trainer" style="font-size:11.5px; color:#64748B">${t.Trainer || '—'}</td>
+          <td class="col-trainer" style="font-size:11.5px; color:#64748B">${t.Trainer || '-'}</td>
           <td class="col-sync" style="text-align:center"><span class="badge-th badge-green" style="font-size:10.5px">Synced</span></td>
           <td class="col-actions" onclick="event.stopPropagation()">
             <button type="button" class="btn-th btn-secondary btn-xs" onclick="openTrainingDrawer('${t.ID}')">
@@ -1301,7 +1312,7 @@
     return `<span class="badge-status">${canonical}</span>`;
   }
 
-  // ─── Column Visibility Controls ──────────────────────────────────────────────
+  // --- Column Visibility Controls ----------------------------------------------
   function toggleColumnPickerDropdown() {
     const dd = document.getElementById('col-picker-dropdown');
     if (dd) dd.classList.toggle('open');
@@ -1335,7 +1346,7 @@
     });
   }
 
-  // ─── Right-Side Slide-Over Detail Drawer ─────────────────────────────────────
+  // --- Right-Side Slide-Over Detail Drawer -------------------------------------
   function openTrainingDrawer(trainingId) {
     const t = masterTrainingsList.find(item => item.ID === trainingId || item.Code === trainingId);
     if (!t) return;
@@ -1357,17 +1368,17 @@
     const elFee = document.getElementById('drawer-fee');
     const elRemarks = document.getElementById('drawer-remarks');
 
-    if (elId) elId.textContent = t.ID || t.Code || '—';
-    if (elName) elName.textContent = t.Name || '—';
+    if (elId) elId.textContent = t.ID || t.Code || '-';
+    if (elName) elName.textContent = t.Name || '-';
     if (elStatus) elStatus.innerHTML = renderStatusBadge(t);
-    if (elDept) elDept.textContent = t.Department || '—';
+    if (elDept) elDept.textContent = t.Department || '-';
     if (elMode) elMode.textContent = t.TrainingMode || 'In-house';
     if (elTna) elTna.textContent = t.TnaSource || 'Training Requisition Form';
     if (elStart) elStart.textContent = formatOrdinalDateStr(t.StartDate);
     if (elEnd) elEnd.textContent = formatOrdinalDateStr(t.EndDate || t.StartDate);
     if (elDuration) elDuration.textContent = `${t.Duration || 1} Days`;
     if (elHours) elHours.textContent = `${t.TotalHours || 8} Hours`;
-    if (elTrainer) elTrainer.textContent = t.Trainer || '—';
+    if (elTrainer) elTrainer.textContent = t.Trainer || '-';
     if (elPax) elPax.textContent = `${t.Participants || 0} pax`;
     
     const feeNum = parseFloat(String(t.CourseFee || 0).replace(/[^0-9\.-]/g, '')) || 0;
@@ -1375,9 +1386,9 @@
     if (elRemarks) elRemarks.value = t.Remarks || '';
 
     // Populate Google Workspace & Sheet Links
-    const sheetUrl  = t.trainingDataSheetUrl || (t.ParticipantsSheetID ? ('ht' + 'tps://docs.google.com/spreadsheets/d/' + t.ParticipantsSheetID + '/edit') : '');
-    const reqUrl    = t.requisitionFormUrl   || (t.RequisitionFormFileID ? ('ht' + 'tps://docs.google.com/spreadsheets/d/' + t.RequisitionFormFileID + '/edit') : (t.RequisitionUrl || t.BrochureURL || ''));
-    const folderUrl = t.folderUrl            || (t.FolderID ? ('ht' + 'tps://drive.google.com/drive/folders/' + t.FolderID) : '');
+    const sheetUrl  = t.trainingDataSheetUrl || (t.ParticipantsSheetID ? ('https://docs.google.com/spreadsheets/d/' + t.ParticipantsSheetID + '/edit') : '');
+    const reqUrl    = t.requisitionFormUrl   || (t.RequisitionFormFileID ? ('https://docs.google.com/spreadsheets/d/' + t.RequisitionFormFileID + '/edit') : (t.RequisitionUrl || t.BrochureURL || ''));
+    const folderUrl = t.folderUrl            || (t.FolderID ? ('https://drive.google.com/drive/folders/' + t.FolderID) : '');
 
     const btnSheet = document.getElementById('drawer-btn-sheet');
     const btnReq   = document.getElementById('drawer-btn-req');
@@ -1432,7 +1443,7 @@
     }
   }
 
-  // ─── Refresh UI Data Engine ──────────────────────────────────────────────────
+  // --- Refresh UI Data Engine --------------------------------------------------
   async function refreshReportDataUI() {
     showToast('Refreshing training data records...', 'info');
     try {
@@ -1448,7 +1459,7 @@
     }
   }
 
-  // ─── Export Filtered Dataset to CSV / Excel ───────────────────────────────
+  // --- Export Filtered Dataset to CSV / Excel -------------------------------
   function exportCurrentFilteredDataset() {
     if (filteredTrainingsList.length === 0) {
       showToast('No filtered records available to export.', 'error');
@@ -1486,7 +1497,7 @@
     showToast(`Exported ${filteredTrainingsList.length} filtered training records to CSV!`, 'success');
   }
 
-  // ─── Existing Custom Google Sheet Reports Integration ────────────────────────
+  // --- Existing Custom Google Sheet Reports Integration ------------------------
   async function loadReportsFolderLinks() {
     try {
       const info = await callServer('getReportsFolderDetails');
@@ -1539,17 +1550,17 @@
         ? '<span class="badge-th badge-green" style="font-size:11px">Success</span>'
         : '<span class="badge-th badge-red" style="font-size:11px">Failed</span>';
 
-      const timeStr = r.timestamp ? r.timestamp.replace('T', ' ').slice(0, 19) : '—';
+      const timeStr = r.timestamp ? r.timestamp.replace('T', ' ').slice(0, 19) : '-';
 
       return `
         <tr>
           <td style="font-family:monospace; font-size:11.5px; color:#475569">${timeStr}</td>
-          <td style="font-weight:700; color:#1E293B">${r.trainingId || '—'}</td>
+          <td style="font-weight:700; color:#1E293B">${r.trainingId || '-'}</td>
           <td><span class="badge-th badge-blue" style="font-size:10.5px">${r.action || 'UPDATE'}</span></td>
-          <td style="color:#64748B; font-size:12px">${r.trigger || '—'}</td>
+          <td style="color:#64748B; font-size:12px">${r.trigger || '-'}</td>
           <td style="font-size:11.5px; color:#334155; max-width:240px; overflow:hidden; text-overflow:ellipsis">${r.reports || 'None'}</td>
           <td>${badge}</td>
-          <td style="font-family:monospace; font-size:11.5px; color:#475569">${r.duration || '—'}</td>
+          <td style="font-family:monospace; font-size:11.5px; color:#475569">${r.duration || '-'}</td>
           <td>
             <button class="btn-th btn-secondary btn-xs" onclick="viewSyncDetail(${idx})">
               <span class="icon sm">visibility</span> Details
@@ -1577,7 +1588,7 @@
         <div class="row g-3">
           <div class="col-6">
             <div style="font-size:11px; color:#64748B">Training ID</div>
-            <div style="font-size:13px; font-weight:700; color:#1E293B">${rec.trainingId || '—'}</div>
+            <div style="font-size:13px; font-weight:700; color:#1E293B">${rec.trainingId || '-'}</div>
           </div>
           <div class="col-6">
             <div style="font-size:11px; color:#64748B">Status</div>
@@ -1605,7 +1616,7 @@
           </div>
           <div class="col-12">
             <div style="font-size:11px; color:#64748B">System Message / Summary</div>
-            <div style="background:#F8FAFC; border:1px solid #E2E8F0; padding:10px; border-radius:6px; font-size:12px; color:#334155">${rec.message || '—'}</div>
+            <div style="background:#F8FAFC; border:1px solid #E2E8F0; padding:10px; border-radius:6px; font-size:12px; color:#334155">${rec.message || '-'}</div>
           </div>
           ${rec.error ? `
             <div class="col-12">
@@ -1631,8 +1642,8 @@
 
   async function triggerManualFullRecoverySync() {
     const currentYrStr = String(new Date().getFullYear());
-    if (!confirm('Run full master database recovery sync? This will reprocess all report sheets.')) return;
-    const yr = document.getElementById('filter-year')?.value || currentYrStr;
+    const yrInput = document.getElementById('filter-year');
+    const yr = (yrInput && yrInput.value) ? yrInput.value : currentYrStr;
     showToast(`Running Full Master Recovery Sync for ${yr}...`, 'info');
     try {
       const res = await callServer('syncAllTrainings', yr);
@@ -1651,14 +1662,22 @@
 
   function getActiveFilters() {
     const currentYrStr = String(new Date().getFullYear());
+    const elYr = document.getElementById('filter-year');
+    const elMo = document.getElementById('filter-month');
+    const elSt = document.getElementById('filter-status');
+    const elDp = document.getElementById('filter-dept');
+    const elCt = document.getElementById('filter-category');
+    const elMd = document.getElementById('filter-mode');
+    const elTt = document.getElementById('filter-training-title');
+
     return {
-      year:       document.getElementById('filter-year')?.value || currentYrStr,
-      month:      document.getElementById('filter-month')?.value || 'All',
-      status:     document.getElementById('filter-status')?.value || '',
-      costCentre: document.getElementById('filter-dept')?.value || '',
-      category:   document.getElementById('filter-category')?.value || '',
-      mode:       document.getElementById('filter-mode')?.value || '',
-      title:      document.getElementById('filter-training-title')?.value || ''
+      year:       (elYr && elYr.value) ? elYr.value : currentYrStr,
+      month:      (elMo && elMo.value) ? elMo.value : 'All',
+      status:     (elSt && elSt.value) ? elSt.value : '',
+      costCentre: (elDp && elDp.value) ? elDp.value : '',
+      category:   (elCt && elCt.value) ? elCt.value : '',
+      mode:       (elMd && elMd.value) ? elMd.value : '',
+      title:      (elTt && elTt.value) ? elTt.value : ''
     };
   }
 
@@ -1718,7 +1737,7 @@
     const year = filters.year || '2026';
 
     if (type === 'hours') {
-      titleEl.textContent = `1. Training Hours Report (${year}) — Cost Centre vs Month`;
+      titleEl.textContent = `1. Training Hours Report (${year}) - Cost Centre vs Month`;
       subEl.textContent   = `Training hours breakdown per month across all Cost Centres / Departments for ${year}`;
       tableContainer.innerHTML = buildHoursReportHtml(data, year);
     } else if (type === 'cost') {
@@ -1770,7 +1789,7 @@
           ${rows.length ? rows.map(r => `
             <tr>
               <td style="font-weight:700; color:#1E293B; background:#F8FAFC">${r.costCentre}</td>
-              ${(r.months || []).map(h => `<td style="text-align:center; color:${h > 0 ? '#1E293B' : '#CBD5E1'}">${h > 0 ? `<strong>${h}</strong>` : '—'}</td>`).join('')}
+              ${(r.months || []).map(h => `<td style="text-align:center; color:${h > 0 ? '#1E293B' : '#CBD5E1'}">${h > 0 ? `<strong>${h}</strong>` : '-'}</td>`).join('')}
               <td style="text-align:center; font-weight:800; color:#2563EB; background:#EFF6FF">${r.totalYear} hrs</td>
               <td style="text-align:center; font-weight:800; color:#059669; background:#ECFDF5">${r.totalHours} hrs</td>
             </tr>
@@ -1780,7 +1799,7 @@
           <tfoot>
             <tr style="background:#EFF6FF; border-top:2px solid #2563EB; font-weight:800">
               <td style="font-weight:800; color:#1E3A8A; background:#DBEAFE">Total</td>
-              ${monthTotals.map(t => `<td style="text-align:center; color:#1E3A8A">${t > 0 ? `<strong>${t}</strong>` : '—'}</td>`).join('')}
+              ${monthTotals.map(t => `<td style="text-align:center; color:#1E3A8A">${t > 0 ? `<strong>${t}</strong>` : '-'}</td>`).join('')}
               <td style="text-align:center; font-weight:800; color:#2563EB">${grandSum} hrs</td>
               <td style="text-align:center; font-weight:800; color:#059669">${grandSum} hrs</td>
             </tr>
@@ -1832,16 +1851,16 @@
               <td style="text-align:center">${r.dateFrom}</td>
               <td style="text-align:center">${r.dateTo}</td>
               <td style="text-align:center; font-weight:700; color:#2563EB">${r.totalParticipant} pax</td>
-              <td style="text-align:center; color:#94A3B8">${r.trainingFees ? `RM ${r.trainingFees}` : '—'}</td>
-              <td style="text-align:center; color:#94A3B8">—</td>
-              <td style="text-align:center; color:#94A3B8">—</td>
-              <td style="text-align:center; color:#94A3B8">—</td>
-              <td style="text-align:center; color:#94A3B8">—</td>
-              <td style="text-align:center; color:#94A3B8">—</td>
-              <td style="text-align:center; color:#94A3B8">—</td>
-              <td style="text-align:center; color:#94A3B8">—</td>
-              <td style="text-align:center; font-weight:700; color:#16A34A">${r.totalCost ? `RM ${r.totalCost}` : '—'}</td>
-              <td style="text-align:center; color:#94A3B8">—</td>
+              <td style="text-align:center; color:#94A3B8">${r.trainingFees ? `RM ${r.trainingFees}` : '-'}</td>
+              <td style="text-align:center; color:#94A3B8">-</td>
+              <td style="text-align:center; color:#94A3B8">-</td>
+              <td style="text-align:center; color:#94A3B8">-</td>
+              <td style="text-align:center; color:#94A3B8">-</td>
+              <td style="text-align:center; color:#94A3B8">-</td>
+              <td style="text-align:center; color:#94A3B8">-</td>
+              <td style="text-align:center; color:#94A3B8">-</td>
+              <td style="text-align:center; font-weight:700; color:#16A34A">${r.totalCost ? `RM ${r.totalCost}` : '-'}</td>
+              <td style="text-align:center; color:#94A3B8">-</td>
             </tr>
           `).join('') : '<tr><td colspan="14" style="text-align:center; padding:24px; color:#94A3B8">No cost records found for selected filters.</td></tr>'}
         </tbody>
@@ -1952,7 +1971,7 @@
               <td>${r.position}</td>
               <td style="text-align:center; font-weight:700; color:#2563EB">${r.totalTrainings}</td>
               <td style="text-align:center; font-weight:800; color:#059669">${r.totalHours} hrs</td>
-              <td style="font-size:11.5px; color:#64748B">${Array.isArray(r.attendedList) ? (r.attendedList.join(', ') || '—') : (r.attendedList || '—')}</td>
+              <td style="font-size:11.5px; color:#64748B">${Array.isArray(r.attendedList) ? (r.attendedList.join(', ') || '-') : (r.attendedList || '-')}</td>
               <td>${renderStatusBadge(r.status)}</td>
             </tr>
           `).join('') : '<tr><td colspan="9" style="text-align:center; padding:24px; color:#94A3B8">No employee records found.</td></tr>'}
@@ -2039,7 +2058,7 @@
     const tableContainer = document.getElementById('report-table-container');
 
     const t = report.training;
-    titleEl.textContent = `6. Single Programme Report — [${t.Code}] ${t.Name}`;
+    titleEl.textContent = `6. Single Programme Report - [${t.Code}] ${t.Name}`;
     subEl.textContent   = `Full detail summary for ${t.Name} generated on ${report.generatedAt}`;
 
     const att = report.attendance || {};

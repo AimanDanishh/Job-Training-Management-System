@@ -1,5 +1,5 @@
 /**
- * ValidationService.gs — Validation module for session attendance submissions
+ * ValidationService.gs - Validation module for session attendance submissions
  */
 
 /**

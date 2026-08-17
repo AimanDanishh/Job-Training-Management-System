@@ -3,16 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Apollo — Training Programmes</title>
-  <script>
-    window.__TRAINHUB_PAGE__ = '<?!= currentPage ?>';
-    window.__PUBLIC_PORTAL_URL__ = '<?!= (typeof publicPortalUrl !== "undefined" && publicPortalUrl) ? publicPortalUrl : "" ?>';
-    window.__COMPANY_LOGO_URL__ = '<?!= (typeof companyLogoUrl !== "undefined" && companyLogoUrl) ? companyLogoUrl : "" ?>';
-  </script>
+  <title>Apollo - Training Programmes</title>
   <?!= include('style') ?>
   <?!= include('script') ?>
 </head>
 <body>
+<div id="__trainhub_config__" style="display:none" data-config="<?!= encodeURIComponent(JSON.stringify({ page: currentPage || '', publicPortalUrl: (typeof publicPortalUrl !== 'undefined' && publicPortalUrl) ? publicPortalUrl : '', companyLogoUrl: (typeof companyLogoUrl !== 'undefined' && companyLogoUrl) ? companyLogoUrl : '' })) ?>"></div>
 <div class="app-shell">
   <!-- Sidebar -->
   <?!= include('sidebar') ?>
@@ -30,14 +26,17 @@
         <div class="d-flex gap-2 flex-wrap justify-content-between align-items-center mb-3">
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <div style="position:relative">
-              <span class="icon" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94A3B8;font-size:14px">search</span>
-              <input id="search-t" class="input-th" style="padding-left:28px;width:220px" placeholder="Search programmes...">
+              <label for="search-t" class="visually-hidden" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">Search programmes</label>
+              <span class="icon" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94A3B8;font-size:14px" aria-hidden="true">search</span>
+              <input id="search-t" class="input-th" style="padding-left:28px;width:220px" placeholder="Search programmes..." aria-label="Search programmes">
             </div>
-            <select id="status-t" class="input-th" style="width:auto">
+            <label for="status-t" class="visually-hidden" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">Filter by Status</label>
+            <select id="status-t" class="input-th" style="width:auto" aria-label="Filter by Status">
               <option value="">All Status</option>
               <option>Draft</option><option>Upcoming</option><option>In Progress</option><option>Completed</option><option>Archived</option>
             </select>
-            <select id="approval-t" class="input-th" style="width:auto">
+            <label for="approval-t" class="visually-hidden" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">Filter by Approval Status</label>
+            <select id="approval-t" class="input-th" style="width:auto" aria-label="Filter by Approval Status">
               <option value="">All Approval Status</option>
               <option value="Approved">Approved</option>
               <option value="Pending HOD Approval">Needs HOD Approval</option>
@@ -45,7 +44,8 @@
               <option value="Pending HOHR Approval">Needs HOHR Approval</option>
               <option value="Rejected">Rejected</option>
             </select>
-            <select id="cat-t" class="input-th" style="width:auto">
+            <label for="cat-t" class="visually-hidden" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">Filter by Category</label>
+            <select id="cat-t" class="input-th" style="width:auto" aria-label="Filter by Category">
               <option value="">All Categories</option>
               <option value="Behavioral Skills">Behavioral Skills</option>
               <option value="Technical Skills">Technical Skills</option>
@@ -95,11 +95,11 @@
         <span class="icon sm" style="color:#2563EB">school</span> 1. Training Programme Specifications (AP-HRD-F01-01)
       </div>
       <div class="col-12">
-        <label class="label-th">Programme Name / Title <span class="required">*</span></label>
+        <label for="t-name" class="label-th">Programme Name / Title <span class="required">*</span></label>
         <input id="t-name" class="input-th" placeholder="e.g. Leadership Excellence & Strategic Management">
       </div>
       <div class="col-md-4">
-        <label class="label-th">Training Category</label>
+        <label for="t-cat" class="label-th">Training Category</label>
         <select id="t-cat" class="input-th">
           <option value="Behavioral Skills">Behavioral Skills</option>
           <option value="Technical Skills">Technical Skills</option>
@@ -115,7 +115,7 @@
         </select>
       </div>
       <div class="col-md-4">
-        <label class="label-th">Training Type / Mode</label>
+        <label for="t-mode" class="label-th">Training Type / Mode</label>
         <select id="t-mode" class="input-th">
           <option value="In-House Training">In-House Training</option>
           <option value="Public">Public Training</option>
@@ -123,7 +123,7 @@
         </select>
       </div>
       <div class="col-md-4">
-        <label class="label-th">TNA Source</label>
+        <label for="t-tna" class="label-th">TNA Source</label>
         <select id="t-tna" class="input-th">
           <option value="Training Requisition Form">Training Requisition Form</option>
           <option value="Training Procedure">Training Procedure</option>
@@ -139,27 +139,27 @@
         <span class="icon sm" style="color:#2563EB">calendar_today</span> 2. Dates, Duration & Financials
       </div>
       <div class="col-md-4">
-        <label class="label-th">Start Date <span class="required">*</span></label>
+        <label for="t-start" class="label-th">Start Date <span class="required">*</span></label>
         <input id="t-start" class="input-th" type="date">
       </div>
       <div class="col-md-4">
-        <label class="label-th">End Date</label>
+        <label for="t-end" class="label-th">End Date</label>
         <input id="t-end" class="input-th" type="date">
       </div>
       <div class="col-md-2">
-        <label class="label-th">Days</label>
+        <label for="t-duration" class="label-th">Days</label>
         <input id="t-duration" class="input-th" type="number" min="1" value="1">
       </div>
       <div class="col-md-2">
-        <label class="label-th">Total Hours</label>
+        <label for="t-hours" class="label-th">Total Hours</label>
         <input id="t-hours" class="input-th" type="number" min="0.5" step="0.5" value="8">
       </div>
       <div class="col-md-6">
-        <label class="label-th">Course Fee (RM)</label>
+        <label for="t-fee" class="label-th">Course Fee (RM)</label>
         <input id="t-fee" class="input-th" type="number" min="0" step="0.01" placeholder="1500.00">
       </div>
       <div class="col-md-6">
-        <label class="label-th">Department / Cost Centre</label>
+        <label for="t-dept" class="label-th">Department / Cost Centre</label>
         <select id="t-dept" class="input-th">
           <option value="">All Departments / Cost Centres</option>
         </select>
@@ -170,19 +170,19 @@
         <span class="icon sm" style="color:#2563EB">corporate_fare</span> 3. Facilitator, Venue & Provider Details
       </div>
       <div class="col-md-6">
-        <label class="label-th">Trainer / Facilitator Name <span class="required">*</span></label>
+        <label for="t-trainer" class="label-th">Trainer / Facilitator Name <span class="required">*</span></label>
         <input id="t-trainer" class="input-th" placeholder="Trainer name">
       </div>
       <div class="col-md-6">
-        <label class="label-th">Training Venue</label>
+        <label for="t-venue" class="label-th">Training Venue</label>
         <input id="t-venue" class="input-th" placeholder="e.g. Training Room A / Hotel Ballroom">
       </div>
       <div class="col-md-6">
-        <label class="label-th">Training Provider / Vendor Company</label>
+        <label for="t-provider" class="label-th">Training Provider / Vendor Company</label>
         <input id="t-provider" class="input-th" placeholder="Vendor / Provider Company Name">
       </div>
       <div class="col-md-6">
-        <label class="label-th">Certificate Expiry Date (if applicable)</label>
+        <label for="t-cert-expiry" class="label-th">Certificate Expiry Date (if applicable)</label>
         <input id="t-cert-expiry" class="input-th" type="date">
       </div>
 
@@ -191,15 +191,15 @@
         <span class="icon sm" style="color:#2563EB">description</span> 4. Supporting Documents & Business Justification
       </div>
       <div class="col-12">
-        <label class="label-th">Brochure Link / Requisition URL</label>
+        <label for="t-brochure" class="label-th">Brochure Link / Requisition URL</label>
         <input id="t-brochure" class="input-th" type="url" placeholder="https://drive.google.com/...">
       </div>
       <div class="col-12">
-        <label class="label-th">Reason for Training / Business Justification</label>
+        <label for="t-reason" class="label-th">Reason for Training / Business Justification</label>
         <textarea id="t-reason" class="input-th" rows="2" placeholder="State business justification, operational need, or skill gap..."></textarea>
       </div>
       <div class="col-12">
-        <label class="label-th">Programme Objectives</label>
+        <label for="t-obj" class="label-th">Programme Objectives</label>
         <textarea id="t-obj" class="input-th" rows="2" placeholder="Describe key learning outcomes and objectives..."></textarea>
       </div>
 
@@ -208,13 +208,13 @@
         <span class="icon sm" style="color:#2563EB">settings</span> 5. Lifecycle & Status Controls
       </div>
       <div class="col-md-4">
-        <label class="label-th">Status</label>
+        <label for="t-status" class="label-th">Status</label>
         <select id="t-status" class="input-th">
           <option>Draft</option><option>Upcoming</option><option>In Progress</option><option>Completed</option>
         </select>
       </div>
       <div class="col-md-4">
-        <label class="label-th">Lifecycle Stage</label>
+        <label for="t-stage" class="label-th">Lifecycle Stage</label>
         <select id="t-stage" class="input-th">
           <option value="Created">Created</option>
           <option value="Participants Imported">Participants Imported</option>
@@ -226,7 +226,7 @@
         </select>
       </div>
       <div class="col-md-4">
-        <label class="label-th">Approval Status</label>
+        <label for="t-app-status" class="label-th">Approval Status</label>
         <select id="t-app-status" class="input-th">
           <option value="Approved">Approved</option>
           <option value="Pending HOD Approval">Pending HOD Approval</option>
@@ -274,19 +274,21 @@
       <div class="row g-2 mb-2">
         <div class="col-md-7">
           <div style="position:relative">
-            <span class="icon" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94A3B8;font-size:14px">search</span>
-            <input id="pm-search" class="input-th" style="padding-left:28px" placeholder="Search by Name or Employee ID...">
+            <label for="pm-search" class="visually-hidden" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">Search Participant</label>
+            <span class="icon" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94A3B8;font-size:14px" aria-hidden="true">search</span>
+            <input id="pm-search" class="input-th" style="padding-left:28px" placeholder="Search by Name or Employee ID..." aria-label="Search by Name or Employee ID">
           </div>
         </div>
         <div class="col-md-5">
-          <select id="pm-dept" class="input-th">
+          <label for="pm-dept" class="visually-hidden" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">Filter Department</label>
+          <select id="pm-dept" class="input-th" aria-label="Filter Department">
             <option value="">All Departments</option>
           </select>
         </div>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:#E2E8F0;border-radius:6px 6px 0 0;font-size:11.5px;font-weight:600;color:#475569">
-        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0">
-          <input type="checkbox" id="pm-select-all" onchange="toggleSelectAllPm(this.checked)">
+        <label for="pm-select-all" style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0">
+          <input type="checkbox" id="pm-select-all" onchange="toggleSelectAllPm(this.checked)" aria-label="Select All Filtered Employees">
           <span>Select All Filtered (<span id="pm-filtered-count">0</span>)</span>
         </label>
         <span id="pm-selected-count" style="color:#2563EB">0 selected</span>
@@ -301,8 +303,8 @@
 
     <!-- Tab 3: Bulk Add Paste Area -->
     <div id="pm-tab-bulk" style="display:none;background:#F8FAFC;border:1px solid #CBD5E1;border-radius:10px;padding:16px">
-      <label class="label-th">Paste Employee IDs or Names (One per line or comma/tab separated)</label>
-      <textarea id="pm-bulk-input" class="input-th mb-2" rows="6" placeholder="e.g.&#10;EMP001&#10;EMP002, John Doe&#10;EMP003	Jane Smith	HR"></textarea>
+      <label for="pm-bulk-input" class="label-th">Paste Employee IDs or Names (One per line or comma/tab separated)</label>
+      <textarea id="pm-bulk-input" class="input-th mb-2" rows="6" placeholder="e.g.&#10;EMP001&#10;EMP002, John Doe&#10;EMP003	Jane Smith	HR" aria-label="Paste Employee IDs or Names"></textarea>
       <div style="font-size:11.5px;color:#64748B;margin-bottom:12px">
         <span class="icon sm" style="color:#D97706">lightbulb</span> <strong>Tip:</strong> You can copy a column of Employee IDs directly from Microsoft Excel or Google Sheets and paste them here.
       </div>
@@ -331,23 +333,23 @@
     <input type="hidden" id="s-training-id">
     <div class="row g-3 mt-1">
       <div class="col-12">
-        <label class="label-th">Session Name <span class="required">*</span></label>
+        <label for="s-name" class="label-th">Session Name <span class="required">*</span></label>
         <input id="s-name" class="input-th" placeholder="e.g. Day 1, Morning, Day 2 Afternoon">
       </div>
       <div class="col-md-6">
-        <label class="label-th">Session Date <span class="required">*</span></label>
+        <label for="s-date" class="label-th">Session Date <span class="required">*</span></label>
         <input id="s-date" class="input-th" type="date">
       </div>
       <div class="col-md-3">
-        <label class="label-th">Start Time</label>
+        <label for="s-start-time" class="label-th">Start Time</label>
         <input id="s-start-time" class="input-th" type="time" value="09:00">
       </div>
       <div class="col-md-3">
-        <label class="label-th">End Time</label>
+        <label for="s-end-time" class="label-th">End Time</label>
         <input id="s-end-time" class="input-th" type="time" value="17:00">
       </div>
       <div class="col-12">
-        <label class="label-th">QR Status</label>
+        <label for="s-status" class="label-th">QR Status</label>
         <select id="s-status" class="input-th">
           <option value="Active">Active (Ready for check-in)</option>
           <option value="Expired">Expired (Check-in closed)</option>
@@ -366,9 +368,10 @@
 
 <div id="toast-container"></div>
 <script>
+  console.log("=== APOLLO TRAINING SCRIPT START ===");
   let allTrainings = [];
 
-  document.addEventListener('DOMContentLoaded', () => {
+  function initTrainingPage() {
     const searchEl   = document.getElementById('search-t');
     const statusEl   = document.getElementById('status-t');
     const approvalEl = document.getElementById('approval-t');
@@ -388,8 +391,17 @@
 
     loadTrainings();
     loadCostCentres();
-  });
+  }
 
+  if (typeof onReady === 'function') {
+    onReady(initTrainingPage);
+  } else if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    setTimeout(initTrainingPage, 0);
+  } else {
+    document.addEventListener('DOMContentLoaded', initTrainingPage);
+  }
+
+  console.log("=== BEFORE loadTrainings ===");
   async function loadTrainings() {
     const grid = document.getElementById('training-grid');
     const countEl = document.getElementById('t-count');
@@ -439,6 +451,7 @@
     }
   }
   window.loadTrainings = loadTrainings;
+  console.log("=== AFTER loadTrainings ===");
 
   function filterTrainings() {
     const searchEl   = document.getElementById('search-t');
@@ -503,20 +516,116 @@
     } catch(e) {}
   }
 
-  // Keep external URLs out of the HTML script source. Apps Script can inject
-  // page scripts with document.write and has been observed to corrupt them.
-  function externalUrl(path) {
-    return 'ht' + 'tps://' + path.replace(/^\/+/, '');
-  }
-
   function driveFolderUrl(folderId) {
-    return externalUrl('drive.google.com/drive/folders/' + encodeURIComponent(folderId));
+    return 'https://drive.google.com/drive/folders/' + encodeURIComponent(folderId);
   }
 
   function quickChartUrl(value) {
-    return externalUrl('quickchart.io/qr?size=400&ecLevel=H&text=' + encodeURIComponent(value));
+    return 'https://quickchart.io/qr?size=400&ecLevel=H&text=' + encodeURIComponent(value);
   }
 
+
+  function getTrainingDataSheetButton(t) {
+    const url = t.trainingDataSheetUrl || (t.ParticipantsSheetID ? ('https://docs.google.com/spreadsheets/d/' + t.ParticipantsSheetID + '/edit') : '');
+    if (!url) return '';
+    return `<a class="btn-th btn-sm" style="background:#059669;color:#fff;border:none;text-decoration:none;display:inline-flex;align-items:center;gap:4px" href="${url}" target="_blank" title="Open Training Data Sheet"><span class="icon sm">table_chart</span>Data Sheet</a>`;
+  }
+
+  function getTrainingRequisitionButton(t) {
+    const url = t.requisitionFormUrl || (t.RequisitionFormFileID ? ('https://docs.google.com/spreadsheets/d/' + t.RequisitionFormFileID + '/edit') : '');
+    if (!url) return '';
+    return `<a class="btn-th btn-secondary btn-sm" href="${url}" target="_blank" title="Open Requisition Form" style="text-decoration:none"><span class="icon sm">description</span>Form</a>`;
+  }
+
+  function getTrainingFolderButton(t) {
+    const url = t.folderUrl || (t.FolderID ? ('https://drive.google.com/drive/folders/' + t.FolderID) : '');
+    if (!url) return '';
+    return `<a class="btn-th btn-secondary btn-sm" href="${url}" target="_blank" title="Open Google Drive Workspace" style="text-decoration:none"><span class="icon sm">folder</span>Folder</a>`;
+  }
+
+  function renderTrainingCardHtml(t) {
+    const cc = CAT_COLORS[t.Category] || '#2563EB';
+    const isApproved = isTrainingApproved(t);
+    const appStatusStr = t.ApprovalStatus || 'Approved';
+
+    const compDate = t.EndDate || t.StartDate;
+    const isCompleted = ['Training Completed','Evaluation Completed','Waiting for 3-Month Review','Programme Closed','Completed'].includes(t.Stage || t.Status);
+    const is2WDone = ['Evaluation Completed','Waiting for 3-Month Review','Programme Closed'].includes(t.Stage);
+    const is3MDone = ['Programme Closed'].includes(t.Stage);
+    const st2W = ApolloCountdown.getStatus(compDate, '2week', is2WDone, !isCompleted);
+    const st3M = ApolloCountdown.getStatus(compDate, '3month', is3MDone, !isCompleted);
+    const dateRangeStr = toDisplayDateStr(t.StartDate) + (t.EndDate ? ' to ' + toDisplayDateStr(t.EndDate) : '');
+
+    return `
+    <div class="col-md-6 col-xl-4">
+      <div style="background:#fff;border:1.5px solid #E2E8F0;border-radius:12px;overflow:hidden;
+                  transition:box-shadow 0.15s,transform 0.1s;cursor:pointer"
+           onmouseover="this.style.boxShadow='0 6px 20px rgba(0,0,0,0.09)';this.style.transform='translateY(-1px)'"
+           onmouseout="this.style.boxShadow='';this.style.transform=''">
+        <div style="height:4px;background:${cc}"></div>
+        <div style="padding:16px">
+          <!-- Header -->
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:8px">
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;align-items:center">
+                <span style="font-size:10.5px;font-family:monospace;color:#64748B;background:#F8FAFC;padding:2px 6px;border-radius:4px;border:1px solid #E2E8F0;font-weight:700">${t.Code || '-'}</span>
+                <span style="font-size:10.5px;color:${cc};background:${cc}15;padding:2px 7px;border-radius:999px;font-weight:600">${t.Category}</span>
+              </div>
+              <h3 style="font-size:13.5px;font-weight:700;color:var(--apollo-dark);margin:0;line-height:1.3">${t.Name}</h3>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+              ${statusBadge(t.Status)}
+              ${approvalStatusBadge(appStatusStr)}
+            </div>
+          </div>
+          <!-- Meta -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;margin-bottom:10px">
+            <div style="display:flex;align-items:center;gap:4px"><span class="icon sm" style="color:#94A3B8">person</span><span style="font-size:11.5px;color:#64748B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.Trainer || '-'}</span></div>
+            <div style="display:flex;align-items:center;gap:4px"><span class="icon sm" style="color:#94A3B8">location_on</span><span style="font-size:11.5px;color:#64748B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.Venue || '-'}</span></div>
+            <div style="display:flex;align-items:center;gap:4px"><span class="icon sm" style="color:#94A3B8">calendar_today</span><span style="font-size:11.5px;color:#64748B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${dateRangeStr}</span></div>
+            <div style="display:flex;align-items:center;gap:4px"><span class="icon sm" style="color:#94A3B8">schedule</span><span style="font-size:11.5px;color:#64748B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.Duration || 1}d | ${t.TotalHours || 8}h</span></div>
+            <div style="display:flex;align-items:center;gap:4px"><span class="icon sm" style="color:#94A3B8">group</span><span style="font-size:11.5px;color:#64748B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.Participants || 0} Participants</span></div>
+            <div style="display:flex;align-items:center;gap:4px"><span class="icon sm" style="color:#94A3B8">corporate_fare</span><span style="font-size:11.5px;color:#64748B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.Department || 'All Depts'}</span></div>
+          </div>
+          <!-- Stage chip -->
+          <div style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:#F8FAFC;border-radius:7px;margin-bottom:8px;border:1px solid #F1F5F9">
+            <span class="icon sm" style="color:#E91C2D">linear_scale</span>
+            <span style="font-size:11.5px;font-weight:600;color:var(--apollo-dark);flex:1">Stage: ${t.Stage || 'Created'}</span>
+          </div>
+
+          <!-- Real-Time Evaluation Countdown Chips -->
+          <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px;padding:8px 10px;background:#FFF8CF;border-radius:7px;border:1px solid #FEC30D">
+            <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
+              <span style="color:#92400E;font-weight:600">Training Eval (2-Wk):</span>
+              ${ApolloCountdown.renderBadge(st2W)}
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
+              <span style="color:#92400E;font-weight:600">Supervisor (3-Mo):</span>
+              ${ApolloCountdown.renderBadge(st3M)}
+            </div>
+          </div>
+
+          ${!isApproved ? `
+          <div style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:#FFFBEB;border-radius:7px;margin-bottom:10px;border:1px solid #FDE68A;color:#B45309;font-size:11px">
+            <span class="icon sm" style="color:#D97706">lock</span>
+            <span>Requires ${getApprovalRoleText(appStatusStr)} approval before session creation</span>
+          </div>
+          ` : ''}
+
+          <!-- Actions -->
+          <div style="display:flex;gap:6px;border-top:1px solid #F1F5F9;padding-top:12px;flex-wrap:wrap">
+            <button class="btn-th btn-primary btn-sm" style="flex:1;justify-content:center" onclick="openDetail('${t.ID}')"><span class="icon sm">open_in_new</span>Open</button>
+            <button class="btn-th btn-secondary btn-sm" onclick="openParticipantManager('${t.ID}')" title="Manage Participants"><span class="icon sm">group_add</span></button>
+            ${getTrainingDataSheetButton(t)}
+            ${getTrainingRequisitionButton(t)}
+            ${getTrainingFolderButton(t)}
+            <button class="btn-th btn-secondary btn-sm" onclick="editTraining('${t.ID}')"><span class="icon sm">edit</span></button>
+            <button class="btn-th btn-danger btn-sm" onclick="confirmDeleteT('${t.ID}')"><span class="icon sm">archive</span></button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }
 
   function renderGrid(list) {
     const countEl = document.getElementById('t-count');
@@ -531,86 +640,7 @@
       }
       return;
     }
-    grid.innerHTML = list.map(t => {
-      const cc = CAT_COLORS[t.Category] || '#2563EB';
-      const isApproved = isTrainingApproved(t);
-      const appStatusStr = t.ApprovalStatus || 'Approved';
-
-      // Real-time evaluation countdown statuses
-      const compDate = t.EndDate || t.StartDate;
-      const isCompleted = ['Training Completed','Evaluation Completed','Waiting for 3-Month Review','Programme Closed','Completed'].includes(t.Stage || t.Status);
-      const is2WDone = ['Evaluation Completed','Waiting for 3-Month Review','Programme Closed'].includes(t.Stage);
-      const is3MDone = ['Programme Closed'].includes(t.Stage);
-      const st2W = ApolloCountdown.getStatus(compDate, '2week', is2WDone, !isCompleted);
-      const st3M = ApolloCountdown.getStatus(compDate, '3month', is3MDone, !isCompleted);
-
-      return `
-      <div class="col-md-6 col-xl-4">
-        <div style="background:#fff;border:1.5px solid #E2E8F0;border-radius:12px;overflow:hidden;
-                    transition:box-shadow 0.15s,transform 0.1s;cursor:pointer"
-             onmouseover="this.style.boxShadow='0 6px 20px rgba(0,0,0,0.09)';this.style.transform='translateY(-1px)'"
-             onmouseout="this.style.boxShadow='';this.style.transform=''">
-          <div style="height:4px;background:${cc}"></div>
-          <div style="padding:16px">
-            <!-- Header -->
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:8px">
-              <div style="flex:1;min-width:0">
-                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;align-items:center">
-                  <span style="font-size:10.5px;font-family:monospace;color:#64748B;background:#F8FAFC;padding:2px 6px;border-radius:4px;border:1px solid #E2E8F0;font-weight:700">${t.Code || '—'}</span>
-                  <span style="font-size:10.5px;color:${cc};background:${cc}15;padding:2px 7px;border-radius:999px;font-weight:600">${t.Category}</span>
-                </div>
-                <h3 style="font-size:13.5px;font-weight:700;color:var(--apollo-dark);margin:0;line-height:1.3">${t.Name}</h3>
-              </div>
-              <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
-                ${statusBadge(t.Status)}
-                ${approvalStatusBadge(appStatusStr)}
-              </div>
-            </div>
-            <!-- Meta -->
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;margin-bottom:10px">
-              ${[['person',t.Trainer],['location_on',t.Venue||'—'],['calendar_today',toDisplayDateStr(t.StartDate)+(t.EndDate ? ' → '+toDisplayDateStr(t.EndDate) : '')],['schedule',t.Duration+'d · '+(t.TotalHours||'?')+'h'],['group',t.Participants+' Participants'],['corporate_fare',t.Department||'All Depts']].map(([ic,tx])=>
-                `<div style="display:flex;align-items:center;gap:4px"><span class="icon sm" style="color:#94A3B8">${ic}</span><span style="font-size:11.5px;color:#64748B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${tx}</span></div>`
-              ).join('')}
-            </div>
-            <!-- Stage chip -->
-            <div style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:#F8FAFC;border-radius:7px;margin-bottom:8px;border:1px solid #F1F5F9">
-              <span class="icon sm" style="color:#E91C2D">linear_scale</span>
-              <span style="font-size:11.5px;font-weight:600;color:var(--apollo-dark);flex:1">Stage: ${t.Stage||'Created'}</span>
-            </div>
-
-            <!-- Real-Time Evaluation Countdown Chips -->
-            <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px;padding:8px 10px;background:#FFF8CF;border-radius:7px;border:1px solid #FEC30D">
-              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
-                <span style="color:#92400E;font-weight:600">2-Wk Post Eval:</span>
-                ${ApolloCountdown.renderBadge(st2W)}
-              </div>
-              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
-                <span style="color:#92400E;font-weight:600">3-Mo Supervisor:</span>
-                ${ApolloCountdown.renderBadge(st3M)}
-              </div>
-            </div>
-
-            ${!isApproved ? `
-            <!-- Approval Lock Warning Chip -->
-            <div style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:#FFFBEB;border-radius:7px;margin-bottom:10px;border:1px solid #FDE68A;color:#B45309;font-size:11px">
-              <span class="icon sm" style="color:#D97706">lock</span>
-              <span>Requires ${getApprovalRoleText(appStatusStr)} approval before session creation</span>
-            </div>
-            ` : ''}
-            <!-- Actions -->
-            <div style="display:flex;gap:6px;border-top:1px solid #F1F5F9;padding-top:12px;flex-wrap:wrap">
-              <button class="btn-th btn-primary btn-sm" style="flex:1;justify-content:center" onclick="openDetail('${t.ID}')"><span class="icon sm">open_in_new</span>Open</button>
-              <button class="btn-th btn-secondary btn-sm" onclick="openParticipantManager('${t.ID}')" title="Manage Participants"><span class="icon sm">group_add</span></button>
-              ${t.trainingDataSheetUrl ? `<a class="btn-th btn-sm" style="background:#059669;color:#fff;border:none;text-decoration:none;display:inline-flex;align-items:center;gap:4px" href="${t.trainingDataSheetUrl}" target="_blank" title="Open Training Data Sheet"><span class="icon sm">table_chart</span>Data Sheet</a>` : (t.ParticipantsSheetID ? `<a class="btn-th btn-sm" style="background:#059669;color:#fff;border:none;text-decoration:none;display:inline-flex;align-items:center;gap:4px" href="${'ht' + 'tps://docs.google.com/spreadsheets/d/' + t.ParticipantsSheetID + '/edit'}" target="_blank" title="Open Training Data Sheet"><span class="icon sm">table_chart</span>Data Sheet</a>` : '')}
-              ${t.requisitionFormUrl ? `<a class="btn-th btn-secondary btn-sm" href="${t.requisitionFormUrl}" target="_blank" title="Open Requisition Form" style="text-decoration:none"><span class="icon sm">description</span>Form</a>` : (t.RequisitionFormFileID ? `<a class="btn-th btn-secondary btn-sm" href="${'ht' + 'tps://docs.google.com/spreadsheets/d/' + t.RequisitionFormFileID + '/edit'}" target="_blank" title="Open Requisition Form" style="text-decoration:none"><span class="icon sm">description</span>Form</a>` : '')}
-              ${t.folderUrl ? `<a class="btn-th btn-secondary btn-sm" href="${t.folderUrl}" target="_blank" title="Open Google Drive Workspace" style="text-decoration:none"><span class="icon sm">folder</span>Folder</a>` : (t.FolderID ? `<a class="btn-th btn-secondary btn-sm" href="${driveFolderUrl(t.FolderID)}" target="_blank" title="Open Google Drive Workspace" style="text-decoration:none"><span class="icon sm">folder</span>Folder</a>` : '')}
-              <button class="btn-th btn-secondary btn-sm" onclick="editTraining('${t.ID}')"><span class="icon sm">edit</span></button>
-              <button class="btn-th btn-danger btn-sm" onclick="confirmDeleteT('${t.ID}')"><span class="icon sm">archive</span></button>
-            </div>
-          </div>
-        </div>
-      </div>`;
-    }).join('');
+    grid.innerHTML = list.map(t => renderTrainingCardHtml(t)).join('');
   }
 
   function toDisplayDateStr(val) {
@@ -725,7 +755,7 @@
       const res = await callServer(id ? 'updateTraining' : 'addTraining', data);
       if (res && res.folderUrl) {
         const formLink = res.requisitionFormUrl
-          ? ` · <a href="${res.requisitionFormUrl}" target="_blank" style="color:white;text-decoration:underline;font-weight:600">Open Requisition Form</a>`
+          ? ` | <a href="${res.requisitionFormUrl}" target="_blank" style="color:white;text-decoration:underline;font-weight:600">Open Requisition Form</a>`
           : '';
         showToast(`Programme & Drive Workspace created! <a href="${res.folderUrl}" target="_blank" style="color:white;text-decoration:underline;font-weight:600">Open Folder</a>${formLink}`, 'success');
       } else {
@@ -780,9 +810,9 @@
     const isApproved = isTrainingApproved(t);
     const appStatusStr = t.ApprovalStatus || 'Approved';
 
-    const dataSheetUrl = t.trainingDataSheetUrl || (t.ParticipantsSheetID ? ('ht' + 'tps://docs.google.com/spreadsheets/d/' + t.ParticipantsSheetID + '/edit') : '');
-    const reqUrl       = t.requisitionFormUrl   || (t.RequisitionFormFileID ? ('ht' + 'tps://docs.google.com/spreadsheets/d/' + t.RequisitionFormFileID + '/edit') : (t.RequisitionUrl || t.BrochureURL || ''));
-    const folderUrl    = t.folderUrl            || (t.FolderID ? driveFolderUrl(t.FolderID) : '');
+    const dataSheetUrl = t.trainingDataSheetUrl || (t.ParticipantsSheetID ? ('https://docs.google.com/spreadsheets/d/' + t.ParticipantsSheetID + '/edit') : '');
+    const reqUrl       = t.requisitionFormUrl   || (t.RequisitionFormFileID ? ('https://docs.google.com/spreadsheets/d/' + t.RequisitionFormFileID + '/edit') : (t.RequisitionUrl || t.BrochureURL || ''));
+    const folderUrl    = t.folderUrl            || (t.FolderID ? ('https://drive.google.com/drive/folders/' + t.FolderID) : '');
 
     const topActions = document.getElementById('detail-top-actions');
     topActions.innerHTML = `
@@ -819,10 +849,10 @@
     const evalCountdownWidgetsHtml = `
       <div class="row g-3 mb-3">
         <div class="col-md-6">
-          ${ApolloCountdown.renderWidget(st2W, 'Level 2: 2-Week Post Training Application')}
+          ${ApolloCountdown.renderWidget(st2W, 'Training Evaluation (Must be completed within 2 weeks)')}
         </div>
         <div class="col-md-6">
-          ${ApolloCountdown.renderWidget(st3M, 'Level 3: 3-Month Supervisor Evaluation')}
+          ${ApolloCountdown.renderWidget(st3M, 'Supervisor Evaluation (3-Month Review)')}
         </div>
       </div>
     `;
@@ -873,32 +903,32 @@
     }
     const attendanceRowsHtml = flatLogs.length ? flatLogs.map(a => `
       <tr>
-        <td style="font-size:12px;color:#64748B">${a.ScanTime || a.CheckIn || '—'}</td>
-        <td style="font-family:monospace;font-size:11.5px;font-weight:700;color:#2563EB">${a.EmployeeNo || a.EmployeeID || '—'}</td>
-        <td style="font-weight:600;font-size:13px;color:#1E293B">${a.EmployeeName || '—'}</td>
-        <td style="font-size:12px;color:#64748B">${a.Department || '—'}</td>
-        <td style="font-size:12px;color:#475569">${a.Day || a.SessionName || '—'}</td>
+        <td style="font-size:12px;color:#64748B">${a.ScanTime || a.CheckIn || '-'}</td>
+        <td style="font-family:monospace;font-size:11.5px;font-weight:700;color:#2563EB">${a.EmployeeNo || a.EmployeeID || '-'}</td>
+        <td style="font-weight:600;font-size:13px;color:#1E293B">${a.EmployeeName || '-'}</td>
+        <td style="font-size:12px;color:#64748B">${a.Department || '-'}</td>
+        <td style="font-size:12px;color:#475569">${a.Day || a.SessionName || '-'}</td>
         <td>${statusBadge(a.Status || 'Present')}</td>
       </tr>
     `).join('') : '<tr><td colspan="6" style="text-align:center;color:#94A3B8;padding:30px">No attendance check-ins recorded for this training yet.</td></tr>';
 
     const level1EvalsHtml = (evals || []).length ? (evals || []).map(e => `
       <tr>
-        <td style="font-weight:600">${e.EmployeeName || e.EmployeeID || '—'}</td>
-        <td style="color:#64748B">${e.Department || '—'}</td>
-        <td style="font-weight:700;color:#2563EB">${e.AvgScore ? e.AvgScore + ' / 5' : '—'}</td>
-        <td style="color:#64748B;font-size:11px">${toDisplayDateStr(e.Timestamp || e.Date) || '—'}</td>
+        <td style="font-weight:600">${e.EmployeeName || e.EmployeeID || '-'}</td>
+        <td style="color:#64748B">${e.Department || '-'}</td>
+        <td style="font-weight:700;color:#2563EB">${e.AvgScore ? e.AvgScore + ' / 5' : '-'}</td>
+        <td style="color:#64748B;font-size:11px">${toDisplayDateStr(e.Timestamp || e.Date) || '-'}</td>
       </tr>
-    `).join('') : '<tr><td colspan="4" style="text-align:center;color:#94A3B8;padding:20px">No Level 1 evaluations submitted yet.</td></tr>';
+    `).join('') : '<tr><td colspan="4" style="text-align:center;color:#94A3B8;padding:20px">No training evaluations submitted yet.</td></tr>';
 
     const level3PostEvalsHtml = (postEvals || []).length ? (postEvals || []).map(pe => `
       <tr>
-        <td style="font-weight:600">${pe.EmployeeName || pe.EmployeeID || '—'}</td>
-        <td style="color:#64748B">${pe.SupervisorName || pe.SupervisorID || '—'}</td>
-        <td style="font-weight:700;color:#059669">${pe.CompetencyBefore || '—'} → ${pe.CompetencyAfter || '—'}</td>
-        <td style="color:#64748B;font-size:11px">${toDisplayDateStr(pe.Timestamp || pe.Date) || '—'}</td>
+        <td style="font-weight:600">${pe.EmployeeName || pe.EmployeeID || '-'}</td>
+        <td style="color:#64748B">${pe.SupervisorName || pe.SupervisorID || '-'}</td>
+        <td style="font-weight:700;color:#059669">${pe.CompetencyBefore || '-'} -> ${pe.CompetencyAfter || '-'}</td>
+        <td style="color:#64748B;font-size:11px">${toDisplayDateStr(pe.Timestamp || pe.Date) || '-'}</td>
       </tr>
-    `).join('') : '<tr><td colspan="4" style="text-align:center;color:#94A3B8;padding:20px">No 3-month post-evaluations submitted yet.</td></tr>';
+    `).join('') : '<tr><td colspan="4" style="text-align:center;color:#94A3B8;padding:20px">No supervisor post-evaluations submitted yet.</td></tr>';
 
     const content = document.getElementById('detail-full-content');
     content.innerHTML = `
@@ -940,9 +970,9 @@
         <div class="row g-3 mb-3">
           ${[
             ['Trainer / Facilitator', t.Trainer, 'person'],
-            ['Venue', t.Venue || '—', 'location_on'],
+            ['Venue', t.Venue || '-', 'location_on'],
             ['Start Date', toDisplayDateStr(t.StartDate), 'calendar_today'],
-            ['End Date', toDisplayDateStr(t.EndDate) || '—', 'event'],
+            ['End Date', toDisplayDateStr(t.EndDate) || '-', 'event'],
             ['Duration', t.Duration + ' days (' + (t.TotalHours || 8) + ' hours)', 'schedule'],
             ['Course Fee', 'RM ' + (t.CourseFee || '0.00'), 'payments'],
             ['Department / Cost Centre', t.Department || 'All Departments', 'corporate_fare'],
@@ -1109,15 +1139,15 @@
       <div class="card-th mb-4">
         <div style="margin-bottom:16px">
           <h3 style="font-size:16px;font-weight:700;color:#1E293B;margin:0 0 2px">Evaluation Forms QR Codes (Public Participant Portal)</h3>
-          <p style="font-size:12px;color:#64748B;margin:0">Shareable QR codes and direct links for Level 1 Participant & Level 3 Supervisor Post-Evaluations</p>
+          <p style="font-size:12px;color:#64748B;margin:0">Shareable QR codes and direct links for Training Evaluation & Supervisor Post-Evaluation</p>
         </div>
 
         <div class="row g-3">
-          <!-- Level 1 Participant Training Evaluation -->
+          <!-- Participant Training Evaluation -->
           <div class="col-md-6">
             <div style="border:1px solid #E2E8F0;border-radius:10px;padding:16px;background:#fff;height:100%;display:flex;flex-direction:column">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-                <span style="font-size:13px;font-weight:700;color:#1E293B">Level 1: Participant Training Evaluation</span>
+                <span style="font-size:13px;font-weight:700;color:#1E293B">Participant Training Evaluation (2-Week Deadline)</span>
                 <span class="badge-th badge-blue">Participant Form</span>
               </div>
               <p style="font-size:11.5px;color:#64748B;margin-bottom:12px">Scanned by participants upon completing training programme.</p>
@@ -1125,11 +1155,11 @@
             </div>
           </div>
 
-          <!-- Level 3 Supervisor 3-Month Post-Evaluation -->
+          <!-- Supervisor 3-Month Post-Evaluation -->
           <div class="col-md-6">
             <div style="border:1px solid #E2E8F0;border-radius:10px;padding:16px;background:#fff;height:100%;display:flex;flex-direction:column">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-                <span style="font-size:13px;font-weight:700;color:#1E293B">Level 3: Supervisor 3-Month Post Evaluation</span>
+                <span style="font-size:13px;font-weight:700;color:#1E293B">Supervisor Post Evaluation (3-Month Review)</span>
                 <span class="badge-th badge-purple">Supervisor Form</span>
               </div>
               <p style="font-size:11.5px;color:#64748B;margin-bottom:12px">Scanned/opened by supervisors 3 months post-training (${t.countdownText || 'Countdown Active'}).</p>
@@ -1165,7 +1195,7 @@
             </thead>
             <tbody>
               ${participants.length ? participants.map((p, idx) => {
-                const empId = p.EmployeeID || p.ID || p.EmployeeNo || '—';
+                const empId = p.EmployeeID || p.ID || p.EmployeeNo || '-';
                 const empName = p.EmployeeName || p.Name || empId;
                 return `
                 <tr>
@@ -1176,8 +1206,8 @@
                       <span style="font-weight:600;font-size:13px;color:#1E293B">${empName}</span>
                     </div>
                   </td>
-                  <td style="font-size:12px;color:#64748B">${p.Department || '—'}</td>
-                  <td style="font-size:12px;color:#64748B">${p.Position || '—'}</td>
+                  <td style="font-size:12px;color:#64748B">${p.Department || '-'}</td>
+                  <td style="font-size:12px;color:#64748B">${p.Position || '-'}</td>
                   <td>
                     <button class="btn-th btn-danger btn-xs" onclick="removeParticipantInFullView('${t.ID}', '${empId}')" title="Remove participant"><span class="icon sm">delete</span></button>
                   </td>
@@ -1228,12 +1258,12 @@
         </div>
       </div>
 
-      <!-- Submitted Level 1 & Level 3 Evaluation Records Card (Training Data Sheet) -->
+      <!-- Submitted Evaluation Records Card (Training Data Sheet) -->
       <div class="card-th mt-4">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
           <div>
             <h3 style="font-size:16px;font-weight:700;color:#1E293B;margin:0 0 2px">Submitted Evaluation Records (Training Data Sheet)</h3>
-            <p style="font-size:12px;color:#64748B;margin:0">Level 1 Participant Evaluations & Level 3 Supervisor Post-Evaluations</p>
+            <p style="font-size:12px;color:#64748B;margin:0">Participant Training Evaluations & Supervisor Post-Evaluations</p>
           </div>
           <button class="btn-th btn-secondary btn-sm" onclick="navTo('evaluation', {id:'${t.ID}'})">
             <span class="icon sm">rate_review</span> Open Full Evaluation Module
@@ -1241,10 +1271,10 @@
         </div>
 
         <div class="row g-3">
-          <!-- Level 1 Participant Evaluations Table -->
+          <!-- Participant Training Evaluations Table -->
           <div class="col-md-6">
             <div style="border:1px solid #E2E8F0;border-radius:8px;padding:12px;background:#fff">
-              <div style="font-size:13px;font-weight:700;color:#1E293B;margin-bottom:8px">Level 1: Submitted Participant Evaluations (${(evals || []).length})</div>
+              <div style="font-size:13px;font-weight:700;color:#1E293B;margin-bottom:8px">Submitted Participant Training Evaluations (${(evals || []).length})</div>
               <div style="overflow-x:auto">
                 <table class="table-th" style="font-size:12px">
                   <thead>
@@ -1258,14 +1288,14 @@
             </div>
           </div>
 
-          <!-- Level 3 Supervisor 3-Month Post Evaluations Table -->
+          <!-- Supervisor 3-Month Post Evaluations Table -->
           <div class="col-md-6">
             <div style="border:1px solid #E2E8F0;border-radius:8px;padding:12px;background:#fff">
-              <div style="font-size:13px;font-weight:700;color:#1E293B;margin-bottom:8px">Level 3: Submitted Supervisor Post-Evaluations (${(postEvals || []).length})</div>
+              <div style="font-size:13px;font-weight:700;color:#1E293B;margin-bottom:8px">Submitted Supervisor Post-Evaluations (${(postEvals || []).length})</div>
               <div style="overflow-x:auto">
                 <table class="table-th" style="font-size:12px">
                   <thead>
-                    <tr><th>Participant</th><th>Supervisor</th><th>Competency (Pre → Post)</th><th>Date</th></tr>
+                    <tr><th>Participant</th><th>Supervisor</th><th>Competency (Pre -> Post)</th><th>Date</th></tr>
                   </thead>
                   <tbody>
                     ${level3PostEvalsHtml}
@@ -1311,7 +1341,7 @@
 
         if (metaEl) {
           const timeStr = res.lastSync ? res.lastSync.replace('T', ' ').slice(0, 19) : 'Never';
-          metaEl.innerHTML = `Last Sync: <strong>${timeStr}</strong> | Duration: <strong>${res.lastDuration || '—'}</strong> | Trigger: <strong>${res.lastTrigger || '—'}</strong>`;
+          metaEl.innerHTML = `Last Sync: <strong>${timeStr}</strong> | Duration: <strong>${res.lastDuration || '-'}</strong> | Trigger: <strong>${res.lastTrigger || '-'}</strong>`;
         }
       }
     } catch(e) {}
@@ -1339,7 +1369,7 @@
 
 
 
-  // ─── Participant Manager Logic ───────────────────────────────────────────────
+  // --- Participant Manager Logic -----------------------------------------------
   let currentPmTrainingId = null;
   let allMasterEmployees = [];
   let pmSelectedEmpIds = new Set();
@@ -1351,7 +1381,7 @@
 
     const t = allTrainings.find(x => x.ID === trainingId);
     if (t) {
-      document.getElementById('pm-title').textContent = `Manage Participants — ${t.Code}`;
+      document.getElementById('pm-title').textContent = `Manage Participants - ${t.Code}`;
       document.getElementById('pm-sub').textContent = t.Name;
     }
 
@@ -1435,14 +1465,14 @@
         return;
       }
       el.innerHTML = list.map((p, idx) => {
-        const empId = p.EmployeeID || p.ID || p.EmployeeNo || '—';
+        const empId = p.EmployeeID || p.ID || p.EmployeeNo || '-';
         const empName = p.EmployeeName || p.Name || empId;
         return `
         <div style="display:flex;align-items:center;gap:12px;padding:9px 14px;border-bottom:1px solid #F1F5F9;background:${idx%2===0?'#fff':'#FAFAFA'}">
           <span style="font-family:monospace;font-size:11px;font-weight:700;color:#2563EB;background:#EFF6FF;padding:2px 6px;border-radius:4px">${empId}</span>
           <div style="flex:1;min-width:0">
             <strong style="font-size:13px;color:#1E293B">${empName}</strong>
-            <span style="font-size:11.5px;color:#64748B;margin-left:8px">${p.Department || ''} ${p.Position ? '· ' + p.Position : ''}</span>
+            <span style="font-size:11.5px;color:#64748B;margin-left:8px">${p.Department || ''} ${p.Position ? '| ' + p.Position : ''}</span>
           </div>
           <button class="btn-th btn-danger btn-xs" onclick="removeParticipantFromTraining('${empId}')" title="Remove participant"><span class="icon sm">delete</span></button>
         </div>
@@ -1511,6 +1541,7 @@
         <div style="display:flex;align-items:center;gap:12px;padding:9px 14px;border-bottom:1px solid #F1F5F9;background:${isChecked?'#EFF6FF':idx%2===0?'#fff':'#FAFAFA'}">
           <input type="checkbox" style="width:16px;height:16px;cursor:pointer"
                  ${isChecked?'checked':''}
+                 aria-label="Select ${escapeHtml(e.Name || e.ID)}"
                  onchange="togglePmSelection('${e.ID}', this.checked)">
           <div style="flex:1;min-width:0">
             <span style="font-family:monospace;font-size:11px;font-weight:700;color:#2563EB;background:#EFF6FF;padding:2px 6px;border-radius:4px">${e.ID}</span>
@@ -1645,6 +1676,7 @@
       setBtnLoading(btn, false, '<span class="icon sm">save</span>Save Session');
     }
   }
+  console.log("=== APOLLO TRAINING SCRIPT COMPLETE ===");
 </script>
 </body>
 </html>

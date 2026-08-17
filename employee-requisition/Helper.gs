@@ -430,8 +430,10 @@ function syncParticipantsToTrainingDriveSheet(trainingId, directParticipantsList
     if (row === -1) return;
 
     const tData = data[row - 1];
-    const folderId = tData[15]; // Column P = FolderID
-    const code     = tData[1] || trainingId;
+    const folderCol = headers.indexOf('FolderID');
+    const folderId = folderCol !== -1 ? String(tData[folderCol] || '').trim() : String(tData[15] || '').trim();
+    const codeCol   = headers.indexOf('Code');
+    const code     = (codeCol !== -1 ? String(tData[codeCol] || '').trim() : String(tData[1] || '').trim()) || trainingId;
 
     if (!folderId) return;
 
@@ -460,17 +462,17 @@ function syncParticipantsToTrainingDriveSheet(trainingId, directParticipantsList
     }));
 
     const folder = DriveApp.getFolderById(folderId);
-    const headersList = ['ID', 'TrainingID', 'EmployeeID', 'EmployeeName', 'Department', 'Position', 'AddedAt'];
     const file = getOrCreateSingleTrainingSheet(folder, code);
 
     const participantSheetIdColumn = headers.indexOf('ParticipantsSheetID') + 1;
     if (participantSheetIdColumn > 0) tSheet.getRange(row, participantSheetIdColumn).setValue(file.getId());
 
     const ss = SpreadsheetApp.openById(file.getId());
-    let sheet = ss.getSheetByName('TrainingParticipants') || ss.getActiveSheet();
+    let sheet = ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants') || ss.getActiveSheet();
 
+    const headersList = ['ID', 'TrainingID', 'EmployeeID', 'EmployeeName', 'Department', 'Position', 'AddedAt'];
     if (sheet.getLastRow() > 1) {
-      sheet.getRange(2, 1, sheet.getLastRow() - 1, headersList.length).clearContent();
+      sheet.getRange(2, 1, sheet.getLastRow() - 1, Math.max(headersList.length, sheet.getLastColumn())).clearContent();
     }
 
     if (participantsToSync.length > 0) {
@@ -774,7 +776,7 @@ function updateTrainingRequisitionSignatures(trainingId, step, sigData, targetFo
   }
 }
 
-function syncTrainingRequisitionParticipants(trainingId) {
+function syncTrainingRequisitionParticipants(trainingId, directParticipantsList) {
   try {
     const trainingSheet = getSheet('Trainings');
     if (!trainingSheet) return;
@@ -782,7 +784,7 @@ function syncTrainingRequisitionParticipants(trainingId) {
     let row = -1;
     const data = trainingSheet.getDataRange().getValues();
     for (let i = 1; i < data.length; i++) {
-      if (String(data[i][0]).trim() === String(trainingId).trim()) { row = i + 1; break; }
+      if (String(data[i][0]).trim().toLowerCase() === String(trainingId).trim().toLowerCase()) { row = i + 1; break; }
     }
     if (row === -1) return;
 
@@ -790,11 +792,23 @@ function syncTrainingRequisitionParticipants(trainingId) {
     const formId = formCol ? trainingSheet.getRange(row, formCol).getValue() : '';
     if (!formId) return;
 
-    // The per-training Training Data sheet is the sole participant source.
-    const trainingData = getTrainingDataSpreadsheet(trainingId);
-    const dataParticipantSheet = trainingData ? trainingData.getSheetByName('TrainingParticipants') : null;
-    const tpRows = dataParticipantSheet ? sheetToJson(dataParticipantSheet) : [];
-    const resolved = canonicalizeTrainingParticipants(tpRows);
+    let participantsToSync = [];
+    if (Array.isArray(directParticipantsList) && directParticipantsList.length > 0) {
+      participantsToSync = directParticipantsList;
+    } else {
+      const trainingData = getTrainingDataSpreadsheet(trainingId);
+      const dataParticipantSheet = trainingData ? (trainingData.getSheetByName('Participants') || trainingData.getSheetByName('TrainingParticipants')) : null;
+      if (dataParticipantSheet) {
+        participantsToSync = sheetToJson(dataParticipantSheet);
+      }
+    }
+
+    if (!participantsToSync || participantsToSync.length === 0) {
+      Logger.log('No participants found to sync for training ' + trainingId);
+      return;
+    }
+
+    const resolved = canonicalizeTrainingParticipants(participantsToSync);
     if (resolved.rejected.length > 0) {
       Logger.log('Skipped participant rows not found in Employees for ' + trainingId + ': ' + resolved.rejected.join(', '));
     }

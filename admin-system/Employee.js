@@ -1,8 +1,8 @@
 /**
- * Employee.gs — Employee / Participant management
+ * Employee.gs - Employee / Participant management
  */
 
-// ─── Read Master Employee List ──────────────────────────────────────────────────
+// --- Read Master Employee List --------------------------------------------------
 function getEmployees() {
   try {
     const sheet = getSheet(SHEET_NAMES.employees);

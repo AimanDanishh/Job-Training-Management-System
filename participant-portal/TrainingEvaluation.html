@@ -39,8 +39,8 @@
 
       <form onsubmit="handleVerifyEmployeeForEval(event)">
         <div class="form-group">
-          <label class="form-label">Employee ID <span class="req">*</span></label>
-          <input type="text" id="inp-eval-empid" class="form-control" placeholder="00000" required autocomplete="off">
+          <label for="inp-eval-empid" class="form-label">Employee ID <span class="req">*</span></label>
+          <input type="text" id="inp-eval-empid" class="form-control" placeholder="00000" required autocomplete="off" aria-label="Employee ID">
         </div>
 
         <button type="submit" id="btn-verify-eval-emp" class="btn-submit">
@@ -122,18 +122,18 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label">1. What was the most valuable part of the training?<br><small style="color:var(--text-secondary); font-weight:400;">Apakah bahagian latihan yang paling bernilai kepada anda?</small></label>
-          <textarea id="inp-b1" class="form-control" rows="2" placeholder="Your response..."></textarea>
+          <label for="inp-b1" class="form-label">1. What was the most valuable part of the training?<br><small style="color:var(--text-secondary); font-weight:400;">Apakah bahagian latihan yang paling bernilai kepada anda?</small></label>
+          <textarea id="inp-b1" class="form-control" rows="2" placeholder="Your response..." aria-label="What was the most valuable part of the training?"></textarea>
         </div>
 
         <div class="form-group">
-          <label class="form-label">2. What could be improved?<br><small style="color:var(--text-secondary); font-weight:400;">Apa yang boleh diperbaiki?</small></label>
-          <textarea id="inp-b2" class="form-control" rows="2" placeholder="Your response..."></textarea>
+          <label for="inp-b2" class="form-label">2. What could be improved?<br><small style="color:var(--text-secondary); font-weight:400;">Apa yang boleh diperbaiki?</small></label>
+          <textarea id="inp-b2" class="form-control" rows="2" placeholder="Your response..." aria-label="What could be improved?"></textarea>
         </div>
 
         <div class="form-group">
-          <label class="form-label">3. Suggestions for future training topics<br><small style="color:var(--text-secondary); font-weight:400;">Cadangan topik latihan akan datang</small></label>
-          <textarea id="inp-b3" class="form-control" rows="2" placeholder="Your response..."></textarea>
+          <label for="inp-b3" class="form-label">3. Suggestions for future training topics<br><small style="color:var(--text-secondary); font-weight:400;">Cadangan topik latihan akan datang</small></label>
+          <textarea id="inp-b3" class="form-control" rows="2" placeholder="Your response..." aria-label="Suggestions for future training topics"></textarea>
         </div>
 
         <button type="submit" id="btn-submit-eval" class="btn-submit" style="margin-top: 10px;">
@@ -185,7 +185,7 @@
   let activeTrainingObj = null;
 
   document.addEventListener('DOMContentLoaded', async () => {
-    activeTrainingId = getQueryParam('id') || "<?= (params && params.id) ? params.id : '' ?>";
+    activeTrainingId = getQueryParam('id') || <?!= JSON.stringify((typeof params !== 'undefined' && params && params.id) ? params.id : '') ?>;
     
     if (!activeTrainingId) {
       showErrorState('Training ID parameter missing from URL link.');

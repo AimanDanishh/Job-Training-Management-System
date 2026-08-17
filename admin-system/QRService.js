@@ -1,5 +1,5 @@
 /**
- * QRService.gs — QR Code and Attendance URL generation service using QuickChart API
+ * QRService.gs - QR Code and Attendance URL generation service using QuickChart API
  */
 
 /**

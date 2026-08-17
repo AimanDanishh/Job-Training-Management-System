@@ -1,9 +1,9 @@
 /**
- * Code.gs — Main entry point, page router, and Google Workspace Auth
+ * Code.gs - Main entry point, page router, and Google Workspace Auth
  * Place this file in your Apps Script project root.
  */
 
-// ─── Web App Entry Point ───────────────────────────────────────────────────────
+// --- Web App Entry Point -------------------------------------------------------
 function doGet(e) {
   // Normalise the query value before routing.  Apps Script passes query
   // parameters as strings, but links copied from email can contain mixed case
@@ -17,7 +17,7 @@ function doGet(e) {
   ];
 
   const safePage = allowedPages.includes(page) ? page : 'index';
-  const appTitle = getConfigProperty('APP_TITLE', 'TrainHub — Training Management System');
+  const appTitle = getConfigProperty('APP_TITLE', 'TrainHub - Training Management System');
 
   try {
     const template = HtmlService.createTemplateFromFile(safePage);
@@ -26,11 +26,11 @@ function doGet(e) {
     template.sessionParam = (e && e.parameter && e.parameter.session) ? e.parameter.session : '';
     template.queryParams = (e && e.parameter) ? JSON.stringify(e.parameter) : '{}';
     const rawPublicUrl = getPublicPortalUrl() || '';
-    template.publicPortalUrl = String(rawPublicUrl).replace(/"/g, '');
+    template.publicPortalUrl = String(rawPublicUrl);
     try {
       const rawLogo = getCompanyLogoUrl() || '';
       const directLogo = convertDriveLinkToDirectImageUrl(rawLogo) || '';
-      template.companyLogoUrl = String(directLogo).replace(/"/g, '');
+      template.companyLogoUrl = String(directLogo);
     } catch(logoErr) {
       template.companyLogoUrl = '';
     }
@@ -45,7 +45,7 @@ function doGet(e) {
   }
 }
 
-// ─── Template Include Helper ────────────────────────────────────────────────────
+// --- Template Include Helper ----------------------------------------------------
 /**
  * Include another HTML file's content (used inside templates with <?!= include('file') ?>)
  */
@@ -53,7 +53,7 @@ function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
 
-// ─── Google Workspace / Admin Auth Handler ──────────────────────────────────────
+// --- Google Workspace / Admin Auth Handler --------------------------------------
 /**
  * Verifies a Google Account against company domain and administrator requirements.
  */
@@ -135,7 +135,7 @@ function getAppUrl() {
   return ScriptApp.getService().getUrl();
 }
 
-// ─── Settings API Services ─────────────────────────────────────────────────────
+// --- Settings API Services -----------------------------------------------------
 /**
  * Returns structured configuration and system validation for the Settings UI.
  */

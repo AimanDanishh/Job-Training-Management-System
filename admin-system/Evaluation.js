@@ -1,8 +1,8 @@
 /**
- * Evaluation.gs — Training Evaluation and Post-Training (3-month) Evaluation
+ * Evaluation.gs - Training Evaluation and Post-Training (3-month) Evaluation
  */
 
-// ─── Training Evaluation ────────────────────────────────────────────────────────
+// --- Training Evaluation --------------------------------------------------------
 function getTrainingEvaluations(trainingId) {
   try {
     if (!trainingId) return ok([]);
@@ -72,7 +72,7 @@ function saveTrainingEvaluation(data) {
   }
 }
 
-// ─── Post-Training Evaluation (3-month) ────────────────────────────────────────
+// --- Post-Training Evaluation (3-month) ----------------------------------------
 function getPostEvaluations(trainingId) {
   try {
     if (trainingId) {
@@ -161,7 +161,7 @@ function savePostEvaluation(data) {
   }
 }
 
-// ─── Evaluation Summary ─────────────────────────────────────────────────────────
+// --- Evaluation Summary ---------------------------------------------------------
 function getEvaluationSummary(trainingId) {
   try {
     if (!trainingId) return ok({ evalCompleted: 0, avgScore: null, postCompleted: 0 });
@@ -326,7 +326,7 @@ function getAttendedParticipantsForPostEval(trainingId) {
 
       const empKey = empId.toLowerCase();
       const empName = String(p.EmployeeName || p.Name || empId).trim();
-      const dept = String(p.Department || p.Dept || '—').trim();
+      const dept = String(p.Department || p.Dept || '-').trim();
       const pos = String(p.Position || p.JobTitle || 'Participant').trim();
 
       // Look up attendance record by Employee ID OR Employee Name
@@ -409,7 +409,7 @@ function getAttendedParticipantsForPostEval(trainingId) {
 
             const empRecord = (directory && directory.byId && directory.byId[empKey]) || (typeof pItem === 'object' ? pItem : {});
             const empName = empRecord.Name || empRecord.EmployeeName || (typeof pItem === 'object' ? pItem.EmployeeName : pEmpId);
-            const dept = empRecord.Department || (typeof pItem === 'object' ? pItem.Department : '') || '—';
+            const dept = empRecord.Department || (typeof pItem === 'object' ? pItem.Department : '') || '-';
             const pos = empRecord.Position || (typeof pItem === 'object' ? (pItem.Position || pItem.JobTitle) : '') || 'Participant';
 
             const attendanceRecord = attRows.find(a => {
@@ -728,7 +728,7 @@ function cronCheck3MonthPostEvalNotifications() {
   }
 }
 
-// ─── Internal: auto-advance stage ──────────────────────────────────────────────
+// --- Internal: auto-advance stage ----------------------------------------------
 function tryAdvanceToEvaluationCompleted(trainingId) {
   try {
     const tSheet = getSheet(SHEET_NAMES.trainings);

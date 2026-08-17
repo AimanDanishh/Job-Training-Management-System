@@ -1,5 +1,5 @@
 /**
- * TrainingService.gs — Training programme lifecycle management service
+ * TrainingService.gs - Training programme lifecycle management service
  */
 
 /**

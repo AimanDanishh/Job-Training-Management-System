@@ -49,8 +49,8 @@
 
       <!-- Select Training Programme box -->
       <div style="margin-bottom:16px;">
-        <label class="data-label" style="font-size:13px;color:#60a5fa;">Select Training Programme to Evaluate</label>
-        <select id="postEvalTrainingSelect" class="form-control" onchange="onPostEvalTrainingSelectChange(this.value)" style="font-size:15px;padding:12px;background:#0f172a;color:#f8fafc;border-color:#3b82f6;">
+        <label for="postEvalTrainingSelect" class="data-label" style="font-size:13px;color:#60a5fa;">Select Training Programme to Evaluate</label>
+        <select id="postEvalTrainingSelect" class="form-control" onchange="onPostEvalTrainingSelectChange(this.value)" style="font-size:15px;padding:12px;background:#0f172a;color:#f8fafc;border-color:#3b82f6;" aria-label="Select Training Programme to Evaluate">
           <option value="">-- Loading available training programmes... --</option>
         </select>
       </div>
@@ -60,8 +60,8 @@
 
       <!-- Pending Participants selection box -->
       <div style="margin-bottom:20px;">
-        <label class="data-label" style="font-size:13px;color:#60a5fa;">Select Participant To Evaluate (Assigned / Under your Cost Centre)</label>
-        <select id="participantSelect" class="form-control" onchange="onParticipantSelectChange()" style="font-size:15px;padding:12px;">
+        <label for="participantSelect" class="data-label" style="font-size:13px;color:#60a5fa;">Select Participant To Evaluate (Assigned / Under your Cost Centre)</label>
+        <select id="participantSelect" class="form-control" onchange="onParticipantSelectChange()" style="font-size:15px;padding:12px;" aria-label="Select Participant To Evaluate">
           <option value="">-- Loading pending participants... --</option>
         </select>
         <div style="font-size:12px;color:var(--text-secondary);margin-top:6px;" id="pendingStatsInfo">
@@ -77,8 +77,8 @@
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
           <div class="data-group">
-            <div class="data-label">1. Pre-Training Competency Level</div>
-            <select id="qCompetencyBefore" class="form-control">
+            <label for="qCompetencyBefore" class="data-label">1. Pre-Training Competency Level</label>
+            <select id="qCompetencyBefore" class="form-control" aria-label="Pre-Training Competency Level">
               <option value="1 - Novice">1 - Novice (Basic awareness)</option>
               <option value="2 - Advanced Beginner">2 - Advanced Beginner (Limited experience)</option>
               <option value="3 - Competent" selected>3 - Competent (Capable performance)</option>
@@ -88,8 +88,8 @@
           </div>
 
           <div class="data-group">
-            <div class="data-label">2. Post-Training Competency Level (3 Months After)</div>
-            <select id="qCompetencyAfter" class="form-control">
+            <label for="qCompetencyAfter" class="data-label">2. Post-Training Competency Level (3 Months After)</label>
+            <select id="qCompetencyAfter" class="form-control" aria-label="Post-Training Competency Level">
               <option value="1 - Novice">1 - Novice</option>
               <option value="2 - Advanced Beginner">2 - Advanced Beginner</option>
               <option value="3 - Competent">3 - Competent</option>
@@ -101,8 +101,8 @@
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
           <div class="data-group">
-            <div class="data-label">3. Observed Performance Improvement</div>
-            <select id="qImprovement" class="form-control">
+            <label for="qImprovement" class="data-label">3. Observed Performance Improvement</label>
+            <select id="qImprovement" class="form-control" aria-label="Observed Performance Improvement">
               <option value="High" selected>High (Clear productivity gains)</option>
               <option value="Moderate">Moderate (Noticeable improvement)</option>
               <option value="Slight">Slight (Minimal change)</option>
@@ -111,8 +111,8 @@
           </div>
 
           <div class="data-group">
-            <div class="data-label">4. Can Apply Knowledge To Current Work?</div>
-            <select id="qCanApply" class="form-control">
+            <label for="qCanApply" class="data-label">4. Can Apply Knowledge To Current Work?</label>
+            <select id="qCanApply" class="form-control" aria-label="Can Apply Knowledge To Current Work?">
               <option value="Yes" selected>Yes - Fully Applicable</option>
               <option value="Partially">Partially Applicable</option>
               <option value="No">No - Not Applicable</option>
@@ -121,13 +121,13 @@
         </div>
 
         <div class="data-group" style="margin-bottom:20px;">
-          <div class="data-label">5. Further Training / Coaching Recommendation</div>
-          <input type="text" id="qFurtherTraining" class="form-control" placeholder="e.g. Advanced Certification, On-the-job refresher..." value="No further training needed at this stage">
+          <label for="qFurtherTraining" class="data-label">5. Further Training / Coaching Recommendation</label>
+          <input type="text" id="qFurtherTraining" class="form-control" placeholder="e.g. Advanced Certification, On-the-job refresher..." value="No further training needed at this stage" aria-label="Further Training / Coaching Recommendation">
         </div>
 
         <div class="data-group" style="margin-bottom:24px;">
-          <div class="data-label">6. HOD Overall Comments & Impact Assessment</div>
-          <textarea id="qComments" class="form-control" rows="3" placeholder="Describe the participant's application of training skills..."></textarea>
+          <label for="qComments" class="data-label">6. HOD Overall Comments & Impact Assessment</label>
+          <textarea id="qComments" class="form-control" rows="3" placeholder="Describe the participant's application of training skills..." aria-label="HOD Overall Comments & Impact Assessment"></textarea>
         </div>
 
         <button class="btn btn-approve" style="width:100%;padding:14px;font-size:16px;" onclick="submitEvaluation()">

@@ -39,8 +39,8 @@
 
       <form onsubmit="handleVerifyEvaluator(event)">
         <div class="form-group">
-          <label class="form-label">Supervisor / PIC Employee ID <span class="req">*</span></label>
-          <input type="text" id="inp-evaluator-empid" class="form-control" placeholder="00000" required autocomplete="off">
+          <label for="inp-evaluator-empid" class="form-label">Supervisor / PIC Employee ID <span class="req">*</span></label>
+          <input type="text" id="inp-evaluator-empid" class="form-control" placeholder="00000" required autocomplete="off" aria-label="Supervisor / PIC Employee ID">
           <p style="font-size:11.5px; color:var(--text-secondary); margin-top:6px;">ℹ️ Your email and evaluator authorization will be automatically retrieved from the employee database.</p>
         </div>
 
@@ -83,8 +83,8 @@
 
       <!-- Training & Participant Selector -->
       <div class="form-group mb-3">
-        <label class="form-label">Select Participant to Evaluate <span class="req">*</span></label>
-        <select id="sel-participant" class="form-control" onchange="handleParticipantSelectionChange()">
+        <label for="sel-participant" class="form-label">Select Participant to Evaluate <span class="req">*</span></label>
+        <select id="sel-participant" class="form-control" onchange="handleParticipantSelectionChange()" aria-label="Select Participant to Evaluate">
           <option value="">-- Select Pending Participant --</option>
         </select>
         <p style="font-size:12px; color:var(--text-secondary); margin-top:6px;" id="txt-pending-stats">
@@ -148,13 +148,13 @@
           </div>
 
           <div class="form-group mb-4">
-            <label class="form-label">5. Further Training / Coaching Recommendation</label>
-            <input type="text" id="inp-further-training" class="form-control" placeholder="e.g. Advanced Certification, On-the-job coaching..." value="No further training required at this stage">
+            <label for="inp-further-training" class="form-label">5. Further Training / Coaching Recommendation</label>
+            <input type="text" id="inp-further-training" class="form-control" placeholder="e.g. Advanced Certification, On-the-job coaching..." value="No further training required at this stage" aria-label="Further Training / Coaching Recommendation">
           </div>
 
           <div class="form-group mb-4">
-            <label class="form-label">6. Supervisor / PIC Comments & Recommendation</label>
-            <textarea id="inp-post-comments" class="form-control" rows="3" placeholder="Describe the participant's application of skills..."></textarea>
+            <label for="inp-post-comments" class="form-label">6. Supervisor / PIC Comments & Recommendation</label>
+            <textarea id="inp-post-comments" class="form-control" rows="3" placeholder="Describe the participant's application of skills..." aria-label="Supervisor / PIC Comments & Recommendation"></textarea>
           </div>
 
           <button type="submit" id="btn-submit-post" class="btn-submit">
@@ -219,8 +219,8 @@
   let pendingParticipants = [];
 
   document.addEventListener('DOMContentLoaded', () => {
-    activeTrainingId = getQueryParam('id') || "<?= (params && params.id) ? params.id : '' ?>";
-    const preEvalEmp = getQueryParam('evaluator') || getQueryParam('emp') || "<?= (params && params.evaluator || params.emp) ? (params.evaluator || params.emp) : '' ?>";
+    activeTrainingId = getQueryParam('id') || <?!= JSON.stringify((typeof params !== 'undefined' && params && params.id) ? params.id : '') ?>;
+    const preEvalEmp = getQueryParam('evaluator') || getQueryParam('emp') || <?!= JSON.stringify((typeof params !== 'undefined' && params && (params.evaluator || params.emp)) ? (params.evaluator || params.emp) : '') ?>;
 
     renderCompetencySelectors();
 

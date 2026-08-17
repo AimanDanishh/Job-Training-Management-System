@@ -3,16 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Apollo — Employees</title>
-  <script>
-    window.__TRAINHUB_PAGE__ = '<?!= currentPage ?>';
-    window.__PUBLIC_PORTAL_URL__ = '<?!= (typeof publicPortalUrl !== "undefined" && publicPortalUrl) ? publicPortalUrl : "" ?>';
-    window.__COMPANY_LOGO_URL__ = '<?!= (typeof companyLogoUrl !== "undefined" && companyLogoUrl) ? companyLogoUrl : "" ?>';
-  </script>
+  <title>Apollo - Employees</title>
   <?!= include('style') ?>
   <?!= include('script') ?>
 </head>
 <body>
+<div id="__trainhub_config__" style="display:none" data-config="<?!= encodeURIComponent(JSON.stringify({ page: currentPage || '', publicPortalUrl: (typeof publicPortalUrl !== 'undefined' && publicPortalUrl) ? publicPortalUrl : '', companyLogoUrl: (typeof companyLogoUrl !== 'undefined' && companyLogoUrl) ? companyLogoUrl : '' })) ?>"></div>
 <div class="app-shell">
   <!-- Sidebar -->
   <?!= include('sidebar') ?>
@@ -27,15 +23,18 @@
       <div class="d-flex gap-2 flex-wrap justify-content-between align-items-center mb-3">
         <div style="display:flex;gap:8px">
           <div style="position:relative">
-            <span class="icon" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94A3B8;font-size:14px">search</span>
-            <input id="search-input" class="input-th" style="padding-left:28px;width:220px" placeholder="Search employees...">
+            <label for="search-input" class="visually-hidden" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">Search employees</label>
+            <span class="icon" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94A3B8;font-size:14px" aria-hidden="true">search</span>
+            <input id="search-input" class="input-th" style="padding-left:28px;width:220px" placeholder="Search employees..." aria-label="Search employees">
           </div>
-          <select id="dept-filter" class="input-th" style="width:auto">
+          <label for="dept-filter" class="visually-hidden" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">Filter by Department</label>
+          <select id="dept-filter" class="input-th" style="width:auto" aria-label="Filter by Department">
             <option value="">All Departments</option>
             <option>Engineering</option><option>HR</option><option>Finance</option>
             <option>Operations</option><option>IT</option><option>Sales</option>
           </select>
-          <select id="status-filter" class="input-th" style="width:auto">
+          <label for="status-filter" class="visually-hidden" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">Filter by Status</label>
+          <select id="status-filter" class="input-th" style="width:auto" aria-label="Filter by Status">
             <option value="">All Status</option>
             <option>Active</option><option>Inactive</option>
           </select>
@@ -69,16 +68,16 @@
   <div class="modal-box">
     <div class="modal-header">
       <div><h3 class="modal-title" id="modal-title">Add Employee</h3><p class="modal-sub">Fill in the details below</p></div>
-      <button class="modal-close" onclick="closeModal('modal-add')">✕</button>
+      <button class="modal-close" onclick="closeModal('modal-add')"><span class="icon sm">close</span></button>
     </div>
     <input type="hidden" id="emp-id">
     <div class="row g-3">
       <div class="col-md-6">
-        <label class="label-th">Full Name <span class="required">*</span></label>
+        <label for="emp-name" class="label-th">Full Name <span class="required">*</span></label>
         <input id="emp-name" class="input-th" placeholder="Full name">
       </div>
       <div class="col-md-6">
-        <label class="label-th">Department <span class="required">*</span></label>
+        <label for="emp-dept" class="label-th">Department <span class="required">*</span></label>
         <select id="emp-dept" class="input-th">
           <option value="">Select department</option>
           <option>Engineering</option><option>HR</option><option>Finance</option>
@@ -86,21 +85,21 @@
         </select>
       </div>
       <div class="col-md-6">
-        <label class="label-th">Position</label>
+        <label for="emp-position" class="label-th">Position</label>
         <input id="emp-position" class="input-th" placeholder="Job title">
       </div>
       <div class="col-md-6">
-        <label class="label-th">Status</label>
+        <label for="emp-status" class="label-th">Status</label>
         <select id="emp-status" class="input-th">
           <option>Active</option><option>Inactive</option>
         </select>
       </div>
       <div class="col-md-6">
-        <label class="label-th">Email</label>
+        <label for="emp-email" class="label-th">Email</label>
         <input id="emp-email" class="input-th" type="email" placeholder="email@company.com">
       </div>
       <div class="col-md-6">
-        <label class="label-th">Phone</label>
+        <label for="emp-phone" class="label-th">Phone</label>
         <input id="emp-phone" class="input-th" placeholder="+60 1X-XXXXXXXX">
       </div>
     </div>
@@ -115,10 +114,15 @@
 <script>
   let allEmployees = [];
 
-  document.addEventListener('DOMContentLoaded', loadEmployees);
-  document.getElementById('search-input').addEventListener('input', filterTable);
-  document.getElementById('dept-filter').addEventListener('change', filterTable);
-  document.getElementById('status-filter').addEventListener('change', filterTable);
+  onReady(() => {
+    loadEmployees();
+    const sInput = document.getElementById('search-input');
+    const dFilter = document.getElementById('dept-filter');
+    const stFilter = document.getElementById('status-filter');
+    if (sInput) sInput.addEventListener('input', filterTable);
+    if (dFilter) dFilter.addEventListener('change', filterTable);
+    if (stFilter) stFilter.addEventListener('change', filterTable);
+  });
 
   async function loadEmployees() {
     try {
@@ -162,8 +166,8 @@
           </div>
         </td>
         <td style="font-size:12px;color:#64748B">${e.Department}</td>
-        <td style="font-size:12px;color:#64748B">${e.Position || '—'}</td>
-        <td style="font-size:12px;color:#64748B">${e.Email || '—'}</td>
+        <td style="font-size:12px;color:#64748B">${e.Position || '-'}</td>
+        <td style="font-size:12px;color:#64748B">${e.Email || '-'}</td>
         <td>${statusBadge(e.Status || 'Active')}</td>
         <td>
           <div style="display:flex;gap:4px">

@@ -3,16 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Apollo — Dashboard</title>
-  <script>
-    window.__TRAINHUB_PAGE__ = '<?!= currentPage ?>';
-    window.__PUBLIC_PORTAL_URL__ = '<?!= (typeof publicPortalUrl !== "undefined" && publicPortalUrl) ? publicPortalUrl : "" ?>';
-    window.__COMPANY_LOGO_URL__ = '<?!= (typeof companyLogoUrl !== "undefined" && companyLogoUrl) ? companyLogoUrl : "" ?>';
-  </script>
+  <title>Apollo - Dashboard</title>
   <?!= include('style') ?>
   <?!= include('script') ?>
 </head>
 <body>
+<div id="__trainhub_config__" style="display:none" data-config="<?!= encodeURIComponent(JSON.stringify({ page: currentPage || '', publicPortalUrl: (typeof publicPortalUrl !== 'undefined' && publicPortalUrl) ? publicPortalUrl : '', companyLogoUrl: (typeof companyLogoUrl !== 'undefined' && companyLogoUrl) ? companyLogoUrl : '' })) ?>"></div>
 <div class="app-shell">
   <!-- Sidebar -->
   <?!= include('sidebar') ?>
@@ -41,7 +37,7 @@
             <div class="d-flex align-items-center gap-2 mb-2">
               <span class="icon filled md" style="color:#E91C2D">school</span>
             </div>
-            <div class="stat-value" style="color:#E91C2D" id="kpi-total">—</div>
+            <div class="stat-value" style="color:#E91C2D" id="kpi-total">-</div>
             <div class="stat-label">Total Programmes</div>
           </div>
         </div>
@@ -50,7 +46,7 @@
             <div class="d-flex align-items-center gap-2 mb-2">
               <span class="icon filled md" style="color:#D97706">event</span>
             </div>
-            <div class="stat-value" style="color:#D97706" id="kpi-upcoming">—</div>
+            <div class="stat-value" style="color:#D97706" id="kpi-upcoming">-</div>
             <div class="stat-label">Upcoming</div>
           </div>
         </div>
@@ -59,7 +55,7 @@
             <div class="d-flex align-items-center gap-2 mb-2">
               <span class="icon filled md" style="color:#2563EB">sync</span>
             </div>
-            <div class="stat-value" style="color:#2563EB" id="kpi-ongoing">—</div>
+            <div class="stat-value" style="color:#2563EB" id="kpi-ongoing">-</div>
             <div class="stat-label">In Progress</div>
           </div>
         </div>
@@ -68,7 +64,7 @@
             <div class="d-flex align-items-center gap-2 mb-2">
               <span class="icon filled md" style="color:#16A34A">task_alt</span>
             </div>
-            <div class="stat-value" style="color:#16A34A" id="kpi-completed">—</div>
+            <div class="stat-value" style="color:#16A34A" id="kpi-completed">-</div>
             <div class="stat-label">Completed</div>
           </div>
         </div>
@@ -77,7 +73,7 @@
             <div class="d-flex align-items-center gap-2 mb-2">
               <span class="icon filled md" style="color:#E91C2D">rate_review</span>
             </div>
-            <div class="stat-value" style="color:#E91C2D" id="kpi-eval">—</div>
+            <div class="stat-value" style="color:#E91C2D" id="kpi-eval">-</div>
             <div class="stat-label">Pending Eval</div>
           </div>
         </div>
@@ -86,7 +82,7 @@
             <div class="d-flex align-items-center gap-2 mb-2">
               <span class="icon filled md" style="color:#7C3AED">timeline</span>
             </div>
-            <div class="stat-value" style="color:#7C3AED" id="kpi-post">—</div>
+            <div class="stat-value" style="color:#7C3AED" id="kpi-post">-</div>
             <div class="stat-label">Pending 3-Mo Review</div>
           </div>
         </div>
@@ -168,7 +164,7 @@
               <span class="icon filled" style="color:#DC2626">storage</span>
             </div>
             <div>
-              <div style="font-size:14px; font-weight:700; color:#991B1B">⚠️ Database Connection Attention Required</div>
+              <div style="font-size:14px; font-weight:700; color:#991B1B">   Database Connection Attention Required</div>
               <div style="font-size:12.5px; color:#7F1D1D" id="db-config-banner-text">Master Spreadsheet ID is not configured. Please paste your Spreadsheet ID in System Settings.</div>
             </div>
           </div>
@@ -186,7 +182,7 @@
               <span class="icon filled" style="color:#D97706">notifications_active</span>
             </div>
             <div>
-              <div style="font-size:14px; font-weight:700; color:#92400E">⏰ 3-Month Post-Training Evaluation Reminder</div>
+              <div style="font-size:14px; font-weight:700; color:#92400E">[DUE] 3-Month Post-Training Evaluation Reminder</div>
               <div style="font-size:12.5px; color:#B45309" id="noti-6month-text">Some training programmes have reached the 3-month milestone and require supervisor post-evaluations.</div>
             </div>
           </div>
@@ -235,7 +231,7 @@
           <div class="card-th card-th-p0" style="height:100%">
             <div class="card-header-row">
               <span style="font-size:14px;font-weight:700;color:#1E293B">Recent System Activities</span>
-              <span style="font-size:11px;color:#22C55E;font-weight:600">● Live Updates</span>
+              <span style="font-size:11px;color:#22C55E;font-weight:600">* Live Updates</span>
             </div>
             <div id="activity-feed" style="padding:4px 0">
               <div class="p-4 text-center" style="color:#94A3B8"><div class="spinner mb-2"></div><br>Loading recent activities...</div>
@@ -260,7 +256,7 @@
     return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
   }
 
-  document.addEventListener('DOMContentLoaded', () => {
+  onReady(() => {
     const hdrEl = document.getElementById('dashboard-header-date');
     if (hdrEl) hdrEl.textContent = formatMinimalistDate(new Date());
 
@@ -341,12 +337,12 @@
       return;
     }
     el.innerHTML = list.map((p, i) => {
-      const startFormatted = formatMinimalistDate(p.StartDate) || p.StartDate || '—';
+      const startFormatted = formatMinimalistDate(p.StartDate) || p.StartDate || '-';
       const endFormatted   = formatMinimalistDate(p.EndDate) || p.EndDate || '';
-      const dateDisplay    = endFormatted && endFormatted !== startFormatted ? `${startFormatted} — ${endFormatted}` : startFormatted;
+      const dateDisplay    = endFormatted && endFormatted !== startFormatted ? `${startFormatted} - ${endFormatted}` : startFormatted;
 
-      const dataSheetUrl = p.trainingDataSheetUrl || (p.ParticipantsSheetID ? ('ht' + 'tps://docs.google.com/spreadsheets/d/' + p.ParticipantsSheetID + '/edit') : '');
-      const reqUrl       = p.requisitionFormUrl   || (p.RequisitionFormFileID ? ('ht' + 'tps://docs.google.com/spreadsheets/d/' + p.RequisitionFormFileID + '/edit') : (p.RequisitionUrl || p.BrochureURL || ''));
+      const dataSheetUrl = p.trainingDataSheetUrl || (p.ParticipantsSheetID ? ('https://docs.google.com/spreadsheets/d/' + p.ParticipantsSheetID + '/edit') : '');
+      const reqUrl       = p.requisitionFormUrl   || (p.RequisitionFormFileID ? ('https://docs.google.com/spreadsheets/d/' + p.RequisitionFormFileID + '/edit') : (p.RequisitionUrl || p.BrochureURL || ''));
 
       const compDate = p.EndDate || p.StartDate;
       const isCompleted = ['Training Completed','Evaluation Completed','Waiting for 3-Month Review','Programme Closed','Completed'].includes(p.Stage || p.Status);
@@ -362,7 +358,7 @@
           </div>
           <div style="flex:1;min-width:0;cursor:pointer" onclick="navTo('training', {id:'${p.ID}'})">
             <div style="font-size:13px;font-weight:700;color:var(--apollo-dark);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.Name}</div>
-            <div style="font-size:11.5px;color:#64748B;margin-top:2px">${p.Code} · ${dateDisplay}</div>
+            <div style="font-size:11.5px;color:#64748B;margin-top:2px">${p.Code} | ${dateDisplay}</div>
           </div>
           <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;flex-wrap:wrap">
             ${dataSheetUrl ? `<a href="${dataSheetUrl}" target="_blank" onclick="event.stopPropagation()" class="btn-th btn-xs" style="background:#059669;color:#fff;border:none;text-decoration:none;display:inline-flex;align-items:center;gap:3px" title="Open Training Data Sheet"><span class="icon sm">table_chart</span>Sheet</a>` : ''}
@@ -386,7 +382,7 @@
 
     const items = trainings.slice(0, 5).map(t => ({
       title: `Programme Created: ${t.Name}`,
-      sub: `${t.Code} · Stage: ${t.Stage || 'Created'}`,
+      sub: `${t.Code} | Stage: ${t.Stage || 'Created'}`,
       icon: 'school',
       color: '#2563EB',
       time: formatMinimalistDate(t.CreatedDate || t.StartDate) || 'Recently'

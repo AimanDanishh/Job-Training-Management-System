@@ -3,12 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Apollo — Evaluation Dashboard</title>
-  <script>
-    window.__TRAINHUB_PAGE__ = '<?!= currentPage ?>';
-    window.__PUBLIC_PORTAL_URL__ = '<?!= (typeof publicPortalUrl !== "undefined" && publicPortalUrl) ? publicPortalUrl : "" ?>';
-    window.__COMPANY_LOGO_URL__ = '<?!= (typeof companyLogoUrl !== "undefined" && companyLogoUrl) ? companyLogoUrl : "" ?>';
-  </script>
+  <title>Apollo - Evaluation Dashboard</title>
   <?!= include('style') ?>
   <?!= include('script') ?>
   <style>
@@ -24,6 +19,7 @@
   </style>
 </head>
 <body>
+<div id="__trainhub_config__" style="display:none" data-config="<?!= encodeURIComponent(JSON.stringify({ page: currentPage || '', publicPortalUrl: (typeof publicPortalUrl !== 'undefined' && publicPortalUrl) ? publicPortalUrl : '', companyLogoUrl: (typeof companyLogoUrl !== 'undefined' && companyLogoUrl) ? companyLogoUrl : '' })) ?>"></div>
 <div class="app-shell">
   <!-- Sidebar -->
   <?!= include('sidebar') ?>
@@ -38,9 +34,9 @@
       <div class="card-th mb-4">
         <div class="row g-3 align-items-end">
           <div class="col-md-6">
-            <label class="label-th">Select Training Programme</label>
-            <select id="sel-eval-t" class="input-th" onchange="loadEvaluations()">
-              <option value="">— Select a training programme —</option>
+            <label for="sel-eval-t" class="label-th">Select Training Programme</label>
+            <select id="sel-eval-t" class="input-th" onchange="loadEvaluations()" aria-label="Select Training Programme">
+              <option value="">- Select a training programme -</option>
             </select>
           </div>
           <div class="col-md-3">
@@ -55,35 +51,38 @@
       <!-- Real-Time Evaluation Countdown Banner (Updates dynamically per active tab) -->
       <div id="eval-countdown-banner" class="mb-4" style="display:none"></div>
 
-      <!-- Sub-tabs (3 Distinct Evaluation Tabs) -->
+      <!-- Sub-tabs (2 Unified Evaluation Tabs) -->
       <div class="subtab-row" id="eval-subtabs" style="display:none">
-        <button class="subtab active" data-tab="training-eval" onclick="switchTab(this)"><span class="icon sm">rate_review</span>Level 1: Training Evaluation</button>
-        <button class="subtab" data-tab="post-eval" onclick="switchTab(this)"><span class="icon sm">timelapse</span>Level 2: 2-Week Post Evaluation</button>
-        <button class="subtab" data-tab="supervisor-eval" onclick="switchTab(this)"><span class="icon sm">supervised_user_circle</span>Level 3: 3-Month Supervisor Evaluation</button>
+        <button class="subtab active" data-tab="training-eval" onclick="switchTab(this)"><span class="icon sm">rate_review</span>Training Evaluation (2-Week Deadline)</button>
+        <button class="subtab" data-tab="supervisor-eval" onclick="switchTab(this)"><span class="icon sm">supervised_user_circle</span>Supervisor Evaluation (3-Month Review)</button>
       </div>
 
-      <!-- ═════════════════════════════════════════════════════════════════════════
-           Tab 1: Training Evaluation (Level 1)
-           ═════════════════════════════════════════════════════════════════════════ -->
+      <!-- =========================================================================
+           Tab 1: Training Evaluation (2-Week Deadline)
+           ========================================================================= -->
       <div id="tab-training-eval">
-        <!-- Level 1 QR & Link Box -->
+        <!-- 2-Week Countdown Widget Container -->
+        <div id="training-eval-2week-widget" class="mb-3"></div>
+
+        <!-- Participant Evaluation QR & Link Box -->
         <div id="eval-l1-qr-box" class="card-th mb-3" style="display:none;background:#FFF8CF;border-color:#FEC30D">
           <div class="row align-items-center g-3">
             <div class="col-auto">
               <div id="eval-qr-wrap-l1"></div>
             </div>
             <div class="col">
-              <div style="font-size:14px;font-weight:800;color:var(--apollo-dark);margin-bottom:2px">Participant Training Evaluation Link (Level 1)</div>
-              <div style="font-size:12px;color:var(--apollo-gray-600);margin-bottom:10px">Direct QR code & link for participants to evaluate course effectiveness and trainer delivery immediately after the training session.</div>
+              <div style="font-size:14px;font-weight:800;color:var(--apollo-dark);margin-bottom:2px">Participant Training Evaluation Link (2-Week Deadline)</div>
+              <div style="font-size:12px;color:var(--apollo-gray-600);margin-bottom:10px">Direct QR code & link for participants to evaluate course effectiveness and trainer delivery. Must be answered within 2 weeks after training completion.</div>
               <div style="display:flex;gap:8px;flex-wrap:wrap">
                 <button class="btn-th btn-secondary btn-sm" onclick="copyEvalUrl('l1')"><span class="icon sm">content_copy</span> Copy Link</button>
-                <button class="btn-th btn-primary btn-sm" onclick="downloadQRWithLogo(activeEvalUrls.l1, 'Apollo_Level1_Eval_QR.png')"><span class="icon sm">download</span> Download QR Code</button>
+                <button class="btn-th btn-primary btn-sm" onclick="downloadQRWithLogo(activeEvalUrls.l1, 'Apollo_Training_Eval_QR.png')"><span class="icon sm">download</span> Download QR Code</button>
                 <button class="btn-th btn-secondary btn-sm" onclick="openModal('modal-eval')"><span class="icon sm">add_circle</span> Manual Input</button>
               </div>
             </div>
           </div>
         </div>
 
+        <!-- Evaluation Summary Metrics -->
         <div class="row g-3 mb-3" id="eval-summary" style="display:none">
           <div class="col-md-4">
             <div class="card-th" style="background:#F0FDF4;border-color:#BBF7D0">
@@ -93,7 +92,7 @@
           </div>
           <div class="col-md-4">
             <div class="card-th" style="background:#FFF8CF;border-color:#FEC30D">
-              <div class="stat-value" style="color:#92400E" id="e-avg">—</div>
+              <div class="stat-value" style="color:#92400E" id="e-avg">-</div>
               <div class="stat-label">Average Evaluation Score</div>
             </div>
           </div>
@@ -105,31 +104,12 @@
           </div>
         </div>
 
-        <div class="card-th card-th-p0">
-          <div style="padding:16px 20px;border-bottom:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center">
-            <h4 style="font-size:14px;font-weight:800;color:var(--apollo-dark);margin:0">Submitted Level 1 Participant Evaluations</h4>
-          </div>
-          <div style="overflow-x:auto">
-            <table class="table-th">
-              <thead><tr><th>Employee</th><th>Department</th><th>Avg Score</th><th>Submitted At</th></tr></thead>
-              <tbody id="eval-tbody"><tr><td colspan="4" style="text-align:center;color:#94A3B8;padding:40px">Select a training to view evaluations</td></tr></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- ═════════════════════════════════════════════════════════════════════════
-           Tab 2: 2-Week Post Evaluation (Level 2)
-           ═════════════════════════════════════════════════════════════════════════ -->
-      <div id="tab-post-eval" style="display:none">
-        <!-- 2-Week Countdown Widget Container -->
-        <div id="post-eval-2week-widget" class="mb-3"></div>
-
-        <div class="card-th card-th-p0">
+        <!-- Participant 2-Week Evaluation Status Table -->
+        <div class="card-th card-th-p0 mb-4">
           <div style="padding:16px 20px;border-bottom:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
             <div>
-              <h4 style="font-size:14px;font-weight:800;color:var(--apollo-dark);margin:0">2-Week Post-Training Evaluation Participant Status</h4>
-              <p style="font-size:11.5px;color:var(--apollo-gray-500);margin:2px 0 0">2-week post-training assessment to verify immediate practical application of knowledge on the job.</p>
+              <h4 style="font-size:14px;font-weight:800;color:var(--apollo-dark);margin:0">Participant Training Evaluation Status (2-Week Deadline)</h4>
+              <p style="font-size:11.5px;color:var(--apollo-gray-500);margin:2px 0 0">Tracking submission status per enrolled participant. All attendees must complete within 2 weeks of training end date.</p>
             </div>
           </div>
           <div style="overflow-x:auto">
@@ -145,32 +125,45 @@
                 </tr>
               </thead>
               <tbody id="post-eval-2week-tbody">
-                <tr><td colspan="6" style="text-align:center;color:#94A3B8;padding:40px">Select a training to view 2-week post evaluation status</td></tr>
+                <tr><td colspan="6" style="text-align:center;color:#94A3B8;padding:40px">Select a training to view evaluation status</td></tr>
               </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Submitted Participant Evaluations Table -->
+        <div class="card-th card-th-p0">
+          <div style="padding:16px 20px;border-bottom:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center">
+            <h4 style="font-size:14px;font-weight:800;color:var(--apollo-dark);margin:0">Submitted Participant Evaluation Records</h4>
+          </div>
+          <div style="overflow-x:auto">
+            <table class="table-th">
+              <thead><tr><th>Employee</th><th>Department</th><th>Avg Score</th><th>Submitted At</th></tr></thead>
+              <tbody id="eval-tbody"><tr><td colspan="4" style="text-align:center;color:#94A3B8;padding:40px">Select a training to view evaluations</td></tr></tbody>
             </table>
           </div>
         </div>
       </div>
 
-      <!-- ═════════════════════════════════════════════════════════════════════════
-           Tab 3: 3-Month Supervisor Evaluation (Level 3)
-           ═════════════════════════════════════════════════════════════════════════ -->
+      <!-- =========================================================================
+           Tab 2: Supervisor Evaluation (3 Months)
+           ========================================================================= -->
       <div id="tab-supervisor-eval" style="display:none">
         <!-- 3-Month Countdown Widget Container -->
         <div id="supervisor-eval-3month-widget" class="mb-3"></div>
 
-        <!-- Level 3 QR & Link Box -->
+        <!-- Supervisor QR & Link Box -->
         <div id="eval-l3-qr-box" class="card-th mb-3" style="display:none;background:#FFF8CF;border-color:#FEC30D">
           <div class="row align-items-center g-3">
             <div class="col-auto">
               <div id="eval-qr-wrap-l3"></div>
             </div>
             <div class="col">
-              <div style="font-size:14px;font-weight:800;color:var(--apollo-dark);margin-bottom:2px">Supervisor 3-Month Evaluation Link (Level 3)</div>
+              <div style="font-size:14px;font-weight:800;color:var(--apollo-dark);margin-bottom:2px">Supervisor Evaluation Link (3 Months)</div>
               <div style="font-size:12px;color:var(--apollo-gray-600);margin-bottom:10px">Supervisors evaluate employees on behavioral competency improvement 3 months after training completion.</div>
               <div style="display:flex;gap:8px;flex-wrap:wrap">
                 <button class="btn-th btn-secondary btn-sm" onclick="copyEvalUrl('l3')"><span class="icon sm">content_copy</span> Copy Link</button>
-                <button class="btn-th btn-primary btn-sm" onclick="downloadQRWithLogo(activeEvalUrls.l3, 'Apollo_Level3_SupervisorEval_QR.png')"><span class="icon sm">download</span> Download QR Code</button>
+                <button class="btn-th btn-primary btn-sm" onclick="downloadQRWithLogo(activeEvalUrls.l3, 'Apollo_Supervisor_Eval_QR.png')"><span class="icon sm">download</span> Download QR Code</button>
                 <button class="btn-th btn-secondary btn-sm" onclick="openModal('modal-post-eval')"><span class="icon sm">add_circle</span> Manual Input</button>
               </div>
             </div>
@@ -226,7 +219,10 @@
             <table class="table-th">
               <thead>
                 <tr>
-                  <th style="width:36px; text-align:center"><input type="checkbox" id="chk-post-select-all" onchange="toggleSelectAllPostEvalRows(this.checked)"></th>
+                  <th style="width:36px; text-align:center">
+                    <label for="chk-post-select-all" class="visually-hidden" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">Select all participants</label>
+                    <input type="checkbox" id="chk-post-select-all" onchange="toggleSelectAllPostEvalRows(this.checked)" aria-label="Select all participants">
+                  </th>
                   <th>Participant</th>
                   <th>Department</th>
                   <th>Attendance Status</th>
@@ -270,20 +266,20 @@
     <input type="hidden" id="eval-tid">
     <div class="row g-2 mb-3">
       <div class="col-md-6 autocomplete-wrapper">
-        <label class="label-th">Employee ID</label>
-        <input id="eval-empid" class="input-th" placeholder="00000" autocomplete="off">
+        <label for="eval-empid" class="label-th">Employee ID</label>
+        <input id="eval-empid" class="input-th" placeholder="00000" autocomplete="off" aria-label="Employee ID">
         <div id="eval-empid-drop" class="autocomplete-dropdown" style="display:none"></div>
       </div>
       <div class="col-md-6 autocomplete-wrapper">
-        <label class="label-th">Employee Name</label>
-        <input id="eval-empname" class="input-th" placeholder="Full name" autocomplete="off">
+        <label for="eval-empname" class="label-th">Employee Name</label>
+        <input id="eval-empname" class="input-th" placeholder="Full name" autocomplete="off" aria-label="Employee Name">
         <div id="eval-empname-drop" class="autocomplete-dropdown" style="display:none"></div>
       </div>
     </div>
 
     <!-- Section A -->
     <div style="background:#FFF8CF;border-radius:10px;padding:14px 16px;margin-bottom:20px;border:1px solid #FEC30D">
-      <h4 style="font-size:13px;font-weight:700;color:var(--apollo-dark);margin:0 0 4px">Section A — Programme Assessment</h4>
+      <h4 style="font-size:13px;font-weight:700;color:var(--apollo-dark);margin:0 0 4px">Section A - Programme Assessment</h4>
       <p style="font-size:11.5px;color:#92400E;margin:0">Rate each statement: 1 = Strongly Disagree, 5 = Strongly Agree</p>
     </div>
 
@@ -291,18 +287,18 @@
 
     <!-- Section B -->
     <div style="margin:20px 0 14px">
-      <h4 style="font-size:13px;font-weight:700;color:var(--apollo-dark);margin:0 0 14px">Section B — Open Feedback</h4>
+      <h4 style="font-size:13px;font-weight:700;color:var(--apollo-dark);margin:0 0 14px">Section B - Open Feedback</h4>
       <div style="display:flex;flex-direction:column;gap:14px">
         <div>
-          <label class="label-th">1. What was the most valuable part of the training?<br><small style="font-weight:400;color:#94A3B8">Apakah bahagian latihan yang paling bernilai kepada anda?</small></label>
+          <label for="eval-b1" class="label-th">1. What was the most valuable part of the training?<br><small style="font-weight:400;color:#94A3B8">Apakah bahagian latihan yang paling bernilai kepada anda?</small></label>
           <textarea id="eval-b1" class="input-th" rows="2" placeholder="Your response..."></textarea>
         </div>
         <div>
-          <label class="label-th">2. What could be improved?<br><small style="font-weight:400;color:#94A3B8">Apa yang boleh diperbaiki?</small></label>
+          <label for="eval-b2" class="label-th">2. What could be improved?<br><small style="font-weight:400;color:#94A3B8">Apa yang boleh diperbaiki?</small></label>
           <textarea id="eval-b2" class="input-th" rows="2" placeholder="Your response..."></textarea>
         </div>
         <div>
-          <label class="label-th">3. Future training suggestions<br><small style="font-weight:400;color:#94A3B8">Cadangan topik latihan akan datang</small></label>
+          <label for="eval-b3" class="label-th">3. Future training suggestions<br><small style="font-weight:400;color:#94A3B8">Cadangan topik latihan akan datang</small></label>
           <textarea id="eval-b3" class="input-th" rows="2" placeholder="Your response..."></textarea>
         </div>
       </div>
@@ -325,17 +321,17 @@
     <input type="hidden" id="post-tid">
     <div class="row g-2 mb-3">
       <div class="col-md-6 autocomplete-wrapper">
-        <label class="label-th">Employee ID</label>
-        <input id="post-empid" class="input-th" placeholder="00000" autocomplete="off">
+        <label for="post-empid" class="label-th">Employee ID</label>
+        <input id="post-empid" class="input-th" placeholder="00000" autocomplete="off" aria-label="Employee ID">
         <div id="post-empid-drop" class="autocomplete-dropdown" style="display:none"></div>
       </div>
       <div class="col-md-6">
-        <label class="label-th">Evaluator Name</label>
+        <label for="post-evname" class="label-th">Evaluator Name</label>
         <input id="post-evname" class="input-th" placeholder="Supervisor name">
       </div>
       <div class="col-md-6 autocomplete-wrapper">
-        <label class="label-th">Evaluator Employee ID</label>
-        <input id="post-evid" class="input-th" placeholder="00000" autocomplete="off">
+        <label for="post-evid" class="label-th">Evaluator Employee ID</label>
+        <input id="post-evid" class="input-th" placeholder="00000" autocomplete="off" aria-label="Evaluator Employee ID">
         <div id="post-evid-drop" class="autocomplete-dropdown" style="display:none"></div>
       </div>
     </div>
@@ -356,7 +352,7 @@
     </div>
 
     <div style="margin-bottom:18px">
-      <label class="label-th">Additional Comments</label>
+      <label for="post-comments" class="label-th">Additional Comments</label>
       <textarea id="post-comments" class="input-th" rows="3" placeholder="Optional..."></textarea>
     </div>
 
@@ -369,7 +365,7 @@
 
 <div id="toast-container"></div>
 <script>
-  // ─── Likert questions ──────────────────────────────────────────────────────
+  // --- Likert questions ------------------------------------------------------
   const LIKERT_QS = [
     { en: 'The training objectives were clearly defined.', ms: 'Objektif latihan dinyatakan dengan jelas.' },
     { en: 'The content was relevant to my job.',           ms: 'Kandungan latihan berkaitan dengan tugas saya.' },
@@ -428,9 +424,9 @@
     if (!el) return;
     el.innerHTML = COMPETENCY.map(c => `
       <label class="radio-pill" id="${name}-${c.v}" onclick="selectComp('${name}',${c.v})">
-        <input type="radio" name="${name}" value="${c.v}" style="display:none">
+        <input type="radio" name="${name}" value="${c.v}" style="display:none" aria-label="${c.v}. ${c.l}">
         <span style="font-size:13px;font-weight:600">${c.v}. ${c.l}</span>
-        <span style="font-size:11.5px;color:#94A3B8;margin-left:4px">— ${c.d}</span>
+        <span style="font-size:11.5px;color:#94A3B8;margin-left:4px">- ${c.d}</span>
       </label>
     `).join('');
   }
@@ -451,7 +447,7 @@
         <div style="display:flex;gap:8px" id="opts-${q.id}">
           ${(opts[q.id] || ['Yes','No']).map(o => `
             <label class="radio-pill" id="opt-${q.id}-${o}" onclick="selectOpt('${q.id}','${o}')">
-              <input type="radio" name="${q.id}" value="${o}" style="display:none">${o}
+              <input type="radio" name="${q.id}" value="${o}" style="display:none" aria-label="${q.label}: ${o}">${o}
             </label>`).join('')}
         </div>
       </div>
@@ -464,68 +460,37 @@
     if (el) el.classList.add('active');
   }
 
-  // ─── Real-Time Tab & Countdown Engine Synchronizer ──────────────────────────
+  // --- Real-Time Tab & Countdown Engine Synchronizer --------------------------
   function updateEvaluationDashboardCountdowns() {
     if (!activeTrainingObj) return;
 
     const t = activeTrainingObj;
     const compDate = t.EndDate || t.StartDate;
-    const isCompleted = ['Training Completed','Evaluation Completed','Waiting for 3-Month Review','Programme Closed','Completed'].includes(t.Stage || t.Status);
+    const isCompleted = ['Training Completed','Evaluation Completed','Waiting for 3-Month Review','Programme Closed','Completed'].includes((t && t.Stage) || (t && t.Status));
     const bannerEl = document.getElementById('eval-countdown-banner');
 
     if (!bannerEl) return;
     bannerEl.style.display = 'block';
 
     if (currentActiveTab === 'training-eval') {
-      // Tab 1: Level 1 Training Evaluation Status
-      const enrolled = (window.__activeAttendedParticipants__ || []).length || t.ParticipantsCount || 0;
-      const completed = activeEvalSummary ? (activeEvalSummary.evalCompleted || 0) : 0;
-      const avg = activeEvalSummary && activeEvalSummary.avgScore ? activeEvalSummary.avgScore : '—';
-      const isL1Done = enrolled > 0 && completed >= enrolled;
-      const isL1Started = completed > 0;
-
-      let l1Status = 'waiting';
-      let l1Text = 'Not Started';
-      if (isL1Done) { l1Status = 'completed'; l1Text = 'Completed'; }
-      else if (isL1Started) { l1Status = 'approaching'; l1Text = `In Progress (${completed}/${enrolled})`; }
-      else if (isCompleted) { l1Status = 'today'; l1Text = 'Pending Evaluations'; }
-
-      bannerEl.innerHTML = `
-        <div class="card-th" style="background:#FFF8CF;border:1.5px solid #FEC30D;padding:16px 20px">
-          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
-            <div>
-              <div style="font-size:15px;font-weight:800;color:var(--apollo-dark);display:flex;align-items:center;gap:6px">
-                <span class="icon" style="color:#E91C2D">rate_review</span> Level 1: Training Evaluation Overview
-              </div>
-              <div style="font-size:12px;color:var(--apollo-gray-600);margin-top:2px">Participant feedback collected immediately post-session.</div>
-            </div>
-            <div>
-              <span class="countdown-badge cd-${l1Status}"><span class="icon sm filled">${isL1Done ? 'check_circle' : 'schedule'}</span><span>${l1Text}</span></span>
-            </div>
-          </div>
-        </div>
-      `;
-    } else if (currentActiveTab === 'post-eval') {
-      // Tab 2: 2-Week Post Evaluation Countdown
       const is2WeekDone = ['Evaluation Completed','Waiting for 3-Month Review','Programme Closed'].includes(t.Stage);
       const st = ApolloCountdown.getStatus(compDate, '2week', is2WeekDone, !isCompleted);
 
-      bannerEl.innerHTML = ApolloCountdown.renderWidget(st, 'Level 2: 2-Week Post Evaluation Countdown');
+      bannerEl.innerHTML = ApolloCountdown.renderWidget(st, 'Training Evaluation (Must be completed within 2 weeks after training)');
 
-      const widgetBox = document.getElementById('post-eval-2week-widget');
+      const widgetBox = document.getElementById('training-eval-2week-widget');
       if (widgetBox) {
-        widgetBox.innerHTML = ApolloCountdown.renderWidget(st, '2-Week Post Training Application Review');
+        widgetBox.innerHTML = ApolloCountdown.renderWidget(st, 'Training Evaluation (2-Week Deadline)');
       }
     } else if (currentActiveTab === 'supervisor-eval') {
-      // Tab 3: 3-Month Supervisor Evaluation Countdown
       const is3MoDone = ['Programme Closed'].includes(t.Stage);
       const st = ApolloCountdown.getStatus(compDate, '3month', is3MoDone, !isCompleted);
 
-      bannerEl.innerHTML = ApolloCountdown.renderWidget(st, 'Level 3: 3-Month Supervisor Evaluation Countdown');
+      bannerEl.innerHTML = ApolloCountdown.renderWidget(st, 'Supervisor Evaluation (3-Month Competency Assessment)');
 
       const widgetBox = document.getElementById('supervisor-eval-3month-widget');
       if (widgetBox) {
-        widgetBox.innerHTML = ApolloCountdown.renderWidget(st, '3-Month Supervisor Competency Assessment Timeline');
+        widgetBox.innerHTML = ApolloCountdown.renderWidget(st, 'Supervisor Evaluation (3-Month Review)');
       }
     }
   }
@@ -535,7 +500,7 @@
     btn.classList.add('active');
     currentActiveTab = btn.dataset.tab;
 
-    ['training-eval', 'post-eval', 'supervisor-eval'].forEach(id => {
+    ['training-eval', 'supervisor-eval'].forEach(id => {
       const el = document.getElementById('tab-' + id);
       if (el) el.style.display = (btn.dataset.tab === id) ? '' : 'none';
     });
@@ -544,7 +509,7 @@
 
     if (btn.dataset.tab === 'supervisor-eval') {
       renderPostEvalAssignmentTable(window.__activeAttendedParticipants__ || [], activeTrainingObj || {});
-    } else if (btn.dataset.tab === 'post-eval') {
+    } else if (btn.dataset.tab === 'training-eval') {
       render2WeekPostEvalTable(window.__activeAttendedParticipants__ || [], activeTrainingObj || {});
     }
   }
@@ -559,7 +524,7 @@
     const compDate = training ? (training.EndDate || training.StartDate) : null;
     const deadline = ApolloCountdown.calculate2WeekDeadline(compDate);
     const deadlineStr = formatMinimalistDate(deadline);
-    const isCompleted = ['Training Completed','Evaluation Completed','Waiting for 3-Month Review','Programme Closed','Completed'].includes(training?.Stage || training?.Status);
+    const isCompleted = ['Training Completed','Evaluation Completed','Waiting for 3-Month Review','Programme Closed','Completed'].includes((training && training.Stage) || (training && training.Status));
 
     tbody.innerHTML = participants.map((p, i) => {
       const isDone = Boolean(p.PostEvalCompleted || p.L2Completed);
@@ -578,7 +543,7 @@
               </div>
             </div>
           </td>
-          <td style="font-size:12px;color:var(--apollo-gray-600)">${p.Department || '—'}</td>
+          <td style="font-size:12px;color:var(--apollo-gray-600)">${p.Department || '-'}</td>
           <td><span class="badge-th badge-${attColor}">${attText}</span></td>
           <td style="font-size:12px;font-weight:600">${deadlineStr}</td>
           <td>${isDone ? '<span class="badge-th badge-green">Submitted</span>' : '<span class="badge-th badge-yellow">Pending</span>'}</td>
@@ -588,8 +553,8 @@
     }).join('');
   }
 
-  // ─── Page Init ──────────────────────────────────────────────────────────────
-  document.addEventListener('DOMContentLoaded', async () => {
+  // --- Page Init --------------------------------------------------------------
+  onReady(async () => {
     buildLikert();
     buildCompetency('comp-before', 'cb');
     buildCompetency('comp-after',  'ca');
@@ -730,7 +695,7 @@
       activeTrainingObj = tObj;
       activeEvalSummary = sum;
 
-      const sheetUrl = tObj ? (tObj.trainingDataSheetUrl || (tObj.ParticipantsSheetID ? ('ht' + 'tps://docs.google.com/spreadsheets/d/' + tObj.ParticipantsSheetID + '/edit') : '')) : '';
+      const sheetUrl = tObj ? (tObj.trainingDataSheetUrl || (tObj.ParticipantsSheetID ? ('https://docs.google.com/spreadsheets/d/' + tObj.ParticipantsSheetID + '/edit') : '')) : '';
       const evalSheetBtn = document.getElementById('btn-open-eval-sheet');
       if (evalSheetBtn) {
         if (sheetUrl) {
@@ -817,7 +782,7 @@
                 ID: eId,
                 EmployeeID: eId,
                 EmployeeName: eName,
-                Department: String(p.Department || p.Dept || '—').trim(),
+                Department: String(p.Department || p.Dept || '-').trim(),
                 Position: String(p.Position || p.JobTitle || 'Participant').trim(),
                 SupervisorID: supId,
                 SupervisorName: supName,
@@ -842,7 +807,7 @@
       document.getElementById('eval-tbody').innerHTML = evals.length
         ? evals.map((r, i) => `<tr>
             <td><div style="display:flex;align-items:center;gap:8px">${avatar(r.EmployeeName,27,i)}<div><div style="font-size:13px;font-weight:600;color:var(--apollo-dark)">${r.EmployeeName}</div><div style="font-size:11px;color:var(--apollo-gray-500)">${r.EmployeeID}</div></div></div></td>
-            <td style="font-size:12px;color:var(--apollo-gray-600)">—</td>
+            <td style="font-size:12px;color:var(--apollo-gray-600)">-</td>
             <td><span style="font-size:14px;font-weight:800;color:${r.AvgScore>=4?'#16A34A':r.AvgScore>=3?'#D97706':'#E91C2D'}">${Number(r.AvgScore).toFixed(1)}</span><span style="font-size:11px;color:#94A3B8"> / 5.0</span></td>
             <td style="font-size:12px;color:var(--apollo-gray-600)">${r.SubmittedAt}</td>
           </tr>`).join('')
@@ -857,8 +822,8 @@
         ? posts.map((r, i) => `<tr>
             <td><div style="display:flex;align-items:center;gap:8px">${avatar(r.EmployeeID, 27, i)}<span style="font-size:13px;font-weight:600">${r.EmployeeID}</span></div></td>
             <td style="font-size:12px;color:var(--apollo-gray-600)">${r.EvaluatorName}</td>
-            <td>${COMPETENCY.find(c=>c.v==r.CompetencyBefore)?.l||r.CompetencyBefore}</td>
-            <td>${COMPETENCY.find(c=>c.v==r.CompetencyAfter)?.l||r.CompetencyAfter}</td>
+            <td>${(COMPETENCY.find(c=>c.v==r.CompetencyBefore) || {}).l || r.CompetencyBefore}</td>
+            <td>${(COMPETENCY.find(c=>c.v==r.CompetencyAfter) || {}).l || r.CompetencyAfter}</td>
             <td>${statusBadge(r.Improvement)}</td>
             <td style="font-size:12px;color:var(--apollo-gray-600)">${r.SubmittedAt}</td>
           </tr>`).join('')
@@ -892,7 +857,7 @@
       if (elAsg) elAsg.textContent = assignedCount;
     }
 
-    const isCompleted = ['Training Completed','Evaluation Completed','Waiting for 3-Month Review','Programme Closed','Completed'].includes(training?.Stage || training?.Status);
+    const isCompleted = ['Training Completed','Evaluation Completed','Waiting for 3-Month Review','Programme Closed','Completed'].includes((training && training.Stage) || (training && training.Status));
     const compDate = training ? (training.EndDate || training.StartDate) : null;
     const st3Mo = ApolloCountdown.getStatus(compDate, '3month', false, !isCompleted);
 
@@ -902,7 +867,7 @@
         : `<span class="badge-th badge-yellow"><span class="icon sm" style="font-size:12px">schedule</span> ${st3Mo.shortText || 'Locked'}</span>`;
 
       const supText = p.SupervisorName || p.SupervisorID ? `${p.SupervisorName || p.SupervisorID} (${p.SupervisorID || ''})` : '<em style="color:#94A3B8">Not Assigned</em>';
-      const emailText = p.SupervisorEmail ? `<span style="color:#E91C2D;font-size:11.5px;font-weight:600">${p.SupervisorEmail}</span>` : '—';
+      const emailText = p.SupervisorEmail ? `<span style="color:#E91C2D;font-size:11.5px;font-weight:600">${p.SupervisorEmail}</span>` : '-';
       const statusBadge = p.PostEvalCompleted
         ? `<span class="badge-th badge-green">Completed</span>`
         : (p.SupervisorID || p.SupervisorEmail ? `<span class="badge-th badge-gold">Assigned</span>` : `<span class="badge-th badge-gray">Pending</span>`);
@@ -918,17 +883,17 @@
 
       return `
         <tr style="${rowStyle}">
-          <td style="text-align:center"><input type="checkbox" class="chk-post-row" value="${p.EmployeeID}"></td>
+          <td style="text-align:center"><input type="checkbox" class="chk-post-row" value="${p.EmployeeID}" aria-label="Select ${escapedName}"></td>
           <td>
             <div style="display:flex;align-items:center;gap:8px">
               ${avatar(p.EmployeeName, 26, i)}
               <div>
                 <div style="font-size:13px;font-weight:700;color:var(--apollo-dark)">${p.EmployeeName}</div>
-                <div style="font-size:11px;color:var(--apollo-gray-500)">${p.EmployeeID} · ${p.Position || 'Participant'}</div>
+                <div style="font-size:11px;color:var(--apollo-gray-500)">${p.EmployeeID} | ${p.Position || 'Participant'}</div>
               </div>
             </div>
           </td>
-          <td style="font-size:12px;color:var(--apollo-gray-600)">${p.Department || '—'}</td>
+          <td style="font-size:12px;color:var(--apollo-gray-600)">${p.Department || '-'}</td>
           <td>${attBadge}</td>
           <td style="font-size:12.5px">${supText}</td>
           <td>${emailText}</td>
@@ -1163,8 +1128,8 @@
     </div>
     <div class="modal-body">
       <div class="mb-3" style="position:relative">
-        <label class="label-th">Search Supervisor / PIC (by Employee ID or Name)</label>
-        <input id="as-search-input" class="input-th" placeholder="Type Employee ID or Name to search directory..." autocomplete="off">
+        <label for="as-search-input" class="label-th">Search Supervisor / PIC (by Employee ID or Name)</label>
+        <input id="as-search-input" class="input-th" placeholder="Type Employee ID or Name to search directory..." autocomplete="off" aria-label="Search Supervisor by ID or Name">
         <div id="as-search-drop" class="autocomplete-drop" style="display:none"></div>
       </div>
 
@@ -1172,13 +1137,13 @@
       <input type="hidden" id="as-supervisor-name">
 
       <div class="mb-3">
-        <label class="label-th">Selected Supervisor / Name</label>
-        <input id="as-supervisor-id-name" class="input-th" placeholder="Selected supervisor will appear here..." readonly style="background:#F8FAFC; color:#334155; font-weight:600">
+        <label for="as-supervisor-id-name" class="label-th">Selected Supervisor / Name</label>
+        <input id="as-supervisor-id-name" class="input-th" placeholder="Selected supervisor will appear here..." readonly style="background:#F8FAFC; color:#334155; font-weight:600" aria-label="Selected Supervisor Name">
       </div>
 
       <div class="mb-3">
-        <label class="label-th">Supervisor Email Address <span class="required">*</span></label>
-        <input id="as-supervisor-email" class="input-th" type="email" placeholder="e.g. supervisor@apollofood.com.my">
+        <label for="as-supervisor-email" class="label-th">Supervisor Email Address <span class="required">*</span></label>
+        <input id="as-supervisor-email" class="input-th" type="email" placeholder="e.g. supervisor@apollofood.com.my" aria-label="Supervisor Email Address">
         <div style="font-size:11.5px; color:#64748B; margin-top:6px"><span class="icon sm" style="color:#D97706">lightbulb</span> The system will automatically email this supervisor when the 3-month mark is reached.</div>
       </div>
     </div>
@@ -1197,7 +1162,7 @@
     <div class="modal-header">
       <div>
         <h3 class="modal-title">Edit / Change Supervisor</h3>
-        <p class="modal-sub">Updating supervisor for <strong id="txt-edit-emp-name">—</strong></p>
+        <p class="modal-sub">Updating supervisor for <strong id="txt-edit-emp-name">-</strong></p>
       </div>
       <button class="modal-close" onclick="closeModal('modal-edit-supervisor')"><span class="icon sm">close</span></button>
     </div>
@@ -1205,8 +1170,8 @@
       <input type="hidden" id="as-single-empid">
       
       <div class="mb-3" style="position:relative">
-        <label class="label-th">Search New Supervisor / PIC (by Employee ID or Name)</label>
-        <input id="as-single-search-input" class="input-th" placeholder="Type Employee ID or Name to search directory..." autocomplete="off">
+        <label for="as-single-search-input" class="label-th">Search New Supervisor / PIC (by Employee ID or Name)</label>
+        <input id="as-single-search-input" class="input-th" placeholder="Type Employee ID or Name to search directory..." autocomplete="off" aria-label="Search New Supervisor by ID or Name">
         <div id="as-single-search-drop" class="autocomplete-drop" style="display:none"></div>
       </div>
 
@@ -1214,13 +1179,13 @@
       <input type="hidden" id="as-single-supervisor-name">
 
       <div class="mb-3">
-        <label class="label-th">Selected Supervisor / Name</label>
-        <input id="as-single-supervisor-id-name" class="input-th" placeholder="Selected supervisor will appear here..." readonly style="background:#F8FAFC; color:#334155; font-weight:600">
+        <label for="as-single-supervisor-id-name" class="label-th">Selected Supervisor / Name</label>
+        <input id="as-single-supervisor-id-name" class="input-th" placeholder="Selected supervisor will appear here..." readonly style="background:#F8FAFC; color:#334155; font-weight:600" aria-label="Selected Supervisor Name">
       </div>
 
       <div class="mb-3">
-        <label class="label-th">Supervisor Email Address <span class="required">*</span></label>
-        <input id="as-single-supervisor-email" class="input-th" type="email" placeholder="e.g. supervisor@apollofood.com.my">
+        <label for="as-single-supervisor-email" class="label-th">Supervisor Email Address <span class="required">*</span></label>
+        <input id="as-single-supervisor-email" class="input-th" type="email" placeholder="e.g. supervisor@apollofood.com.my" aria-label="Supervisor Email Address">
         <div style="font-size:11.5px; color:#64748B; margin-top:6px"><span class="icon sm" style="color:#D97706">lightbulb</span> Re-assigns the participant to the new supervisor.</div>
       </div>
     </div>

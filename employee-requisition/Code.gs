@@ -617,7 +617,7 @@ function submitEmployeeRequisition(data) {
     if (reqForm && reqForm.fileId) {
       try {
         updateTrainingRequisitionSignatures(id, 'request', requesterSigData, reqForm.fileId);
-        syncTrainingRequisitionParticipants(id);
+        syncTrainingRequisitionParticipants(id, participantsList);
       } catch(syncErr) {
         Logger.log('sync/sig error in submitEmployeeRequisition: ' + syncErr.message);
       }

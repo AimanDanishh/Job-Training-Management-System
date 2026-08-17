@@ -1,8 +1,8 @@
 /**
- * Helper.gs — Shared utilities, sheet access, script properties, and initial setup
+ * Helper.gs - Shared utilities, sheet access, script properties, and initial setup
  */
 
-// ─── Script Properties Configuration ──────────────────────────────────────────
+// --- Script Properties Configuration ------------------------------------------
 /**
  * Utility to retrieve configuration values from Apps Script Project Settings (Script Properties).
  * Falls back to default value if property is not set.
@@ -44,7 +44,7 @@ function initDefaultScriptProperties(overwriteExisting) {
     'EMPLOYEE_SPREADSHEET_ID': '',
     'ALLOWED_DOMAIN':          '',
     'ADMIN_EMAILS':            '',
-    'APP_TITLE':               'TrainHub — Training Management System',
+    'APP_TITLE':               'TrainHub - Training Management System',
     'SHEET_EMPLOYEES':         'For IT',
     'SHEET_HR_EMAIL':          'HR email',
     'SHEET_TRAININGS':         'Trainings',
@@ -343,7 +343,7 @@ const SHEET_NAMES = {
   get trainingParticipants() { return getConfigProperty('SHEET_TRAINING_PARTICIPANTS', 'Participants'); }
 };
 
-// ─── Spreadsheet Access ────────────────────────────────────────────────────────
+// --- Spreadsheet Access --------------------------------------------------------
 let _cachedSpreadsheet = null;
 function getSpreadsheet() {
   if (_cachedSpreadsheet) return _cachedSpreadsheet;
@@ -451,7 +451,7 @@ function getSheet(name) {
 
     if (!sheet) {
       if (isEmployeeSpreadsheetSheet) {
-        // Employee spreadsheet is READ-ONLY — do not modify or insert sheets
+        // Employee spreadsheet is READ-ONLY - do not modify or insert sheets
         if (allSheets.length > 0) {
           sheet = allSheets.find(s => s.getName().toLowerCase().includes('for it') || s.getName().toLowerCase().includes('employee')) || allSheets[0];
         }
@@ -475,7 +475,7 @@ function getSheet(name) {
   return sheet;
 }
 
-// ─── Sheet Headers ─────────────────────────────────────────────────────────────
+// --- Sheet Headers -------------------------------------------------------------
 function initSheetHeaders(sheet, name) {
   const headers = {
     'For IT':             ['ID', 'Name', 'Department', 'Position Title', 'Email', 'Phone', 'Status'],
@@ -852,7 +852,7 @@ function findTrainingBySessionId(sessionId) {
   return null;
 }
 
-// ─── ID Generation ─────────────────────────────────────────────────────────────
+// --- ID Generation -------------------------------------------------------------
 function generateId(prefix) {
   return prefix + '-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
 }
@@ -967,7 +967,7 @@ function sheetToJson(sheet) {
   return rows;
 }
 
-// ─── Find Row By ID ─────────────────────────────────────────────────────────────
+// --- Find Row By ID -------------------------------------------------------------
 function findRowById(sheet, id) {
   const data = sheet.getDataRange().getValues();
   for (let i = 1; i < data.length; i++) {
@@ -976,7 +976,7 @@ function findRowById(sheet, id) {
   return -1;
 }
 
-// ─── Date Helpers ───────────────────────────────────────────────────────────────
+// --- Date Helpers ---------------------------------------------------------------
 function formatDate(date) {
   if (!date) return '';
   const d = new Date(date);
@@ -998,7 +998,7 @@ function now() {
   return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm');
 }
 
-// ─── Response Helpers ───────────────────────────────────────────────────────────
+// --- Response Helpers -----------------------------------------------------------
 function ok(data) {
   return JSON.stringify({ success: true, data: data });
 }

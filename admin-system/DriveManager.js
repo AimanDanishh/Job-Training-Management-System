@@ -1,5 +1,5 @@
 /**
- * DriveManager.gs — Google Drive Workspace Automation & Form Template Population
+ * DriveManager.gs - Google Drive Workspace Automation & Form Template Population
  * Automatically creates and manages training folders, subfolder hierarchies, and template files.
  */
 
@@ -305,6 +305,22 @@ function createTrainingRequisitionForm(code, training, targetFolderId, requester
     setTemplateValue('C8:I8', training.TrainingProvider || training.Provider || training.Trainer || '');
     sheet.getRange('A10').setValue('Reasons for Training:');
     setTemplateValue('A11:I12', training.Objectives || training.Reason || '');
+
+    const partList = Array.isArray(training.ParticipantList) ? training.ParticipantList : (Array.isArray(training.participants) ? training.participants : []);
+    if (partList.length > 0) {
+      try {
+        sheet.getRange('A15:I38').clearContent();
+        partList.slice(0, 24).forEach((p, index) => {
+          const r = 15 + index;
+          setTemplateValue(`A${r}:B${r}`, p.EmployeeID || p.ID || p.EmployeeNo || '');
+          setTemplateValue(`C${r}`, p.EmployeeName || p.Name || '');
+          setTemplateValue(`D${r}:G${r}`, p.Department || p.CostCentre || '');
+          setTemplateValue(`H${r}:I${r}`, p.Position || p.JobTitle || '');
+        });
+      } catch(pErr) {
+        Logger.log('Error populating participants in form creation: ' + pErr.message);
+      }
+    }
 
     // Preserve original template header rows 39 and 40 (columns A to I) completely untouched
 

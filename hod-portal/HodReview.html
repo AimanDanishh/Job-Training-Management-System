@@ -101,8 +101,9 @@
         </div>
 
         <div class="search-box">
+          <label for="searchInput" class="visually-hidden" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">Search requests</label>
           <span class="search-icon">🔍</span>
-          <input type="text" id="searchInput" class="search-input" placeholder="Search requests..." oninput="handleSearch(this.value)">
+          <input type="text" id="searchInput" class="search-input" placeholder="Search requests..." oninput="handleSearch(this.value)" aria-label="Search requests">
         </div>
       </div>
 
@@ -276,10 +277,10 @@
 
           <!-- Section 4: Approver Remarks / Justification Input -->
           <div id="modalRemarksSection">
-            <label class="data-item-label" style="display:block;margin-bottom:6px;">
+            <label for="modalRemarksInput" class="data-item-label" style="display:block;margin-bottom:6px;">
               Approver Remarks / Comments / Justification <span style="color:var(--text-muted);font-weight:400;">(Required for Reject & Return)</span>
             </label>
-            <textarea id="modalRemarksInput" class="form-control" rows="3" placeholder="Enter remarks or feedback..."></textarea>
+            <textarea id="modalRemarksInput" class="form-control" rows="3" placeholder="Enter remarks or feedback..." aria-label="Approver Remarks or Feedback"></textarea>
           </div>
 
           <!-- Digital Stamp Container (If already stamped) -->
@@ -731,16 +732,17 @@
 
       // Participants Table
       const tbody = document.getElementById('modalParticipantsBody');
-      if (!data.participants || data.participants.length === 0) {
+      const partList = Array.isArray(data.participants) ? data.participants : [];
+      if (partList.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:16px;">No target participants specified.</td></tr>';
       } else {
-        tbody.innerHTML = data.participants.map((p, idx) => `
+        tbody.innerHTML = partList.map((p, idx) => `
           <tr>
             <td>${idx + 1}</td>
-            <td><strong>${escapeHtml(p.EmployeeID || p.ID || 'N/A')}</strong></td>
-            <td>${escapeHtml(p.EmployeeName || p.Name || 'N/A')}</td>
-            <td>${escapeHtml(p.Department || p.CostCentre || 'N/A')}</td>
-            <td>${escapeHtml(p.Position || 'Participant')}</td>
+            <td><strong>${escapeHtml(p.EmployeeID || p.EmployeeNo || p['Employee No'] || p.ID || 'N/A')}</strong></td>
+            <td>${escapeHtml(p.EmployeeName || p.Name || p['Employee Name'] || 'N/A')}</td>
+            <td>${escapeHtml(p.Department || p.CostCentre || p['Cost Centre'] || 'N/A')}</td>
+            <td>${escapeHtml(p.Position || p.JobTitle || p['Job Position'] || 'Participant')}</td>
           </tr>
         `).join('');
       }

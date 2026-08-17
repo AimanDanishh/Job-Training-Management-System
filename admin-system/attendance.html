@@ -3,12 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Apollo — Attendance</title>
-  <script>
-    window.__TRAINHUB_PAGE__ = '<?!= currentPage ?>';
-    window.__PUBLIC_PORTAL_URL__ = '<?!= (typeof publicPortalUrl !== "undefined" && publicPortalUrl) ? publicPortalUrl : "" ?>';
-    window.__COMPANY_LOGO_URL__ = '<?!= (typeof companyLogoUrl !== "undefined" && companyLogoUrl) ? companyLogoUrl : "" ?>';
-  </script>
+  <title>Apollo - Attendance</title>
   <?!= include('style') ?>
   <?!= include('script') ?>
   <style>
@@ -82,6 +77,7 @@
   </style>
 </head>
 <body>
+<div id="__trainhub_config__" style="display:none" data-config="<?!= encodeURIComponent(JSON.stringify({ page: currentPage || '', sessionParam: typeof sessionParam !== 'undefined' ? sessionParam : '', publicPortalUrl: (typeof publicPortalUrl !== 'undefined' && publicPortalUrl) ? publicPortalUrl : '', companyLogoUrl: (typeof companyLogoUrl !== 'undefined' && companyLogoUrl) ? companyLogoUrl : '' })) ?>"></div>
 
 <!-- Participant Check-In Container (Shown when QR code scanned with session param) -->
 <div id="participant-checkin-view" style="display:none; min-height: 100vh; background: #F8FAFC; padding: 20px;">
@@ -89,10 +85,10 @@
     <div class="checkin-header">
       <span class="session-badge" id="p-session-badge">Session Attendance</span>
       <h2 id="p-training-title" style="font-size:20px; font-weight:800; color:#1E293B; margin:4px 0 6px">Loading Training...</h2>
-      <h4 id="p-session-name" style="font-size:15px; font-weight:600; color:#2563EB; margin:0 0 10px">—</h4>
+      <h4 id="p-session-name" style="font-size:15px; font-weight:600; color:#2563EB; margin:0 0 10px">-</h4>
       <div style="display:flex; justify-content:center; gap:16px; font-size:12.5px; color:#64748B; background:#F1F5F9; padding:8px 14px; border-radius:8px">
-        <div><span class="icon sm" style="color:#94A3B8">calendar_today</span> <span id="p-session-date">—</span></div>
-        <div><span class="icon sm" style="color:#94A3B8">schedule</span> <span id="p-session-time">—</span></div>
+        <div><span class="icon sm" style="color:#94A3B8">calendar_today</span> <span id="p-session-date">-</span></div>
+        <div><span class="icon sm" style="color:#94A3B8">schedule</span> <span id="p-session-time">-</span></div>
       </div>
     </div>
 
@@ -105,21 +101,21 @@
     <!-- Submission Form -->
     <div id="p-form-container" style="display:none">
       <div class="mb-3">
-        <label class="label-th">Employee Number / ID <span class="required">*</span></label>
+        <label for="p-emp-no" class="label-th">Employee Number / ID <span class="required">*</span></label>
         <div style="position:relative">
-          <input id="p-emp-no" class="input-th" placeholder="00000" oninput="onEmployeeNoInput()">
+          <input id="p-emp-no" class="input-th" placeholder="00000" oninput="onEmployeeNoInput()" aria-label="Employee Number or ID">
           <div id="p-emp-dropdown" class="autocomplete-dropdown" style="display:none"></div>
         </div>
         <div style="font-size:11px; color:#94A3B8; margin-top:4px">Enter your assigned Employee ID number</div>
       </div>
 
       <div class="mb-3">
-        <label class="label-th">Full Name</label>
+        <label for="p-emp-name" class="label-th">Full Name</label>
         <input id="p-emp-name" class="input-th" placeholder="Employee Name">
       </div>
 
       <div class="mb-4">
-        <label class="label-th">Department</label>
+        <label for="p-emp-dept" class="label-th">Department</label>
         <input id="p-emp-dept" class="input-th" placeholder="Department / Cost Centre">
       </div>
 
@@ -130,17 +126,17 @@
 
     <!-- Success Feedback View -->
     <div id="p-success-container" style="display:none" class="success-card">
-      <div class="success-icon">✓</div>
+      <div class="success-icon">[OK]</div>
       <h3 style="font-size:18px; font-weight:700; color:#166534; margin:0 0 6px">Attendance Submitted!</h3>
       <p style="font-size:13px; color:#15803D; margin:0 0 16px" id="p-success-msg">Your check-in has been successfully recorded.</p>
       <div style="font-size:12px; color:#64748B; background:#ffffff; padding:10px; border-radius:8px; border:1px solid #DCFCE7">
-        Check-In Time: <strong id="p-success-time">—</strong>
+        Check-In Time: <strong id="p-success-time">-</strong>
       </div>
     </div>
 
     <!-- Error / Validation Reject View -->
     <div id="p-error-container" style="display:none" class="error-card">
-      <div class="error-icon">✕</div>
+      <div class="error-icon">[X]</div>
       <h3 style="font-size:18px; font-weight:700; color:#991B1B; margin:0 0 6px">Check-In Rejected</h3>
       <p style="font-size:13.5px; color:#B91C1C; margin:0" id="p-error-msg">Attendance submission failed.</p>
       <button class="btn-th btn-secondary btn-sm mt-3" onclick="resetCheckinForm()">Try Again</button>
@@ -164,9 +160,9 @@
       <div class="card-th mb-4">
         <div class="row g-3 align-items-end">
           <div class="col-md-6">
-            <label class="label-th">Select Training Programme</label>
-            <select id="sel-training" class="input-th" onchange="onTrainingSelect()">
-              <option value="">— Select a training —</option>
+            <label for="sel-training" class="label-th">Select Training Programme</label>
+            <select id="sel-training" class="input-th" onchange="onTrainingSelect()" aria-label="Select Training Programme">
+              <option value="">- Select a training -</option>
             </select>
           </div>
           <div class="col-md-3">
@@ -180,10 +176,10 @@
 
       <!-- Summary row -->
       <div class="row g-3 mb-4" id="att-summary" style="display:none">
-        <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-value" style="color:#22C55E" id="s-present">—</div><div class="stat-label">Present Records</div></div></div>
-        <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-value" style="color:#EF4444" id="s-absent">—</div><div class="stat-label">Absent</div></div></div>
-        <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-value" style="color:#F59E0B" id="s-late">—</div><div class="stat-label">Late</div></div></div>
-        <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-value" style="color:#2563EB" id="s-pct">—</div><div class="stat-label">Attendance Rate</div></div></div>
+        <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-value" style="color:#22C55E" id="s-present">-</div><div class="stat-label">Present Records</div></div></div>
+        <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-value" style="color:#EF4444" id="s-absent">-</div><div class="stat-label">Absent</div></div></div>
+        <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-value" style="color:#F59E0B" id="s-late">-</div><div class="stat-label">Late</div></div></div>
+        <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-value" style="color:#2563EB" id="s-pct">-</div><div class="stat-label">Attendance Rate</div></div></div>
       </div>
 
       <!-- Days / Session Accordion -->
@@ -195,24 +191,24 @@
           <h4 style="font-size:14px;font-weight:700;color:#1E293B;margin:0 0 16px">Add Manual Attendance Records</h4>
           <div class="row g-3 mb-3">
             <div class="col-md-6">
-              <label class="label-th">Training Session <span class="required">*</span></label>
-              <select id="add-session-select" class="input-th" onchange="onManualSessionSelect()">
-                <option value="">— Select session —</option>
+              <label for="add-session-select" class="label-th">Training Session <span class="required">*</span></label>
+              <select id="add-session-select" class="input-th" onchange="onManualSessionSelect()" aria-label="Training Session">
+                <option value="">- Select session -</option>
               </select>
             </div>
             <div class="col-md-3">
-              <label class="label-th">Session Date</label>
+              <label for="add-date" class="label-th">Session Date</label>
               <input id="add-date" class="input-th" type="date">
             </div>
           </div>
 
           <!-- Quick Participant Search Bar -->
           <div class="mb-3" style="background:#F8FAFC;padding:12px;border-radius:8px;border:1px solid #E2E8F0">
-            <label class="label-th" style="margin-bottom:6px">Search Participant by Name or Employee ID to Record Attendance</label>
+            <label for="manual-att-search" class="label-th" style="margin-bottom:6px">Search Participant by Name or Employee ID to Record Attendance</label>
             <div class="autocomplete-wrapper">
               <div style="position:relative">
                 <span class="icon" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94A3B8;font-size:15px">search</span>
-                <input id="manual-att-search" class="input-th" style="padding-left:32px" placeholder="Type Employee Name or Employee ID to quick add..." autocomplete="off">
+                <input id="manual-att-search" class="input-th" style="padding-left:32px" placeholder="Type Employee Name or Employee ID to quick add..." autocomplete="off" aria-label="Search Participant by Name or Employee ID">
               </div>
               <div id="manual-att-search-drop" class="autocomplete-dropdown" style="display:none"></div>
             </div>
@@ -237,13 +233,13 @@
   const STATUS_OPTIONS = ['Present','Late','Partial Attendance','Left Early','Absent'];
   const REMARK_OPTIONS = ['No remarks','Left after lunch','Medical leave','Emergency','Personal reason','Attended morning session only'];
 
-  document.addEventListener('DOMContentLoaded', async () => {
+  onReady(async () => {
     try {
       allEmployeesList = await callServer('getEmployees').catch(() => []);
       initDeptFilter();
 
       // Check if opened via QR Code scan with session parameter
-      const sessionIdParam = getQueryParam('session') || "<?!= typeof sessionParam !== 'undefined' ? sessionParam : '' ?>";
+      const sessionIdParam = getQueryParam('session') || (window.__TRAINHUB_CONFIG__ && window.__TRAINHUB_CONFIG__.sessionParam) || '';
       if (sessionIdParam) {
         // Participant QR Check-In Flow
         document.getElementById('admin-attendance-view').style.display = 'none';
@@ -271,7 +267,7 @@
     }
   });
 
-  // ─── Participant Check-In Logic ─────────────────────────────────────────────
+  // --- Participant Check-In Logic ---------------------------------------------
   async function initializeParticipantCheckin(sessionId) {
     document.getElementById('p-loading').style.display = 'block';
     document.getElementById('p-form-container').style.display = 'none';
@@ -390,7 +386,7 @@
     document.getElementById('p-form-container').style.display = 'block';
   }
 
-  // ─── Admin Attendance Logic ────────────────────────────────────────────────
+  // --- Admin Attendance Logic ------------------------------------------------
   function initDeptFilter() {
     const depts = Array.from(new Set(allEmployeesList.map(e => e.Department).filter(Boolean))).sort();
     const sel = document.getElementById('p-dept');
@@ -447,7 +443,7 @@
       searchDrop.innerHTML = matches.slice(0, 8).map(m => `
         <div class="autocomplete-item" onclick="addParticipantFromSearch('${m.ID}')">
           <div><span class="emp-code">${m.ID}</span> <strong style="margin-left:6px">${m.Name}</strong></div>
-          <span class="emp-dept">${m.Department || '—'}</span>
+          <span class="emp-dept">${m.Department || '-'}</span>
         </div>
       `).join('');
       searchDrop.style.display = 'block';
@@ -498,7 +494,7 @@
     currentTrainingParticipants = participants || [];
     document.getElementById('topbar-sub').textContent = t.Name;
 
-    const sheetUrl = t.trainingDataSheetUrl || (t.ParticipantsSheetID ? ('ht' + 'tps://docs.google.com/spreadsheets/d/' + t.ParticipantsSheetID + '/edit') : '');
+    const sheetUrl = t.trainingDataSheetUrl || (t.ParticipantsSheetID ? ('https://docs.google.com/spreadsheets/d/' + t.ParticipantsSheetID + '/edit') : '');
     const attSheetBtn = document.getElementById('btn-open-att-sheet');
     if (attSheetBtn) {
       if (sheetUrl) {
@@ -526,8 +522,8 @@
     // Populate Session Selector Dropdown with Session Name & Date ONLY
     const sSelect = document.getElementById('add-session-select');
     if (sSelect) {
-      sSelect.innerHTML = '<option value="">— Select session —</option>' + (sessions || []).map(s => `
-        <option value="${s.SessionID}" data-date="${s.SessionDate || ''}">${s.SessionName} (${s.SessionDate || '—'})</option>
+      sSelect.innerHTML = '<option value="">- Select session -</option>' + (sessions || []).map(s => `
+        <option value="${s.SessionID}" data-date="${s.SessionDate || ''}">${s.SessionName} (${s.SessionDate || '-'})</option>
       `).join('');
     }
 
@@ -553,11 +549,11 @@
              onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none'">
           <div style="width:38px;height:38px;border-radius:99px;background:#EFF6FF;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0">
             <span style="font-size:8px;font-weight:700;color:#2563EB;text-transform:uppercase">SES</span>
-            <span style="font-size:11px;font-weight:800;color:#2563EB;line-height:1">${s.SessionID || '—'}</span>
+            <span style="font-size:11px;font-weight:800;color:#2563EB;line-height:1">${s.SessionID || '-'}</span>
           </div>
           <div style="flex:1">
             <div style="display:flex;align-items:center;gap:12px;margin-bottom:5px;flex-wrap:wrap">
-              <span style="font-size:14px;font-weight:700;color:#1E293B">${s.SessionName} (${s.SessionDate || '—'})</span>
+              <span style="font-size:14px;font-weight:700;color:#1E293B">${s.SessionName} (${s.SessionDate || '-'})</span>
               <span style="font-size:12px;font-weight:700;color:${pct>=90?'#22C55E':pct>=70?'#F59E0B':'#EF4444'}">
                 ${g.presentCount}/${g.totalRecords} Present
               </span>
@@ -579,9 +575,9 @@
                   <td style="font-family:monospace;font-size:11px;color:#2563EB;font-weight:700">${r.EmployeeNo || r.EmployeeID}</td>
                   <td><div style="display:flex;align-items:center;gap:7px">${avatar(r.EmployeeName,25,i)}<span style="font-size:13px;font-weight:500">${r.EmployeeName}</span></div></td>
                   <td style="font-size:12px;color:#64748B">${r.Department}</td>
-                  <td style="font-family:monospace;font-size:12px">${r.ScanTime || r.CheckIn || '—'}</td>
+                  <td style="font-family:monospace;font-size:12px">${r.ScanTime || r.CheckIn || '-'}</td>
                   <td id="att-stat-cell-${recId}">${statusBadge(r.Status)}</td>
-                  <td id="att-rem-cell-${recId}" style="font-size:12px;color:#64748B">${r.Remarks||'—'}</td>
+                  <td id="att-rem-cell-${recId}" style="font-size:12px;color:#64748B">${r.Remarks||'-'}</td>
                   <td id="att-act-cell-${recId}">
                     <button class="btn-th btn-secondary btn-xs" onclick="editParticipantRow('${recId}', '${r.Status||'Present'}', '${safeRemarks}')">
                       <span class="icon sm">edit</span> Edit
@@ -606,13 +602,13 @@
     if (!statCell || !remCell || !actCell) return;
 
     statCell.innerHTML = `
-      <select id="edit-stat-${recId}" class="input-th" style="font-size:12px;padding:4px 8px;height:32px;width:130px">
+      <select id="edit-stat-${recId}" class="input-th" style="font-size:12px;padding:4px 8px;height:32px;width:130px" aria-label="Edit attendance status">
         ${STATUS_OPTIONS.map(s => `<option value="${s}" ${s === currentStatus ? 'selected' : ''}>${s}</option>`).join('')}
       </select>
     `;
 
     remCell.innerHTML = `
-      <input id="edit-rem-${recId}" class="input-th" style="font-size:12px;padding:4px 8px;height:32px;min-width:180px" value="${currentRemarks}" placeholder="Enter remarks...">
+      <input id="edit-rem-${recId}" class="input-th" style="font-size:12px;padding:4px 8px;height:32px;min-width:180px" value="${currentRemarks}" placeholder="Enter remarks..." aria-label="Edit attendance remarks">
     `;
 
     actCell.innerHTML = `

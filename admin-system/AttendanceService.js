@@ -1,5 +1,5 @@
 /**
- * AttendanceService.gs — Session-based Attendance service
+ * AttendanceService.gs - Session-based Attendance service
  */
 
 /**

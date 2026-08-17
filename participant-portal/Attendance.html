@@ -44,8 +44,8 @@
 
       <form onsubmit="handleVerifyEmployee(event)">
         <div class="form-group">
-          <label class="form-label">Employee ID <span class="req">*</span></label>
-          <input type="text" id="inp-emp-id" class="form-control" placeholder="00000" required autocomplete="off" oninput="onEmployeeIdTyping()">
+          <label for="inp-emp-id" class="form-label">Employee ID <span class="req">*</span></label>
+          <input type="text" id="inp-emp-id" class="form-control" placeholder="00000" required autocomplete="off" oninput="onEmployeeIdTyping()" aria-label="Employee ID">
           <div id="emp-name-preview" style="display:none; margin-top:8px; padding:8px 12px; background:var(--primary-light, #EFF6FF); border:1px solid var(--primary, #2563EB); border-radius:8px; font-size:13px; font-weight:700; color:var(--primary, #2563EB);">
             <span class="icon sm" style="margin-right:4px">person</span> Name: <span id="txt-preview-name">Lookup...</span>
           </div>
@@ -172,7 +172,7 @@
   let activeSessionObj = null;
 
   document.addEventListener('DOMContentLoaded', async () => {
-    activeSessionId = getQueryParam('session') || "<?= (params && params.session) ? params.session : '' ?>";
+    activeSessionId = getQueryParam('session') || <?!= JSON.stringify((typeof params !== 'undefined' && params && params.session) ? params.session : '') ?>;
     
     if (!activeSessionId) {
       showErrorState('Missing session parameter. Please scan a valid session QR code.');

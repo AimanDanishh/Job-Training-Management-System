@@ -1,5 +1,5 @@
 /**
- * SessionService.gs — Training Sessions management service
+ * SessionService.gs - Training Sessions management service
  */
 
 /**
