@@ -8,9 +8,9 @@ function getTrainingEvaluations(trainingId) {
     if (!trainingId) return ok([]);
     const ss = getTrainingDataSpreadsheet(trainingId);
     if (!ss) return ok([]);
-    const sheet = ss.getSheetByName('TrainingEval');
+    const sheet = ss.getSheetByName('Evaluation') || ss.getSheetByName('TrainingEval');
     if (!sheet) return ok([]);
-    const rows  = sheetToJson(sheet);
+    const rows = sheetToJson(sheet);
     return ok(rows);
   } catch (e) {
     return err(e.message);
@@ -25,9 +25,9 @@ function saveTrainingEvaluation(data) {
     const ss = getTrainingDataSpreadsheet(data.TrainingID);
     if (!ss) return err('Could not open per-training sheet for ID: ' + data.TrainingID);
 
-    let sheet = ss.getSheetByName('TrainingEval');
+    let sheet = ss.getSheetByName('Evaluation') || ss.getSheetByName('TrainingEval');
     if (!sheet) {
-      sheet = ss.insertSheet('TrainingEval');
+      sheet = ss.insertSheet('Evaluation');
       sheet.appendRow(['ID', 'TrainingID', 'EmployeeID', 'EmployeeName', 'Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6', 'Q7', 'SectionB1', 'SectionB2', 'SectionB3', 'AvgScore', 'SubmittedAt']);
       sheet.getRange('A1:P1').setFontWeight('bold').setBackground('#2563EB').setFontColor('#FFFFFF');
       sheet.setFrozenRows(1);
@@ -78,7 +78,7 @@ function getPostEvaluations(trainingId) {
     if (trainingId) {
       const ss = getTrainingDataSpreadsheet(trainingId);
       if (!ss) return ok([]);
-      const sheet = ss.getSheetByName('PostEval');
+      const sheet = ss.getSheetByName('Post Evaluation') || ss.getSheetByName('PostEval');
       if (!sheet) return ok([]);
       return ok(sheetToJson(sheet));
     }
@@ -92,7 +92,7 @@ function getPostEvaluations(trainingId) {
       if (t.ID) {
         const ss = getTrainingDataSpreadsheet(t.ID);
         if (ss) {
-          const sheet = ss.getSheetByName('PostEval');
+          const sheet = ss.getSheetByName('Post Evaluation') || ss.getSheetByName('PostEval');
           if (sheet) allPosts = allPosts.concat(sheetToJson(sheet));
         }
       }
@@ -117,9 +117,9 @@ function savePostEvaluation(data) {
     const ss = getTrainingDataSpreadsheet(data.TrainingID);
     if (!ss) return err('Could not open per-training sheet for ID: ' + data.TrainingID);
 
-    let sheet = ss.getSheetByName('PostEval');
+    let sheet = ss.getSheetByName('Post Evaluation') || ss.getSheetByName('PostEval');
     if (!sheet) {
-      sheet = ss.insertSheet('PostEval');
+      sheet = ss.insertSheet('Post Evaluation');
       sheet.appendRow(['ID', 'TrainingID', 'EmployeeID', 'EvaluatorName', 'EvaluatorID', 'CompetencyBefore', 'CompetencyAfter', 'Improvement', 'CanApply', 'FurtherTraining', 'Comments', 'SubmittedAt']);
       sheet.getRange('A1:L1').setFontWeight('bold').setBackground('#2563EB').setFontColor('#FFFFFF');
       sheet.setFrozenRows(1);
@@ -168,10 +168,10 @@ function getEvaluationSummary(trainingId) {
     const ss = getTrainingDataSpreadsheet(trainingId);
     if (!ss) return ok({ evalCompleted: 0, avgScore: null, postCompleted: 0 });
 
-    const evalSheet = ss.getSheetByName('TrainingEval');
+    const evalSheet = ss.getSheetByName('Evaluation') || ss.getSheetByName('TrainingEval');
     const evalRows  = evalSheet ? sheetToJson(evalSheet) : [];
 
-    const postSheet = ss.getSheetByName('PostEval');
+    const postSheet = ss.getSheetByName('Post Evaluation') || ss.getSheetByName('PostEval');
     const postRows  = postSheet ? sheetToJson(postSheet) : [];
 
     const scores = evalRows.map(r => Number(r.AvgScore)).filter(n => n > 0);
@@ -235,8 +235,8 @@ function assignPostEvalSupervisor(trainingId, employeeId, supervisorInput) {
     const ss = getTrainingDataSpreadsheet(cleanTId);
     if (!ss) return err('Could not open training database.');
 
-    let tpSheet = ss.getSheetByName('TrainingParticipants');
-    if (!tpSheet) return err('TrainingParticipants sheet not found for this training.');
+    let tpSheet = ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants');
+    if (!tpSheet) return err('Participants sheet not found for this training.');
 
     ensureTrainingParticipantsColumns(tpSheet);
     const tpRows = sheetToJson(tpSheet);
@@ -284,64 +284,32 @@ function ensureTrainingParticipantsColumns(sheet) {
 function getAttendedParticipantsForPostEval(trainingId) {
   try {
     if (!trainingId) return ok({ training: null, participants: [] });
-    const cleanTId = String(trainingId).trim();
 
-    // Fuzzy key extraction helpers
-    const getEmpNo = (row) => {
-      if (!row) return '';
-      const keys = Object.keys(row);
-      for (let k of ['EmployeeNo', 'EmployeeID', 'Employee No', 'Employee ID', 'EmpNo', 'EmpID', 'StaffNo', 'StaffID', 'Staff ID', 'ID', 'No', 'Emp']) {
-        const match = keys.find(key => key.toLowerCase().replace(/[^a-z0-9]/g, '') === k.toLowerCase().replace(/[^a-z0-9]/g, ''));
-        if (match && row[match] !== undefined && row[match] !== null) {
-          const val = String(row[match]).trim();
-          if (val && !val.toUpperCase().startsWith('ATT-') && !val.toUpperCase().startsWith('SES-') && !val.toUpperCase().startsWith('TRN-')) {
-            return val;
-          }
-        }
-      }
-      return '';
-    };
+    // 1. Get official participants using getTrainingParticipants directly
+    const tpRes = getTrainingParticipants(trainingId);
+    let tpRows = [];
+    if (tpRes && tpRes.success && Array.isArray(tpRes.data)) {
+      tpRows = tpRes.data;
+    } else if (Array.isArray(tpRes)) {
+      tpRows = tpRes;
+    }
 
-    const getEmpName = (row, fallback) => {
-      if (!row) return fallback || '';
-      const keys = Object.keys(row);
-      for (let k of ['EmployeeName', 'Employee Name', 'Name', 'FullName', 'StaffName']) {
-        const match = keys.find(key => key.toLowerCase().replace(/[^a-z0-9]/g, '') === k.toLowerCase().replace(/[^a-z0-9]/g, ''));
-        if (match && row[match] !== undefined && row[match] !== null && String(row[match]).trim() !== '') {
-          return String(row[match]).trim();
-        }
-      }
-      return fallback || '';
-    };
+    // 2. Fetch Attendance and Post Evaluation rows
+    const ss = getTrainingDataSpreadsheet(trainingId);
+    let attRows = [];
+    let postRows = [];
+    if (ss) {
+      const attSheet = ss.getSheetByName('Attendance');
+      if (attSheet) attRows = sheetToJson(attSheet);
 
-    const getDept = (row, fallback) => {
-      if (!row) return fallback || '';
-      const keys = Object.keys(row);
-      for (let k of ['Department', 'Dept', 'CostCentre', 'Cost Centre', 'Division']) {
-        const match = keys.find(key => key.toLowerCase().replace(/[^a-z0-9]/g, '') === k.toLowerCase().replace(/[^a-z0-9]/g, ''));
-        if (match && row[match] !== undefined && row[match] !== null && String(row[match]).trim() !== '') {
-          return String(row[match]).trim();
-        }
-      }
-      return fallback || '';
-    };
+      const postSheet = ss.getSheetByName('Post Evaluation') || ss.getSheetByName('PostEval');
+      if (postSheet) postRows = sheetToJson(postSheet);
+    }
 
-    // Helper to extract Training ID from row
-    const getRowTrainingId = (row) => {
-      if (!row) return '';
-      const keys = Object.keys(row);
-      for (let k of ['TrainingID', 'Training ID', 'TrainingCode', 'Training Code', 'CourseCode', 'Course Code', 'TID']) {
-        const match = keys.find(key => key.toLowerCase().replace(/[^a-z0-9]/g, '') === k.toLowerCase().replace(/[^a-z0-9]/g, ''));
-        if (match && row[match] !== undefined && row[match] !== null && String(row[match]).trim() !== '') {
-          return String(row[match]).trim();
-        }
-      }
-      return '';
-    };
-
-    // 1. Fetch Training record from master database
+    // 3. Get master training record for 3-month milestone date
     const tSheet = getSheet(SHEET_NAMES.trainings);
     const trainings = tSheet ? sheetToJson(tSheet) : [];
+    const cleanTId = String(trainingId).trim();
     const training = trainings.find(t => 
       String(t.ID || '').trim() === cleanTId ||
       String(t.Code || '').trim() === cleanTId ||
@@ -349,114 +317,150 @@ function getAttendedParticipantsForPostEval(trainingId) {
       (t.Name && String(t.Name).trim().toLowerCase() === cleanTId.toLowerCase())
     );
 
-    const effectiveTId = training ? String(training.ID || cleanTId).trim() : cleanTId;
-    const trainingCode = training ? String(training.Code || training.ID || cleanTId).trim() : cleanTId;
-
-    // 2. Open per-training Google Spreadsheet (Training Data)
-    const ss = getTrainingDataSpreadsheet(effectiveTId);
-    let attRows = [];
-    let tpRows = [];
-    let postRows = [];
-
-    if (ss) {
-      const attSheet = ss.getSheetByName('Attendance');
-      if (attSheet) attRows = sheetToJson(attSheet);
-
-      const tpSheet = ss.getSheetByName('TrainingParticipants');
-      if (tpSheet) tpRows = sheetToJson(tpSheet);
-
-      const postSheet = ss.getSheetByName('PostEval');
-      if (postSheet) postRows = sheetToJson(postSheet);
-    }
-
-    // Map supervisor & position info by Employee ID from TrainingParticipants tab
-    const supervisorMap = new Map();
-    tpRows.forEach(tp => {
-      const tpEmpId = getEmpNo(tp).toLowerCase();
-      if (tpEmpId) {
-        supervisorMap.set(tpEmpId, {
-          SupervisorID: tp.SupervisorID || '',
-          SupervisorName: tp.SupervisorName || '',
-          SupervisorEmail: tp.SupervisorEmail || '',
-          Position: tp.Position || tp.JobTitle || tp['Job Title'] || ''
-        });
-      }
-    });
-
+    // 4. Map tpRows to display objects
     const participantsMap = new Map();
 
-    // TIER 1: Populate DIRECTLY from Attendance tab in Training Data
-    attRows.forEach(a => {
-      const empNo = getEmpNo(a);
-      if (!empNo) return;
+    tpRows.forEach(p => {
+      const empId = String(p.EmployeeID || p.ID || p.EmployeeNo || p.EmpID || '').trim();
+      if (!empId) return;
 
-      const empKey = empNo.toLowerCase();
-      if (participantsMap.has(empKey)) return;
+      const empKey = empId.toLowerCase();
+      const empName = String(p.EmployeeName || p.Name || empId).trim();
+      const dept = String(p.Department || p.Dept || '—').trim();
+      const pos = String(p.Position || p.JobTitle || 'Participant').trim();
 
-      const supInfo = supervisorMap.get(empKey) || {};
-      const empName = getEmpName(a, empNo);
-      const dept = getDept(a, '');
-      const attStatus = String(a.Status || 'Present').trim().toLowerCase();
-      const hasAttended = attStatus !== 'absent';
-      const postEvalDone = postRows.some(pr => isSameEmployeeId(getEmpNo(pr) || pr.EmployeeID || pr.ID || '', empNo));
+      // Look up attendance record by Employee ID OR Employee Name
+      const attendanceRecord = attRows.find(a => {
+        const aId = String(a.EmployeeID || a.EmployeeNo || a.EmpID || a.ID || '').trim();
+        const aName = String(a.EmployeeName || a.Name || '').trim().toLowerCase();
+        return isSameEmployeeId(aId, empId) || (empName && aName && aName === empName.toLowerCase());
+      });
+
+      let attStatusText = 'Did Not Attend';
+      let attColor = 'red';
+      let attCode = 'ABSENT';
+      let hasAttended = false;
+
+      if (attendanceRecord) {
+        const rawStatus = String(attendanceRecord.Status || 'Present').trim();
+        const lower = rawStatus.toLowerCase();
+        if (lower === 'absent' || lower === 'did not attend' || lower === 'not attend') {
+          attStatusText = 'Did Not Attend';
+          attColor = 'red';
+          attCode = 'ABSENT';
+          hasAttended = false;
+        } else if (lower === 'late' || lower === 'partial' || lower === 'partial attendance') {
+          attStatusText = 'Late / Partial';
+          attColor = 'yellow';
+          attCode = 'PARTIAL';
+          hasAttended = true;
+        } else {
+          attStatusText = 'Attended';
+          attColor = 'green';
+          attCode = 'ATTENDED';
+          hasAttended = true;
+        }
+      }
+
+      const postEvalDone = postRows.some(pr => isSameEmployeeId(pr.EmployeeID || pr.EmployeeNo || pr.ID || '', empId));
+      const supId = String(p.SupervisorID || '').trim();
+      const supEmail = String(p.SupervisorEmail || '').trim();
+      const supName = String(p.SupervisorName || '').trim();
 
       participantsMap.set(empKey, {
-        ID: empNo,
-        EmployeeID: empNo,
+        ID: empId,
+        EmployeeID: empId,
         EmployeeName: empName,
         Department: dept,
-        Position: supInfo.Position || 'Participant',
-        SupervisorID: supInfo.SupervisorID || '',
-        SupervisorName: supInfo.SupervisorName || '',
-        SupervisorEmail: supInfo.SupervisorEmail || '',
+        Position: pos,
+        SupervisorID: supId,
+        SupervisorName: supName,
+        SupervisorEmail: supEmail,
         Attended: hasAttended,
+        AttendanceStatus: attStatusText,
+        AttendanceColor: attColor,
+        AttendanceCode: attCode,
         PostEvalCompleted: postEvalDone,
-        Status: postEvalDone ? 'Evaluation Completed' : (supInfo.SupervisorID || supInfo.SupervisorEmail ? 'Supervisor Assigned' : 'Pending Assignment')
+        Status: postEvalDone ? 'Evaluation Completed' : (supId || supEmail ? 'Supervisor Assigned' : 'Pending Assignment')
       });
     });
 
-    // The per-training roster is authoritative. Merge every enrolled participant
-    // with attendance instead of using Attendance as an exclusive source; partial
-    // attendance logs must never hide a rostered participant from post evaluation.
-    if (tpRows.length > 0) {
-      tpRows.forEach(p => {
-        const empId = getEmpNo(p);
-        if (!empId) return;
-
-        const empKey = empId.toLowerCase();
-        const attendanceRecord = attRows.find(a => isSameEmployeeId(getEmpNo(a), empId));
-        const existing = participantsMap.get(empKey);
-        if (existing) {
-          existing.EmployeeName = existing.EmployeeName || getEmpName(p, empId);
-          existing.Department = existing.Department || getDept(p, '');
-          existing.Position = p.Position || p.JobTitle || existing.Position || 'Participant';
-          existing.SupervisorID = p.SupervisorID || existing.SupervisorID || '';
-          existing.SupervisorName = p.SupervisorName || existing.SupervisorName || '';
-          existing.SupervisorEmail = p.SupervisorEmail || existing.SupervisorEmail || '';
-          return;
+    // Fallback: If tpRows is empty, parse from master training.Participants
+    if (participantsMap.size === 0 && training && training.Participants) {
+      try {
+        let rawParts = training.Participants;
+        if (typeof rawParts === 'string') {
+          const trimmed = rawParts.trim();
+          if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+            try { rawParts = JSON.parse(trimmed); } catch(e) { rawParts = trimmed.split(',').map(s => s.trim()).filter(Boolean); }
+          } else {
+            rawParts = trimmed.split(',').map(s => s.trim()).filter(Boolean);
+          }
         }
+        if (Array.isArray(rawParts)) {
+          const directory = getOfficialEmployeeDirectory();
+          rawParts.forEach(pItem => {
+            let pEmpId = typeof pItem === 'object' ? (pItem.EmployeeID || pItem.ID || '') : String(pItem || '').trim();
+            if (!pEmpId && typeof pItem === 'string') pEmpId = pItem.trim();
+            if (!pEmpId) return;
 
-        const postEvalDone = postRows.some(pr => isSameEmployeeId(getEmpNo(pr) || pr.EmployeeID || pr.ID || '', empId));
+            const empKey = pEmpId.toLowerCase();
+            if (participantsMap.has(empKey)) return;
 
-        participantsMap.set(empKey, {
-          ID: empId,
-          EmployeeID: empId,
-          EmployeeName: getEmpName(p, empId),
-          Department: getDept(p, ''),
-          Position: p.Position || p.JobTitle || 'Participant',
-          SupervisorID: p.SupervisorID || '',
-          SupervisorName: p.SupervisorName || '',
-          SupervisorEmail: p.SupervisorEmail || '',
-          Attended: !!attendanceRecord && String(attendanceRecord.Status || '').trim().toLowerCase() !== 'absent',
-          PostEvalCompleted: postEvalDone,
-          Status: postEvalDone ? 'Evaluation Completed' : (p.SupervisorID || p.SupervisorEmail ? 'Supervisor Assigned' : 'Pending Assignment')
-        });
-      });
+            const empRecord = (directory && directory.byId && directory.byId[empKey]) || (typeof pItem === 'object' ? pItem : {});
+            const empName = empRecord.Name || empRecord.EmployeeName || (typeof pItem === 'object' ? pItem.EmployeeName : pEmpId);
+            const dept = empRecord.Department || (typeof pItem === 'object' ? pItem.Department : '') || '—';
+            const pos = empRecord.Position || (typeof pItem === 'object' ? (pItem.Position || pItem.JobTitle) : '') || 'Participant';
+
+            const attendanceRecord = attRows.find(a => {
+              const aId = String(a.EmployeeID || a.EmployeeNo || a.EmpID || a.ID || '').trim();
+              const aName = String(a.EmployeeName || a.Name || '').trim().toLowerCase();
+              return isSameEmployeeId(aId, pEmpId) || (empName && aName && aName === empName.toLowerCase());
+            });
+
+            let attStatusText = 'Did Not Attend';
+            let attColor = 'red';
+            let attCode = 'ABSENT';
+            let hasAttended = false;
+
+            if (attendanceRecord) {
+              const rawStatus = String(attendanceRecord.Status || 'Present').trim();
+              const lower = rawStatus.toLowerCase();
+              if (lower === 'absent' || lower === 'did not attend' || lower === 'not attend') {
+                attStatusText = 'Did Not Attend'; attColor = 'red'; attCode = 'ABSENT'; hasAttended = false;
+              } else if (lower === 'late' || lower === 'partial' || lower === 'partial attendance') {
+                attStatusText = 'Late / Partial'; attColor = 'yellow'; attCode = 'PARTIAL'; hasAttended = true;
+              } else {
+                attStatusText = 'Attended'; attColor = 'green'; attCode = 'ATTENDED'; hasAttended = true;
+              }
+            }
+
+            const postEvalDone = postRows.some(pr => isSameEmployeeId(pr.EmployeeID || pr.EmployeeNo || pr.ID || '', pEmpId));
+
+            participantsMap.set(empKey, {
+              ID: pEmpId,
+              EmployeeID: pEmpId,
+              EmployeeName: empName,
+              Department: dept,
+              Position: pos,
+              SupervisorID: empRecord.SupervisorID || (typeof pItem === 'object' ? pItem.SupervisorID : '') || '',
+              SupervisorName: empRecord.SupervisorName || (typeof pItem === 'object' ? pItem.SupervisorName : '') || '',
+              SupervisorEmail: empRecord.SupervisorEmail || (typeof pItem === 'object' ? pItem.SupervisorEmail : '') || '',
+              Attended: hasAttended,
+              AttendanceStatus: attStatusText,
+              AttendanceColor: attColor,
+              AttendanceCode: attCode,
+              PostEvalCompleted: postEvalDone,
+              Status: postEvalDone ? 'Evaluation Completed' : 'Pending Assignment'
+            });
+          });
+        }
+      } catch(err) {
+        Logger.log('Fallback parsing error: ' + err.message);
+      }
     }
 
     const participants = Array.from(participantsMap.values());
-
-    // Calculate 3-month target date
     const endDate = training ? parseDateObj(training.EndDate || training.StartDate) || new Date() : new Date();
     const target3MonthDate = new Date(endDate.getTime() + 90 * 24 * 60 * 60 * 1000);
     const now = new Date();
@@ -464,7 +468,7 @@ function getAttendedParticipantsForPostEval(trainingId) {
 
     return ok({
       training: {
-        ID: effectiveTId,
+        ID: training ? String(training.ID || cleanTId).trim() : cleanTId,
         Name: training ? training.Name : cleanTId,
         Code: training ? (training.Code || training.ID) : cleanTId,
         EndDate: formatMinimalistDate(endDate),
@@ -483,7 +487,7 @@ function getAttendedParticipantsForPostEval(trainingId) {
   }
 }
 
-function assignPostEvalSupervisorsBulk(trainingId, participantIds, supervisorInput) {
+function assignPostEvalSupervisorsBulk(trainingId, participantIds, supervisorInput, overrideEmail, overrideName) {
   try {
     if (!trainingId || !participantIds || !Array.isArray(participantIds) || participantIds.length === 0 || !supervisorInput) {
       return err('Training ID, participant selection, and Supervisor Email/ID are required.');
@@ -498,27 +502,33 @@ function assignPostEvalSupervisorsBulk(trainingId, participantIds, supervisorInp
       const employees = sheetToJson(empSheet);
       supervisor = employees.find(e => 
         isSameEmployeeId(e.ID || e.EmployeeID || e.EmployeeNo || '', cleanSupInput) ||
-        String(e.Email || '').trim().toLowerCase() === cleanSupInput
+        String(e.Email || '').trim().toLowerCase() === cleanSupInput ||
+        String(e.Name || '').trim().toLowerCase() === cleanSupInput
       );
     }
 
     if (!supervisor) {
-      if (cleanSupInput.includes('@')) {
-        supervisor = {
-          ID: cleanSupInput.split('@')[0],
-          Name: cleanSupInput.split('@')[0],
-          Email: cleanSupInput
-        };
-      } else {
-        return err(`Supervisor '${supervisorInput}' was not found in employee records.`);
-      }
+      supervisor = {
+        ID: cleanSupInput.split('@')[0],
+        Name: overrideName || cleanSupInput.split('@')[0],
+        Email: overrideEmail || (cleanSupInput.includes('@') ? cleanSupInput : '')
+      };
+    } else {
+      supervisor = {
+        ID: supervisor.ID || supervisor.EmployeeID || cleanSupInput,
+        Name: overrideName || supervisor.Name || supervisor.EmployeeName || cleanSupInput,
+        Email: overrideEmail || supervisor.Email || (cleanSupInput.includes('@') ? cleanSupInput : '')
+      };
     }
+
+    if (overrideEmail) supervisor.Email = String(overrideEmail).trim();
+    if (overrideName) supervisor.Name = String(overrideName).trim();
 
     const ss = getTrainingDataSpreadsheet(cleanTId);
     if (!ss) return err('Could not open training database.');
 
-    let tpSheet = ss.getSheetByName('TrainingParticipants');
-    if (!tpSheet) return err('TrainingParticipants sheet not found.');
+    let tpSheet = ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants');
+    if (!tpSheet) return err('Participants sheet not found.');
 
     ensureTrainingParticipantsColumns(tpSheet);
     const tpRows = sheetToJson(tpSheet);
@@ -535,15 +545,36 @@ function assignPostEvalSupervisorsBulk(trainingId, participantIds, supervisorInp
       const targetRowIndex = tpRows.findIndex(r => isSameEmployeeId(r.EmployeeID || r.EmployeeNo || r.ID || '', cleanEmpId));
       if (targetRowIndex !== -1) {
         const rowNum = targetRowIndex + 2;
-        if (supIdIdx !== -1) tpSheet.getRange(rowNum, supIdIdx + 1).setValue(supervisor.ID || supervisor.EmployeeID || '');
+        if (supIdIdx !== -1) tpSheet.getRange(rowNum, supIdIdx + 1).setValue(supervisor.ID || supervisor.Email || '');
         if (supEmailIdx !== -1) tpSheet.getRange(rowNum, supEmailIdx + 1).setValue(supervisor.Email || '');
-        if (supNameIdx !== -1) tpSheet.getRange(rowNum, supNameIdx + 1).setValue(supervisor.Name || supervisor.EmployeeName || '');
+        if (supNameIdx !== -1) tpSheet.getRange(rowNum, supNameIdx + 1).setValue(supervisor.Name || supervisor.Email || '');
         updatedCount++;
       }
     });
 
+    // Check if 3-month milestone is reached for this training
+    const tSheet = getSheet(SHEET_NAMES.trainings);
+    const trainings = tSheet ? sheetToJson(tSheet) : [];
+    const tObj = trainings.find(tr => String(tr.ID || tr.TrainingID || '').trim() === cleanTId);
+
+    const endDate = tObj ? parseDateObj(tObj.EndDate || tObj.StartDate) || new Date() : new Date();
+    const target3MonthDate = new Date(endDate.getTime() + 90 * 24 * 60 * 60 * 1000);
+    const is3MonthReached = (new Date()) >= target3MonthDate;
+
+    let emailMsg = '';
+    if (is3MonthReached && supervisor.Email) {
+      try {
+        sendSupervisorPostEvalEmail(cleanTId, supervisor, tObj);
+        emailMsg = ' 3-Month milestone reached: notification email sent to supervisor immediately.';
+      } catch(e) {
+        emailMsg = ' (Notification email error: ' + e.message + ')';
+      }
+    } else {
+      emailMsg = ' Notification email will automatically be sent when the 3-month milestone is reached.';
+    }
+
     return ok({
-      message: `Supervisor ${supervisor.Name || supervisor.Email} assigned to ${updatedCount} participant(s).`,
+      message: `Supervisor ${supervisor.Name || supervisor.Email} assigned to ${updatedCount} participant(s).${emailMsg}`,
       updatedCount: updatedCount,
       supervisor: supervisor
     });
@@ -554,12 +585,12 @@ function assignPostEvalSupervisorsBulk(trainingId, participantIds, supervisorInp
   }
 }
 
-function editParticipantSupervisor(trainingId, employeeId, newSupervisorInput) {
+function editParticipantSupervisor(trainingId, employeeId, newSupervisorInput, overrideEmail, overrideName) {
   try {
-    if (!trainingId || !employeeId || !newSupervisorInput) {
-      return err('Training ID, Employee ID, and New Supervisor Email/ID are required.');
+    if (!trainingId || !employeeId || (!newSupervisorInput && !overrideEmail)) {
+      return err('Training ID, Employee ID, and Supervisor Email/ID are required.');
     }
-    return assignPostEvalSupervisorsBulk(trainingId, [employeeId], newSupervisorInput);
+    return assignPostEvalSupervisorsBulk(trainingId, [employeeId], newSupervisorInput || overrideEmail, overrideEmail, overrideName);
   } catch (e) {
     Logger.log('editParticipantSupervisor error: ' + e.message);
     return err('Failed to edit supervisor: ' + e.message);
@@ -577,7 +608,7 @@ function sendSupervisorPostEvalNotificationSingle(trainingId, employeeId) {
     const ss = getTrainingDataSpreadsheet(cleanTId);
     if (!ss) return err('Training spreadsheet not found.');
 
-    const tpSheet = ss.getSheetByName('TrainingParticipants');
+    const tpSheet = ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants');
     const tpRows = tpSheet ? sheetToJson(tpSheet) : [];
     const participant = tpRows.find(r => isSameEmployeeId(r.EmployeeID || r.EmployeeNo || r.ID || '', cleanEmpId));
 
@@ -639,6 +670,64 @@ function sendSupervisorPostEvalEmail(trainingId, supervisor, trainingObj) {
   }
 }
 
+/**
+ * Daily Cron Task: Checks all active trainings. If 3-month milestone (90 days post EndDate) is reached,
+ * emails all assigned supervisors who haven't completed post-evaluation yet.
+ */
+function cronCheck3MonthPostEvalNotifications() {
+  try {
+    const tSheet = getSheet(SHEET_NAMES.trainings);
+    if (!tSheet) return;
+    const trainings = sheetToJson(tSheet);
+    const now = new Date();
+
+    trainings.forEach(t => {
+      const tId = String(t.ID || t.Code || '').trim();
+      if (!tId) return;
+
+      const endDate = parseDateObj(t.EndDate || t.StartDate);
+      if (!endDate) return;
+
+      const target3MonthDate = new Date(endDate.getTime() + 90 * 24 * 60 * 60 * 1000);
+      if (now < target3MonthDate) return;
+
+      const ss = getTrainingDataSpreadsheet(tId);
+      if (!ss) return;
+
+      const tpSheet = ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants');
+      if (!tpSheet) return;
+
+      const tpRows = sheetToJson(tpSheet);
+      const postSheet = ss.getSheetByName('Post Evaluation') || ss.getSheetByName('PostEval');
+      const postRows = postSheet ? sheetToJson(postSheet) : [];
+
+      const notifiedSupervisors = new Set();
+
+      tpRows.forEach(p => {
+        const empId = String(p.EmployeeID || p.ID || '').trim();
+        if (!empId) return;
+
+        const postCompleted = postRows.some(pr => isSameEmployeeId(pr.EmployeeID || pr.ID || '', empId));
+        if (postCompleted) return;
+
+        const supEmail = String(p.SupervisorEmail || '').trim();
+        const supId = String(p.SupervisorID || '').trim();
+        const supName = String(p.SupervisorName || supId || supEmail).trim();
+
+        if (!supEmail || notifiedSupervisors.has(supEmail.toLowerCase())) return;
+
+        const supervisorObj = { ID: supId || supEmail, Name: supName, Email: supEmail };
+        sendSupervisorPostEvalEmail(tId, supervisorObj, t);
+        notifiedSupervisors.add(supEmail.toLowerCase());
+        Logger.log(`Automated 3-Month Post Eval Email sent to ${supEmail} for training ${tId}`);
+      });
+    });
+
+  } catch(e) {
+    Logger.log('cronCheck3MonthPostEvalNotifications error: ' + e.message);
+  }
+}
+
 // ─── Internal: auto-advance stage ──────────────────────────────────────────────
 function tryAdvanceToEvaluationCompleted(trainingId) {
   try {
@@ -648,7 +737,7 @@ function tryAdvanceToEvaluationCompleted(trainingId) {
     if (!t) return;
 
     const ss = getTrainingDataSpreadsheet(trainingId);
-    const eSheet = ss ? ss.getSheetByName('TrainingEval') : null;
+    const eSheet = ss ? (ss.getSheetByName('Evaluation') || ss.getSheetByName('TrainingEval')) : null;
     const evalCount = eSheet ? sheetToJson(eSheet).length : 0;
 
     if (evalCount > 0 && ['Created', 'Participants Imported', 'Attendance In Progress', 'Training Completed'].includes(t.Stage)) {
@@ -658,5 +747,3 @@ function tryAdvanceToEvaluationCompleted(trainingId) {
     Logger.log('Stage auto-advance error: ' + e.message);
   }
 }
-
-

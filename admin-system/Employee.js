@@ -39,13 +39,7 @@ function getCostCentres() {
   } catch (e) {
     Logger.log('getCostCentres error: ' + e.message);
   }
-  return ok([
-    'Operations & Safety',
-    'Management & HR',
-    'IT & Engineering',
-    'Finance & Admin',
-    'Sales & Customer Service'
-  ]);
+  return ok([]);
 }
 
 /**

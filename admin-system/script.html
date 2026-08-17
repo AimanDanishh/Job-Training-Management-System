@@ -1,32 +1,19 @@
 <script>
 function safeExternalUrl(domainAndPath) {
   if (!domainAndPath) return '';
-  const clean = String(domainAndPath).replace(/^https?:\/\//i, '').replace(/^\/+/, '');
+  var clean = String(domainAndPath).replace(/^https?:\/\//i, '').replace(/^\/+/, '');
   return 'ht' + 'tps://' + clean;
 }
 
-window.__PUBLIC_PORTAL_URL__ = (function() {
-  const b64 = "<?!= (typeof publicPortalUrl !== 'undefined') ? publicPortalUrl : '' ?>";
-  try {
-    return b64 ? atob(b64) : '';
-  } catch(e) {
-    return '';
-  }
-})();
+if (typeof window.__PUBLIC_PORTAL_URL__ === 'undefined') {
+  window.__PUBLIC_PORTAL_URL__ = '';
+}
+if (typeof window.__COMPANY_LOGO_URL__ === 'undefined') {
+  window.__COMPANY_LOGO_URL__ = '';
+}
 
-window.__COMPANY_LOGO_URL__ = (function() {
-  const b64 = "<?!= (typeof companyLogoUrl !== 'undefined') ? companyLogoUrl : '' ?>";
-  try {
-    return b64 ? atob(b64) : '';
-  } catch(e) {
-    return '';
-  }
-})();
-// Bootstrap's CSS is used for layout utilities; its JavaScript bundle is not
-// required by this app. Keeping it out avoids Apps Script's document.write
-// parser corrupting the external script URL during page rendering.
 // ═══════════════════════════════════════════════════════════════════════════════
-// Shared Utilities
+// Shared Utilities & Global Overlays
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // ─── Global Loading Screen & Animation Overlay ──────────────────────────────
@@ -42,8 +29,8 @@ function showLoadingOverlay(message = 'Processing request...') {
     el.className = 'global-loading-overlay';
     el.innerHTML = `
       <div class="loading-card">
-        <div class="spinner" style="width:36px;height:36px;border-width:3px;border-top-color:#2563EB;margin:0 auto 12px"></div>
-        <div id="loading-msg-text" style="font-size:13.5px;font-weight:600;color:#1E293B">Loading...</div>
+        <div class="spinner" style="width:36px;height:36px;border-width:3.5px;border-top-color:#E91C2D;margin:0 auto 12px"></div>
+        <div id="loading-msg-text" style="font-size:13.5px;font-weight:700;color:#111111">Loading...</div>
         <div style="font-size:11.5px;color:#64748B;margin-top:4px">Please wait a moment</div>
       </div>
     `;
@@ -116,12 +103,16 @@ function showToast(message, type = 'success') {
   const icons = { success: 'check_circle', error: 'error', info: 'info' };
   t.innerHTML = `<span class="icon filled sm">${icons[type] || 'info'}</span>${message}`;
   container.appendChild(t);
-  setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity 0.3s';
-    setTimeout(() => t.remove(), 300); }, 3500);
+  setTimeout(() => {
+    t.style.opacity = '0';
+    t.style.transition = 'opacity 0.3s ease';
+    setTimeout(() => t.remove(), 300);
+  }, 3500);
 }
 
 // ─── Button loading state ────────────────────────────────────────────────────
 function setBtnLoading(btn, loading, text) {
+  if (!btn) return;
   if (loading) {
     btn.dataset.origText = btn.innerHTML;
     btn.innerHTML = '<span class="spinner"></span> ' + (text || 'Loading...');
@@ -161,17 +152,16 @@ function getQueryParam(name) {
 // ─── Navigate to page ────────────────────────────────────────────────────────
 let _cachedBaseUrl = null;
 function navTo(page, params) {
+  // Clean up timers when navigating
+  if (window.CountdownTimerManager) {
+    window.CountdownTimerManager.stop();
+  }
   const navigate = (base) => {
     if (!base) return;
     const cleanBase = String(base || '').split('?')[0];
     let url = cleanBase + '?page=' + page;
     if (params) Object.entries(params).forEach(([k,v]) => url += '&' + k + '=' + encodeURIComponent(v));
 
-    // HtmlService renders inside a Google-owned iframe.  Assigning to
-    // window.location only replaces that iframe, while touching top.location
-    // can be rejected after an asynchronous Apps Script call.  Opening the
-    // destination in _top is the supported navigation mechanism and works
-    // for both the first navigation and subsequent sidebar links.
     try {
       window.open(url, '_top');
     } catch(e) {
@@ -194,32 +184,62 @@ function navTo(page, params) {
       navigate(base);
     })
     .withFailureHandler(() => {
-      // Keep navigation usable if the URL lookup itself fails.  This is also
-      // useful in embedded previews where the current URL is the only URL
-      // available to the client.
       navigate(currentUrl);
     })
     .getAppUrl();
 }
 
 // ─── Modal helpers ───────────────────────────────────────────────────────────
-function openModal(id)  { document.getElementById(id).style.display = 'flex'; }
-function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+function openModal(id)  {
+  const el = document.getElementById(id);
+  if (el) el.style.display = 'flex';
+}
+function closeModal(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = 'none';
+}
 
-// Close modal on overlay click
 document.addEventListener('click', e => {
-  if (e.target.classList.contains('modal-overlay')) {
+  if (e.target && e.target.classList && e.target.classList.contains('modal-overlay')) {
     e.target.style.display = 'none';
   }
 });
 
-// ─── QR Code Logo Helpers (Robust Overlay & Canvas Download Engine) ───────────
-const DEFAULT_FALLBACK_LOGO = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="22" fill="%232563EB"/><circle cx="50" cy="50" r="28" fill="%23FFFFFF"/><text x="50" y="61" font-family="Arial, sans-serif" font-weight="900" font-size="32" fill="%232563EB" text-anchor="middle">A</text></svg>';
+// ═══════════════════════════════════════════════════════════════════════════════
+// Apollo Brand & Company Logo Management
+// ═══════════════════════════════════════════════════════════════════════════════
+const DEFAULT_FALLBACK_LOGO = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjIyIiBmaWxsPSIjRTkxQzJEIi8+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iMjgiIGZpbGw9IiNGRkY4Q0YiIHN0cm9rZT0iI0ZFQzMwRCIgc3Ryb2tlLXdpZHRoPSIyIi8+PHRleHQgeD0iNTAiIHk9IjYxIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI5MDAiIGZvbnQtc2l6ZT0iMzIiIGZpbGw9IiNFOTFDMkQiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkE8L3RleHQ+PC9zdmc+';
 
 function getApolloLogoUrl() {
-  return window.__COMPANY_LOGO_URL__ || DEFAULT_FALLBACK_LOGO;
+  var url = (typeof window.__COMPANY_LOGO_URL__ === 'string') ? window.__COMPANY_LOGO_URL__.trim() : '';
+  if (url && !url.startsWith('<?') && !url.includes('<?!=')) {
+    return url;
+  }
+  return DEFAULT_FALLBACK_LOGO;
 }
 
+function handleSidebarLogoError(imgEl) {
+  if (imgEl) {
+    imgEl.onerror = null;
+    imgEl.src = DEFAULT_FALLBACK_LOGO;
+    imgEl.style.display = 'block';
+    var fb = document.getElementById('sidebar-logo-fallback');
+    if (fb) fb.style.display = 'none';
+  }
+}
+
+function initSidebarLogo() {
+  var logoImg = document.getElementById('sidebar-company-logo');
+  var logoFb  = document.getElementById('sidebar-logo-fallback');
+  var logoUrl = getApolloLogoUrl();
+  if (logoImg) {
+    logoImg.src = logoUrl;
+    logoImg.style.display = 'block';
+    if (logoFb) logoFb.style.display = 'none';
+  }
+}
+
+// ─── QR Code Engine (with Apollo Logo Centered) ──────────────────────────────
 function getQuickChartBaseUrl(attUrl) {
   const cleanUrl = String(attUrl || '').trim();
   return safeExternalUrl(`quickchart.io/qr?size=400&ecLevel=H&text=${encodeURIComponent(cleanUrl)}`);
@@ -229,21 +249,21 @@ function ensureQRLogoUrl(existingQrUrl, attUrl) {
   return getQuickChartBaseUrl(attUrl);
 }
 
-function renderQRWithLogoHtml(attUrl, imgSize = 140, logoSize = 32) {
+function renderQRWithLogoHtml(attUrl, imgSize = 140, logoSize = 34) {
   const qrSrc = getQuickChartBaseUrl(attUrl);
   const logoSrc = getApolloLogoUrl();
 
   return `
-    <div class="qr-logo-wrapper" style="position:relative;display:inline-block;background:#fff;padding:6px;border-radius:8px;border:1px solid #CBD5E1;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
-      <img src="${qrSrc}" alt="QR Code" style="width:${imgSize}px;height:${imgSize}px;display:block;border-radius:4px" onerror="this.onerror=null;this.src='${qrSrc}';">
-      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:${logoSize}px;height:${logoSize}px;background:#fff;border-radius:6px;padding:2px;box-shadow:0 2px 5px rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;overflow:hidden;z-index:2">
-        <img src="${logoSrc}" alt="Logo" style="max-width:100%;max-height:100%;object-fit:contain" onerror="this.onerror=null;this.src='${DEFAULT_FALLBACK_LOGO}'">
+    <div class="qr-logo-wrapper" style="position:relative;display:inline-block;background:#fff;padding:6px;border-radius:10px;border:1.5px solid #E2E8F0;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+      <img src="${qrSrc}" alt="QR Code" style="width:${imgSize}px;height:${imgSize}px;display:block;border-radius:6px">
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:${logoSize}px;height:${logoSize}px;background:#FFF8CF;border-radius:7px;border:1px solid #FEC30D;padding:2px;box-shadow:0 2px 6px rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;overflow:hidden;z-index:2">
+        <img src="${logoSrc}" alt="Logo" style="max-width:100%;max-height:100%;object-fit:contain" onerror="this.style.display='none'">
       </div>
     </div>
   `;
 }
 
-function downloadQRWithLogo(attUrl, filename = 'QR_Code.png') {
+function downloadQRWithLogo(attUrl, filename = 'Apollo_QR_Code.png') {
   const qrSrc = getQuickChartBaseUrl(attUrl);
   const logoSrc = getApolloLogoUrl();
 
@@ -260,14 +280,17 @@ function downloadQRWithLogo(attUrl, filename = 'QR_Code.png') {
       const x = (400 - lSize) / 2;
       const y = (400 - lSize) / 2;
 
-      ctx.fillStyle = '#FFFFFF';
+      ctx.fillStyle = '#FFF8CF';
+      ctx.strokeStyle = '#FEC30D';
+      ctx.lineWidth = 3;
       ctx.beginPath();
       if (ctx.roundRect) {
-        ctx.roundRect(x - 5, y - 5, lSize + 10, lSize + 10, 8);
+        ctx.roundRect(x - 6, y - 6, lSize + 12, lSize + 12, 10);
       } else {
-        ctx.fillRect(x - 5, y - 5, lSize + 10, lSize + 10);
+        ctx.fillRect(x - 6, y - 6, lSize + 12, lSize + 12);
       }
       ctx.fill();
+      ctx.stroke();
 
       ctx.drawImage(logoImg, x, y, lSize, lSize);
 
@@ -301,12 +324,323 @@ function downloadQRWithLogo(attUrl, filename = 'QR_Code.png') {
   qrImg.src = qrSrc;
 }
 
-// ─── Status badge helper ─────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// Real-Time Time-Aware Training Status & Evaluation Countdown Engine
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const ApolloCountdown = {
+  parseDateSafely(val) {
+    if (!val) return null;
+    if (val instanceof Date) {
+      return !isNaN(val.getTime()) ? new Date(val.getFullYear(), val.getMonth(), val.getDate()) : null;
+    }
+    const str = String(val).replace(/GMT.*$/, '').replace(/\(.*\)$/, '').trim();
+    if (!str) return null;
+    const ymdMatch = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+    if (ymdMatch) {
+      return new Date(parseInt(ymdMatch[1], 10), parseInt(ymdMatch[2], 10) - 1, parseInt(ymdMatch[3], 10));
+    }
+    const dmyMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+    if (dmyMatch) {
+      return new Date(parseInt(dmyMatch[3], 10), parseInt(dmyMatch[2], 10) - 1, parseInt(dmyMatch[1], 10));
+    }
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) {
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    }
+    return null;
+  },
+
+  calculate2WeekDeadline(completionDate) {
+    const d = this.parseDateSafely(completionDate);
+    if (!d) return null;
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 14, 23, 59, 59, 999);
+  },
+
+  calculate3MonthDeadline(completionDate) {
+    const d = this.parseDateSafely(completionDate);
+    if (!d) return null;
+    const y = d.getFullYear();
+    const m = d.getMonth() + 3;
+    const day = d.getDate();
+    const targetY = y + Math.floor(m / 12);
+    const targetM = m % 12;
+    const daysInTargetMonth = new Date(targetY, targetM + 1, 0).getDate();
+    const targetDay = Math.min(day, daysInTargetMonth);
+    return new Date(targetY, targetM, targetDay, 23, 59, 59, 999);
+  },
+
+  getStatus(completionDateInput, deadlineType = '2week', isCompleted = false, isWaiting = false) {
+    const is3Mo = deadlineType === '3month';
+    const typeLabel = is3Mo ? 'Supervisor Evaluation' : 'Post Evaluation';
+
+    if (isCompleted) {
+      return {
+        status: 'completed',
+        label: `${typeLabel} Completed`,
+        badgeText: 'Completed',
+        shortText: 'Completed',
+        detail: `${typeLabel} is complete`,
+        isCompleted: true,
+        daysDiff: 0
+      };
+    }
+
+    if (isWaiting || !completionDateInput) {
+      return {
+        status: 'waiting',
+        label: 'Waiting for Training Completion',
+        badgeText: 'Waiting for Completion',
+        shortText: 'Waiting',
+        detail: 'Countdowns start once training is completed',
+        isWaiting: true,
+        daysDiff: 0
+      };
+    }
+
+    const completionDate = this.parseDateSafely(completionDateInput);
+    if (!completionDate) {
+      return {
+        status: 'waiting',
+        label: 'Waiting for Training Completion',
+        badgeText: 'Waiting for Completion',
+        shortText: 'Waiting',
+        detail: 'No valid completion date found',
+        isWaiting: true,
+        daysDiff: 0
+      };
+    }
+
+    const deadline = is3Mo ? this.calculate3MonthDeadline(completionDate) : this.calculate2WeekDeadline(completionDate);
+    if (!deadline) {
+      return {
+        status: 'waiting',
+        label: 'Waiting for Training Completion',
+        badgeText: 'Waiting for Completion',
+        shortText: 'Waiting',
+        detail: 'No deadline calculated',
+        isWaiting: true,
+        daysDiff: 0
+      };
+    }
+
+    const now = new Date();
+    const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const deadlineMidnight = new Date(deadline.getFullYear(), deadline.getMonth(), deadline.getDate());
+
+    const diffDays = Math.round((deadlineMidnight.getTime() - nowMidnight.getTime()) / (1000 * 60 * 60 * 24));
+    const compStr = formatMinimalistDate(completionDate);
+    const deadStr = formatMinimalistDate(deadline);
+
+    if (diffDays < 0) {
+      const overdueDays = Math.abs(diffDays);
+      const dayText = overdueDays === 1 ? '1 day' : `${overdueDays} days`;
+      return {
+        status: 'overdue',
+        label: `${typeLabel} Overdue (${dayText} overdue)`,
+        badgeText: `Overdue by ${dayText}`,
+        shortText: `Overdue by ${dayText}`,
+        detail: `Deadline was ${deadStr}`,
+        completionDateStr: compStr,
+        deadlineDateStr: deadStr,
+        daysDiff: diffDays,
+        deadlineDate: deadline,
+        completionDate: completionDate,
+        isOverdue: true
+      };
+    }
+
+    if (diffDays === 0) {
+      return {
+        status: 'today',
+        label: 'Due Today',
+        badgeText: 'Due Today',
+        shortText: 'Due Today',
+        detail: `Deadline is today (${deadStr})`,
+        completionDateStr: compStr,
+        deadlineDateStr: deadStr,
+        daysDiff: 0,
+        deadlineDate: deadline,
+        completionDate: completionDate,
+        isDueToday: true
+      };
+    }
+
+    if (diffDays === 1) {
+      return {
+        status: 'approaching',
+        label: 'Due Tomorrow',
+        badgeText: 'Due Tomorrow',
+        shortText: 'Due Tomorrow',
+        detail: `Deadline: ${deadStr}`,
+        completionDateStr: compStr,
+        deadlineDateStr: deadStr,
+        daysDiff: 1,
+        deadlineDate: deadline,
+        completionDate: completionDate,
+        isApproaching: true
+      };
+    }
+
+    if (diffDays <= 14) {
+      const isApproaching = diffDays <= 5;
+      const text = (diffDays === 14 && !is3Mo) ? 'Due in 2 weeks' : `Due in ${diffDays} days`;
+      return {
+        status: isApproaching ? 'approaching' : 'normal',
+        label: text,
+        badgeText: text,
+        shortText: text,
+        detail: `Deadline: ${deadStr}`,
+        completionDateStr: compStr,
+        deadlineDateStr: deadStr,
+        daysDiff: diffDays,
+        deadlineDate: deadline,
+        completionDate: completionDate,
+        isApproaching: isApproaching
+      };
+    }
+
+    const months = Math.max(1, Math.round(diffDays / 30.43));
+    const monthText = months === 1 ? '1 month' : `${months} months`;
+    const labelText = `Due in ${monthText}`;
+
+    return {
+      status: 'normal',
+      label: labelText,
+      badgeText: labelText,
+      shortText: labelText,
+      detail: `Deadline: ${deadStr}`,
+      completionDateStr: compStr,
+      deadlineDateStr: deadStr,
+      daysDiff: diffDays,
+      deadlineDate: deadline,
+      completionDate: completionDate
+    };
+  },
+
+  renderBadge(statusObj) {
+    if (!statusObj) return '';
+    const icons = {
+      completed: 'check_circle',
+      overdue: 'cancel',
+      today: 'warning',
+      approaching: 'schedule',
+      normal: 'schedule',
+      waiting: 'hourglass_empty'
+    };
+    const icon = icons[statusObj.status] || 'schedule';
+    return `<span class="countdown-badge cd-${statusObj.status}"><span class="icon sm filled">${icon}</span><span>${statusObj.badgeText || statusObj.label}</span></span>`;
+  },
+
+  renderWidget(statusObj, title = 'Evaluation Timeline') {
+    if (!statusObj) return '';
+    const isCompleted = statusObj.status === 'completed';
+    const isOverdue = statusObj.status === 'overdue';
+    const isToday = statusObj.status === 'today';
+    const isWaiting = statusObj.status === 'waiting';
+
+    let headerBg = '#F8FAFC';
+    let borderColor = '#E2E8F0';
+    if (isCompleted) { headerBg = '#F0FDF4'; borderColor = '#BBF7D0'; }
+    else if (isOverdue) { headerBg = '#FEF2F2'; borderColor = '#FECACA'; }
+    else if (isToday) { headerBg = '#FFF8CF'; borderColor = '#FEC30D'; }
+    else if (statusObj.status === 'approaching') { headerBg = '#FFFBEB'; borderColor = '#FDE68A'; }
+
+    return `
+      <div class="card-th" style="background:${headerBg};border:1.5px solid ${borderColor};padding:18px 20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px">
+          <div>
+            <div style="font-size:14px;font-weight:800;color:var(--apollo-dark);display:flex;align-items:center;gap:6px">
+              <span class="icon" style="color:${isCompleted ? '#16A34A' : isOverdue ? '#E91C2D' : '#FEC30D'}">timer</span>
+              ${title}
+            </div>
+            <div style="font-size:12px;color:var(--apollo-gray-600);margin-top:2px">${statusObj.detail || ''}</div>
+          </div>
+          <div>
+            ${this.renderBadge(statusObj)}
+          </div>
+        </div>
+        ${!isWaiting ? `
+          <div class="row g-2" style="font-size:12px;padding-top:10px;border-top:1px solid rgba(0,0,0,0.06)">
+            <div class="col-6 col-md-4">
+              <span style="color:var(--apollo-gray-500)">Training Completed:</span>
+              <strong style="color:var(--apollo-dark);display:block">${statusObj.completionDateStr || '—'}</strong>
+            </div>
+            <div class="col-6 col-md-4">
+              <span style="color:var(--apollo-gray-500)">Target Deadline:</span>
+              <strong style="color:var(--apollo-dark);display:block">${statusObj.deadlineDateStr || '—'}</strong>
+            </div>
+            <div class="col-12 col-md-4">
+              <span style="color:var(--apollo-gray-500)">Current Status:</span>
+              <strong style="color:${isCompleted ? '#16A34A' : isOverdue ? '#E91C2D' : '#111111'};display:block">${statusObj.label}</strong>
+            </div>
+          </div>
+        ` : `
+          <div style="font-size:12px;color:var(--apollo-gray-500);padding-top:8px;border-top:1px dashed #CBD5E1">
+            Training is currently in progress or not yet marked as completed. The post-training countdown will automatically begin on the training completion date.
+          </div>
+        `}
+      </div>
+    `;
+  }
+};
+
+// ─── Real-Time Countdown Timer Manager ───────────────────────────────────────
+const CountdownTimerManager = {
+  _timer: null,
+  _callbacks: new Map(),
+
+  start() {
+    if (this._timer) clearInterval(this._timer);
+    this._timer = setInterval(() => this.tick(), 60000);
+  },
+
+  stop() {
+    if (this._timer) {
+      clearInterval(this._timer);
+      this._timer = null;
+    }
+  },
+
+  register(id, callback) {
+    if (!id || typeof callback !== 'function') return;
+    this._callbacks.set(id, callback);
+    try { callback(); } catch(e) {}
+  },
+
+  unregister(id) {
+    this._callbacks.delete(id);
+  },
+
+  tick() {
+    this.refreshAll();
+  },
+
+  refreshAll() {
+    this._callbacks.forEach(fn => {
+      try { fn(); } catch(e) {}
+    });
+
+    document.querySelectorAll('[data-apollo-countdown]').forEach(el => {
+      const completionDate = el.dataset.completionDate;
+      const type = el.dataset.countdownType || '2week';
+      const isCompleted = el.dataset.isCompleted === 'true';
+      const isWaiting = el.dataset.isWaiting === 'true';
+      const statusObj = ApolloCountdown.getStatus(completionDate, type, isCompleted, isWaiting);
+      el.innerHTML = ApolloCountdown.renderBadge(statusObj);
+    });
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Status Badges & Lifecycle Formatting
+// ═══════════════════════════════════════════════════════════════════════════════
+
 function statusBadge(status) {
   const map = {
-    'Active':           'badge-green',   'In Progress':       'badge-blue',
+    'Active':           'badge-green',   'In Progress':       'badge-gold',
     'Upcoming':         'badge-yellow',  'Completed':         'badge-green',
-    'On going':         'badge-blue',    'On planning':       'badge-purple',
+    'On going':         'badge-gold',    'On planning':       'badge-purple',
     'Draft':            'badge-gray',    'Archived':          'badge-gray',
     'Present':          'badge-green',   'Absent':            'badge-red',
     'Late':             'badge-yellow',  'Partial Attendance':'badge-yellow',
@@ -320,23 +654,22 @@ function statusBadge(status) {
   return `<span class="badge-th ${cls}">${status}</span>`;
 }
 
-// ─── Automated Approval Status Badge ───────────────────────────────────────────
 function approvalStatusBadge(status) {
   const s = String(status || '').trim();
   if (s.toLowerCase().includes('return')) {
-    return `<span class="badge-th badge-yellow" style="display:inline-flex;align-items:center;gap:4px;background:#FEF3C7;color:#92400E;border:1px solid #FCD34D"><span class="icon sm" style="font-size:13px">undo</span>Returned</span>`;
+    return `<span class="badge-th badge-yellow" style="display:inline-flex;align-items:center;gap:4px;background:#FFF8CF;color:#92400E;border:1px solid #FEC30D"><span class="icon sm" style="font-size:13px">undo</span>Returned</span>`;
   }
   if (!s || s === 'Approved' || s === 'Auto-Approved' || s === 'Fully Approved') {
     return `<span class="badge-th badge-green" style="display:inline-flex;align-items:center;gap:4px"><span class="icon sm" style="font-size:13px">check_circle</span>Approved</span>`;
   }
   if (s === 'Pending HOD Approval') {
-    return `<span class="badge-th badge-yellow" style="display:inline-flex;align-items:center;gap:4px;background:#FEF3C7;color:#92400E;border:1px solid #FCD34D"><span class="icon sm" style="font-size:13px">hourglass_empty</span>Needs HOD Approval</span>`;
+    return `<span class="badge-th badge-yellow" style="display:inline-flex;align-items:center;gap:4px;background:#FFFBEB;color:#92400E;border:1px solid #FCD34D"><span class="icon sm" style="font-size:13px">hourglass_empty</span>Needs HOD Approval</span>`;
   }
   if (s === 'Pending C-Suite Approval') {
     return `<span class="badge-th badge-yellow" style="display:inline-flex;align-items:center;gap:4px;background:#FFEDD5;color:#9A3412;border:1px solid #FDBA74"><span class="icon sm" style="font-size:13px">gavel</span>Needs C-Suite Approval</span>`;
   }
   if (s === 'Pending HOHR Approval') {
-    return `<span class="badge-th badge-yellow" style="display:inline-flex;align-items:center;gap:4px;background:#FDE68A;color:#78350F;border:1px solid #F59E0B"><span class="icon sm" style="font-size:13px">badge</span>Needs HOHR Approval</span>`;
+    return `<span class="badge-th badge-yellow" style="display:inline-flex;align-items:center;gap:4px;background:#FFF8CF;color:#78350F;border:1px solid #FEC30D"><span class="icon sm" style="font-size:13px">badge</span>Needs HOHR Approval</span>`;
   }
   if (s === 'Rejected') {
     return `<span class="badge-th badge-red" style="display:inline-flex;align-items:center;gap:4px"><span class="icon sm" style="font-size:13px">cancel</span>Rejected</span>`;
@@ -430,57 +763,78 @@ function formatMinimalistDateTime(dateVal) {
   return str;
 }
 
-// ─── Lifecycle Timeline ──────────────────────────────────────────────────────
+// ─── Enhanced Lifecycle Timeline with Real-Time Countdowns ──────────────────
 const LIFECYCLE_STAGES = [
-  { id: 'created',      label: 'Created',                   icon: 'add_circle' },
-  { id: 'participants', label: 'Participants\nImported',     icon: 'group_add' },
-  { id: 'attendance',   label: 'Attendance\nIn Progress',   icon: 'fact_check' },
-  { id: 'completed',    label: 'Training\nCompleted',        icon: 'task_alt' },
-  { id: 'evaluation',   label: 'Evaluation\nCompleted',      icon: 'rate_review' },
-  { id: 'threemonth',   label: 'Waiting for\n3-Month Review',icon: 'schedule' },
-  { id: 'closed',       label: 'Programme\nClosed',          icon: 'verified' }
+  { id: 'created',      label: 'Training Requested',       icon: 'add_circle' },
+  { id: 'participants', label: 'Approved & Participants',  icon: 'group_add' },
+  { id: 'attendance',   label: 'Ongoing Attendance',       icon: 'fact_check' },
+  { id: 'completed',    label: 'Training Completed',       icon: 'task_alt' },
+  { id: 'evaluation',   label: 'Post Eval (2 Weeks)',      icon: 'rate_review', hasCountdown: '2week' },
+  { id: 'threemonth',   label: 'Supervisor (3 Months)',    icon: 'schedule',    hasCountdown: '3month' },
+  { id: 'closed',       label: 'Programme Closed',         icon: 'verified' }
 ];
+
 const STAGE_INDEX = {
   'Created': 0,
+  'Training Requested': 0,
   'Participants Imported': 1,
+  'Approved': 1,
   'Attendance In Progress': 2,
+  'Ongoing': 2,
   'Training Completed': 3,
   'Evaluation Completed': 4,
+  'Post Evaluation': 4,
   'Waiting for 3-Month Review': 5,
-  'Waiting for 6-Month Review': 5,
-  'Programme Closed': 6
+  'Supervisor Evaluation': 5,
+  'Programme Closed': 6,
+  'Closed': 6
 };
 
-function renderLifecycle(currentStage) {
+function renderLifecycle(currentStage, trainingObj) {
   const current = STAGE_INDEX[currentStage] ?? 0;
+  const isCompleted = current >= 3;
+  const compDate = trainingObj ? (trainingObj.EndDate || trainingObj.StartDate) : null;
+
   return '<div class="lifecycle">' + LIFECYCLE_STAGES.map((s, i) => {
-    const cls = i < current ? 'done' : i === current ? 'current' : '';
-    const icon = i < current ? 'check' : s.icon;
+    const isDone = i < current;
+    const isCurr = i === current;
+    const cls = isDone ? 'done' : isCurr ? 'current' : '';
+    const icon = isDone ? 'check' : s.icon;
+
+    let countdownChip = '';
+    if (s.hasCountdown && isCompleted && compDate) {
+      const isEvalDone = (s.hasCountdown === '2week' && current >= 4) || (s.hasCountdown === '3month' && current >= 6);
+      const st = ApolloCountdown.getStatus(compDate, s.hasCountdown, isEvalDone, false);
+      if (!isEvalDone) {
+        countdownChip = `<div class="lc-badge cd-${st.status}" style="margin-top:4px;font-size:9.5px;padding:2px 6px;border-radius:4px;font-weight:700">${st.shortText || st.badgeText}</div>`;
+      }
+    }
+
     return `<div class="lc-step ${cls}">
       <div class="lc-dot"><span class="icon sm">${icon}</span></div>
-      <div class="lc-label">${s.label.replace('\n', '<br>')}</div>
+      <div class="lc-label">${s.label}</div>
+      ${countdownChip}
     </div>`;
   }).join('') + '</div>';
 }
 
 // ─── Progress bar ─────────────────────────────────────────────────────────────
-function progressBar(pct, color = '#2563EB', height = 7) {
+function progressBar(pct, color = '#E91C2D', height = 7) {
   return `<div class="progress-th" style="height:${height}px">
     <div class="progress-bar-th" style="width:${pct}%;background:${color}"></div>
   </div>`;
 }
 
 // ─── Avatar ────────────────────────────────────────────────────────────────────
-const AVATAR_COLORS = ['#2563EB','#7C3AED','#0891B2','#059669','#D97706','#DC2626','#DB2777'];
-function avatar(name, size = 30, index = 0) {
+const AVATAR_COLORS = ['#E91C2D','#FEC30D','#059669','#2563EB','#7C3AED','#D97706','#DC2626'];
+function avatar(name, size = 32, index = 0) {
   const safeName = String(name || '').trim();
-  const initials = safeName ? safeName.split(/\s+/).map(w => w[0]).join('').slice(0,2).toUpperCase() : '?';
+  const initials = safeName ? safeName.split(/\s+/).map(w => w[0]).join('').slice(0,2).toUpperCase() : 'AD';
   const bg = AVATAR_COLORS[index % AVATAR_COLORS.length];
   return `<div class="avatar" style="width:${size}px;height:${size}px;background:${bg};font-size:${size*0.38}px">${initials}</div>`;
 }
 
-
-// ─── Sidebar minimizable collapse & real profile helpers ─────────────────────
+// ─── Sidebar Minimizable Collapse ───────────────────────────────────────────
 function toggleSidebarCollapse() {
   const sidebar = document.querySelector('.sidebar');
   const mainArea = document.querySelector('.main-area');
@@ -513,23 +867,24 @@ function initSidebarState() {
   } catch(e) {}
 }
 
+// ─── Real User Profile Loader ────────────────────────────────────────────────
 function loadRealUserProfile() {
   callServer('getCurrentUser').then(user => {
     if (user && user.email) {
       const nameEl = document.getElementById('sidebar-user-name');
       const emailEl = document.getElementById('sidebar-user-email');
       const avatarEl = document.getElementById('sidebar-user-avatar');
-      
+
       const emailStr = user.email;
       let nameStr = user.name;
       if (!nameStr) {
         const localPart = emailStr.split('@')[0] || 'User';
         nameStr = localPart.replace(/[\._\-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
       }
-      
+
       if (nameEl) nameEl.textContent = nameStr;
       if (emailEl) emailEl.textContent = emailStr;
-      
+
       if (avatarEl) {
         const initials = nameStr.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase() || 'AD';
         avatarEl.textContent = initials;
@@ -539,10 +894,12 @@ function loadRealUserProfile() {
   }).catch(() => {});
 }
 
-// ─── Sidebar active state & navigation ───────────────────────────────────────
+// ─── Sidebar Navigation & Active State ───────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   initSidebarState();
+  initSidebarLogo();
   loadRealUserProfile();
+  CountdownTimerManager.start();
 
   const urlPage = getQueryParam('page');
   const page = window.__TRAINHUB_PAGE__ || urlPage || 'dashboard';
@@ -558,12 +915,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Mobile sidebar toggle
   const toggleBtn = document.getElementById('sidebar-toggle');
   const sidebar   = document.querySelector('.sidebar');
   if (toggleBtn && sidebar) {
     toggleBtn.addEventListener('click', () => sidebar.classList.toggle('open'));
   }
+});
+
+// Stop timer on window unload
+window.addEventListener('beforeunload', () => {
+  CountdownTimerManager.stop();
 });
 
 // Explicitly bind utility functions to global window object
@@ -577,6 +938,8 @@ window.hideLoadingOverlay = hideLoadingOverlay;
 window.openModal = openModal;
 window.closeModal = closeModal;
 window.getApolloLogoUrl = getApolloLogoUrl;
+window.handleSidebarLogoError = handleSidebarLogoError;
+window.initSidebarLogo = initSidebarLogo;
 window.getQuickChartBaseUrl = getQuickChartBaseUrl;
 window.ensureQRLogoUrl = ensureQRLogoUrl;
 window.renderQRWithLogoHtml = renderQRWithLogoHtml;
@@ -595,4 +958,6 @@ window.avatar = avatar;
 window.toggleSidebarCollapse = toggleSidebarCollapse;
 window.initSidebarState = initSidebarState;
 window.loadRealUserProfile = loadRealUserProfile;
+window.ApolloCountdown = ApolloCountdown;
+window.CountdownTimerManager = CountdownTimerManager;
 </script>

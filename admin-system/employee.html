@@ -3,8 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Apollo — Employees</title>
+  <script>
+    window.__TRAINHUB_PAGE__ = '<?!= currentPage ?>';
+    window.__PUBLIC_PORTAL_URL__ = '<?!= (typeof publicPortalUrl !== "undefined" && publicPortalUrl) ? publicPortalUrl : "" ?>';
+    window.__COMPANY_LOGO_URL__ = '<?!= (typeof companyLogoUrl !== "undefined" && companyLogoUrl) ? companyLogoUrl : "" ?>';
+  </script>
   <?!= include('style') ?>
-  <title>TrainHub — Employees</title>
+  <?!= include('script') ?>
 </head>
 <body>
 <div class="app-shell">
@@ -106,8 +112,6 @@
 </div>
 
 <div id="toast-container"></div>
-<script>window.__TRAINHUB_PAGE__ = '<?!= currentPage ?>';</script>
-<?!= include('script') ?>
 <script>
   let allEmployees = [];
 

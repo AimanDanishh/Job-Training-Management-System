@@ -3,8 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Apollo — Training Sessions & QR Codes</title>
+  <script>
+    window.__TRAINHUB_PAGE__ = '<?!= currentPage ?>';
+    window.__PUBLIC_PORTAL_URL__ = '<?!= (typeof publicPortalUrl !== "undefined" && publicPortalUrl) ? publicPortalUrl : "" ?>';
+    window.__COMPANY_LOGO_URL__ = '<?!= (typeof companyLogoUrl !== "undefined" && companyLogoUrl) ? companyLogoUrl : "" ?>';
+  </script>
   <?!= include('style') ?>
-  <title>TrainHub — Training Sessions & QR Codes</title>
+  <?!= include('script') ?>
   <style>
     .session-card {
       background: #ffffff;
@@ -121,7 +127,7 @@
         <h3 class="modal-title" id="session-modal-title">New Training Session</h3>
         <p class="modal-sub">Create a session with auto-generated QR code</p>
       </div>
-      <button class="modal-close" onclick="closeModal('modal-session')">✕</button>
+      <button class="modal-close" onclick="closeModal('modal-session')"><span class="icon sm">close</span></button>
     </div>
     <div class="row g-3 mt-1">
       <div class="col-12">
@@ -168,13 +174,13 @@
         <h3 class="modal-title">Center Company Logo for QR Codes</h3>
         <p class="modal-sub">Add a Google Drive logo image link to embed inside QR codes</p>
       </div>
-      <button class="modal-close" onclick="closeModal('modal-logo')">✕</button>
+      <button class="modal-close" onclick="closeModal('modal-logo')"><span class="icon sm">close</span></button>
     </div>
     <div class="mt-2 mb-3">
       <label class="label-th">Google Drive Logo Share Link or Image URL</label>
       <input id="logo-url-input" class="input-th" placeholder="https://drive.google.com/file/d/FILE_ID/view?usp=sharing">
       <div style="font-size:11.5px;color:#64748B;margin-top:6px;line-height:1.5;background:#F8FAFC;padding:10px;border-radius:6px;border:1px solid #E2E8F0">
-        💡 <strong>Tip:</strong> Paste your Google Drive logo share link. Make sure the file sharing setting in Google Drive is set to <em>"Anyone with the link can view"</em> so QuickChart can fetch the image.
+        <span class="icon sm" style="color:#D97706">lightbulb</span> <strong>Tip:</strong> Paste your Google Drive logo share link. Make sure the file sharing setting in Google Drive is set to <em>"Anyone with the link can view"</em> so QuickChart can fetch the image.
       </div>
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid #F1F5F9">
@@ -187,8 +193,6 @@
 </div>
 
 <div id="toast-container"></div>
-<script>window.__TRAINHUB_PAGE__ = '<?!= currentPage ?>';</script>
-<?!= include('script') ?>
 <script>
   let allTrainings = [];
   let allSessionsList = [];
@@ -325,7 +329,7 @@
                 <span class="icon sm">${status==='Active'?'block':'check_circle'}</span>
               </button>
             </div>
-            ${parentT.trainingDataSheetUrl || parentT.ParticipantsSheetID ? `<a class="btn-th btn-sm" style="background:#059669;color:#fff;border:none;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:4px;width:100%" href="${parentT.trainingDataSheetUrl || 'https://docs.google.com/spreadsheets/d/' + parentT.ParticipantsSheetID + '/edit'}" target="_blank" title="Open Training Data Sheet"><span class="icon sm">table_chart</span>Open Training Data Sheet</a>` : ''}
+            ${parentT.trainingDataSheetUrl || parentT.ParticipantsSheetID ? `<a class="btn-th btn-sm" style="background:#059669;color:#fff;border:none;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:4px;width:100%" href="${parentT.trainingDataSheetUrl || ('ht' + 'tps://docs.google.com/spreadsheets/d/' + parentT.ParticipantsSheetID + '/edit')}" target="_blank" title="Open Training Data Sheet"><span class="icon sm">table_chart</span>Open Training Data Sheet</a>` : ''}
           </div>
         </div>
       </div>`;

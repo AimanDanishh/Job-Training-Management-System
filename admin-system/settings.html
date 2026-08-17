@@ -3,8 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Apollo — Settings & Configuration</title>
+  <script>
+    window.__TRAINHUB_PAGE__ = '<?!= currentPage ?>';
+    window.__PUBLIC_PORTAL_URL__ = '<?!= (typeof publicPortalUrl !== "undefined" && publicPortalUrl) ? publicPortalUrl : "" ?>';
+    window.__COMPANY_LOGO_URL__ = '<?!= (typeof companyLogoUrl !== "undefined" && companyLogoUrl) ? companyLogoUrl : "" ?>';
+  </script>
   <?!= include('style') ?>
-  <title>TrainHub — Settings & Configuration</title>
+  <?!= include('script') ?>
 </head>
 <body>
 <div class="app-shell">
@@ -20,9 +26,14 @@
           <h1 class="topbar-title">System Settings</h1>
           <p class="topbar-sub">Database connection status, sheet verification, and application properties.</p>
         </div>
-        <button class="btn-th btn-secondary btn-sm" onclick="loadSettingsData()">
-          <span class="icon sm">refresh</span> Refresh Status
-        </button>
+        <div style="display:flex; gap:8px">
+          <button class="btn-th btn-primary btn-sm" onclick="executeSaveSettings()">
+            <span class="icon sm">save</span> Save All Settings
+          </button>
+          <button class="btn-th btn-secondary btn-sm" onclick="loadSettingsData()">
+            <span class="icon sm">refresh</span> Refresh Status
+          </button>
+        </div>
       </div>
     </header>
 
@@ -36,7 +47,7 @@
             <div style="font-size:12.5px" id="banner-sub">Master database is connected and all required sheets are verified.</div>
           </div>
         </div>
-        <span class="badge-th badge-success" id="banner-badge">● Connected</span>
+        <span class="badge-th badge-success" id="banner-badge">Connected</span>
       </div>
 
       <div class="row g-4">
@@ -48,16 +59,16 @@
                 <h3 class="card-th-title" style="display:flex; align-items:center; gap:8px">
                   <span class="icon filled" style="color:#2563EB">storage</span> Database Connection & Sheets
                 </h3>
-                <p class="card-th-sub">Connected Google Spreadsheet details and sheet tabs health.</p>
+                <p class="card-th-sub">Configure your Google Spreadsheet database & folder IDs.</p>
               </div>
-              <span id="db-status-pill" class="badge-th badge-success">● Connected</span>
+              <span id="db-status-pill" class="badge-th badge-success">Connected</span>
             </div>
             <div class="card-th-body">
               <div class="row g-3 mb-4">
                 <div class="col-12">
-                  <label class="label-th">Master Spreadsheet ID (DATABASE_ID)</label>
+                  <label class="label-th">Master Spreadsheet ID (SPREADSHEET_ID) <span style="color:#EF4444">*</span></label>
                   <div style="display:flex; gap:8px">
-                    <input type="text" id="cfg-master-id" class="input-th" readonly style="background:#F8FAFC; font-family:monospace; font-size:12.5px">
+                    <input type="text" id="cfg-master-id" class="input-th" style="font-family:monospace; font-size:12.5px" placeholder="Paste TrainHub Database Spreadsheet ID">
                     <button class="btn-th btn-secondary btn-sm" onclick="copyValue('cfg-master-id')" title="Copy ID">
                       <span class="icon sm">content_copy</span>
                     </button>
@@ -67,9 +78,9 @@
                   </div>
                 </div>
                 <div class="col-12">
-                  <label class="label-th">Employee Spreadsheet ID (EMPLOYEE_SPREADSHEET_ID)</label>
+                  <label class="label-th">Employee Spreadsheet ID / Namelist (EMPLOYEE_SPREADSHEET_ID)</label>
                   <div style="display:flex; gap:8px">
-                    <input type="text" id="cfg-emp-id" class="input-th" readonly style="background:#F8FAFC; font-family:monospace; font-size:12.5px" placeholder="Same as Master Database ID">
+                    <input type="text" id="cfg-emp-id" class="input-th" style="font-family:monospace; font-size:12.5px" placeholder="Paste Namelist Employee Spreadsheet ID">
                     <button class="btn-th btn-secondary btn-sm" onclick="copyValue('cfg-emp-id')" title="Copy ID">
                       <span class="icon sm">content_copy</span>
                     </button>
@@ -77,6 +88,18 @@
                       <span class="icon sm">open_in_new</span> Open Sheet
                     </a>
                   </div>
+                </div>
+                <div class="col-12 col-md-6">
+                  <label class="label-th">Root Workspace Folder ID (ROOT_FOLDER_ID)</label>
+                  <input type="text" id="cfg-root-folder-id" class="input-th" style="font-family:monospace; font-size:12.5px" placeholder="Google Drive Root Folder ID">
+                </div>
+                <div class="col-12 col-md-6">
+                  <label class="label-th">Training Folder ID (TRAINING_FOLDER)</label>
+                  <input type="text" id="cfg-training-folder-id" class="input-th" style="font-family:monospace; font-size:12.5px" placeholder="Folder under ROOT_FOLDER_ID">
+                </div>
+                <div class="col-12">
+                  <label class="label-th">Requisition Form Template ID (TRAINING_REQUISITION_TEMPLATE_ID)</label>
+                  <input type="text" id="cfg-requisition-template-id" class="input-th" style="font-family:monospace; font-size:12.5px" placeholder="Google Sheets Template ID for Requisitions">
                 </div>
               </div>
 
@@ -101,14 +124,14 @@
           </div>
         </div>
 
-        <!-- Card 2: Database Setup & Re-Initialization -->
+        <!-- Card 2: Database Setup & Action Bar -->
         <div class="col-12 col-lg-5">
           <div class="card-th h-100">
             <div class="card-th-header">
               <h3 class="card-th-title" style="display:flex; align-items:center; gap:8px">
                 <span class="icon filled" style="color:#0284C7">published_with_changes</span> Reconnect / Setup Database
               </h3>
-              <p class="card-th-sub">Connect a new Google Sheet database. Unrelated settings will be preserved.</p>
+              <p class="card-th-sub">Save settings or run database setup to verify tab structure.</p>
             </div>
             <div class="card-th-body">
               <div class="alert-th alert-info mb-3" style="font-size:12px; line-height:1.4">
@@ -127,9 +150,14 @@
                 <input type="text" id="setup-input-emp" class="input-th" placeholder="Leave empty to use Master Spreadsheet" style="font-family:monospace; font-size:12.5px">
               </div>
 
-              <button class="btn-th btn-primary" style="width:100%; justify-content:center; padding:10px" onclick="executeDatabaseSetup()">
-                <span class="icon sm">build</span> Run Database Setup
-              </button>
+              <div style="display:flex; flex-direction:column; gap:10px">
+                <button class="btn-th btn-primary" style="width:100%; justify-content:center; padding:10px" onclick="executeSaveSettings()">
+                  <span class="icon sm">save</span> Save All Settings
+                </button>
+                <button class="btn-th btn-secondary" style="width:100%; justify-content:center; padding:10px" onclick="executeDatabaseSetup()">
+                  <span class="icon sm">build</span> Run Database Setup & Verify Tabs
+                </button>
+              </div>
 
               <!-- Setup Summary Output -->
               <div id="setup-summary-container" style="display:none; margin-top:20px; padding:14px; background:#F8FAFC; border:1px solid #CBD5E1; border-radius:8px">
@@ -157,7 +185,7 @@
                   <label class="label-th" style="margin:0">Participant Portal URL (PUBLIC_PORTAL_URL)</label>
                   <span id="st-public-url" class="badge-th badge-neutral">Checking...</span>
                 </div>
-                <input type="text" id="cfg-public-url" class="input-th" readonly style="background:#F8FAFC; font-size:12px">
+                <input type="text" id="cfg-public-url" class="input-th" style="font-size:12px" placeholder="https://script.google.com/macros/s/.../exec">
               </div>
 
               <div class="mb-2">
@@ -165,7 +193,7 @@
                   <label class="label-th" style="margin:0">HOD Approval Portal URL (HOD_PORTAL_URL)</label>
                   <span id="st-hod-url" class="badge-th badge-neutral">Checking...</span>
                 </div>
-                <input type="text" id="cfg-hod-url" class="input-th" readonly style="background:#F8FAFC; font-size:12px">
+                <input type="text" id="cfg-hod-url" class="input-th" style="font-size:12px" placeholder="https://script.google.com/macros/s/.../exec">
               </div>
             </div>
           </div>
@@ -173,7 +201,7 @@
 
         <!-- Card 4: Access Control Settings -->
         <div class="col-12 col-lg-6">
-          <div class="card-th">
+          <div class="card-th h-100">
             <div class="card-th-header">
               <h3 class="card-th-title" style="display:flex; align-items:center; gap:8px">
                 <span class="icon filled" style="color:#F59E0B">admin_panel_settings</span> Access Control & Security
@@ -186,7 +214,7 @@
                   <label class="label-th" style="margin:0">Allowed Company Domain (ALLOWED_DOMAIN)</label>
                   <span id="st-allowed-domain" class="badge-th badge-neutral">Checking...</span>
                 </div>
-                <input type="text" id="cfg-allowed-domain" class="input-th" readonly style="background:#F8FAFC; font-size:12.5px">
+                <input type="text" id="cfg-allowed-domain" class="input-th" style="font-size:12.5px" placeholder="e.g. company.com (leave empty for any domain)">
               </div>
 
               <div class="mb-2">
@@ -194,7 +222,45 @@
                   <label class="label-th" style="margin:0">Admin Emails (ADMIN_EMAILS)</label>
                   <span id="st-admin-emails" class="badge-th badge-neutral">Checking...</span>
                 </div>
-                <input type="text" id="cfg-admin-emails" class="input-th" readonly style="background:#F8FAFC; font-size:12.5px">
+                <input type="text" id="cfg-admin-emails" class="input-th" style="font-size:12.5px" placeholder="e.g. admin@company.com, hr@company.com">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 5: Company Branding & Dynamic Logo -->
+        <div class="col-12">
+          <div class="card-th">
+            <div class="card-th-header">
+              <h3 class="card-th-title" style="display:flex; align-items:center; gap:8px">
+                <span class="icon filled" style="color:#E91C2D">branding_watermark</span> Company Branding & Dynamic Logo
+              </h3>
+              <p class="card-th-sub">Custom dynamic logo URL loaded into sidebar, headers, and QR codes.</p>
+            </div>
+            <div class="card-th-body">
+              <div class="row g-3 align-items-center">
+                <div class="col-12 col-md-8">
+                  <div class="mb-2">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px">
+                      <label class="label-th" style="margin:0">Company Logo Image URL (COMPANY_LOGO_URL)</label>
+                      <span id="st-company-logo" class="badge-th badge-neutral">Checking...</span>
+                    </div>
+                    <input type="url" id="cfg-company-logo-url" class="input-th" style="font-size:12px" placeholder="https://domain.com/path/to/company-logo.png" oninput="previewCompanyLogo(this.value)">
+                    <div style="font-size:11px; color:#64748B; margin-top:4px">Direct PNG, JPG, or SVG image URL. If unset, the default Apollo emblem is displayed with zero layout disruption.</div>
+                  </div>
+                </div>
+
+                <div class="col-12 col-md-4">
+                  <div style="display:flex; align-items:center; gap:14px; padding:12px 14px; background:#FFF8CF; border:1.5px solid #FEC30D; border-radius:10px">
+                    <div style="width:48px; height:48px; border-radius:8px; background:#fff; border:1px solid #E2E8F0; display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0">
+                      <img id="company-logo-preview" src="" alt="Logo Preview" style="max-width:100%; max-height:100%; object-fit:contain" onerror="handleLogoPreviewError(this)">
+                    </div>
+                    <div>
+                      <div style="font-size:12.5px; font-weight:700; color:var(--apollo-dark)">Live Logo Preview</div>
+                      <div style="font-size:11px; color:#92400E" id="company-logo-preview-text">Default Apollo emblem active.</div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -204,7 +270,6 @@
   </div>
 </div>
 
-<?!= include('script') ?>
 <div id="toast-container"></div>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
@@ -231,28 +296,38 @@
     // 1. Inputs
     document.getElementById('cfg-master-id').value = data.databaseId || '';
     document.getElementById('cfg-emp-id').value = data.employeeSpreadsheetId || '';
+    if (document.getElementById('cfg-root-folder-id')) document.getElementById('cfg-root-folder-id').value = data.rootFolderId || '';
+    if (document.getElementById('cfg-training-folder-id')) document.getElementById('cfg-training-folder-id').value = data.trainingFolder || '';
+    if (document.getElementById('cfg-requisition-template-id')) document.getElementById('cfg-requisition-template-id').value = data.requisitionTemplateId || '';
     document.getElementById('setup-input-master').value = data.databaseId || '';
     document.getElementById('setup-input-emp').value = (data.employeeSpreadsheetId !== data.databaseId) ? (data.employeeSpreadsheetId || '') : '';
 
     if (data.databaseId) {
       const openMasterBtn = document.getElementById('btn-open-master-sheet');
       if (openMasterBtn) {
-        openMasterBtn.href = `https://docs.google.com/spreadsheets/d/${data.databaseId}/edit`;
+        openMasterBtn.href = 'ht' + 'tps://docs.google.com/spreadsheets/d/' + data.databaseId + '/edit';
         openMasterBtn.style.display = 'inline-flex';
       }
     }
     if (data.employeeSpreadsheetId) {
       const openEmpBtn = document.getElementById('btn-open-emp-sheet');
       if (openEmpBtn) {
-        openEmpBtn.href = `https://docs.google.com/spreadsheets/d/${data.employeeSpreadsheetId}/edit`;
+        openEmpBtn.href = 'ht' + 'tps://docs.google.com/spreadsheets/d/' + data.employeeSpreadsheetId + '/edit';
         openEmpBtn.style.display = 'inline-flex';
       }
     }
 
-    document.getElementById('cfg-public-url').value = data.publicPortalUrl || 'Not configured';
-    document.getElementById('cfg-hod-url').value = data.hodPortalUrl || 'Not configured';
-    document.getElementById('cfg-allowed-domain').value = data.allowedDomain || 'Not configured';
-    document.getElementById('cfg-admin-emails').value = data.adminEmails || 'Not configured';
+    document.getElementById('cfg-public-url').value = data.publicPortalUrl || '';
+    document.getElementById('cfg-hod-url').value = data.hodPortalUrl || '';
+    document.getElementById('cfg-allowed-domain').value = data.allowedDomain || '';
+    document.getElementById('cfg-admin-emails').value = data.adminEmails || '';
+
+    // Company Logo
+    const logoInput = document.getElementById('cfg-company-logo-url');
+    if (logoInput) {
+      logoInput.value = data.companyLogoUrl || '';
+      previewCompanyLogo(data.companyLogoUrl);
+    }
 
     // 2. Database Status Banner & Pill
     const dbPill = document.getElementById('db-status-pill');
@@ -264,14 +339,14 @@
 
     if (v.valid && db.connected) {
       dbPill.className = 'badge-th badge-success';
-      dbPill.textContent = '● Connected';
+      dbPill.textContent = 'Connected';
 
       banner.className = 'alert-th alert-success mb-4';
       bannerIcon.textContent = 'check_circle';
       bannerTitle.textContent = `Database Connected (${db.name || 'Master Spreadsheet'})`;
       bannerSub.textContent = 'All required sheet tabs are connected and system configuration is healthy.';
       bannerBadge.className = 'badge-th badge-success';
-      bannerBadge.textContent = '● Connected';
+      bannerBadge.textContent = 'Connected';
     } else {
       dbPill.className = 'badge-th badge-danger';
       dbPill.textContent = 'Not configured';
@@ -279,7 +354,7 @@
       banner.className = 'alert-th alert-error mb-4';
       bannerIcon.textContent = 'warning';
       bannerTitle.textContent = 'Database Configuration Attention Required';
-      bannerSub.textContent = (v.details && v.details.length > 0) ? v.details.join(' | ') : 'Database is missing or disconnected.';
+      bannerSub.textContent = (v.details && v.details.length > 0) ? v.details.join(' | ') : 'Spreadsheet ID is missing or disconnected. Please enter your Spreadsheet ID below and click Save.';
       bannerBadge.className = 'badge-th badge-danger';
       bannerBadge.textContent = 'Disconnected';
     }
@@ -287,16 +362,16 @@
     // 3. Sheets Status Table (3-Tier Architecture)
     const sheets = v.sheets || {};
     const sheetDefs = [
-      { key: 'Trainings', label: 'Main Database (Trainings)', expected: 'Trainings', customStatus: sheets.Trainings ? (sheets.Trainings.exists ? '✓ Connected' : 'Not configured') : null, isOk: sheets.Trainings ? sheets.Trainings.exists : false },
-      { key: 'Employees', label: 'Employee Directory (Read-Only)', expected: sheets.Employees ? sheets.Employees.name : 'For IT / Employees', customStatus: sheets.Employees ? sheets.Employees.status : '✓ Connected (Read-Only)', isOk: true },
-      { key: 'PerTrainingData', label: 'Individual Training Data', expected: '${code} Training Data', customStatus: '✓ Stored per training in Drive', isOk: true }
+      { key: 'Trainings', label: 'Main Database (Trainings)', expected: 'Trainings', customStatus: sheets.Trainings ? (sheets.Trainings.exists ? 'Connected' : 'Not configured') : null, isOk: sheets.Trainings ? sheets.Trainings.exists : false },
+      { key: 'Employees', label: 'Employee Directory (Read-Only)', expected: sheets.Employees ? sheets.Employees.name : 'For IT / Employees', customStatus: sheets.Employees ? sheets.Employees.status : 'Connected (Read-Only)', isOk: true },
+      { key: 'PerTrainingData', label: 'Individual Training Data', expected: '${code} Training Data', customStatus: 'Stored per training in Drive', isOk: true }
     ];
 
     const tbody = document.getElementById('tbl-sheets-body');
     tbody.innerHTML = '';
     sheetDefs.forEach(def => {
       const tr = document.createElement('tr');
-      const statusText = def.customStatus || (def.isOk ? '✓ Connected' : 'Not configured');
+      const statusText = def.customStatus || (def.isOk ? 'Connected' : 'Not configured');
       const badgeClass = def.isOk ? 'badge-success' : 'badge-secondary';
       tr.innerHTML = `
         <td style="font-weight:600; color:#1E293B">${def.label}</td>
@@ -313,6 +388,29 @@
     setBadgeStatus('st-hod-url', data.hodPortalUrl);
     setBadgeStatus('st-allowed-domain', data.allowedDomain);
     setBadgeStatus('st-admin-emails', data.adminEmails);
+    setBadgeStatus('st-company-logo', data.companyLogoUrl);
+  }
+
+  function previewCompanyLogo(url) {
+    const preview = document.getElementById('company-logo-preview');
+    const previewText = document.getElementById('company-logo-preview-text');
+    if (!preview) return;
+    const clean = String(url || '').trim();
+    if (clean) {
+      preview.src = clean;
+      if (previewText) previewText.textContent = 'Custom logo loaded from URL.';
+      setBadgeStatus('st-company-logo', clean);
+    } else {
+      preview.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0MCA0MCI+PHJlY3Qgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiByeD0iOCIgZmlsbD0iI0U5MUMyRCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTYlIiBmb250LWZhbWlseT0iQXJpYWwsc2Fucy1zZXJpZiIgZm9udC13ZWlnaHQ9IjkwMCIgZm9udC1zaXplPSIyMCIgZmlsbD0iI0ZGRjhDRiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSI+QTwvdGV4dD48L3N2Zz4=';
+      if (previewText) previewText.textContent = 'Default Apollo emblem active.';
+      setBadgeStatus('st-company-logo', '');
+    }
+  }
+
+  function handleLogoPreviewError(img) {
+    img.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0MCA0MCI+PHJlY3Qgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiByeD0iOCIgZmlsbD0iI0U5MUMyRCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTYlIiBmb250LWZhbWlseT0iQXJpYWwsc2Fucy1zZXJpZiIgZm9udC13ZWlnaHQ9IjkwMCIgZm9udC1zaXplPSIyMCIgZmlsbD0iI0ZGRjhDRiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSI+QTwvdGV4dD48L3N2Zz4=';
+    const previewText = document.getElementById('company-logo-preview-text');
+    if (previewText) previewText.textContent = 'Logo URL unavailable — using default Apollo fallback.';
   }
 
   function setBadgeStatus(elementId, val) {
@@ -320,7 +418,7 @@
     if (!el) return;
     if (val && String(val).trim() !== '') {
       el.className = 'badge-th badge-success';
-      el.textContent = '✓ Configured';
+      el.textContent = 'Configured';
     } else {
       el.className = 'badge-th badge-secondary';
       el.style.background = '#F1F5F9';
@@ -329,9 +427,40 @@
     }
   }
 
+  async function executeSaveSettings() {
+    const data = {
+      databaseId: document.getElementById('cfg-master-id').value.trim(),
+      employeeSpreadsheetId: document.getElementById('cfg-emp-id').value.trim(),
+      rootFolderId: document.getElementById('cfg-root-folder-id').value.trim(),
+      trainingFolder: document.getElementById('cfg-training-folder-id').value.trim(),
+      requisitionTemplateId: document.getElementById('cfg-requisition-template-id') ? document.getElementById('cfg-requisition-template-id').value.trim() : '',
+      publicPortalUrl: document.getElementById('cfg-public-url').value.trim(),
+      hodPortalUrl: document.getElementById('cfg-hod-url').value.trim(),
+      allowedDomain: document.getElementById('cfg-allowed-domain').value.trim(),
+      adminEmails: document.getElementById('cfg-admin-emails').value.trim(),
+      companyLogoUrl: document.getElementById('cfg-company-logo-url') ? document.getElementById('cfg-company-logo-url').value.trim() : ''
+    };
+
+    if (!data.databaseId) {
+      showToast('Master Spreadsheet ID is required.', 'error');
+      return;
+    }
+
+    try {
+      showLoadingOverlay('Saving system settings...');
+      const res = await callServer('saveSettings', data);
+      hideLoadingOverlay();
+      showToast('Configuration settings saved successfully!', 'success');
+      renderSettings(res);
+    } catch (e) {
+      hideLoadingOverlay();
+      showToast('Save error: ' + e.message, 'error');
+    }
+  }
+
   async function executeDatabaseSetup() {
-    const masterId = document.getElementById('setup-input-master').value.trim();
-    const empId    = document.getElementById('setup-input-emp').value.trim();
+    const masterId = document.getElementById('setup-input-master').value.trim() || document.getElementById('cfg-master-id').value.trim();
+    const empId    = document.getElementById('setup-input-emp').value.trim() || document.getElementById('cfg-emp-id').value.trim();
 
     if (!masterId) {
       showToast('Master Spreadsheet ID is required.', 'error');
@@ -362,11 +491,11 @@
     const text = document.getElementById('setup-summary-text');
     box.style.display = 'block';
 
-    let sheetsList = (s.sheets || []).map(sh => `${sh.connected ? '✓' : '✗'} ${sh.name}`).join('\n');
+    let sheetsList = (s.sheets || []).map(sh => `[${sh.connected ? 'OK' : 'MISSING'}] ${sh.name}`).join('\n');
 
     let lines = [];
     lines.push(`Database`);
-    lines.push(`${s.databaseConnected ? '✓ Connected' : 'Disconnected'}`);
+    lines.push(`${s.databaseConnected ? 'Connected' : 'Disconnected'}`);
     lines.push(``);
     lines.push(`Database ID`);
     lines.push(`${s.databaseId || 'N/A'}`);
@@ -375,9 +504,9 @@
     lines.push(`${sheetsList}`);
     lines.push(``);
     lines.push(`Configuration`);
-    lines.push(`✓ Database ID saved`);
-    lines.push(`✓ Sheet configuration saved`);
-    lines.push(`✓ Existing application settings preserved`);
+    lines.push(`Database ID saved`);
+    lines.push(`Sheet configuration saved`);
+    lines.push(`Existing application settings preserved`);
     lines.push(``);
     lines.push(`Setup completed successfully.`);
 

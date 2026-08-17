@@ -66,9 +66,9 @@ function saveTrainingEvaluation(data) {
     const ss = getTrainingDataSpreadsheet(trainingId);
     if (!ss) return err('Could not open per-training sheet for ID: ' + trainingId);
 
-    let sheet = ss.getSheetByName('TrainingEval');
+    let sheet = ss.getSheetByName('Evaluation') || ss.getSheetByName('TrainingEval');
     if (!sheet) {
-      sheet = ss.insertSheet('TrainingEval');
+      sheet = ss.insertSheet('Evaluation');
       sheet.appendRow(['ID', 'TrainingID', 'EmployeeID', 'EmployeeName', 'Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6', 'Q7', 'SectionB1', 'SectionB2', 'SectionB3', 'AvgScore', 'SubmittedAt']);
       sheet.getRange('A1:P1').setFontWeight('bold').setBackground('#2563EB').setFontColor('#FFFFFF');
       sheet.setFrozenRows(1);

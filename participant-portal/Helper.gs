@@ -210,14 +210,21 @@ function getTrainingDataSpreadsheet(trainingId) {
   const t = trainings.find(r => String(r.ID || r.TrainingID || r.Code || '').trim() === cleanId);
   if (!t) return null;
 
-  // Resolve from the configured Root Folder, never from a stored file ID.
   try {
-    const rootId = getConfigProperty('ROOT_FOLDER_ID', '');
-    if (!rootId) throw new Error('ROOT_FOLDER_ID is required.');
-    const systemRoot = DriveApp.getFolderById(rootId);
-    let trainingRootIter = systemRoot.getFoldersByName('Training Folder');
-    if (!trainingRootIter.hasNext()) throw new Error("Required folder 'Training Folder' was not found under ROOT_FOLDER_ID.");
-    const trainingRoot = trainingRootIter.next();
+    const configuredFolderId = getConfigProperty('TRAINING_FOLDER', '') || getConfigProperty('TRAINING_FOLDER_ID', '');
+    let trainingRoot = null;
+    if (configuredFolderId) {
+      try { trainingRoot = DriveApp.getFolderById(configuredFolderId); } catch(e) {}
+    }
+
+    if (!trainingRoot) {
+      const rootId = getConfigProperty('ROOT_FOLDER_ID', '');
+      if (!rootId) throw new Error('ROOT_FOLDER_ID is required.');
+      const systemRoot = DriveApp.getFolderById(rootId);
+      let trainingRootIter = systemRoot.getFoldersByName('Training Folder');
+      if (trainingRootIter.hasNext()) trainingRoot = trainingRootIter.next();
+    }
+    if (!trainingRoot) return null;
 
     const code = t.Code || t.ID || cleanId;
     const folderName = `${code} ${t.Name || ''}`.trim();
@@ -227,7 +234,8 @@ function getTrainingDataSpreadsheet(trainingId) {
     if (folderIter.hasNext()) targetFolder = folderIter.next();
 
     if (targetFolder) {
-      const fileIter = targetFolder.getFilesByName(`${code} Training Data`);
+      let fileIter = targetFolder.getFilesByName('Training Data');
+      if (!fileIter.hasNext()) fileIter = targetFolder.getFilesByName(`${code} Training Data`);
       if (fileIter.hasNext()) {
         return SpreadsheetApp.openById(fileIter.next().getId());
       }
@@ -263,11 +271,11 @@ function getOrCreateSingleTrainingSheet(folder, code) {
 
   const tabDefs = [
     {
-      name: 'TrainingParticipants',
-      headers: ['ID', 'TrainingID', 'EmployeeID', 'EmployeeName', 'Department', 'Position', 'AddedAt']
+      name: 'Participants',
+      headers: ['ID', 'TrainingID', 'EmployeeID', 'EmployeeName', 'Department', 'Position', 'AddedAt', 'SupervisorID', 'SupervisorEmail', 'SupervisorName']
     },
     {
-      name: 'TrainingSessions',
+      name: 'Sessions',
       headers: ['SessionID', 'TrainingID', 'SessionName', 'SessionDate', 'StartTime', 'EndTime', 'AttendanceURL', 'QRCodeURL', 'QRStatus', 'CreatedDate']
     },
     {
@@ -275,11 +283,11 @@ function getOrCreateSingleTrainingSheet(folder, code) {
       headers: ['AttendanceID', 'SessionID', 'TrainingID', 'EmployeeNo', 'EmployeeName', 'Department', 'ScanTime', 'Status', 'TrainingCode', 'Day', 'Date', 'Hours', 'Remarks', 'EditedBy', 'EditedAt']
     },
     {
-      name: 'TrainingEval',
+      name: 'Evaluation',
       headers: ['ID', 'TrainingID', 'EmployeeID', 'EmployeeName', 'Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6', 'Q7', 'SectionB1', 'SectionB2', 'SectionB3', 'AvgScore', 'SubmittedAt']
     },
     {
-      name: 'PostEval',
+      name: 'Post Evaluation',
       headers: ['ID', 'TrainingID', 'EmployeeID', 'EvaluatorName', 'EvaluatorID', 'CompetencyBefore', 'CompetencyAfter', 'Improvement', 'CanApply', 'FurtherTraining', 'Comments', 'SubmittedAt']
     }
   ];
@@ -288,7 +296,7 @@ function getOrCreateSingleTrainingSheet(folder, code) {
     let sheet = ss.getSheetByName(def.name);
     if (!sheet) {
       const allSheets = ss.getSheets();
-      sheet = allSheets.find(s => s.getName().toLowerCase().includes(def.name.toLowerCase()));
+      sheet = allSheets.find(s => s.getName().toLowerCase().replace(/[^a-z0-9]/g, '') === def.name.toLowerCase().replace(/[^a-z0-9]/g, ''));
       if (!sheet) {
         sheet = ss.insertSheet(def.name);
       } else {
@@ -317,13 +325,13 @@ function getOrCreateSingleTrainingSheet(folder, code) {
     summarySheet.getRange('A1:B1').setFontWeight('bold').setBackground('#1E293B').setFontColor('#FFFFFF');
 
     summarySheet.getRange('A2:B8').setFormulas([
-      ['Total Enrolled Participants', '=IF(ISREF(TrainingParticipants!A2), COUNTA(TrainingParticipants!A2:A), 0)'],
-      ['Total Sessions Created', '=IF(ISREF(TrainingSessions!A2), COUNTA(TrainingSessions!A2:A), 0)'],
+      ['Total Enrolled Participants', '=IF(ISREF(Participants!A2), COUNTA(Participants!A2:A), 0)'],
+      ['Total Sessions Created', '=IF(ISREF(Sessions!A2), COUNTA(Sessions!A2:A), 0)'],
       ['Total Attendance Logs', '=IF(ISREF(Attendance!A2), COUNTA(Attendance!A2:A), 0)'],
       ['Present Count', '=IF(ISREF(Attendance!H2), COUNTIF(Attendance!H2:H, "Present"), 0)'],
-      ['Total Evaluations Submitted', '=IF(ISREF(TrainingEval!A2), COUNTA(TrainingEval!A2:A), 0)'],
-      ['Overall Average Score', '=IF(AND(ISREF(TrainingEval!O2), COUNTA(TrainingEval!O2:O)>0), AVERAGE(TrainingEval!O2:O), 0)'],
-      ['Total Post-Reviews Completed', '=IF(ISREF(PostEval!A2), COUNTA(PostEval!A2:A), 0)']
+      ['Total Evaluations Submitted', '=IF(ISREF(Evaluation!A2), COUNTA(Evaluation!A2:A), 0)'],
+      ['Overall Average Score', '=IF(AND(ISREF(Evaluation!O2), COUNTA(Evaluation!O2:O)>0), AVERAGE(Evaluation!O2:O), 0)'],
+      ['Total Post-Reviews Completed', '=IF(ISREF(\'Post Evaluation\'!A2), COUNTA(\'Post Evaluation\'!A2:A), 0)']
     ]);
   }
 
@@ -349,7 +357,7 @@ function findTrainingBySessionId(sessionId) {
     if (!t.ID) continue;
     const ss = getTrainingDataSpreadsheet(t.ID);
     if (!ss) continue;
-    const sessSheet = ss.getSheetByName('TrainingSessions');
+    const sessSheet = ss.getSheetByName('Sessions') || ss.getSheetByName('TrainingSessions');
     if (!sessSheet) continue;
     const sessions = sheetToJson(sessSheet);
     const session = sessions.find(s => String(s.SessionID || '').trim() === cleanSessionId);

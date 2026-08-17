@@ -42,13 +42,14 @@ function initDefaultScriptProperties(overwriteExisting) {
   const defaults = {
     'SPREADSHEET_ID':          '',
     'EMPLOYEE_SPREADSHEET_ID': '',
-    'ALLOWED_DOMAIN':          'company.com',
-    'ADMIN_EMAILS':            'admin@company.com',
+    'ALLOWED_DOMAIN':          '',
+    'ADMIN_EMAILS':            '',
     'APP_TITLE':               'TrainHub — Training Management System',
-    'SHEET_EMPLOYEES':         'Employees',
+    'SHEET_EMPLOYEES':         'For IT',
     'SHEET_HR_EMAIL':          'HR email',
     'SHEET_TRAININGS':         'Trainings',
     'ROOT_FOLDER_ID':          '',
+    'TRAINING_FOLDER':         '',
     'TEMPLATE_FOLDER_ID':      '',
     'ATTENDANCE_TEMPLATE_ID':  '',
     'EVALUATION_TEMPLATE_ID':  '',
@@ -121,6 +122,9 @@ function getSystemConfigurationDiagnostics() {
   const keys = [
     'SPREADSHEET_ID',
     'EMPLOYEE_SPREADSHEET_ID',
+    'ROOT_FOLDER_ID',
+    'TRAINING_FOLDER',
+    'TRAINING_REQUISITION_TEMPLATE_ID',
     'ALLOWED_DOMAIN',
     'ADMIN_EMAILS',
     'APP_TITLE',
@@ -135,7 +139,7 @@ function getSystemConfigurationDiagnostics() {
   const result = {};
   keys.forEach(k => {
     const val = props[k];
-    result[k] = (val !== undefined && val !== null && String(val).trim() !== '') ? '✓ Configured' : 'Not configured';
+    result[k] = (val !== undefined && val !== null && String(val).trim() !== '') ? 'Configured' : 'Not configured';
   });
   return result;
 }
@@ -254,7 +258,7 @@ function getEmployeeSpreadsheetId() {
   return getConfigProperty('EMPLOYEE_SPREADSHEET_ID', getSpreadsheetId());
 }
 
-const DEFAULT_APOLLO_LOGO_URL = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="22" fill="%232563EB"/><circle cx="50" cy="50" r="28" fill="%23FFFFFF"/><text x="50" y="61" font-family="Arial, sans-serif" font-weight="900" font-size="32" fill="%232563EB" text-anchor="middle">A</text></svg>';
+const DEFAULT_APOLLO_LOGO_URL = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjIyIiBmaWxsPSIjRTkxQzJEIi8+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iMjgiIGZpbGw9IiNGRkY4Q0YiIHN0cm9rZT0iI0ZFQzMwRCIgc3Ryb2tlLXdpZHRoPSIyIi8+PHRleHQgeD0iNTAiIHk9IjYxIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI5MDAiIGZvbnQtc2l6ZT0iMzIiIGZpbGw9IiNFOTFDMkQiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkE8L3RleHQ+PC9zdmc+';
 
 function getCompanyLogoUrl() {
   const url = getConfigProperty('COMPANY_LOGO_URL', '');
@@ -329,41 +333,83 @@ function convertDriveLinkToDirectImageUrl(input) {
 }
 
 const SHEET_NAMES = {
-  get employees()            { return getConfigProperty('SHEET_EMPLOYEES', 'Employees'); },
+  get employees()            { return getConfigProperty('SHEET_EMPLOYEES', 'For IT'); },
   get hrEmail()              { return getConfigProperty('SHEET_HR_EMAIL', 'HR email'); },
   get trainings()            { return getConfigProperty('SHEET_TRAININGS', 'Trainings'); },
-  get trainingSessions()     { return getConfigProperty('SHEET_TRAINING_SESSIONS', 'TrainingSessions'); },
+  get trainingSessions()     { return getConfigProperty('SHEET_TRAINING_SESSIONS', 'Sessions'); },
   get attendance()           { return getConfigProperty('SHEET_ATTENDANCE', 'Attendance'); },
-  get trainingEval()         { return getConfigProperty('SHEET_TRAINING_EVAL', 'TrainingEval'); },
-  get postEval()             { return getConfigProperty('SHEET_POST_EVAL', 'PostEval'); },
-  get trainingParticipants() { return getConfigProperty('SHEET_TRAINING_PARTICIPANTS', 'TrainingParticipants'); }
+  get trainingEval()         { return getConfigProperty('SHEET_TRAINING_EVAL', 'Evaluation'); },
+  get postEval()             { return getConfigProperty('SHEET_POST_EVAL', 'Post Evaluation'); },
+  get trainingParticipants() { return getConfigProperty('SHEET_TRAINING_PARTICIPANTS', 'Participants'); }
 };
 
 // ─── Spreadsheet Access ────────────────────────────────────────────────────────
 let _cachedSpreadsheet = null;
 function getSpreadsheet() {
   if (_cachedSpreadsheet) return _cachedSpreadsheet;
+
   const spreadsheetId = getSpreadsheetId();
-  if (spreadsheetId) {
-    _cachedSpreadsheet = SpreadsheetApp.openById(spreadsheetId);
-    return _cachedSpreadsheet;
+  if (spreadsheetId && String(spreadsheetId).trim() !== '') {
+    try {
+      _cachedSpreadsheet = SpreadsheetApp.openById(String(spreadsheetId).trim());
+      if (_cachedSpreadsheet) return _cachedSpreadsheet;
+    } catch (e) {
+      Logger.log('Warning: Failed to open configured SPREADSHEET_ID (' + spreadsheetId + '): ' + e.message);
+    }
   }
-  _cachedSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  return _cachedSpreadsheet;
+
+  // Fallback 1: Container active spreadsheet
+  try {
+    const active = SpreadsheetApp.getActiveSpreadsheet();
+    if (active) {
+      _cachedSpreadsheet = active;
+      try { setConfigProperty('SPREADSHEET_ID', active.getId()); } catch(pErr) {}
+      return _cachedSpreadsheet;
+    }
+  } catch(aErr) {}
+
+  // Fallback 2: Search Google Drive for existing 'TrainHub Database' or 'TrainHub Master Database'
+  try {
+    let files = DriveApp.getFilesByName('TrainHub Database');
+    if (!files.hasNext()) files = DriveApp.getFilesByName('TrainHub Master Database');
+    if (files.hasNext()) {
+      const file = files.next();
+      _cachedSpreadsheet = SpreadsheetApp.openById(file.getId());
+      if (_cachedSpreadsheet) {
+        try { setConfigProperty('SPREADSHEET_ID', file.getId()); } catch(pErr) {}
+        return _cachedSpreadsheet;
+      }
+    }
+  } catch(dErr) {}
+
+  return null;
 }
 
 let _cachedEmployeeSpreadsheet = null;
 function getEmployeeSpreadsheet() {
   if (_cachedEmployeeSpreadsheet) return _cachedEmployeeSpreadsheet;
+
   const empSpreadsheetId = getEmployeeSpreadsheetId();
-  if (empSpreadsheetId) {
+  if (empSpreadsheetId && String(empSpreadsheetId).trim() !== '') {
     try {
-      _cachedEmployeeSpreadsheet = SpreadsheetApp.openById(empSpreadsheetId);
-      return _cachedEmployeeSpreadsheet;
+      _cachedEmployeeSpreadsheet = SpreadsheetApp.openById(String(empSpreadsheetId).trim());
+      if (_cachedEmployeeSpreadsheet) return _cachedEmployeeSpreadsheet;
     } catch(e) {
-      Logger.log('Failed to open separate EMPLOYEE_SPREADSHEET_ID: ' + e.message);
+      Logger.log('Failed to open separate EMPLOYEE_SPREADSHEET_ID (' + empSpreadsheetId + '): ' + e.message);
     }
   }
+
+  // Fallback: Search Google Drive for 'Namelist' or 'TrainHub Employee Master Database'
+  try {
+    let files = DriveApp.getFilesByName('Namelist');
+    if (!files.hasNext()) files = DriveApp.getFilesByName('TrainHub Employee Master Database');
+    if (files.hasNext()) {
+      const file = files.next();
+      _cachedEmployeeSpreadsheet = SpreadsheetApp.openById(file.getId());
+      if (_cachedEmployeeSpreadsheet) return _cachedEmployeeSpreadsheet;
+    }
+  } catch(dErr) {}
+
   return getSpreadsheet();
 }
 
@@ -383,6 +429,7 @@ function getSheet(name) {
 
   const ss = isEmployeeSpreadsheetSheet ? getEmployeeSpreadsheet() : getSpreadsheet();
   if (!ss) return null;
+
   let sheet = ss.getSheetByName(name);
   if (!sheet) {
     const allSheets = ss.getSheets();
@@ -390,8 +437,16 @@ function getSheet(name) {
     sheet = allSheets.find(s => {
       const sClean = s.getName().toLowerCase().replace(/[^a-z0-9]/g, '');
       return sClean === targetClean ||
-             sClean === targetClean + 's' ||
-             sClean + 's' === targetClean;
+             (targetClean === 'forit' && (sClean === 'employees' || sClean.includes('employee'))) ||
+             (targetClean === 'employees' && sClean === 'forit') ||
+             (targetClean === 'participants' && sClean === 'trainingparticipants') ||
+             (targetClean === 'trainingparticipants' && sClean === 'participants') ||
+             (targetClean === 'sessions' && sClean === 'trainingsessions') ||
+             (targetClean === 'trainingsessions' && sClean === 'sessions') ||
+             (targetClean === 'evaluation' && sClean === 'trainingeval') ||
+             (targetClean === 'trainingeval' && sClean === 'evaluation') ||
+             (targetClean === 'postevaluation' && sClean === 'posteval') ||
+             (targetClean === 'posteval' && sClean === 'postevaluation');
     });
 
     if (!sheet) {
@@ -407,12 +462,7 @@ function getSheet(name) {
     }
   }
 
-  // Auto-seed initial sample records if sheet is newly created or empty
-  if (sheet && sheet.getLastRow() <= 1) {
-    seedInitialSheetData(sheet, name);
-  }
-
-  // Ensure required columns exist for Trainings and TrainingSessions sheets
+  // Ensure required columns exist for Trainings and Sessions sheets
   if (sheet) {
     const cleanName = String(name).toLowerCase().replace(/[^a-z0-9]/g, '');
     if (cleanName === 'trainings') {
@@ -425,28 +475,37 @@ function getSheet(name) {
   return sheet;
 }
 
-// ─── Sheet Headers & Sample Data ─────────────────────────────────────────────
+// ─── Sheet Headers ─────────────────────────────────────────────────────────────
 function initSheetHeaders(sheet, name) {
   const headers = {
-    Employees:        ['ID', 'Name', 'Department', 'Position', 'Email', 'Phone', 'Status'],
-    'HR email':       ['Employee No', 'HR', 'Cost Centre', 'Position Title', 'Email'],
-    Trainings:        ['ID', 'Code', 'Name', 'Category', 'Trainer', 'Venue', 'StartDate',
-                       'EndDate', 'Duration', 'TotalHours', 'Department', 'Objectives',
-                       'Status', 'Stage', 'Participants',
-                       'FolderID', 'ParticipantsSheetID', 'SessionsSheetID', 'AttendanceSheetID',
-                       'EvaluationSheetID', 'PostSheetID', 'RequisitionFormFileID',
-                       'CreatedDate', 'UpdatedDate', 'CourseFee',
-                       'ApprovalStatus', 'RequestedBy', 'RequestedByName', 'RequestedByEmail', 'RequestedDate', 'ApprovedBy', 'ApprovedCostCentre', 'ApprovedAt', 'ApprovalRemarks', 'RescheduledDate'],
-    TrainingSessions: ['SessionID', 'TrainingID', 'SessionName', 'SessionDate', 'StartTime', 'EndTime', 'AttendanceURL', 'QRCodeURL', 'QRStatus', 'CreatedDate'],
-    Attendance:       ['AttendanceID', 'SessionID', 'TrainingID', 'EmployeeNo', 'EmployeeName',
-                       'Department', 'ScanTime', 'Status', 'TrainingCode', 'Day', 'Date', 'Hours',
-                       'Remarks', 'EditedBy', 'EditedAt'],
-    TrainingEval:     ['ID', 'TrainingID', 'EmployeeID', 'EmployeeName',
-                       'Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6', 'Q7',
-                       'SectionB1', 'SectionB2', 'SectionB3', 'AvgScore', 'SubmittedAt'],
-    PostEval:         ['ID', 'TrainingID', 'EmployeeID', 'EvaluatorName', 'EvaluatorID',
-                       'CompetencyBefore', 'CompetencyAfter', 'Improvement', 'CanApply',
-                       'FurtherTraining', 'Comments', 'SubmittedAt'],
+    'For IT':             ['ID', 'Name', 'Department', 'Position Title', 'Email', 'Phone', 'Status'],
+    Employees:            ['ID', 'Name', 'Department', 'Position Title', 'Email', 'Phone', 'Status'],
+    'HR email':           ['Employee No', 'HR', 'Cost Centre', 'Position Title', 'Email'],
+    Trainings:            ['ID', 'Code', 'Name', 'Category', 'Trainer', 'Venue', 'StartDate',
+                           'EndDate', 'Duration', 'TotalHours', 'Department', 'Objectives',
+                           'Status', 'Stage', 'Participants',
+                           'FolderID', 'ParticipantsSheetID', 'SessionsSheetID', 'AttendanceSheetID',
+                           'EvaluationSheetID', 'PostSheetID', 'RequisitionFormFileID',
+                           'CreatedDate', 'UpdatedDate', 'CourseFee',
+                           'ApprovalStatus', 'RequestedBy', 'RequestedByName', 'RequestedByEmail', 'RequestedDate', 'ApprovedBy', 'ApprovedCostCentre', 'ApprovedAt', 'ApprovalRemarks', 'RescheduledDate'],
+    Sessions:             ['SessionID', 'TrainingID', 'SessionName', 'SessionDate', 'StartTime', 'EndTime', 'AttendanceURL', 'QRCodeURL', 'QRStatus', 'CreatedDate'],
+    TrainingSessions:     ['SessionID', 'TrainingID', 'SessionName', 'SessionDate', 'StartTime', 'EndTime', 'AttendanceURL', 'QRCodeURL', 'QRStatus', 'CreatedDate'],
+    Attendance:           ['AttendanceID', 'SessionID', 'TrainingID', 'EmployeeNo', 'EmployeeName',
+                           'Department', 'ScanTime', 'Status', 'TrainingCode', 'Day', 'Date', 'Hours',
+                           'Remarks', 'EditedBy', 'EditedAt'],
+    Evaluation:           ['ID', 'TrainingID', 'EmployeeID', 'EmployeeName',
+                           'Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6', 'Q7',
+                           'SectionB1', 'SectionB2', 'SectionB3', 'AvgScore', 'SubmittedAt'],
+    TrainingEval:         ['ID', 'TrainingID', 'EmployeeID', 'EmployeeName',
+                           'Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6', 'Q7',
+                           'SectionB1', 'SectionB2', 'SectionB3', 'AvgScore', 'SubmittedAt'],
+    'Post Evaluation':    ['ID', 'TrainingID', 'EmployeeID', 'EvaluatorName', 'EvaluatorID',
+                           'CompetencyBefore', 'CompetencyAfter', 'Improvement', 'CanApply',
+                           'FurtherTraining', 'Comments', 'SubmittedAt'],
+    PostEval:             ['ID', 'TrainingID', 'EmployeeID', 'EvaluatorName', 'EvaluatorID',
+                           'CompetencyBefore', 'CompetencyAfter', 'Improvement', 'CanApply',
+                           'FurtherTraining', 'Comments', 'SubmittedAt'],
+    Participants:         ['ID', 'TrainingID', 'EmployeeID', 'EmployeeName', 'Department', 'Position', 'AddedAt', 'SupervisorID', 'SupervisorEmail', 'SupervisorName'],
     TrainingParticipants: ['ID', 'TrainingID', 'EmployeeID', 'EmployeeName', 'Department', 'Position', 'AddedAt', 'SupervisorID', 'SupervisorEmail', 'SupervisorName']
   };
 
@@ -460,63 +519,6 @@ function initSheetHeaders(sheet, name) {
       .setBackground('#2563EB')
       .setFontColor('#FFFFFF');
     sheet.setFrozenRows(1);
-  }
-}
-
-function seedInitialSheetData(sheet, name) {
-  if (!sheet) return;
-  if (sheet.getLastRow() === 0) {
-    initSheetHeaders(sheet, name);
-  }
-
-  const cleanName = String(name).toLowerCase().replace(/[^a-z0-9]/g, '');
-  if (cleanName === 'trainings' && sheet.getLastRow() <= 1) {
-    const headers = ensureTrainingSheetColumns(sheet);
-    const timeNow = now();
-    const initialTrainings = [
-      {
-        ID: 'TRN-101', Code: 'TRN-101', Name: 'Leadership & Executive Strategy 2026', Category: 'Behavioral Skills',
-        TrainingMode: 'In-house training', TnaSource: 'Training Requisition Form', Trainer: 'Dr. Robert Chen',
-        Venue: 'Apollo Grand Ballroom & Virtual', StartDate: '2026-09-01', EndDate: '2026-09-03',
-        Duration: 3, TotalHours: 24, Department: 'Management / Executive', Objectives: 'Enhance strategic decision-making, executive communication, and team leadership across business units.',
-        Status: 'Upcoming', Stage: 'Participants Imported', Participants: 15, CourseFee: '1500.00', ApprovalStatus: 'Approved',
-        CreatedDate: timeNow, UpdatedDate: timeNow, RequestedBy: 'ADMIN', RequestedByName: 'Administrator', RequestedDate: timeNow,
-        ApprovedBy: 'Sarah Jenkins (C-Suite)', ApprovedAt: timeNow, ApprovedCostCentre: 'Executive'
-      },
-      {
-        ID: 'TRN-102', Code: 'TRN-102', Name: 'Cybersecurity Compliance & ISO 27001', Category: 'Compliance Training',
-        TrainingMode: 'In-house training', TnaSource: 'Training Procedure', Trainer: 'Alan Walker',
-        Venue: 'IT Training Suite B', StartDate: '2026-08-10', EndDate: '2026-08-12',
-        Duration: 3, TotalHours: 24, Department: 'Information Technology', Objectives: 'Comprehensive information security compliance, data privacy, and ISO 27001 audit readiness.',
-        Status: 'In Progress', Stage: 'Attendance In Progress', Participants: 25, CourseFee: '2800.00', ApprovalStatus: 'Approved',
-        CreatedDate: timeNow, UpdatedDate: timeNow, RequestedBy: 'ADMIN', RequestedByName: 'Administrator', RequestedDate: timeNow,
-        ApprovedBy: 'Michael Tan (HOHR)', ApprovedAt: timeNow, ApprovedCostCentre: 'IT'
-      },
-      {
-        ID: 'TRN-103', Code: 'TRN-103', Name: 'Agile & Scrum Master Certification', Category: 'Technical Skills',
-        TrainingMode: 'Public', TnaSource: 'Training Requisition Form', Trainer: 'Scrum Alliance Certified Institute',
-        Venue: 'Kuala Lumpur Convention Centre', StartDate: '2026-05-15', EndDate: '2026-05-17',
-        Duration: 3, TotalHours: 24, Department: 'Software Engineering', Objectives: 'Agile project delivery, sprint planning, backlog grooming, and Scrum Master certification.',
-        Status: 'Completed', Stage: 'Waiting for 3-Month Review', Participants: 10, CourseFee: '1200.00', ApprovalStatus: 'Approved',
-        CreatedDate: timeNow, UpdatedDate: timeNow, RequestedBy: 'ADMIN', RequestedByName: 'Administrator', RequestedDate: timeNow,
-        ApprovedBy: 'David Lee (HOD)', ApprovedAt: timeNow, ApprovedCostCentre: 'Engineering'
-      },
-      {
-        ID: 'TRN-104', Code: 'TRN-104', Name: 'Project Management Fundamentals', Category: 'Business Skills',
-        TrainingMode: 'On-Job Training', TnaSource: 'Training Procedure', Trainer: 'Internal HRD Facilitators',
-        Venue: 'Main Conference Room A', StartDate: '2026-10-05', EndDate: '2026-10-06',
-        Duration: 2, TotalHours: 16, Department: 'Operations & Supply Chain', Objectives: 'Fundamental project planning, budgeting, risk management, and milestone tracking.',
-        Status: 'Upcoming', Stage: 'Created', Participants: 18, CourseFee: '2200.00', ApprovalStatus: 'Pending HOD Approval',
-        CreatedDate: timeNow, UpdatedDate: timeNow, RequestedBy: 'ADMIN', RequestedByName: 'Administrator', RequestedDate: timeNow,
-        ApprovedBy: 'Pending HOD Approval', ApprovedAt: '', ApprovedCostCentre: 'Operations'
-      }
-    ];
-
-    initialTrainings.forEach(t => {
-      const rowValues = headers.map(h => t[h] !== undefined ? t[h] : '');
-      sheet.appendRow(rowValues);
-    });
-    SpreadsheetApp.flush();
   }
 }
 

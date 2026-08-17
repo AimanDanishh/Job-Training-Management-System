@@ -156,7 +156,7 @@ function getEmployeeSubmittedRequests(employeeId) {
       const cleanTCode = tCode.toLowerCase();
 
       const trainingData = getTrainingDataSpreadsheet(tId || tCode);
-      const participantSheet = trainingData ? trainingData.getSheetByName('TrainingParticipants') : null;
+      const participantSheet = trainingData ? (trainingData.getSheetByName('Participants') || trainingData.getSheetByName('TrainingParticipants')) : null;
       const rawParticipants = participantSheet ? sheetToJson(participantSheet) : [];
 
       let reqParticipants = rawParticipants.map(p => ({

@@ -486,6 +486,7 @@ Training Type: add "On-Job Training"
 
 
 **Admin System (New Programme/Training Form):**
+
 1. TNA Source: Training Requisition Form and Training Procedure only
 
 2\. Remove lifecycle stage
@@ -495,6 +496,7 @@ Training Type: add "On-Job Training"
 
 
 **Admin System (3-month** **Post Evaluation):**
+
 1. For 3-month post evaluation, list all participants for the training (if they attend)
 
 2\. Admin can select/tick the participant and assign to the supervisor/PIC by selecting their employee name/ID and enter their email, they may assign to multiple supervisor (each of them need email)
@@ -512,22 +514,25 @@ Training Type: add "On-Job Training"
 
 
 
-**Database Structure (All are under Root Folder):**
+**Database Structure (All are under Root Folder (ROOT\_FOLDER\_ID)):**
 
-1. TrainHub Database (Sheets store Trainings)
+1. TrainHub Database (SPREADSHEET\_ID, Sheets store Trainings)
 2. Training Folder (store individual training in independent folder)
 
-   * Training Data (Sheets, below are the tab list)
+\-Training Data (Sheets auto create under each own training folder, below are the tab list)
 
-     * Participants
-     * Sessions
-     * Attendance
-     * Evaluation
-     * Post Evaluation
-     * Summary
-   * Training Requisition Form
-   * Brochure
-3. Reports
+* Participants
+* Sessions
+* Attendance
+* Evaluation
+* Post Evaluation
+* Summary
+
+\-Training Requisition Form (TRAINING\_REQUISITION\_TEMPLATE\_ID)
+
+\-Brochure (participants upload from form)
+
+3. Reports (sheets auto create under ROOT\_FOLDER\_ID, below are the tab list)
 
    * Annual Training Plan
    * Training Cost
@@ -535,9 +540,10 @@ Training Type: add "On-Job Training"
    * Employee Report
    * Training Hours
    * Sync History
-4. Namelist (fixed list of employee)
+4. Company logo (COMPANY\_LOGO\_URL)
+5. Namelist (EMPLOYEE\_SPREADSHEET\_ID, fixed list of employee)
 
-   * For IT (the list of employee)
+   * For IT (the list of employee details)
    * HOD email
    * Csuite email
    * HOHR email

@@ -3,8 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Apollo — Reports & Training Data Management</title>
+  <script>
+    window.__TRAINHUB_PAGE__ = '<?!= currentPage ?>';
+    window.__PUBLIC_PORTAL_URL__ = '<?!= (typeof publicPortalUrl !== "undefined" && publicPortalUrl) ? publicPortalUrl : "" ?>';
+    window.__COMPANY_LOGO_URL__ = '<?!= (typeof companyLogoUrl !== "undefined" && companyLogoUrl) ? companyLogoUrl : "" ?>';
+  </script>
   <?!= include('style') ?>
-  <title>TrainHub — Reports & Training Data Management</title>
+  <?!= include('script') ?>
   <style>
     /* Data Management Card & Filters */
     .filter-card {
@@ -328,7 +334,7 @@
             <!-- Column Visibility Toggle Button -->
             <div style="position:relative">
               <button type="button" class="btn-th btn-secondary btn-sm" onclick="toggleColumnPickerDropdown()">
-                <span class="icon sm">settings</span> ⚙ Columns <span class="icon sm">arrow_drop_down</span>
+                <span class="icon sm">settings</span> Columns <span class="icon sm">arrow_drop_down</span>
               </button>
 
               <div id="col-picker-dropdown" class="col-picker-dropdown">
@@ -387,6 +393,12 @@
                 <option value="Compliance Training">Compliance Training</option>
                 <option value="Business Skills">Business Skills</option>
                 <option value="Onboarding">Onboarding</option>
+                <option value="Leadership & Management">Leadership & Management</option>
+                <option value="Compliance & Regulatory">Compliance & Regulatory</option>
+                <option value="Technology & Innovation">Technology & Innovation</option>
+                <option value="Project Management">Project Management</option>
+                <option value="Data & Analytics">Data & Analytics</option>
+                <option value="Customer Experience">Customer Experience</option>
               </select>
             </div>
 
@@ -450,13 +462,13 @@
             <table class="table-report" id="mgmt-data-table">
               <thead>
                 <tr>
-                  <th class="th-sortable col-id" onclick="toggleSort('ID')">Training ID <span id="sort-icon-ID">↑↓</span></th>
-                  <th class="th-sortable col-title" onclick="toggleSort('Name')">Training Title <span id="sort-icon-Name">↑↓</span></th>
-                  <th class="th-sortable col-dept" onclick="toggleSort('Department')">Department <span id="sort-icon-Department">↑↓</span></th>
-                  <th class="th-sortable col-date" onclick="toggleSort('StartDate')">Start Date <span id="sort-icon-StartDate">↑↓</span></th>
-                  <th class="th-sortable col-status" onclick="toggleSort('Status')">Status <span id="sort-icon-Status">↑↓</span></th>
+                  <th class="th-sortable col-id" onclick="toggleSort('ID')">Training ID <span id="sort-icon-ID"></span></th>
+                  <th class="th-sortable col-title" onclick="toggleSort('Name')">Training Title <span id="sort-icon-Name"></span></th>
+                  <th class="th-sortable col-dept" onclick="toggleSort('Department')">Department <span id="sort-icon-Department"></span></th>
+                  <th class="th-sortable col-date" onclick="toggleSort('StartDate')">Start Date <span id="sort-icon-StartDate"></span></th>
+                  <th class="th-sortable col-status" onclick="toggleSort('Status')">Status <span id="sort-icon-Status"></span></th>
                   <th class="col-pax">Participants</th>
-                  <th class="th-sortable col-cost" onclick="toggleSort('CourseFee')">Fee (RM) <span id="sort-icon-CourseFee">↑↓</span></th>
+                  <th class="th-sortable col-cost" onclick="toggleSort('CourseFee')">Fee (RM) <span id="sort-icon-CourseFee"></span></th>
                   <th class="col-trainer">Trainer / Provider</th>
                   <th class="col-sync">Sync Status</th>
                   <th class="col-actions" style="width:100px">Actions</th>
@@ -477,8 +489,8 @@
           <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px; flex-wrap:wrap; gap:10px">
             <div style="font-size:12px; color:#64748B" id="pagination-summary">Page 1 of 1</div>
             <div style="display:flex; gap:4px" id="pagination-controls">
-              <button class="btn-th btn-secondary btn-sm" disabled>‹ Previous</button>
-              <button class="btn-th btn-secondary btn-sm" disabled>Next ›</button>
+              <button class="btn-th btn-secondary btn-sm" disabled>Previous</button>
+              <button class="btn-th btn-secondary btn-sm" disabled>Next</button>
             </div>
           </div>
         </div>
@@ -579,6 +591,12 @@
                 <option value="Compliance Training">Compliance Training</option>
                 <option value="Business Skills">Business Skills</option>
                 <option value="Onboarding">Onboarding</option>
+                <option value="Leadership & Management">Leadership & Management</option>
+                <option value="Compliance & Regulatory">Compliance & Regulatory</option>
+                <option value="Technology & Innovation">Technology & Innovation</option>
+                <option value="Project Management">Project Management</option>
+                <option value="Data & Analytics">Data & Analytics</option>
+                <option value="Customer Experience">Customer Experience</option>
               </select>
             </div>
 
@@ -652,8 +670,8 @@
             </div>
             <select id="sync-filter-status" class="input-th" style="width:auto; font-size:12px" onchange="loadSyncHistoryUI()">
               <option value="All">All Status</option>
-              <option value="SUCCESS">✓ Success</option>
-              <option value="FAILED">✕ Failed</option>
+              <option value="SUCCESS">Success</option>
+              <option value="FAILED">Failed</option>
             </select>
             <button class="btn-th btn-secondary btn-sm" onclick="loadSyncHistoryUI()">
               <span class="icon sm">refresh</span> Refresh Log
@@ -692,7 +710,7 @@
               <h3 class="modal-title" id="sync-modal-title">Sync Details</h3>
               <p class="modal-sub" id="sync-modal-sub">Execution log</p>
             </div>
-            <button class="modal-close" onclick="closeModal('modal-sync-detail')">✕</button>
+            <button class="modal-close" onclick="closeModal('modal-sync-detail')"><span class="icon sm">close</span></button>
           </div>
           <div id="sync-modal-content"></div>
           <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:20px; padding-top:16px; border-top:1px solid #F1F5F9">
@@ -706,10 +724,10 @@
         <div class="drawer-box">
           <div class="drawer-header">
             <div>
-              <div style="font-size:12px; font-weight:700; color:#2563EB; text-transform:uppercase" id="drawer-training-id">TRN-101</div>
+              <div style="font-size:12px; font-weight:700; color:#2563EB; text-transform:uppercase" id="drawer-training-id">-</div>
               <h3 style="font-size:16px; font-weight:800; color:#1E293B; margin:2px 0 0" id="drawer-training-name">Training Title</h3>
             </div>
-            <button type="button" class="modal-close" onclick="closeTrainingDrawer()">✕</button>
+            <button type="button" class="modal-close" onclick="closeTrainingDrawer()"><span class="icon sm">close</span></button>
           </div>
           <div class="drawer-body">
             <div id="drawer-status-badge-container" class="mb-3"></div>
@@ -765,7 +783,7 @@
             <div style="background:#EFF6FF; border:1px solid #BFDBFE; border-radius:10px; padding:14px">
               <div style="font-size:11px; font-weight:800; color:#1D4ED8; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center">
                 <span>Sync Status</span>
-                <span id="drawer-sync-badge"><span class="badge-th badge-green">✓ Synced</span></span>
+                <span id="drawer-sync-badge"><span class="badge-th badge-green">Synced</span></span>
               </div>
               <div style="font-size:12px; color:#1E40AF" id="drawer-sync-msg">
                 Training data synchronized with Google Sheets report.
@@ -788,8 +806,6 @@
 </div>
 
 <div id="toast-container"></div>
-<script>window.__TRAINHUB_PAGE__ = '<?!= currentPage ?>';</script>
-<?!= include('script') ?>
 <script>
   let masterTrainingsList = [];
   let masterCostCentresList = [];
@@ -984,7 +1000,46 @@
     if (elApproved) elApproved.textContent = approved;
     if (elOngoing) elOngoing.textContent = ongoing;
     if (elCompleted) elCompleted.textContent = completed;
-    if (elCost) elCost.textContent = `RM ${totalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+
+  function formatOrdinalDateStr(val) {
+    if (!val) return '—';
+    const s = String(val).trim();
+    if (!s || s === '—') return '—';
+
+    let d = null;
+    const dmy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+    if (dmy) {
+      d = new Date(parseInt(dmy[3], 10), parseInt(dmy[2], 10) - 1, parseInt(dmy[1], 10));
+    } else {
+      const ymd = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+      if (ymd) {
+        d = new Date(parseInt(ymd[1], 10), parseInt(ymd[2], 10) - 1, parseInt(ymd[3], 10));
+      } else {
+        d = new Date(s);
+      }
+    }
+
+    if (!d || isNaN(d.getTime())) return s;
+
+    const dayNum = d.getDate();
+    let suffix = 'th';
+    if (dayNum < 4 || dayNum > 20) {
+      switch (dayNum % 10) {
+        case 1: suffix = 'st'; break;
+        case 2: suffix = 'nd'; break;
+        case 3: suffix = 'rd'; break;
+      }
+    }
+
+    const fullMonths = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    const monthStr = fullMonths[d.getMonth()];
+    const yearStr = d.getFullYear();
+
+    return `${dayNum}${suffix} ${monthStr} ${yearStr}`;
   }
 
   // ─── Clickable KPI Card Filter ──────────────────────────────────────────────
@@ -1127,8 +1182,8 @@
     ['ID', 'Name', 'Department', 'StartDate', 'Status', 'CourseFee'].forEach(c => {
       const el = document.getElementById(`sort-icon-${c}`);
       if (el) {
-        if (c === sortColumn) el.textContent = sortDirection === 'asc' ? '↑' : '↓';
-        else el.textContent = '↑↓';
+        if (c === sortColumn) el.textContent = sortDirection === 'asc' ? '▲' : '▼';
+        else el.textContent = '';
       }
     });
 
@@ -1175,7 +1230,7 @@
       tbody.innerHTML = '<tr><td colspan="10" class="text-center p-4" style="color:#94A3B8">No matching training records found. Try adjusting your search or filters.</td></tr>';
       if (countInfo) countInfo.textContent = 'Showing 0 of 0 records';
       if (pagSummary) pagSummary.textContent = 'Page 0 of 0';
-      if (pagControls) pagControls.innerHTML = '<button class="btn-th btn-secondary btn-sm" disabled>‹ Previous</button><button class="btn-th btn-secondary btn-sm" disabled>Next ›</button>';
+      if (pagControls) pagControls.innerHTML = '<button class="btn-th btn-secondary btn-sm" disabled>Previous</button><button class="btn-th btn-secondary btn-sm" disabled>Next</button>';
       return;
     }
 
@@ -1187,11 +1242,11 @@
     const endIndex = Math.min(startIndex + pageSize, totalRecords);
     const pageRecords = filteredTrainingsList.slice(startIndex, endIndex);
 
-    if (countInfo) countInfo.textContent = `Showing ${startIndex + 1}–${endIndex} of ${totalRecords} records`;
+    if (countInfo) countInfo.textContent = `Showing ${startIndex + 1} - ${endIndex} of ${totalRecords} records`;
     if (pagSummary) pagSummary.textContent = `Page ${currentPage} of ${totalPages}`;
 
     // Render Pagination Controls
-    let navBtns = `<button class="btn-th btn-secondary btn-sm" ${currentPage === 1 ? 'disabled' : ''} onclick="changePage(${currentPage - 1})">‹ Previous</button>`;
+    let navBtns = `<button class="btn-th btn-secondary btn-sm" ${currentPage === 1 ? 'disabled' : ''} onclick="changePage(${currentPage - 1})">Previous</button>`;
     for (let p = 1; p <= totalPages; p++) {
       if (p === 1 || p === totalPages || (p >= currentPage - 1 && p <= currentPage + 1)) {
         navBtns += `<button class="btn-th ${p === currentPage ? 'btn-primary' : 'btn-secondary'} btn-sm" onclick="changePage(${p})">${p}</button>`;
@@ -1199,7 +1254,7 @@
         navBtns += `<span style="padding:0 4px; color:#94A3B8">...</span>`;
       }
     }
-    navBtns += `<button class="btn-th btn-secondary btn-sm" ${currentPage === totalPages ? 'disabled' : ''} onclick="changePage(${currentPage + 1})">Next ›</button>`;
+    navBtns += `<button class="btn-th btn-secondary btn-sm" ${currentPage === totalPages ? 'disabled' : ''} onclick="changePage(${currentPage + 1})">Next</button>`;
     if (pagControls) pagControls.innerHTML = navBtns;
 
     // Render Rows
@@ -1212,12 +1267,12 @@
           <td class="col-id" style="font-weight:700; color:#2563EB; font-family:monospace">${t.ID || t.Code || '—'}</td>
           <td class="col-title" style="font-weight:700; color:#1E293B">${t.Name || '—'}</td>
           <td class="col-dept">${t.Department || '—'}</td>
-          <td class="col-date" style="text-align:center">${t.StartDate || '—'}</td>
+          <td class="col-date" style="text-align:center">${formatOrdinalDateStr(t.StartDate)}</td>
           <td class="col-status" style="text-align:center">${renderStatusBadge(t)}</td>
           <td class="col-pax" style="text-align:center; font-weight:700; color:#2563EB">${t.Participants || 0} pax</td>
           <td class="col-cost" style="text-align:center; font-weight:700; color:#16A34A">${feeFormatted}</td>
           <td class="col-trainer" style="font-size:11.5px; color:#64748B">${t.Trainer || '—'}</td>
-          <td class="col-sync" style="text-align:center"><span class="badge-th badge-green" style="font-size:10.5px">✓ Synced</span></td>
+          <td class="col-sync" style="text-align:center"><span class="badge-th badge-green" style="font-size:10.5px">Synced</span></td>
           <td class="col-actions" onclick="event.stopPropagation()">
             <button type="button" class="btn-th btn-secondary btn-xs" onclick="openTrainingDrawer('${t.ID}')">
               <span class="icon sm">visibility</span> Details
@@ -1238,11 +1293,11 @@
   function renderStatusBadge(tOrStatus) {
     let canonical = typeof tOrStatus === 'object' && tOrStatus !== null ? getCanonicalTrainingStatus(tOrStatus) : getCanonicalTrainingStatus({ Status: tOrStatus, ApprovalStatus: tOrStatus });
 
-    if (canonical === 'Pending Approval') return '<span class="badge-status pending">● Pending</span>';
-    if (canonical === 'Approved') return '<span class="badge-status approved">● Approved</span>';
-    if (canonical === 'Ongoing') return '<span class="badge-status ongoing">● Ongoing</span>';
-    if (canonical === 'Completed') return '<span class="badge-status completed">● Completed</span>';
-    if (canonical === 'Rejected') return '<span class="badge-status rejected">● Rejected</span>';
+    if (canonical === 'Pending Approval') return '<span class="badge-status pending">Pending</span>';
+    if (canonical === 'Approved') return '<span class="badge-status approved">Approved</span>';
+    if (canonical === 'Ongoing') return '<span class="badge-status ongoing">Ongoing</span>';
+    if (canonical === 'Completed') return '<span class="badge-status completed">Completed</span>';
+    if (canonical === 'Rejected') return '<span class="badge-status rejected">Rejected</span>';
     return `<span class="badge-status">${canonical}</span>`;
   }
 
@@ -1308,8 +1363,8 @@
     if (elDept) elDept.textContent = t.Department || '—';
     if (elMode) elMode.textContent = t.TrainingMode || 'In-house';
     if (elTna) elTna.textContent = t.TnaSource || 'Training Requisition Form';
-    if (elStart) elStart.textContent = t.StartDate || '—';
-    if (elEnd) elEnd.textContent = t.EndDate || '—';
+    if (elStart) elStart.textContent = formatOrdinalDateStr(t.StartDate);
+    if (elEnd) elEnd.textContent = formatOrdinalDateStr(t.EndDate || t.StartDate);
     if (elDuration) elDuration.textContent = `${t.Duration || 1} Days`;
     if (elHours) elHours.textContent = `${t.TotalHours || 8} Hours`;
     if (elTrainer) elTrainer.textContent = t.Trainer || '—';
@@ -1320,9 +1375,9 @@
     if (elRemarks) elRemarks.value = t.Remarks || '';
 
     // Populate Google Workspace & Sheet Links
-    const sheetUrl  = t.trainingDataSheetUrl || (t.ParticipantsSheetID ? `https://docs.google.com/spreadsheets/d/${t.ParticipantsSheetID}/edit` : '');
-    const reqUrl    = t.requisitionFormUrl   || (t.RequisitionFormFileID ? `https://docs.google.com/spreadsheets/d/${t.RequisitionFormFileID}/edit` : (t.RequisitionUrl || t.BrochureURL || ''));
-    const folderUrl = t.folderUrl            || (t.FolderID ? `https://drive.google.com/drive/folders/${t.FolderID}` : '');
+    const sheetUrl  = t.trainingDataSheetUrl || (t.ParticipantsSheetID ? ('ht' + 'tps://docs.google.com/spreadsheets/d/' + t.ParticipantsSheetID + '/edit') : '');
+    const reqUrl    = t.requisitionFormUrl   || (t.RequisitionFormFileID ? ('ht' + 'tps://docs.google.com/spreadsheets/d/' + t.RequisitionFormFileID + '/edit') : (t.RequisitionUrl || t.BrochureURL || ''));
+    const folderUrl = t.folderUrl            || (t.FolderID ? ('ht' + 'tps://drive.google.com/drive/folders/' + t.FolderID) : '');
 
     const btnSheet = document.getElementById('drawer-btn-sheet');
     const btnReq   = document.getElementById('drawer-btn-req');
@@ -1366,11 +1421,11 @@
     try {
       const res = await callServer('syncTrainingById', activeDrawerTrainingId, 'Manual Admin Drawer', 'UPDATE');
       if (res && res.status === 'SUCCESS') {
-        showToast(`✓ Training ${activeDrawerTrainingId} synced successfully in ${res.duration}!`, 'success');
+        showToast(`Training ${activeDrawerTrainingId} synced successfully in ${res.duration}!`, 'success');
         loadSyncHistoryUI();
         openTrainingDrawer(activeDrawerTrainingId);
       } else {
-        showToast(`⚠ Sync failed: ${res.message || res.error}`, 'error');
+        showToast(`Sync failed: ${res.message || res.error}`, 'error');
       }
     } catch(e) {
       showToast('Sync error: ' + e.message, 'error');
@@ -1386,7 +1441,7 @@
         masterTrainingsList = trainings;
         computeKpiMetrics(masterTrainingsList);
         applyDataFilters();
-        showToast('✓ Training data records refreshed successfully!', 'success');
+        showToast('Training data records refreshed successfully!', 'success');
       }
     } catch(e) {
       showToast('Refresh error: ' + e.message, 'error');
@@ -1410,8 +1465,8 @@
         `"${(t.Name || '').replace(/"/g, '""')}"`,
         `"${(t.Department || '').replace(/"/g, '""')}"`,
         `"${(t.Category || '').replace(/"/g, '""')}"`,
-        `"${t.StartDate || ''}"`,
-        `"${t.EndDate || ''}"`,
+        `"${formatOrdinalDateStr(t.StartDate)}"`,
+        `"${formatOrdinalDateStr(t.EndDate || t.StartDate)}"`,
         `"${t.Status || t.ApprovalStatus || ''}"`,
         `"${t.Participants || 0}"`,
         `"${feeNum}"`,
@@ -1428,7 +1483,7 @@
     link.click();
     document.body.removeChild(link);
 
-    showToast(`✓ Exported ${filteredTrainingsList.length} filtered training records to CSV!`, 'success');
+    showToast(`Exported ${filteredTrainingsList.length} filtered training records to CSV!`, 'success');
   }
 
   // ─── Existing Custom Google Sheet Reports Integration ────────────────────────
@@ -1481,8 +1536,8 @@
     tbody.innerHTML = rows.map((r, idx) => {
       const isSuccess = r.status === 'SUCCESS';
       const badge = isSuccess
-        ? '<span class="badge-th badge-green" style="font-size:11px">✓ Success</span>'
-        : '<span class="badge-th badge-red" style="font-size:11px">✕ Failed</span>';
+        ? '<span class="badge-th badge-green" style="font-size:11px">Success</span>'
+        : '<span class="badge-th badge-red" style="font-size:11px">Failed</span>';
 
       const timeStr = r.timestamp ? r.timestamp.replace('T', ' ').slice(0, 19) : '—';
 
@@ -1526,7 +1581,7 @@
           </div>
           <div class="col-6">
             <div style="font-size:11px; color:#64748B">Status</div>
-            <div>${isSuccess ? '<span class="badge-th badge-green">✓ SUCCESS</span>' : '<span class="badge-th badge-red">✕ FAILED</span>'}</div>
+            <div>${isSuccess ? '<span class="badge-th badge-green">SUCCESS</span>' : '<span class="badge-th badge-red">FAILED</span>'}</div>
           </div>
           <div class="col-6">
             <div style="font-size:11px; color:#64748B">Action</div>
@@ -2070,8 +2125,8 @@
             </div>
           </div>
           <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:14px; margin-bottom:18px">
-            <div style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase; margin-bottom:6px">📁 Storage Location</div>
-            <div style="font-size:13px; font-weight:700; color:#1E293B; margin-bottom:8px">📄 ${fileName}</div>
+            <div style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase; margin-bottom:6px"><span class="icon sm" style="color:#2563EB">folder</span> Storage Location</div>
+            <div style="font-size:13px; font-weight:700; color:#1E293B; margin-bottom:8px"><span class="icon sm" style="color:#059669">description</span> ${fileName}</div>
             <div style="font-size:12px; color:#059669; font-weight:600">Saved in: <code>Project Root / ${folderName}</code></div>
           </div>
           <div style="display:flex; flex-direction:column; gap:10px">

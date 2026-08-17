@@ -39,7 +39,7 @@ function getValidEmployee(employeeId, trainingId) {
   if (cleanTId) {
     try {
       const ss = getTrainingDataSpreadsheet(cleanTId);
-      const tpSheet = ss ? ss.getSheetByName('TrainingParticipants') : null;
+      const tpSheet = ss ? (ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants')) : null;
       if (tpSheet) {
         const tpRows = sheetToJson(tpSheet);
         const tpEmp = tpRows.find(r => 
@@ -88,7 +88,7 @@ function validateParticipantEnrollment(trainingId, employeeId) {
 
   // A. Check per-training spreadsheet TrainingParticipants sheet tab
   const ss = getTrainingDataSpreadsheet(cleanTId);
-  const tpSheet = ss ? ss.getSheetByName('TrainingParticipants') : null;
+  const tpSheet = ss ? (ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants')) : null;
   if (tpSheet) {
     const tpRows = sheetToJson(tpSheet);
     const enrolled = tpRows.find(r => 
@@ -329,7 +329,7 @@ function verifyEmployeeForEvaluation(trainingId, employeeId) {
 
     // E. Check if Evaluation Already Submitted
     const ss = getTrainingDataSpreadsheet(cleanTId);
-    const evalSheet = ss ? ss.getSheetByName('TrainingEval') : null;
+    const evalSheet = ss ? (ss.getSheetByName('Evaluation') || ss.getSheetByName('TrainingEval')) : null;
     if (evalSheet) {
       const evalRows = sheetToJson(evalSheet);
       const duplicate = evalRows.find(r => 
@@ -389,8 +389,8 @@ function verifyEvaluatorByEmployeeId(evaluatorEmployeeId, trainingId) {
 
       const ss = getTrainingDataSpreadsheet(trnIdFilter);
       if (ss) {
-        const tpSheet   = ss.getSheetByName('TrainingParticipants');
-        const postSheet = ss.getSheetByName('PostEval');
+        const tpSheet   = ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants');
+        const postSheet = ss.getSheetByName('Post Evaluation') || ss.getSheetByName('PostEval');
 
         const tpRows   = tpSheet ? sheetToJson(tpSheet) : [];
         const postRows = postSheet ? sheetToJson(postSheet) : [];
@@ -425,8 +425,8 @@ function verifyEvaluatorByEmployeeId(evaluatorEmployeeId, trainingId) {
           trnIdFilter = targetTraining.ID;
           const ss = getTrainingDataSpreadsheet(trnIdFilter);
           if (ss) {
-            const tpSheet   = ss.getSheetByName('TrainingParticipants');
-            const postSheet = ss.getSheetByName('PostEval');
+            const tpSheet   = ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants');
+            const postSheet = ss.getSheetByName('Post Evaluation') || ss.getSheetByName('PostEval');
 
             const tpRows   = tpSheet ? sheetToJson(tpSheet) : [];
             const postRows = postSheet ? sheetToJson(postSheet) : [];
@@ -528,7 +528,7 @@ function validatePublicEvaluation(trainingId, employeeId) {
 
     // E. Prevent Duplicate Evaluation Submission
     const ss = getTrainingDataSpreadsheet(cleanTId);
-    const evalSheet = ss ? ss.getSheetByName('TrainingEval') : null;
+    const evalSheet = ss ? (ss.getSheetByName('Evaluation') || ss.getSheetByName('TrainingEval')) : null;
     if (evalSheet) {
       const evalRows = sheetToJson(evalSheet);
       const duplicate = evalRows.find(r => 
@@ -593,7 +593,7 @@ function validatePublicPostEvaluation(trainingId, employeeId, token) {
 
     // D. Prevent Duplicate Post-Evaluation Submission
     const ss = getTrainingDataSpreadsheet(effectiveTId);
-    const postSheet = ss ? ss.getSheetByName('PostEval') : null;
+    const postSheet = ss ? (ss.getSheetByName('Post Evaluation') || ss.getSheetByName('PostEval')) : null;
     if (postSheet) {
       const postRows = sheetToJson(postSheet);
       const duplicate = postRows.find(r =>

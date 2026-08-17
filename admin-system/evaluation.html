@@ -3,18 +3,24 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Apollo — Evaluation Dashboard</title>
+  <script>
+    window.__TRAINHUB_PAGE__ = '<?!= currentPage ?>';
+    window.__PUBLIC_PORTAL_URL__ = '<?!= (typeof publicPortalUrl !== "undefined" && publicPortalUrl) ? publicPortalUrl : "" ?>';
+    window.__COMPANY_LOGO_URL__ = '<?!= (typeof companyLogoUrl !== "undefined" && companyLogoUrl) ? companyLogoUrl : "" ?>';
+  </script>
   <?!= include('style') ?>
-  <title>TrainHub — Evaluation</title>
+  <?!= include('script') ?>
   <style>
     .likert-btn { width:32px;height:32px;border-radius:7px;border:2px solid #E2E8F0;
                   background:#fff;font-size:12px;font-weight:700;cursor:pointer;transition:all 0.12s; }
-    .likert-btn.sel-1,.likert-btn.sel-2 { border-color:#EF4444;background:#FEF2F2;color:#EF4444; }
-    .likert-btn.sel-3 { border-color:#F59E0B;background:#FFFBEB;color:#D97706; }
-    .likert-btn.sel-4,.likert-btn.sel-5 { border-color:#22C55E;background:#F0FDF4;color:#16A34A; }
+    .likert-btn.sel-1,.likert-btn.sel-2 { border-color:#E91C2D;background:#FEF2F2;color:#E91C2D; }
+    .likert-btn.sel-3 { border-color:#FEC30D;background:#FFF8CF;color:#92400E; }
+    .likert-btn.sel-4,.likert-btn.sel-5 { border-color:#16A34A;background:#F0FDF4;color:#16A34A; }
     .radio-pill { display:flex;align-items:center;gap:6px;cursor:pointer;padding:7px 14px;
                   border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;font-size:13px;
-                  font-weight:400;color:#374151;transition:all 0.12s; }
-    .radio-pill.active { border-color:#2563EB;background:#EFF6FF;color:#2563EB;font-weight:600; }
+                  font-weight:400;color:var(--apollo-dark);transition:all 0.12s; }
+    .radio-pill.active { border-color:#E91C2D;background:#FFF8CF;color:#E91C2D;font-weight:700; }
   </style>
 </head>
 <body>
@@ -24,77 +30,85 @@
 
   <div class="main-area">
     <header class="topbar">
-      <div style="flex:1"><h1 class="topbar-title">Evaluation</h1><p class="topbar-sub">Training & Post-Training Evaluations</p></div>
+      <div style="flex:1"><h1 class="topbar-title">Evaluation Dashboard</h1><p class="topbar-sub">Real-Time Training, Post-Training & Supervisor Evaluations</p></div>
     </header>
 
     <main class="page-content">
-      <!-- Selector -->      <div class="card-th mb-4">
+      <!-- Selector -->
+      <div class="card-th mb-4">
         <div class="row g-3 align-items-end">
           <div class="col-md-6">
             <label class="label-th">Select Training Programme</label>
-            <select id="sel-eval-t" class="input-th">
-              <option value="">— Select a training —</option>
+            <select id="sel-eval-t" class="input-th" onchange="loadEvaluations()">
+              <option value="">— Select a training programme —</option>
             </select>
           </div>
           <div class="col-md-3">
-            <button class="btn-th btn-primary" style="width:100%" onclick="loadEvaluations()"><span class="icon sm">search</span>Load</button>
+            <button class="btn-th btn-primary" style="width:100%" onclick="loadEvaluations()"><span class="icon sm">search</span>Load Data</button>
           </div>
           <div class="col-md-3">
-            <a id="btn-open-eval-sheet" class="btn-th" style="display:none;width:100%;background:#059669;color:#fff;border:none;text-decoration:none;justify-content:center;align-items:center;gap:6px;padding:9px" target="_blank"><span class="icon sm">table_chart</span>Open Data Sheet</a>
-          </div>
-        </div>
-      </div>
-      <!-- Evaluation Form QR Codes & Share Links Card (Participant Portal Linkage) -->
-      <div id="eval-qr-card" class="card-th mb-4" style="display:none">
-        <div style="margin-bottom:14px">
-          <h3 style="font-size:15px;font-weight:700;color:#1E293B;margin:0 0 2px">Public Participant Portal Evaluation QR Codes</h3>
-          <p style="font-size:12px;color:#64748B;margin:0">Scan or copy links to open evaluation forms on the public participant portal</p>
-        </div>
-
-        <div class="row g-3">
-          <div class="col-md-6">
-            <div style="border:1px solid #E2E8F0;border-radius:10px;padding:14px;background:#fff;display:flex;align-items:center;gap:14px">
-              <div id="eval-qr-wrap-l1"></div>
-              <div style="flex:1;min-width:0">
-                <div style="font-size:12.5px;font-weight:700;color:#1E293B;margin-bottom:2px">Level 1: Participant Training Evaluation</div>
-                <div style="font-size:10.5px;color:#64748B;margin-bottom:8px">Participant self-evaluation form</div>
-                <div style="display:flex;gap:6px">
-                  <button class="btn-th btn-secondary btn-xs" onclick="copyEvalUrl('l1')"><span class="icon sm">content_copy</span> Copy Link</button>
-                  <button class="btn-th btn-primary btn-xs" onclick="downloadQRWithLogo(activeEvalUrls.l1, 'ParticipantEval_QR.png')"><span class="icon sm">download</span> QR</button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="col-md-6">
-            <div style="border:1px solid #E2E8F0;border-radius:10px;padding:14px;background:#fff;display:flex;align-items:center;gap:14px">
-              <div id="eval-qr-wrap-l3"></div>
-              <div style="flex:1;min-width:0">
-                <div style="font-size:12.5px;font-weight:700;color:#1E293B;margin-bottom:2px">Level 3: Supervisor 3-Month Post Evaluation</div>
-                <div style="font-size:10.5px;color:#64748B;margin-bottom:8px">Supervisor post-training evaluation form</div>
-                <div style="display:flex;gap:6px">
-                  <button class="btn-th btn-secondary btn-xs" onclick="copyEvalUrl('l3')"><span class="icon sm">content_copy</span> Copy Link</button>
-                  <button class="btn-th btn-primary btn-xs" onclick="downloadQRWithLogo(activeEvalUrls.l3, 'SupervisorPostEval_QR.png')"><span class="icon sm">download</span> QR</button>
-                </div>
-              </div>
-            </div>
+            <a id="btn-open-eval-sheet" class="btn-th" style="display:none;width:100%;background:#16A34A;color:#fff;border:none;text-decoration:none;justify-content:center;align-items:center;gap:6px;padding:9px" target="_blank"><span class="icon sm">table_chart</span>Open Data Sheet</a>
           </div>
         </div>
       </div>
 
-      <!-- Sub-tabs -->
+      <!-- Real-Time Evaluation Countdown Banner (Updates dynamically per active tab) -->
+      <div id="eval-countdown-banner" class="mb-4" style="display:none"></div>
+
+      <!-- Sub-tabs (3 Distinct Evaluation Tabs) -->
       <div class="subtab-row" id="eval-subtabs" style="display:none">
-        <button class="subtab active" data-tab="training-eval" onclick="switchTab(this)"><span class="icon sm">rate_review</span>Training Evaluation</button>
-        <button class="subtab" data-tab="post-eval" onclick="switchTab(this)"><span class="icon sm">timeline</span>3-Month Post Evaluation</button>
+        <button class="subtab active" data-tab="training-eval" onclick="switchTab(this)"><span class="icon sm">rate_review</span>Level 1: Training Evaluation</button>
+        <button class="subtab" data-tab="post-eval" onclick="switchTab(this)"><span class="icon sm">timelapse</span>Level 2: 2-Week Post Evaluation</button>
+        <button class="subtab" data-tab="supervisor-eval" onclick="switchTab(this)"><span class="icon sm">supervised_user_circle</span>Level 3: 3-Month Supervisor Evaluation</button>
       </div>
 
-      <!-- Training Eval Tab -->
+      <!-- ═════════════════════════════════════════════════════════════════════════
+           Tab 1: Training Evaluation (Level 1)
+           ═════════════════════════════════════════════════════════════════════════ -->
       <div id="tab-training-eval">
-        <div class="row g-3 mb-3" id="eval-summary" style="display:none">
-          <div class="col-md-4"><div class="card-th" style="background:#F0FDF4;border-color:#BBF7D0"><div class="stat-value" style="color:#22C55E" id="e-completed">—</div><div class="stat-label">Completed</div></div></div>
-          <div class="col-md-4"><div class="card-th" style="background:#F5F3FF;border-color:#DDD6FE"><div class="stat-value" style="color:#8B5CF6" id="e-avg">—</div><div class="stat-label">Average Score</div></div></div>
+        <!-- Level 1 QR & Link Box -->
+        <div id="eval-l1-qr-box" class="card-th mb-3" style="display:none;background:#FFF8CF;border-color:#FEC30D">
+          <div class="row align-items-center g-3">
+            <div class="col-auto">
+              <div id="eval-qr-wrap-l1"></div>
+            </div>
+            <div class="col">
+              <div style="font-size:14px;font-weight:800;color:var(--apollo-dark);margin-bottom:2px">Participant Training Evaluation Link (Level 1)</div>
+              <div style="font-size:12px;color:var(--apollo-gray-600);margin-bottom:10px">Direct QR code & link for participants to evaluate course effectiveness and trainer delivery immediately after the training session.</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button class="btn-th btn-secondary btn-sm" onclick="copyEvalUrl('l1')"><span class="icon sm">content_copy</span> Copy Link</button>
+                <button class="btn-th btn-primary btn-sm" onclick="downloadQRWithLogo(activeEvalUrls.l1, 'Apollo_Level1_Eval_QR.png')"><span class="icon sm">download</span> Download QR Code</button>
+                <button class="btn-th btn-secondary btn-sm" onclick="openModal('modal-eval')"><span class="icon sm">add_circle</span> Manual Input</button>
+              </div>
+            </div>
+          </div>
         </div>
+
+        <div class="row g-3 mb-3" id="eval-summary" style="display:none">
+          <div class="col-md-4">
+            <div class="card-th" style="background:#F0FDF4;border-color:#BBF7D0">
+              <div class="stat-value" style="color:#16A34A" id="e-completed">0</div>
+              <div class="stat-label">Evaluations Completed</div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card-th" style="background:#FFF8CF;border-color:#FEC30D">
+              <div class="stat-value" style="color:#92400E" id="e-avg">—</div>
+              <div class="stat-label">Average Evaluation Score</div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card-th" style="background:#EFF6FF;border-color:#BFDBFE">
+              <div class="stat-value" style="color:#2563EB" id="e-response-rate">0%</div>
+              <div class="stat-label">Participant Response Rate</div>
+            </div>
+          </div>
+        </div>
+
         <div class="card-th card-th-p0">
+          <div style="padding:16px 20px;border-bottom:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center">
+            <h4 style="font-size:14px;font-weight:800;color:var(--apollo-dark);margin:0">Submitted Level 1 Participant Evaluations</h4>
+          </div>
           <div style="overflow-x:auto">
             <table class="table-th">
               <thead><tr><th>Employee</th><th>Department</th><th>Avg Score</th><th>Submitted At</th></tr></thead>
@@ -104,54 +118,110 @@
         </div>
       </div>
 
-      <!-- Post Eval Tab -->
+      <!-- ═════════════════════════════════════════════════════════════════════════
+           Tab 2: 2-Week Post Evaluation (Level 2)
+           ═════════════════════════════════════════════════════════════════════════ -->
       <div id="tab-post-eval" style="display:none">
+        <!-- 2-Week Countdown Widget Container -->
+        <div id="post-eval-2week-widget" class="mb-3"></div>
+
+        <div class="card-th card-th-p0">
+          <div style="padding:16px 20px;border-bottom:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+            <div>
+              <h4 style="font-size:14px;font-weight:800;color:var(--apollo-dark);margin:0">2-Week Post-Training Evaluation Participant Status</h4>
+              <p style="font-size:11.5px;color:var(--apollo-gray-500);margin:2px 0 0">2-week post-training assessment to verify immediate practical application of knowledge on the job.</p>
+            </div>
+          </div>
+          <div style="overflow-x:auto">
+            <table class="table-th">
+              <thead>
+                <tr>
+                  <th>Participant</th>
+                  <th>Department</th>
+                  <th>Attendance Status</th>
+                  <th>2-Week Deadline</th>
+                  <th>Evaluation Status</th>
+                  <th>Countdown Status</th>
+                </tr>
+              </thead>
+              <tbody id="post-eval-2week-tbody">
+                <tr><td colspan="6" style="text-align:center;color:#94A3B8;padding:40px">Select a training to view 2-week post evaluation status</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═════════════════════════════════════════════════════════════════════════
+           Tab 3: 3-Month Supervisor Evaluation (Level 3)
+           ═════════════════════════════════════════════════════════════════════════ -->
+      <div id="tab-supervisor-eval" style="display:none">
+        <!-- 3-Month Countdown Widget Container -->
+        <div id="supervisor-eval-3month-widget" class="mb-3"></div>
+
+        <!-- Level 3 QR & Link Box -->
+        <div id="eval-l3-qr-box" class="card-th mb-3" style="display:none;background:#FFF8CF;border-color:#FEC30D">
+          <div class="row align-items-center g-3">
+            <div class="col-auto">
+              <div id="eval-qr-wrap-l3"></div>
+            </div>
+            <div class="col">
+              <div style="font-size:14px;font-weight:800;color:var(--apollo-dark);margin-bottom:2px">Supervisor 3-Month Evaluation Link (Level 3)</div>
+              <div style="font-size:12px;color:var(--apollo-gray-600);margin-bottom:10px">Supervisors evaluate employees on behavioral competency improvement 3 months after training completion.</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button class="btn-th btn-secondary btn-sm" onclick="copyEvalUrl('l3')"><span class="icon sm">content_copy</span> Copy Link</button>
+                <button class="btn-th btn-primary btn-sm" onclick="downloadQRWithLogo(activeEvalUrls.l3, 'Apollo_Level3_SupervisorEval_QR.png')"><span class="icon sm">download</span> Download QR Code</button>
+                <button class="btn-th btn-secondary btn-sm" onclick="openModal('modal-post-eval')"><span class="icon sm">add_circle</span> Manual Input</button>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <!-- Notification Banner Summary Stats -->
         <div class="row g-3 mb-3" id="post-eval-summary-banner" style="display:none">
           <div class="col-md-3">
             <div class="card-th" style="background:#EFF6FF;border-color:#BFDBFE;padding:12px 14px">
               <div class="stat-value" style="color:#2563EB" id="cnt-post-total">0</div>
-              <div class="stat-label">Attended Participants</div>
+              <div class="stat-label">Enrolled Participants</div>
             </div>
           </div>
           <div class="col-md-3">
             <div class="card-th" style="background:#F0FDF4;border-color:#BBF7D0;padding:12px 14px">
-              <div class="stat-value" style="color:#16A34A" id="cnt-post-assigned">0</div>
+              <div class="stat-value" style="color:#16A34A" id="cnt-post-attended">0</div>
+              <div class="stat-label">Attended / Partial</div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card-th" style="background:#FEF2F2;border-color:#FECACA;padding:12px 14px">
+              <div class="stat-value" style="color:#E91C2D" id="cnt-post-absent">0</div>
+              <div class="stat-label">Absent / No Record</div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card-th" style="background:#FFF8CF;border-color:#FEC30D;padding:12px 14px">
+              <div class="stat-value" style="color:#92400E" id="cnt-post-assigned">0</div>
               <div class="stat-label">Supervisors Assigned</div>
-            </div>
-          </div>
-          <div class="col-md-3">
-            <div class="card-th" style="background:#FEF3C7;border-color:#FDE68A;padding:12px 14px">
-              <div class="stat-value" style="color:#D97706" id="cnt-post-pending">0</div>
-              <div class="stat-label">Pending Supervisor Assignment</div>
-            </div>
-          </div>
-          <div class="col-md-3">
-            <div class="card-th" style="background:#F5F3FF;border-color:#DDD6FE;padding:12px 14px">
-              <div class="stat-value" style="color:#8B5CF6" id="cnt-post-unlocked">0</div>
-              <div class="stat-label">3-Month Milestone Ready</div>
             </div>
           </div>
         </div>
 
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; padding:14px 16px; background:#fff; border-radius:10px; border:1px solid #E2E8F0; flex-wrap:wrap; gap:12px">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; padding:14px 16px; background:#fff; border-radius:10px; border:1.5px solid #E2E8F0; flex-wrap:wrap; gap:12px">
           <div>
-            <h4 style="font-size:14px; font-weight:800; color:#1E293B; margin:0; display:flex; align-items:center; gap:6px">
-              <span class="icon" style="color:#2563EB">group_add</span> 3-Month Post Evaluation Supervisor Assignments
+            <h4 style="font-size:14px; font-weight:800; color:var(--apollo-dark); margin:0; display:flex; align-items:center; gap:6px">
+              <span class="icon" style="color:#E91C2D">group_add</span> 3-Month Post Evaluation Supervisor Assignments
             </h4>
-            <p style="font-size:11.5px; color:#64748B; margin:2px 0 0 0">Select attended participants to assign or edit assigned Supervisor/PIC. If a supervisor changes, you can edit and send notifications to the new supervisor.</p>
+            <p style="font-size:11.5px; color:var(--apollo-gray-500); margin:2px 0 0 0">Participants who did not attend are highlighted. Select participant(s) to assign/re-assign supervisors.</p>
           </div>
           <div style="display:flex; gap:8px">
             <button class="btn-th btn-secondary btn-sm" onclick="selectAllPostEvalParticipants(true)">Select All</button>
             <button class="btn-th btn-secondary btn-sm" onclick="selectAllPostEvalParticipants(false)">Deselect All</button>
             <button class="btn-th btn-primary btn-sm" onclick="openBulkAssignSupervisorModal()">
-              <span class="icon sm">person_add</span> Assign Selected to Supervisor
+              <span class="icon sm">person_add</span> Assign Selected
             </button>
           </div>
         </div>
 
-        <div class="card-th card-th-p0">
+        <div class="card-th card-th-p0 mb-4">
           <div style="overflow-x:auto">
             <table class="table-th">
               <thead>
@@ -159,6 +229,7 @@
                   <th style="width:36px; text-align:center"><input type="checkbox" id="chk-post-select-all" onchange="toggleSelectAllPostEvalRows(this.checked)"></th>
                   <th>Participant</th>
                   <th>Department</th>
+                  <th>Attendance Status</th>
                   <th>Assigned Supervisor / PIC</th>
                   <th>Supervisor Email</th>
                   <th>Assignment Status</th>
@@ -167,20 +238,20 @@
                 </tr>
               </thead>
               <tbody id="post-assignment-tbody">
-                <tr><td colspan="8" style="text-align:center;color:#94A3B8;padding:40px">Select a training to view participants</td></tr>
+                <tr><td colspan="9" style="text-align:center;color:#94A3B8;padding:40px">Select a training to view participants</td></tr>
               </tbody>
             </table>
           </div>
         </div>
 
         <div style="margin-top:24px; margin-bottom:12px;">
-          <h4 style="font-size:14px; font-weight:800; color:#1E293B; margin:0">Submitted 3-Month Competency Reviews</h4>
+          <h4 style="font-size:14px; font-weight:800; color:var(--apollo-dark); margin:0">Submitted 3-Month Competency Reviews</h4>
         </div>
         <div class="card-th card-th-p0">
           <div style="overflow-x:auto">
             <table class="table-th">
               <thead><tr><th>Employee</th><th>Evaluator</th><th>Competency Before</th><th>Competency After</th><th>Improvement</th><th>Submitted At</th></tr></thead>
-              <tbody id="post-tbody"><tr><td colspan="6" style="text-align:center;color:#94A3B8;padding:32px">No post-evaluations submitted yet.</td></tr></tbody>
+              <tbody id="post-tbody"><tr><td colspan="6" style="text-align:center;color:#94A3B8;padding:32px">No supervisor evaluations submitted yet.</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -194,7 +265,7 @@
   <div class="modal-box" style="max-width:620px">
     <div class="modal-header">
       <div><h3 class="modal-title">Training Evaluation Form</h3><p class="modal-sub">Borang Penilaian Latihan</p></div>
-      <button class="modal-close" onclick="closeModal('modal-eval')">✕</button>
+      <button class="modal-close" onclick="closeModal('modal-eval')"><span class="icon sm">close</span></button>
     </div>
     <input type="hidden" id="eval-tid">
     <div class="row g-2 mb-3">
@@ -211,16 +282,16 @@
     </div>
 
     <!-- Section A -->
-    <div style="background:#EFF6FF;border-radius:10px;padding:14px 16px;margin-bottom:20px">
-      <h4 style="font-size:13px;font-weight:700;color:#1E293B;margin:0 0 4px">Section A — Programme Assessment</h4>
-      <p style="font-size:11.5px;color:#1D4ED8;margin:0">Rate each statement: 1 = Strongly Disagree, 5 = Strongly Agree</p>
+    <div style="background:#FFF8CF;border-radius:10px;padding:14px 16px;margin-bottom:20px;border:1px solid #FEC30D">
+      <h4 style="font-size:13px;font-weight:700;color:var(--apollo-dark);margin:0 0 4px">Section A — Programme Assessment</h4>
+      <p style="font-size:11.5px;color:#92400E;margin:0">Rate each statement: 1 = Strongly Disagree, 5 = Strongly Agree</p>
     </div>
 
     <div id="likert-questions"></div>
 
     <!-- Section B -->
     <div style="margin:20px 0 14px">
-      <h4 style="font-size:13px;font-weight:700;color:#1E293B;margin:0 0 14px">Section B — Open Feedback</h4>
+      <h4 style="font-size:13px;font-weight:700;color:var(--apollo-dark);margin:0 0 14px">Section B — Open Feedback</h4>
       <div style="display:flex;flex-direction:column;gap:14px">
         <div>
           <label class="label-th">1. What was the most valuable part of the training?<br><small style="font-weight:400;color:#94A3B8">Apakah bahagian latihan yang paling bernilai kepada anda?</small></label>
@@ -249,7 +320,7 @@
   <div class="modal-box" style="max-width:600px">
     <div class="modal-header">
       <div><h3 class="modal-title">Post Training Evaluation (3 Months)</h3><p class="modal-sub">Supervisor assessment form</p></div>
-      <button class="modal-close" onclick="closeModal('modal-post-eval')">✕</button>
+      <button class="modal-close" onclick="closeModal('modal-post-eval')"><span class="icon sm">close</span></button>
     </div>
     <input type="hidden" id="post-tid">
     <div class="row g-2 mb-3">
@@ -271,7 +342,7 @@
 
     <!-- Competency Before -->
     <div style="margin-bottom:18px">
-      <h4 style="font-size:13px;font-weight:700;color:#1E293B;margin:0 0 10px">Competency Level Before Training</h4>
+      <h4 style="font-size:13px;font-weight:700;color:var(--apollo-dark);margin:0 0 10px">Competency Level Before Training</h4>
       <div id="comp-before" style="display:flex;flex-direction:column;gap:6px"></div>
     </div>
 
@@ -280,7 +351,7 @@
 
     <!-- Competency After -->
     <div style="margin-bottom:18px">
-      <h4 style="font-size:13px;font-weight:700;color:#1E293B;margin:0 0 10px">Competency Level After Training</h4>
+      <h4 style="font-size:13px;font-weight:700;color:var(--apollo-dark);margin:0 0 10px">Competency Level After Training</h4>
       <div id="comp-after" style="display:flex;flex-direction:column;gap:6px"></div>
     </div>
 
@@ -297,8 +368,6 @@
 </div>
 
 <div id="toast-container"></div>
-<script>window.__TRAINHUB_PAGE__ = '<?!= currentPage ?>';</script>
-<?!= include('script') ?>
 <script>
   // ─── Likert questions ──────────────────────────────────────────────────────
   const LIKERT_QS = [
@@ -324,10 +393,16 @@
   ];
 
   let likertScores = Array(7).fill(0);
+  let allEmployees = [];
+  let activeEvalUrls = { l1: '', l3: '' };
+  let currentActiveTab = 'training-eval';
+  let activeTrainingObj = null;
+  let activeEvalSummary = null;
 
   // Build likert form
   function buildLikert() {
     const el = document.getElementById('likert-questions');
+    if (!el) return;
     el.innerHTML = LIKERT_QS.map((q, qi) => `
       <div style="display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid #F8FAFC">
         <div style="flex:1;min-width:0">
@@ -348,9 +423,10 @@
     });
   }
 
-  // Build competency selectors
   function buildCompetency(containerId, name) {
-    document.getElementById(containerId).innerHTML = COMPETENCY.map(c => `
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    el.innerHTML = COMPETENCY.map(c => `
       <label class="radio-pill" id="${name}-${c.v}" onclick="selectComp('${name}',${c.v})">
         <input type="radio" name="${name}" value="${c.v}" style="display:none">
         <span style="font-size:13px;font-weight:600">${c.v}. ${c.l}</span>
@@ -365,9 +441,9 @@
     if (target) target.classList.add('active');
   }
 
-  // Build improvement questions
   function buildImprovementQs() {
     const el = document.getElementById('improvement-questions');
+    if (!el) return;
     const opts = { improvement: ['Yes','Partially','No'], canApply: ['Yes','Partially','No'], further: ['Yes','No'] };
     el.innerHTML = IMPROVE_QS.map(q => `
       <div>
@@ -384,17 +460,147 @@
 
   function selectOpt(name, v) {
     document.querySelectorAll(`[id^="opt-${name}-"]`).forEach(el => el.classList.remove('active'));
-    document.getElementById(`opt-${name}-${v}`).classList.add('active');
+    const el = document.getElementById(`opt-${name}-${v}`);
+    if (el) el.classList.add('active');
   }
 
-  let allEmployees = [];
+  // ─── Real-Time Tab & Countdown Engine Synchronizer ──────────────────────────
+  function updateEvaluationDashboardCountdowns() {
+    if (!activeTrainingObj) return;
 
-  // ─── Page init ───────────────────────────────────────────────────────────────
+    const t = activeTrainingObj;
+    const compDate = t.EndDate || t.StartDate;
+    const isCompleted = ['Training Completed','Evaluation Completed','Waiting for 3-Month Review','Programme Closed','Completed'].includes(t.Stage || t.Status);
+    const bannerEl = document.getElementById('eval-countdown-banner');
+
+    if (!bannerEl) return;
+    bannerEl.style.display = 'block';
+
+    if (currentActiveTab === 'training-eval') {
+      // Tab 1: Level 1 Training Evaluation Status
+      const enrolled = (window.__activeAttendedParticipants__ || []).length || t.ParticipantsCount || 0;
+      const completed = activeEvalSummary ? (activeEvalSummary.evalCompleted || 0) : 0;
+      const avg = activeEvalSummary && activeEvalSummary.avgScore ? activeEvalSummary.avgScore : '—';
+      const isL1Done = enrolled > 0 && completed >= enrolled;
+      const isL1Started = completed > 0;
+
+      let l1Status = 'waiting';
+      let l1Text = 'Not Started';
+      if (isL1Done) { l1Status = 'completed'; l1Text = 'Completed'; }
+      else if (isL1Started) { l1Status = 'approaching'; l1Text = `In Progress (${completed}/${enrolled})`; }
+      else if (isCompleted) { l1Status = 'today'; l1Text = 'Pending Evaluations'; }
+
+      bannerEl.innerHTML = `
+        <div class="card-th" style="background:#FFF8CF;border:1.5px solid #FEC30D;padding:16px 20px">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+            <div>
+              <div style="font-size:15px;font-weight:800;color:var(--apollo-dark);display:flex;align-items:center;gap:6px">
+                <span class="icon" style="color:#E91C2D">rate_review</span> Level 1: Training Evaluation Overview
+              </div>
+              <div style="font-size:12px;color:var(--apollo-gray-600);margin-top:2px">Participant feedback collected immediately post-session.</div>
+            </div>
+            <div>
+              <span class="countdown-badge cd-${l1Status}"><span class="icon sm filled">${isL1Done ? 'check_circle' : 'schedule'}</span><span>${l1Text}</span></span>
+            </div>
+          </div>
+        </div>
+      `;
+    } else if (currentActiveTab === 'post-eval') {
+      // Tab 2: 2-Week Post Evaluation Countdown
+      const is2WeekDone = ['Evaluation Completed','Waiting for 3-Month Review','Programme Closed'].includes(t.Stage);
+      const st = ApolloCountdown.getStatus(compDate, '2week', is2WeekDone, !isCompleted);
+
+      bannerEl.innerHTML = ApolloCountdown.renderWidget(st, 'Level 2: 2-Week Post Evaluation Countdown');
+
+      const widgetBox = document.getElementById('post-eval-2week-widget');
+      if (widgetBox) {
+        widgetBox.innerHTML = ApolloCountdown.renderWidget(st, '2-Week Post Training Application Review');
+      }
+    } else if (currentActiveTab === 'supervisor-eval') {
+      // Tab 3: 3-Month Supervisor Evaluation Countdown
+      const is3MoDone = ['Programme Closed'].includes(t.Stage);
+      const st = ApolloCountdown.getStatus(compDate, '3month', is3MoDone, !isCompleted);
+
+      bannerEl.innerHTML = ApolloCountdown.renderWidget(st, 'Level 3: 3-Month Supervisor Evaluation Countdown');
+
+      const widgetBox = document.getElementById('supervisor-eval-3month-widget');
+      if (widgetBox) {
+        widgetBox.innerHTML = ApolloCountdown.renderWidget(st, '3-Month Supervisor Competency Assessment Timeline');
+      }
+    }
+  }
+
+  function switchTab(btn) {
+    document.querySelectorAll('.subtab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentActiveTab = btn.dataset.tab;
+
+    ['training-eval', 'post-eval', 'supervisor-eval'].forEach(id => {
+      const el = document.getElementById('tab-' + id);
+      if (el) el.style.display = (btn.dataset.tab === id) ? '' : 'none';
+    });
+
+    updateEvaluationDashboardCountdowns();
+
+    if (btn.dataset.tab === 'supervisor-eval') {
+      renderPostEvalAssignmentTable(window.__activeAttendedParticipants__ || [], activeTrainingObj || {});
+    } else if (btn.dataset.tab === 'post-eval') {
+      render2WeekPostEvalTable(window.__activeAttendedParticipants__ || [], activeTrainingObj || {});
+    }
+  }
+
+  function render2WeekPostEvalTable(participants, training) {
+    const tbody = document.getElementById('post-eval-2week-tbody');
+    if (!tbody) return;
+    if (!participants || participants.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#94A3B8;padding:32px">No participants found.</td></tr>';
+      return;
+    }
+    const compDate = training ? (training.EndDate || training.StartDate) : null;
+    const deadline = ApolloCountdown.calculate2WeekDeadline(compDate);
+    const deadlineStr = formatMinimalistDate(deadline);
+    const isCompleted = ['Training Completed','Evaluation Completed','Waiting for 3-Month Review','Programme Closed','Completed'].includes(training?.Stage || training?.Status);
+
+    tbody.innerHTML = participants.map((p, i) => {
+      const isDone = Boolean(p.PostEvalCompleted || p.L2Completed);
+      const st = ApolloCountdown.getStatus(compDate, '2week', isDone, !isCompleted);
+      const attColor = p.AttendanceColor || (p.Attended ? 'green' : 'red');
+      const attText  = p.AttendanceStatus || (p.Attended ? 'Attended' : 'Absent');
+
+      return `
+        <tr>
+          <td>
+            <div style="display:flex;align-items:center;gap:8px">
+              ${avatar(p.EmployeeName, 26, i)}
+              <div>
+                <div style="font-size:13px;font-weight:600;color:var(--apollo-dark)">${p.EmployeeName}</div>
+                <div style="font-size:11px;color:var(--apollo-gray-500)">${p.EmployeeID}</div>
+              </div>
+            </div>
+          </td>
+          <td style="font-size:12px;color:var(--apollo-gray-600)">${p.Department || '—'}</td>
+          <td><span class="badge-th badge-${attColor}">${attText}</span></td>
+          <td style="font-size:12px;font-weight:600">${deadlineStr}</td>
+          <td>${isDone ? '<span class="badge-th badge-green">Submitted</span>' : '<span class="badge-th badge-yellow">Pending</span>'}</td>
+          <td>${ApolloCountdown.renderBadge(st)}</td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  // ─── Page Init ──────────────────────────────────────────────────────────────
   document.addEventListener('DOMContentLoaded', async () => {
     buildLikert();
     buildCompetency('comp-before', 'cb');
     buildCompetency('comp-after',  'ca');
     buildImprovementQs();
+
+    // Register with real-time countdown timer manager
+    if (window.CountdownTimerManager) {
+      window.CountdownTimerManager.register('eval-page', () => {
+        updateEvaluationDashboardCountdowns();
+      });
+    }
 
     try {
       const [trainings, employees] = await Promise.all([
@@ -408,7 +614,7 @@
       trainings.forEach(t => {
         const o = document.createElement('option');
         o.value = t.ID;
-        const tag = (t.isThreeMonthsReached || t.isSixMonthsReached || t.Stage === 'Waiting for 3-Month Review') ? '⏰ [3-MO REVIEW DUE] ' : '';
+        const tag = (t.isThreeMonthsReached || t.isSixMonthsReached || t.Stage === 'Waiting for 3-Month Review') ? '[3-MO DUE] ' : '';
         o.textContent = `${tag}[${t.Code}] ${t.Name}`;
         sel.appendChild(o);
       });
@@ -432,6 +638,24 @@
     setupFieldAutocomplete('post-evid', 'post-evid-drop', (emp) => {
       document.getElementById('post-evid').value = emp.ID || '';
       document.getElementById('post-evname').value = emp.Name || '';
+    });
+    setupFieldAutocomplete('as-search-input', 'as-search-drop', (emp) => {
+      document.getElementById('as-search-input').value = `${emp.Name} (${emp.ID})`;
+      document.getElementById('as-supervisor-id-name').value = `${emp.Name} (${emp.ID})`;
+      document.getElementById('as-supervisor-id').value = emp.ID || '';
+      document.getElementById('as-supervisor-name').value = emp.Name || '';
+      if (emp.Email) {
+        document.getElementById('as-supervisor-email').value = emp.Email;
+      }
+    });
+    setupFieldAutocomplete('as-single-search-input', 'as-single-search-drop', (emp) => {
+      document.getElementById('as-single-search-input').value = `${emp.Name} (${emp.ID})`;
+      document.getElementById('as-single-supervisor-id-name').value = `${emp.Name} (${emp.ID})`;
+      document.getElementById('as-single-supervisor-id').value = emp.ID || '';
+      document.getElementById('as-single-supervisor-name').value = emp.Name || '';
+      if (emp.Email) {
+        document.getElementById('as-single-supervisor-email').value = emp.Email;
+      }
     });
   }
 
@@ -476,33 +700,20 @@
     });
   }
 
-  function switchTab(btn) {
-    document.querySelectorAll('.subtab').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    ['training-eval','post-eval'].forEach(id =>
-      document.getElementById('tab-'+id).style.display = btn.dataset.tab === id ? '' : 'none'
-    );
-    if (btn.dataset.tab === 'post-eval' && window.__activeAttendedParticipants__) {
-      renderPostEvalAssignmentTable(window.__activeAttendedParticipants__, window.__activeTrainingInfo__ || {});
-    }
-  }
-
-  let activeEvalUrls = { l1: '', l3: '' };
-
   function copyEvalUrl(type) {
     const url = activeEvalUrls[type];
     if (url) {
       navigator.clipboard.writeText(url).then(() => {
-        showToast('Evaluation Form link copied!', 'success');
+        showToast('Evaluation Form link copied to clipboard!', 'success');
       });
     }
   }
 
   async function loadEvaluations() {
     const id = document.getElementById('sel-eval-t').value;
-    if (!id) { showToast('Select a training.', 'error'); return; }
+    if (!id) { return; }
 
-    document.getElementById('eval-subtabs').style.display = '';
+    document.getElementById('eval-subtabs').style.display = 'flex';
     document.getElementById('eval-tid').value  = id;
     document.getElementById('post-tid').value  = id;
 
@@ -516,7 +727,10 @@
         callServer('getTrainingById', id).catch(() => null)
       ]);
 
-      const sheetUrl = tObj ? (tObj.trainingDataSheetUrl || (tObj.ParticipantsSheetID ? `https://docs.google.com/spreadsheets/d/${tObj.ParticipantsSheetID}/edit` : '')) : '';
+      activeTrainingObj = tObj;
+      activeEvalSummary = sum;
+
+      const sheetUrl = tObj ? (tObj.trainingDataSheetUrl || (tObj.ParticipantsSheetID ? ('ht' + 'tps://docs.google.com/spreadsheets/d/' + tObj.ParticipantsSheetID + '/edit') : '')) : '';
       const evalSheetBtn = document.getElementById('btn-open-eval-sheet');
       if (evalSheetBtn) {
         if (sheetUrl) {
@@ -531,43 +745,334 @@
         activeEvalUrls.l1 = qrData.participantEval.url;
         activeEvalUrls.l3 = qrData.supervisorPostEval.url;
 
-        document.getElementById('eval-qr-wrap-l1').innerHTML = renderQRWithLogoHtml(activeEvalUrls.l1, 110, 26);
-        document.getElementById('eval-qr-wrap-l3').innerHTML = renderQRWithLogoHtml(activeEvalUrls.l3, 110, 26);
+        document.getElementById('eval-qr-wrap-l1').innerHTML = renderQRWithLogoHtml(activeEvalUrls.l1, 100, 26);
+        document.getElementById('eval-qr-wrap-l3').innerHTML = renderQRWithLogoHtml(activeEvalUrls.l3, 100, 26);
 
-        document.getElementById('eval-qr-card').style.display = 'block';
+        document.getElementById('eval-l1-qr-box').style.display = 'block';
+        document.getElementById('eval-l3-qr-box').style.display = 'block';
       }
 
+      // Populate Level 1 summary
       document.getElementById('eval-summary').style.display = '';
-      document.getElementById('e-completed').textContent = sum.evalCompleted || 0;
-      document.getElementById('e-avg').textContent = sum.avgScore ? sum.avgScore + ' / 5' : 'N/A';
+      const compCount = sum.evalCompleted || 0;
+      document.getElementById('e-completed').textContent = compCount;
+      document.getElementById('e-avg').textContent = sum.avgScore ? Number(sum.avgScore).toFixed(1) + ' / 5.0' : 'N/A';
 
+      // Parse participants
+      let participantsList = [];
+      let trainingInfo = tObj || {};
+      if (attendedRes) {
+        if (Array.isArray(attendedRes.participants) && attendedRes.participants.length > 0) {
+          participantsList = attendedRes.participants;
+        } else if (Array.isArray(attendedRes) && attendedRes.length > 0) {
+          participantsList = attendedRes;
+        }
+      }
+
+      if (participantsList.length === 0 && id) {
+        try {
+          const [directParts, attData] = await Promise.all([
+            callServer('getTrainingParticipants', id).catch(() => []),
+            callServer('getAttendance', id).catch(() => [])
+          ]);
+
+          let allAttRecords = [];
+          if (Array.isArray(attData)) {
+            attData.forEach(d => {
+              if (d && Array.isArray(d.records)) allAttRecords = allAttRecords.concat(d.records);
+              else if (d && (d.EmployeeID || d.ID)) allAttRecords.push(d);
+            });
+          }
+
+          if (Array.isArray(directParts) && directParts.length > 0) {
+            participantsList = directParts.map(p => {
+              const eId = String(p.EmployeeID || p.ID || p.EmployeeNo || '').trim();
+              const eName = String(p.EmployeeName || p.Name || eId).trim();
+              const supEmail = String(p.SupervisorEmail || '').trim();
+              const supId = String(p.SupervisorID || '').trim();
+              const supName = String(p.SupervisorName || '').trim();
+
+              const attRec = allAttRecords.find(a => {
+                const aId = String(a.EmployeeID || a.EmployeeNo || a.ID || '').trim().toLowerCase();
+                const aName = String(a.EmployeeName || a.Name || '').trim().toLowerCase();
+                return (eId && aId === eId.toLowerCase()) || (eName && aName && aName === eName.toLowerCase());
+              });
+
+              let attStatusText = 'Did Not Attend';
+              let attColor = 'red';
+              let hasAttended = false;
+
+              if (attRec) {
+                const rawStatus = String(attRec.Status || 'Present').trim().toLowerCase();
+                if (rawStatus === 'absent' || rawStatus === 'did not attend') {
+                  attStatusText = 'Did Not Attend'; attColor = 'red'; hasAttended = false;
+                } else if (rawStatus === 'late' || rawStatus === 'partial') {
+                  attStatusText = 'Late / Partial'; attColor = 'yellow'; hasAttended = true;
+                } else {
+                  attStatusText = 'Attended'; attColor = 'green'; hasAttended = true;
+                }
+              }
+
+              return {
+                ID: eId,
+                EmployeeID: eId,
+                EmployeeName: eName,
+                Department: String(p.Department || p.Dept || '—').trim(),
+                Position: String(p.Position || p.JobTitle || 'Participant').trim(),
+                SupervisorID: supId,
+                SupervisorName: supName,
+                SupervisorEmail: supEmail,
+                Attended: hasAttended,
+                AttendanceStatus: attStatusText,
+                AttendanceColor: attColor,
+                PostEvalCompleted: false
+              };
+            });
+          }
+        } catch(directErr) {}
+      }
+
+      window.__activeAttendedParticipants__ = participantsList;
+      const totalParts = participantsList.length || (tObj ? (tObj.ParticipantsCount || 0) : 0);
+      const respPct = totalParts > 0 ? Math.round((compCount / totalParts) * 100) : 0;
+      const respRateEl = document.getElementById('e-response-rate');
+      if (respRateEl) respRateEl.textContent = respPct + '%';
+
+      // Render Level 1 Evaluations Table
       document.getElementById('eval-tbody').innerHTML = evals.length
         ? evals.map((r, i) => `<tr>
-            <td><div style="display:flex;align-items:center;gap:8px">${avatar(r.EmployeeName,27,i)}<div><div style="font-size:13px;font-weight:500">${r.EmployeeName}</div><div style="font-size:11px;color:#94A3B8">${r.EmployeeID}</div></div></div></td>
-            <td style="font-size:12px;color:#64748B">—</td>
-            <td><span style="font-size:14px;font-weight:800;color:${r.AvgScore>=4?'#22C55E':r.AvgScore>=3?'#F59E0B':'#EF4444'}">${Number(r.AvgScore).toFixed(1)}</span><span style="font-size:11px;color:#94A3B8">/5</span></td>
-            <td style="font-size:12px;color:#64748B">${r.SubmittedAt}</td>
+            <td><div style="display:flex;align-items:center;gap:8px">${avatar(r.EmployeeName,27,i)}<div><div style="font-size:13px;font-weight:600;color:var(--apollo-dark)">${r.EmployeeName}</div><div style="font-size:11px;color:var(--apollo-gray-500)">${r.EmployeeID}</div></div></div></td>
+            <td style="font-size:12px;color:var(--apollo-gray-600)">—</td>
+            <td><span style="font-size:14px;font-weight:800;color:${r.AvgScore>=4?'#16A34A':r.AvgScore>=3?'#D97706':'#E91C2D'}">${Number(r.AvgScore).toFixed(1)}</span><span style="font-size:11px;color:#94A3B8"> / 5.0</span></td>
+            <td style="font-size:12px;color:var(--apollo-gray-600)">${r.SubmittedAt}</td>
           </tr>`).join('')
         : '<tr><td colspan="4" style="text-align:center;color:#94A3B8;padding:32px">No evaluations submitted yet.</td></tr>';
 
-      // Render Attended Participant Assignment Table
-      const participantsList = (attendedRes && Array.isArray(attendedRes.participants)) ? attendedRes.participants : [];
-      const trainingInfo = (attendedRes && attendedRes.training) ? attendedRes.training : {};
-      window.__activeAttendedParticipants__ = participantsList;
-      window.__activeTrainingInfo__ = trainingInfo;
-      renderPostEvalAssignmentTable(participantsList, trainingInfo);
+      // Render Level 2 and Level 3 tables
+      render2WeekPostEvalTable(participantsList, tObj);
+      renderPostEvalAssignmentTable(participantsList, tObj);
 
+      // Render Level 3 Submitted Reviews Table
       document.getElementById('post-tbody').innerHTML = posts.length
         ? posts.map((r, i) => `<tr>
-            <td><div style="display:flex;align-items:center;gap:8px">${avatar(r.EmployeeID, 27, i)}<span style="font-size:13px;font-weight:500">${r.EmployeeID}</span></div></td>
-            <td style="font-size:12px;color:#64748B">${r.EvaluatorName}</td>
+            <td><div style="display:flex;align-items:center;gap:8px">${avatar(r.EmployeeID, 27, i)}<span style="font-size:13px;font-weight:600">${r.EmployeeID}</span></div></td>
+            <td style="font-size:12px;color:var(--apollo-gray-600)">${r.EvaluatorName}</td>
             <td>${COMPETENCY.find(c=>c.v==r.CompetencyBefore)?.l||r.CompetencyBefore}</td>
             <td>${COMPETENCY.find(c=>c.v==r.CompetencyAfter)?.l||r.CompetencyAfter}</td>
             <td>${statusBadge(r.Improvement)}</td>
-            <td style="font-size:12px;color:#64748B">${r.SubmittedAt}</td>
+            <td style="font-size:12px;color:var(--apollo-gray-600)">${r.SubmittedAt}</td>
           </tr>`).join('')
-        : '<tr><td colspan="6" style="text-align:center;color:#94A3B8;padding:32px">No post-evaluations submitted yet.</td></tr>';
+        : '<tr><td colspan="6" style="text-align:center;color:#94A3B8;padding:32px">No supervisor evaluations submitted yet.</td></tr>';
+
+      updateEvaluationDashboardCountdowns();
     } catch(e) { showToast(e.message, 'error'); }
+  }
+
+  function renderPostEvalAssignmentTable(participants, training) {
+    const tbody = document.getElementById('post-assignment-tbody');
+    if (!tbody) return;
+    if (!participants || participants.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#94A3B8;padding:32px">No participants found for this training programme.</td></tr>';
+      return;
+    }
+
+    const banner = document.getElementById('post-eval-summary-banner');
+    if (banner) {
+      banner.style.display = '';
+      document.getElementById('cnt-post-total').textContent = participants.length;
+      const attendedCount = participants.filter(p => p.AttendanceColor === 'green' || p.AttendanceColor === 'yellow' || p.Attended).length;
+      const absentCount = participants.length - attendedCount;
+      const assignedCount = participants.filter(p => p.SupervisorID || p.SupervisorEmail).length;
+
+      const elAtt = document.getElementById('cnt-post-attended');
+      if (elAtt) elAtt.textContent = attendedCount;
+      const elAbs = document.getElementById('cnt-post-absent');
+      if (elAbs) elAbs.textContent = absentCount;
+      const elAsg = document.getElementById('cnt-post-assigned');
+      if (elAsg) elAsg.textContent = assignedCount;
+    }
+
+    const isCompleted = ['Training Completed','Evaluation Completed','Waiting for 3-Month Review','Programme Closed','Completed'].includes(training?.Stage || training?.Status);
+    const compDate = training ? (training.EndDate || training.StartDate) : null;
+    const st3Mo = ApolloCountdown.getStatus(compDate, '3month', false, !isCompleted);
+
+    tbody.innerHTML = participants.map((p, i) => {
+      const lockBadge = st3Mo.isOverdue || st3Mo.isDueToday
+        ? `<span class="badge-th badge-green"><span class="icon sm" style="font-size:12px">lock_open</span> Ready</span>`
+        : `<span class="badge-th badge-yellow"><span class="icon sm" style="font-size:12px">schedule</span> ${st3Mo.shortText || 'Locked'}</span>`;
+
+      const supText = p.SupervisorName || p.SupervisorID ? `${p.SupervisorName || p.SupervisorID} (${p.SupervisorID || ''})` : '<em style="color:#94A3B8">Not Assigned</em>';
+      const emailText = p.SupervisorEmail ? `<span style="color:#E91C2D;font-size:11.5px;font-weight:600">${p.SupervisorEmail}</span>` : '—';
+      const statusBadge = p.PostEvalCompleted
+        ? `<span class="badge-th badge-green">Completed</span>`
+        : (p.SupervisorID || p.SupervisorEmail ? `<span class="badge-th badge-gold">Assigned</span>` : `<span class="badge-th badge-gray">Pending</span>`);
+
+      const attColor = p.AttendanceColor || (p.Attended ? 'green' : 'red');
+      const attText  = p.AttendanceStatus || (p.Attended ? 'Attended' : 'Absent');
+
+      let attBadge = `<span class="badge-th badge-${attColor}"><span class="dot"></span> ${attText}</span>`;
+      let rowStyle = (attColor === 'yellow') ? 'background:#FFFBEB' : (attColor === 'red') ? 'background:#FEF2F2' : '';
+
+      const escapedSup = (p.SupervisorID || p.SupervisorEmail || '').replace(/'/g, "\\'");
+      const escapedName = (p.EmployeeName || '').replace(/'/g, "\\'");
+
+      return `
+        <tr style="${rowStyle}">
+          <td style="text-align:center"><input type="checkbox" class="chk-post-row" value="${p.EmployeeID}"></td>
+          <td>
+            <div style="display:flex;align-items:center;gap:8px">
+              ${avatar(p.EmployeeName, 26, i)}
+              <div>
+                <div style="font-size:13px;font-weight:700;color:var(--apollo-dark)">${p.EmployeeName}</div>
+                <div style="font-size:11px;color:var(--apollo-gray-500)">${p.EmployeeID} · ${p.Position || 'Participant'}</div>
+              </div>
+            </div>
+          </td>
+          <td style="font-size:12px;color:var(--apollo-gray-600)">${p.Department || '—'}</td>
+          <td>${attBadge}</td>
+          <td style="font-size:12.5px">${supText}</td>
+          <td>${emailText}</td>
+          <td>${statusBadge}</td>
+          <td>${lockBadge}</td>
+          <td style="text-align:center">
+            <div style="display:flex; gap:4px; justify-content:center">
+              <button class="btn-th btn-secondary btn-xs" onclick="openEditSupervisorModal('${p.EmployeeID}', '${escapedName}', '${escapedSup}')" title="Edit / Change Supervisor">
+                <span class="icon sm">edit</span> Edit
+              </button>
+              <button class="btn-th btn-primary btn-xs" onclick="sendSupervisorNotification('${p.EmployeeID}', '${escapedName}')" title="Send Email Notification to Assigned Supervisor">
+                <span class="icon sm">mail</span> Email
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function toggleSelectAllPostEvalRows(checked) {
+    const chks = document.querySelectorAll('.chk-post-row');
+    chks.forEach(c => c.checked = checked);
+  }
+
+  function selectAllPostEvalParticipants(selectAll) {
+    const masterChk = document.getElementById('chk-post-select-all');
+    if (masterChk) masterChk.checked = selectAll;
+    toggleSelectAllPostEvalRows(selectAll);
+  }
+
+  function openBulkAssignSupervisorModal() {
+    const selectedChks = Array.from(document.querySelectorAll('.chk-post-row:checked'));
+    if (selectedChks.length === 0) {
+      showToast('Please tick at least one participant checkbox to assign.', 'error');
+      return;
+    }
+    const selectedIds = selectedChks.map(c => c.value);
+    const txtCount = document.getElementById('txt-selected-count');
+    if (txtCount) txtCount.textContent = selectedIds.length;
+
+    document.getElementById('as-search-input').value = '';
+    document.getElementById('as-supervisor-id-name').value = '';
+    document.getElementById('as-supervisor-id').value = '';
+    document.getElementById('as-supervisor-name').value = '';
+    document.getElementById('as-supervisor-email').value = '';
+
+    openModal('modal-assign-supervisor');
+  }
+
+  function openEditSupervisorModal(empId, empName, currentSup) {
+    document.getElementById('txt-edit-emp-name').textContent = `${empName} (${empId})`;
+    document.getElementById('as-single-empid').value = empId;
+    document.getElementById('as-single-search-input').value = currentSup || '';
+    document.getElementById('as-single-supervisor-id-name').value = currentSup || '';
+    document.getElementById('as-single-supervisor-id').value = currentSup || '';
+    document.getElementById('as-single-supervisor-name').value = currentSup || '';
+    document.getElementById('as-single-supervisor-email').value = currentSup && currentSup.includes('@') ? currentSup : '';
+
+    const foundEmp = (allEmployees || []).find(e => (e.ID && e.ID.toLowerCase() === (currentSup||'').toLowerCase()) || (e.Email && e.Email.toLowerCase() === (currentSup||'').toLowerCase()));
+    if (foundEmp) {
+      document.getElementById('as-single-supervisor-id-name').value = `${foundEmp.Name} (${foundEmp.ID})`;
+      document.getElementById('as-single-supervisor-id').value = foundEmp.ID;
+      document.getElementById('as-single-supervisor-name').value = foundEmp.Name;
+      if (foundEmp.Email) document.getElementById('as-single-supervisor-email').value = foundEmp.Email;
+    }
+
+    openModal('modal-edit-supervisor');
+  }
+
+  async function submitEditSingleSupervisor() {
+    const tId = document.getElementById('sel-eval-t').value;
+    const empId = document.getElementById('as-single-empid').value;
+    const supId = document.getElementById('as-single-supervisor-id').value.trim() || document.getElementById('as-single-search-input').value.trim();
+    const supName = document.getElementById('as-single-supervisor-name').value.trim();
+    const supEmail = document.getElementById('as-single-supervisor-email').value.trim();
+
+    if (!tId || !empId || (!supEmail && !supId)) {
+      showToast('Training, Employee ID, and Supervisor Email address are required.', 'error');
+      return;
+    }
+
+    const btn = document.getElementById('btn-save-single-assign');
+    setBtnLoading(btn, true, 'Saving...');
+
+    try {
+      const res = await callServer('assignPostEvalSupervisorsBulk', tId, [empId], supId || supEmail, supEmail, supName);
+      showToast(res.message || 'Supervisor updated successfully!', 'success');
+      closeModal('modal-edit-supervisor');
+      loadEvaluations();
+    } catch(e) {
+      showToast(e.message, 'error');
+    } finally {
+      setBtnLoading(btn, false, '<span class="icon sm">check</span> Save Changes');
+    }
+  }
+
+  async function sendSupervisorNotification(empId, empName) {
+    const tId = document.getElementById('sel-eval-t').value;
+    if (!tId || !empId) {
+      showToast('Training and Employee selection required.', 'error');
+      return;
+    }
+
+    showToast(`Sending notification email...`, 'info');
+    try {
+      const res = await callServer('sendSupervisorPostEvalNotificationSingle', tId, empId);
+      showToast(res.message || 'Notification email sent successfully!', 'success');
+    } catch(e) {
+      showToast(e.message, 'error');
+    }
+  }
+
+  async function submitAssignSupervisor() {
+    const tId = document.getElementById('sel-eval-t').value;
+    const selectedChks = Array.from(document.querySelectorAll('.chk-post-row:checked'));
+    let participantIds = selectedChks.map(c => c.value);
+
+    if (participantIds.length === 0 && window.__activeAttendedParticipants__) {
+      participantIds = window.__activeAttendedParticipants__.map(p => p.EmployeeID || p.ID);
+    }
+
+    const supId = document.getElementById('as-supervisor-id').value.trim() || document.getElementById('as-search-input').value.trim();
+    const supName = document.getElementById('as-supervisor-name').value.trim();
+    const supEmail = document.getElementById('as-supervisor-email').value.trim();
+
+    if (!tId || participantIds.length === 0 || (!supEmail && !supId)) {
+      showToast('Training, participant selection, and Supervisor Email address are required.', 'error');
+      return;
+    }
+
+    const btn = document.getElementById('btn-save-assign');
+    setBtnLoading(btn, true, 'Assigning...');
+
+    try {
+      const res = await callServer('assignPostEvalSupervisorsBulk', tId, participantIds, supId || supEmail, supEmail, supName);
+      showToast(res.message || 'Supervisor assigned successfully!', 'success');
+      closeModal('modal-assign-supervisor');
+      loadEvaluations();
+    } catch(e) {
+      showToast(e.message, 'error');
+    } finally {
+      setBtnLoading(btn, false, '<span class="icon sm">check</span> Save Assignment');
+    }
   }
 
   async function submitEval() {
@@ -644,240 +1149,79 @@
     } catch(e) { showToast(e.message, 'error'); }
     finally { setBtnLoading(btn, false, '<span class="icon sm">send</span> Submit'); }
   }
-
-  async function openAssignSupervisorModal() {
-    const sel = document.getElementById('as-training-select');
-    sel.innerHTML = '<option value="">Select Training Programme...</option>';
-    (allTrainings || []).forEach(t => {
-      sel.innerHTML += `<option value="${t.ID}">${t.Code ? t.Code + ' — ' : ''}${t.Name}</option>`;
-    });
-    const currentTId = document.getElementById('sel-eval-t').value;
-    if (currentTId) {
-      sel.value = currentTId;
-      loadParticipantsForAssign(currentTId);
-    }
-    document.getElementById('as-supervisor-input').value = '';
-    openModal('modal-assign-supervisor');
-  }
-
-  async function loadParticipantsForAssign(tId) {
-    const empSel = document.getElementById('as-employee-select');
-    empSel.innerHTML = '<option value="">Loading enrolled participants...</option>';
-    if (!tId) {
-      empSel.innerHTML = '<option value="">Select Training first...</option>';
-      return;
-    }
-    try {
-      const parts = await callServer('getTrainingParticipants', tId);
-      if (Array.isArray(parts) && parts.length > 0) {
-        empSel.innerHTML = parts.map(p => `<option value="${p.EmployeeID || p.ID}">${p.EmployeeName} (${p.EmployeeID || p.ID}) ${p.SupervisorEmail ? '— Assigned: ' + (p.SupervisorName || p.SupervisorEmail) : ''}</option>`).join('');
-      } else {
-        empSel.innerHTML = '<option value="">No participants enrolled</option>';
-      }
-    } catch(e) {
-      empSel.innerHTML = '<option value="">Failed to load participants</option>';
-    }
-  }
-
-  function renderPostEvalAssignmentTable(participants, training) {
-    const tbody = document.getElementById('post-assignment-tbody');
-    if (!tbody) return;
-    if (!participants || participants.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#94A3B8;padding:32px">No participants found for this training programme.</td></tr>';
-      return;
-    }
-
-    // Update Notification Summary Banner Stats
-    const banner = document.getElementById('post-eval-summary-banner');
-    if (banner) {
-      banner.style.display = '';
-      document.getElementById('cnt-post-total').textContent = participants.length;
-      const assignedCount = participants.filter(p => p.SupervisorID || p.SupervisorEmail).length;
-      document.getElementById('cnt-post-assigned').textContent = assignedCount;
-      document.getElementById('cnt-post-pending').textContent = participants.length - assignedCount;
-      document.getElementById('cnt-post-unlocked').textContent = training.Is3MonthReached ? participants.length : 0;
-    }
-
-    tbody.innerHTML = participants.map((p, i) => {
-      const lockBadge = training.Is3MonthReached
-        ? `<span class="badge-th badge-success">Unlocked (Ready)</span>`
-        : `<span class="badge-th badge-warning">Unlocks ${training.Target3MonthDate}</span>`;
-      
-      const supText = p.SupervisorName || p.SupervisorID ? `${p.SupervisorName || p.SupervisorID} (${p.SupervisorID || ''})` : '<em style="color:#94A3B8">Not Assigned</em>';
-      const emailText = p.SupervisorEmail ? `<span style="color:#2563EB;font-size:11.5px">${p.SupervisorEmail}</span>` : '—';
-      const statusBadge = p.PostEvalCompleted
-        ? `<span class="badge-th badge-success">Completed</span>`
-        : (p.SupervisorID || p.SupervisorEmail ? `<span class="badge-th badge-info">Assigned</span>` : `<span class="badge-th badge-secondary">Pending</span>`);
-
-      const escapedSup = (p.SupervisorID || p.SupervisorEmail || '').replace(/'/g, "\\'");
-      const escapedName = (p.EmployeeName || '').replace(/'/g, "\\'");
-
-      return `
-        <tr>
-          <td style="text-align:center"><input type="checkbox" class="chk-post-row" value="${p.EmployeeID}"></td>
-          <td>
-            <div style="display:flex;align-items:center;gap:8px">
-              ${avatar(p.EmployeeName, 26, i)}
-              <div>
-                <div style="font-size:13px;font-weight:600;color:#1E293B">${p.EmployeeName}</div>
-                <div style="font-size:11px;color:#64748B">${p.EmployeeID} · ${p.Position || 'Participant'}</div>
-              </div>
-            </div>
-          </td>
-          <td style="font-size:12px;color:#64748B">${p.Department || '—'}</td>
-          <td style="font-size:12.5px">${supText}</td>
-          <td>${emailText}</td>
-          <td>${statusBadge}</td>
-          <td>${lockBadge}</td>
-          <td style="text-align:center">
-            <div style="display:flex; gap:4px; justify-content:center">
-              <button class="btn-th btn-secondary btn-xs" onclick="openEditSupervisorModal('${p.EmployeeID}', '${escapedName}', '${escapedSup}')" title="Edit / Change Supervisor">
-                <span class="icon sm">edit</span> Edit
-              </button>
-              <button class="btn-th btn-primary btn-xs" onclick="sendSupervisorNotification('${p.EmployeeID}', '${escapedName}')" title="Send Email Notification to Assigned Supervisor">
-                <span class="icon sm">mail</span> Email
-              </button>
-            </div>
-          </td>
-        </tr>
-      `;
-    }).join('');
-  }
-
-  function toggleSelectAllPostEvalRows(checked) {
-    const chks = document.querySelectorAll('.chk-post-row');
-    chks.forEach(c => c.checked = checked);
-  }
-
-  function selectAllPostEvalParticipants(selectAll) {
-    const masterChk = document.getElementById('chk-post-select-all');
-    if (masterChk) masterChk.checked = selectAll;
-    toggleSelectAllPostEvalRows(selectAll);
-  }
-
-  function openBulkAssignSupervisorModal() {
-    const selectedChks = Array.from(document.querySelectorAll('.chk-post-row:checked'));
-    if (selectedChks.length === 0) {
-      showToast('Please tick at least one participant checkbox to assign.', 'error');
-      return;
-    }
-    const selectedIds = selectedChks.map(c => c.value);
-    const tId = document.getElementById('sel-eval-t').value;
-    
-    document.getElementById('as-training-select').value = tId;
-    document.getElementById('txt-selected-count').textContent = selectedIds.length;
-    openModal('modal-assign-supervisor');
-  }
-
-  function openEditSupervisorModal(empId, empName, currentSup) {
-    document.getElementById('txt-edit-emp-name').textContent = `${empName} (${empId})`;
-    document.getElementById('as-single-empid').value = empId;
-    document.getElementById('as-single-supervisor-input').value = currentSup || '';
-    openModal('modal-edit-supervisor');
-  }
-
-  async function submitEditSingleSupervisor() {
-    const tId = document.getElementById('sel-eval-t').value;
-    const empId = document.getElementById('as-single-empid').value;
-    const supInput = document.getElementById('as-single-supervisor-input').value.trim();
-
-    if (!tId || !empId || !supInput) {
-      showToast('Training, Employee ID, and Supervisor Email/ID are required.', 'error');
-      return;
-    }
-
-    const btn = document.getElementById('btn-save-single-assign');
-    setBtnLoading(btn, true, 'Updating...');
-
-    try {
-      const res = await callServer('editParticipantSupervisor', tId, empId, supInput);
-      showToast(res.message || 'Supervisor updated successfully!', 'success');
-      closeModal('modal-edit-supervisor');
-      loadEvaluations();
-    } catch(e) {
-      showToast(e.message, 'error');
-    } finally {
-      setBtnLoading(btn, false, '<span class="icon sm">check</span> Save Changes');
-    }
-  }
-
-  async function sendSupervisorNotification(empId, empName) {
-    const tId = document.getElementById('sel-eval-t').value;
-    if (!tId || !empId) return;
-
-    if (!confirm(`Send 3-month post evaluation notification email to the assigned supervisor of ${empName}?`)) {
-      return;
-    }
-
-    showToast(`Sending notification email...`, 'info');
-    try {
-      const res = await callServer('sendSupervisorPostEvalNotificationSingle', tId, empId);
-      showToast(res.message || 'Notification email sent successfully!', 'success');
-    } catch(e) {
-      showToast(e.message, 'error');
-    }
-  }
-
-  async function submitAssignSupervisor() {
-    const tId = document.getElementById('sel-eval-t').value;
-    const selectedChks = Array.from(document.querySelectorAll('.chk-post-row:checked'));
-    const participantIds = selectedChks.map(c => c.value);
-    const supInput = document.getElementById('as-supervisor-input').value.trim();
-
-    if (!tId || participantIds.length === 0 || !supInput) {
-      showToast('Training, participant selection, and Supervisor Email/ID are required.', 'error');
-      return;
-    }
-
-    const btn = document.getElementById('btn-save-assign');
-    setBtnLoading(btn, true, 'Assigning...');
-
-    try {
-      const res = await callServer('assignPostEvalSupervisorsBulk', tId, participantIds, supInput);
-      showToast(res.message || 'Supervisor assigned successfully!', 'success');
-      closeModal('modal-assign-supervisor');
-      loadEvaluations();
-    } catch(e) {
-      showToast(e.message, 'error');
-    } finally {
-      setBtnLoading(btn, false, '<span class="icon sm">check</span> Save Assignment');
-    }
-  }
 </script>
 
 <!-- Assign Supervisor Modal -->
 <div id="modal-assign-supervisor" class="modal-overlay" style="display:none">
-  <div class="modal-box" style="max-width:520px">
+  <div class="modal-box" style="max-width:540px">
     <div class="modal-header">
       <div>
-        <h3 class="modal-title">Assign Supervisor for Post Evaluation</h3>
+        <h3 class="modal-title">Assign Supervisor for 3-Month Post Evaluation</h3>
         <p class="modal-sub">Assigning supervisor to <strong id="txt-selected-count">0</strong> selected participant(s)</p>
       </div>
-      <button class="modal-close" onclick="closeModal('modal-assign-supervisor')">✕</button>
+      <button class="modal-close" onclick="closeModal('modal-assign-supervisor')"><span class="icon sm">close</span></button>
     </div>
     <div class="modal-body">
+      <div class="mb-3" style="position:relative">
+        <label class="label-th">Search Supervisor / PIC (by Employee ID or Name)</label>
+        <input id="as-search-input" class="input-th" placeholder="Type Employee ID or Name to search directory..." autocomplete="off">
+        <div id="as-search-drop" class="autocomplete-drop" style="display:none"></div>
+      </div>
+
+      <input type="hidden" id="as-supervisor-id">
+      <input type="hidden" id="as-supervisor-name">
+
       <div class="mb-3">
-        <label class="label-th">Supervisor / PIC (Email or Employee ID) <span class="required">*</span></label>
-        <input id="as-supervisor-input" class="input-th" placeholder="e.g. 61069 or supervisor@apollofood.com.my">
-        <div style="font-size:11.5px; color:#64748B; margin-top:6px">💡 System searches employee database by ID or Email. Notifications are scheduled for 3 months post-training.</div>
+        <label class="label-th">Selected Supervisor / Name</label>
+        <input id="as-supervisor-id-name" class="input-th" placeholder="Selected supervisor will appear here..." readonly style="background:#F8FAFC; color:#334155; font-weight:600">
+      </div>
+
+      <div class="mb-3">
+        <label class="label-th">Supervisor Email Address <span class="required">*</span></label>
+        <input id="as-supervisor-email" class="input-th" type="email" placeholder="e.g. supervisor@apollofood.com.my">
+        <div style="font-size:11.5px; color:#64748B; margin-top:6px"><span class="icon sm" style="color:#D97706">lightbulb</span> The system will automatically email this supervisor when the 3-month mark is reached.</div>
       </div>
     </div>
+    <div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end;padding-top:16px;border-top:1px solid #F1F5F9">
+      <button class="btn-th btn-secondary" onclick="closeModal('modal-assign-supervisor')">Cancel</button>
+      <button class="btn-th btn-primary" id="btn-save-assign" onclick="submitAssignSupervisor()">
+        <span class="icon sm">check</span> Save Assignment
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- Edit Single Supervisor Modal -->
 <div id="modal-edit-supervisor" class="modal-overlay" style="display:none">
-  <div class="modal-box" style="max-width:520px">
+  <div class="modal-box" style="max-width:540px">
     <div class="modal-header">
       <div>
         <h3 class="modal-title">Edit / Change Supervisor</h3>
         <p class="modal-sub">Updating supervisor for <strong id="txt-edit-emp-name">—</strong></p>
       </div>
-      <button class="modal-close" onclick="closeModal('modal-edit-supervisor')">✕</button>
+      <button class="modal-close" onclick="closeModal('modal-edit-supervisor')"><span class="icon sm">close</span></button>
     </div>
     <div class="modal-body">
       <input type="hidden" id="as-single-empid">
+      
+      <div class="mb-3" style="position:relative">
+        <label class="label-th">Search New Supervisor / PIC (by Employee ID or Name)</label>
+        <input id="as-single-search-input" class="input-th" placeholder="Type Employee ID or Name to search directory..." autocomplete="off">
+        <div id="as-single-search-drop" class="autocomplete-drop" style="display:none"></div>
+      </div>
+
+      <input type="hidden" id="as-single-supervisor-id">
+      <input type="hidden" id="as-single-supervisor-name">
+
       <div class="mb-3">
-        <label class="label-th">New Supervisor / PIC (Email or Employee ID) <span class="required">*</span></label>
-        <input id="as-single-supervisor-input" class="input-th" placeholder="e.g. 61069 or supervisor@apollofood.com.my">
-        <div style="font-size:11.5px; color:#64748B; margin-top:6px">💡 Re-assigns the participant to the new supervisor. If the supervisor resigns or changes roles, updating here updates all records.</div>
+        <label class="label-th">Selected Supervisor / Name</label>
+        <input id="as-single-supervisor-id-name" class="input-th" placeholder="Selected supervisor will appear here..." readonly style="background:#F8FAFC; color:#334155; font-weight:600">
+      </div>
+
+      <div class="mb-3">
+        <label class="label-th">Supervisor Email Address <span class="required">*</span></label>
+        <input id="as-single-supervisor-email" class="input-th" type="email" placeholder="e.g. supervisor@apollofood.com.my">
+        <div style="font-size:11.5px; color:#64748B; margin-top:6px"><span class="icon sm" style="color:#D97706">lightbulb</span> Re-assigns the participant to the new supervisor.</div>
       </div>
     </div>
     <div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end;padding-top:16px;border-top:1px solid #F1F5F9">

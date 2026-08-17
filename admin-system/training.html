@@ -3,8 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Apollo — Training Programmes</title>
+  <script>
+    window.__TRAINHUB_PAGE__ = '<?!= currentPage ?>';
+    window.__PUBLIC_PORTAL_URL__ = '<?!= (typeof publicPortalUrl !== "undefined" && publicPortalUrl) ? publicPortalUrl : "" ?>';
+    window.__COMPANY_LOGO_URL__ = '<?!= (typeof companyLogoUrl !== "undefined" && companyLogoUrl) ? companyLogoUrl : "" ?>';
+  </script>
   <?!= include('style') ?>
-  <title>TrainHub — Training Programmes</title>
+  <?!= include('script') ?>
 </head>
 <body>
 <div class="app-shell">
@@ -46,6 +52,12 @@
               <option value="Compliance Training">Compliance Training</option>
               <option value="Business Skills">Business Skills</option>
               <option value="Onboarding">Onboarding</option>
+              <option value="Leadership & Management">Leadership & Management</option>
+              <option value="Compliance & Regulatory">Compliance & Regulatory</option>
+              <option value="Technology & Innovation">Technology & Innovation</option>
+              <option value="Project Management">Project Management</option>
+              <option value="Data & Analytics">Data & Analytics</option>
+              <option value="Customer Experience">Customer Experience</option>
             </select>
           </div>
           <button class="btn-th btn-secondary btn-sm" onclick="loadTrainings()"><span class="icon sm">refresh</span>Refresh</button>
@@ -74,13 +86,13 @@
   <div class="modal-box" style="max-width:640px">
     <div class="modal-header">
       <div><h3 class="modal-title" id="t-modal-title">New Training Programme</h3><p class="modal-sub">Fill in programme details</p></div>
-      <button class="modal-close" onclick="closeModal('modal-training')">✕</button>
+      <button class="modal-close" onclick="closeModal('modal-training')"><span class="icon sm">close</span></button>
     </div>
     <input type="hidden" id="t-id">
     <div class="row g-3">
       <!-- Section 1: Specifications -->
       <div class="col-12" style="font-weight:700; font-size:13px; color:#2563EB; border-bottom:1px solid #E2E8F0; padding-bottom:4px; margin-top:10px">
-        🎓 1. Training Programme Specifications (AP-HRD-F01-01)
+        <span class="icon sm" style="color:#2563EB">school</span> 1. Training Programme Specifications (AP-HRD-F01-01)
       </div>
       <div class="col-12">
         <label class="label-th">Programme Name / Title <span class="required">*</span></label>
@@ -94,6 +106,12 @@
           <option value="Compliance Training">Compliance Training</option>
           <option value="Business Skills">Business Skills</option>
           <option value="Onboarding">Onboarding</option>
+          <option value="Leadership & Management">Leadership & Management</option>
+          <option value="Compliance & Regulatory">Compliance & Regulatory</option>
+          <option value="Technology & Innovation">Technology & Innovation</option>
+          <option value="Project Management">Project Management</option>
+          <option value="Data & Analytics">Data & Analytics</option>
+          <option value="Customer Experience">Customer Experience</option>
         </select>
       </div>
       <div class="col-md-4">
@@ -118,7 +136,7 @@
 
       <!-- Section 2: Dates & Financials -->
       <div class="col-12" style="font-weight:700; font-size:13px; color:#2563EB; border-bottom:1px solid #E2E8F0; padding-bottom:4px; margin-top:16px">
-        📅 2. Dates, Duration & Financials
+        <span class="icon sm" style="color:#2563EB">calendar_today</span> 2. Dates, Duration & Financials
       </div>
       <div class="col-md-4">
         <label class="label-th">Start Date <span class="required">*</span></label>
@@ -149,7 +167,7 @@
 
       <!-- Section 3: Facilitator & Provider Details -->
       <div class="col-12" style="font-weight:700; font-size:13px; color:#2563EB; border-bottom:1px solid #E2E8F0; padding-bottom:4px; margin-top:16px">
-        🏫 3. Facilitator, Venue & Provider Details
+        <span class="icon sm" style="color:#2563EB">corporate_fare</span> 3. Facilitator, Venue & Provider Details
       </div>
       <div class="col-md-6">
         <label class="label-th">Trainer / Facilitator Name <span class="required">*</span></label>
@@ -170,7 +188,7 @@
 
       <!-- Section 4: Supporting Materials & Justifications -->
       <div class="col-12" style="font-weight:700; font-size:13px; color:#2563EB; border-bottom:1px solid #E2E8F0; padding-bottom:4px; margin-top:16px">
-        📄 4. Supporting Documents & Business Justification
+        <span class="icon sm" style="color:#2563EB">description</span> 4. Supporting Documents & Business Justification
       </div>
       <div class="col-12">
         <label class="label-th">Brochure Link / Requisition URL</label>
@@ -187,7 +205,7 @@
 
       <!-- Section 5: Lifecycle & Status Controls -->
       <div class="col-12" style="font-weight:700; font-size:13px; color:#2563EB; border-bottom:1px solid #E2E8F0; padding-bottom:4px; margin-top:16px">
-        ⚙️ 5. Lifecycle & Status Controls
+        <span class="icon sm" style="color:#2563EB">settings</span> 5. Lifecycle & Status Controls
       </div>
       <div class="col-md-4">
         <label class="label-th">Status</label>
@@ -233,7 +251,7 @@
         <h3 class="modal-title" id="pm-title">Manage Training Participants</h3>
         <p class="modal-sub" id="pm-sub">Add or remove employees for this specific training programme</p>
       </div>
-      <button class="modal-close" onclick="closeModal('modal-manage-participants')">✕</button>
+      <button class="modal-close" onclick="closeModal('modal-manage-participants')"><span class="icon sm">close</span></button>
     </div>
     <input type="hidden" id="pm-training-id">
 
@@ -286,7 +304,7 @@
       <label class="label-th">Paste Employee IDs or Names (One per line or comma/tab separated)</label>
       <textarea id="pm-bulk-input" class="input-th mb-2" rows="6" placeholder="e.g.&#10;EMP001&#10;EMP002, John Doe&#10;EMP003	Jane Smith	HR"></textarea>
       <div style="font-size:11.5px;color:#64748B;margin-bottom:12px">
-        💡 <strong>Tip:</strong> You can copy a column of Employee IDs directly from Microsoft Excel or Google Sheets and paste them here.
+        <span class="icon sm" style="color:#D97706">lightbulb</span> <strong>Tip:</strong> You can copy a column of Employee IDs directly from Microsoft Excel or Google Sheets and paste them here.
       </div>
       <div style="display:flex;justify-content:flex-end">
         <button class="btn-th btn-primary btn-sm" id="btn-pm-bulk-submit" onclick="submitBulkParticipants()"><span class="icon sm">person_add</span>Parse & Add Bulk Participants</button>
@@ -308,7 +326,7 @@
         <h3 class="modal-title" id="session-modal-title">New Training Session</h3>
         <p class="modal-sub">Create a session with auto-generated QR code</p>
       </div>
-      <button class="modal-close" onclick="closeModal('modal-session')">✕</button>
+      <button class="modal-close" onclick="closeModal('modal-session')"><span class="icon sm">close</span></button>
     </div>
     <input type="hidden" id="s-training-id">
     <div class="row g-3 mt-1">
@@ -347,8 +365,6 @@
 </div>
 
 <div id="toast-container"></div>
-<script>window.__TRAINHUB_PAGE__ = '<?!= currentPage ?>';</script>
-<?!= include('script') ?>
 <script>
   let allTrainings = [];
 
@@ -363,22 +379,66 @@
     if (approvalEl) approvalEl.addEventListener('change', filterTrainings);
     if (catEl)      catEl.addEventListener('change', filterTrainings);
 
+    // Register with real-time countdown timer manager
+    if (window.CountdownTimerManager) {
+      window.CountdownTimerManager.register('training-grid', () => {
+        filterTrainings();
+      });
+    }
+
     loadTrainings();
     loadCostCentres();
   });
 
   async function loadTrainings() {
     const grid = document.getElementById('training-grid');
+    const countEl = document.getElementById('t-count');
+    if (countEl) countEl.textContent = 'Loading programmes...';
     if (grid) grid.innerHTML = '<div class="col-12 text-center py-5" style="color:#94A3B8"><div class="spinner mb-2"></div><br>Loading programmes...</div>';
+    
     try {
+      console.log('[loadTrainings] Fetching training programmes from TrainHub database...');
       const res = await callServer('getTrainings');
-      allTrainings = Array.isArray(res) ? res : (res && Array.isArray(res.data) ? res.data : []);
+      console.log('[loadTrainings] Server response received:', res);
+      
+      let trainings = null;
+      if (Array.isArray(res)) {
+        trainings = res;
+      } else if (res && Array.isArray(res.data)) {
+        trainings = res.data;
+      } else if (res && typeof res === 'object' && res.success === false) {
+        throw new Error(res.message || res.error || 'Failed to retrieve training records.');
+      } else if (res === null || res === undefined) {
+        throw new Error('No response received from Google Apps Script server.');
+      } else {
+        throw new Error('Invalid data format returned by server. Expected an array of training programmes.');
+      }
+
+      allTrainings = trainings;
+      console.log(`[loadTrainings] Successfully loaded ${allTrainings.length} training programmes.`);
       filterTrainings();
     } catch(e) {
+      console.error('[loadTrainings] Error loading trainings:', e);
       allTrainings = [];
-      filterTrainings();
+      if (countEl) countEl.textContent = 'Failed to load programmes';
+      if (grid) {
+        grid.innerHTML = `
+          <div class="col-12">
+            <div class="empty-state" style="padding:40px 20px;text-align:center;background:#fff;border:1.5px solid #FECACA;border-radius:12px">
+              <span class="icon lg" style="color:#EF4444;font-size:36px;display:block;margin-bottom:8px">error</span>
+              <h4 style="font-size:15px;font-weight:700;color:#1E293B;margin:0 0 6px">Unable to Load Training Programmes</h4>
+              <p style="font-size:12.5px;color:#64748B;max-width:520px;margin:0 auto 16px;line-height:1.5">${e.message || 'Database connection error'}</p>
+              <button class="btn-th btn-primary btn-sm" onclick="loadTrainings()">
+                <span class="icon sm">refresh</span> Retry
+              </button>
+            </div>
+          </div>
+        `;
+      }
+      showToast('Failed to load trainings: ' + e.message, 'error');
     }
   }
+  window.loadTrainings = loadTrainings;
 
   function filterTrainings() {
     const searchEl   = document.getElementById('search-t');
@@ -387,25 +447,28 @@
     const catEl      = document.getElementById('cat-t');
 
     const q   = searchEl ? searchEl.value.trim().toLowerCase() : '';
-    const st  = statusEl ? statusEl.value : '';
-    const app = approvalEl ? approvalEl.value : '';
-    const cat = catEl ? catEl.value : '';
+    const st  = statusEl ? statusEl.value.trim() : '';
+    const app = approvalEl ? approvalEl.value.trim() : '';
+    const cat = catEl ? catEl.value.trim() : '';
 
     const list = Array.isArray(allTrainings) ? allTrainings : [];
 
     const f = list.filter(t => {
       if (!t) return false;
-      const name      = String(t.Name || t.TrainingTitle || '').toLowerCase();
-      const code      = String(t.Code || t.TrainingCode || t.ID || '').toLowerCase();
-      const trainer   = String(t.Trainer || '').toLowerCase();
-      const status    = String(t.Status || '');
-      const appStatus = String(t.ApprovalStatus || 'Approved');
-      const category  = String(t.Category || '');
+      const name    = String(t.Name || t.TrainingTitle || '').toLowerCase();
+      const code    = String(t.Code || t.TrainingCode || '').toLowerCase();
+      const id      = String(t.ID || t.TrainingID || '').toLowerCase();
+      const trainer = String(t.Trainer || '').toLowerCase();
+      const dept    = String(t.Department || '').toLowerCase();
+      const venue   = String(t.Venue || '').toLowerCase();
+      const status    = String(t.Status || '').trim();
+      const appStatus = String(t.ApprovalStatus || 'Approved').trim();
+      const category  = String(t.Category || '').trim();
 
-      const matchQ   = !q || name.includes(q) || code.includes(q) || trainer.includes(q);
-      const matchSt  = !st || status === st;
-      const matchApp = !app || appStatus === app || (app === 'Approved' && (!t.ApprovalStatus || t.ApprovalStatus === 'Auto-Approved'));
-      const matchCat = !cat || category.toLowerCase().includes(cat.toLowerCase()) || cat.toLowerCase().includes(category.toLowerCase());
+      const matchQ   = !q || name.includes(q) || code.includes(q) || id.includes(q) || trainer.includes(q) || dept.includes(q) || venue.includes(q);
+      const matchSt  = !st || status.toLowerCase() === st.toLowerCase();
+      const matchApp = !app || appStatus.toLowerCase() === app.toLowerCase() || (app.toLowerCase() === 'approved' && (!t.ApprovalStatus || t.ApprovalStatus === 'Auto-Approved'));
+      const matchCat = !cat || category.toLowerCase() === cat.toLowerCase() || category.toLowerCase().includes(cat.toLowerCase());
 
       return matchQ && matchSt && matchApp && matchCat;
     });
@@ -414,11 +477,17 @@
   }
 
   const CAT_COLORS = {
-    'Behavioral Skills': '#2563EB',
-    'Technical Skills': '#8B5CF6',
-    'Compliance Training': '#EF4444',
-    'Business Skills': '#0891B2',
-    'Onboarding': '#22C55E'
+    'Behavioral Skills':       '#2563EB',
+    'Technical Skills':        '#8B5CF6',
+    'Compliance Training':     '#EF4444',
+    'Business Skills':         '#0891B2',
+    'Onboarding':              '#22C55E',
+    'Leadership & Management': '#F59E0B',
+    'Compliance & Regulatory': '#DC2626',
+    'Technology & Innovation': '#3B82F6',
+    'Project Management':      '#10B981',
+    'Data & Analytics':        '#6366F1',
+    'Customer Experience':     '#EC4899'
   };
 
   async function loadCostCentres() {
@@ -450,19 +519,34 @@
 
 
   function renderGrid(list) {
-    document.getElementById('t-count').textContent = `Showing ${list.length} of ${allTrainings.length} programmes`;
+    const countEl = document.getElementById('t-count');
+    if (countEl) countEl.textContent = `Showing ${list.length} of ${allTrainings.length} programmes`;
     const grid = document.getElementById('training-grid');
+    if (!grid) return;
     if (!list.length) {
-      grid.innerHTML = '<div class="col-12"><div class="empty-state"><span class="icon">school</span><p style="color:#94A3B8">No training programmes found</p></div></div>';
+      if (allTrainings.length === 0) {
+        grid.innerHTML = '<div class="col-12"><div class="empty-state"><span class="icon">school</span><p style="color:#94A3B8">No training programmes found in database</p></div></div>';
+      } else {
+        grid.innerHTML = '<div class="col-12"><div class="empty-state"><span class="icon">filter_alt_off</span><p style="color:#94A3B8">No training programmes match the selected filters</p></div></div>';
+      }
       return;
     }
     grid.innerHTML = list.map(t => {
       const cc = CAT_COLORS[t.Category] || '#2563EB';
       const isApproved = isTrainingApproved(t);
       const appStatusStr = t.ApprovalStatus || 'Approved';
+
+      // Real-time evaluation countdown statuses
+      const compDate = t.EndDate || t.StartDate;
+      const isCompleted = ['Training Completed','Evaluation Completed','Waiting for 3-Month Review','Programme Closed','Completed'].includes(t.Stage || t.Status);
+      const is2WDone = ['Evaluation Completed','Waiting for 3-Month Review','Programme Closed'].includes(t.Stage);
+      const is3MDone = ['Programme Closed'].includes(t.Stage);
+      const st2W = ApolloCountdown.getStatus(compDate, '2week', is2WDone, !isCompleted);
+      const st3M = ApolloCountdown.getStatus(compDate, '3month', is3MDone, !isCompleted);
+
       return `
       <div class="col-md-6 col-xl-4">
-        <div style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden;
+        <div style="background:#fff;border:1.5px solid #E2E8F0;border-radius:12px;overflow:hidden;
                     transition:box-shadow 0.15s,transform 0.1s;cursor:pointer"
              onmouseover="this.style.boxShadow='0 6px 20px rgba(0,0,0,0.09)';this.style.transform='translateY(-1px)'"
              onmouseout="this.style.boxShadow='';this.style.transform=''">
@@ -472,10 +556,10 @@
             <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:8px">
               <div style="flex:1;min-width:0">
                 <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;align-items:center">
-                  <span style="font-size:10.5px;font-family:monospace;color:#94A3B8;background:#F8FAFC;padding:2px 6px;border-radius:4px;border:1px solid #E2E8F0">${t.Code || '—'}</span>
-                  <span style="font-size:10.5px;color:${cc};background:${cc}15;padding:2px 7px;border-radius:999px;font-weight:500">${t.Category}</span>
+                  <span style="font-size:10.5px;font-family:monospace;color:#64748B;background:#F8FAFC;padding:2px 6px;border-radius:4px;border:1px solid #E2E8F0;font-weight:700">${t.Code || '—'}</span>
+                  <span style="font-size:10.5px;color:${cc};background:${cc}15;padding:2px 7px;border-radius:999px;font-weight:600">${t.Category}</span>
                 </div>
-                <h3 style="font-size:13.5px;font-weight:700;color:#1E293B;margin:0;line-height:1.3">${t.Name}</h3>
+                <h3 style="font-size:13.5px;font-weight:700;color:var(--apollo-dark);margin:0;line-height:1.3">${t.Name}</h3>
               </div>
               <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
                 ${statusBadge(t.Status)}
@@ -489,10 +573,23 @@
               ).join('')}
             </div>
             <!-- Stage chip -->
-            <div style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:#F8FAFC;border-radius:7px;margin-bottom:10px;border:1px solid #F1F5F9">
-              <span class="icon sm" style="color:#2563EB">linear_scale</span>
-              <span style="font-size:11.5px;font-weight:600;color:#1E293B;flex:1">Stage: ${t.Stage||'Created'}</span>
+            <div style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:#F8FAFC;border-radius:7px;margin-bottom:8px;border:1px solid #F1F5F9">
+              <span class="icon sm" style="color:#E91C2D">linear_scale</span>
+              <span style="font-size:11.5px;font-weight:600;color:var(--apollo-dark);flex:1">Stage: ${t.Stage||'Created'}</span>
             </div>
+
+            <!-- Real-Time Evaluation Countdown Chips -->
+            <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px;padding:8px 10px;background:#FFF8CF;border-radius:7px;border:1px solid #FEC30D">
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
+                <span style="color:#92400E;font-weight:600">2-Wk Post Eval:</span>
+                ${ApolloCountdown.renderBadge(st2W)}
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
+                <span style="color:#92400E;font-weight:600">3-Mo Supervisor:</span>
+                ${ApolloCountdown.renderBadge(st3M)}
+              </div>
+            </div>
+
             ${!isApproved ? `
             <!-- Approval Lock Warning Chip -->
             <div style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:#FFFBEB;border-radius:7px;margin-bottom:10px;border:1px solid #FDE68A;color:#B45309;font-size:11px">
@@ -504,8 +601,8 @@
             <div style="display:flex;gap:6px;border-top:1px solid #F1F5F9;padding-top:12px;flex-wrap:wrap">
               <button class="btn-th btn-primary btn-sm" style="flex:1;justify-content:center" onclick="openDetail('${t.ID}')"><span class="icon sm">open_in_new</span>Open</button>
               <button class="btn-th btn-secondary btn-sm" onclick="openParticipantManager('${t.ID}')" title="Manage Participants"><span class="icon sm">group_add</span></button>
-              ${t.trainingDataSheetUrl ? `<a class="btn-th btn-sm" style="background:#059669;color:#fff;border:none;text-decoration:none;display:inline-flex;align-items:center;gap:4px" href="${t.trainingDataSheetUrl}" target="_blank" title="Open Training Data Sheet"><span class="icon sm">table_chart</span>Data Sheet</a>` : (t.ParticipantsSheetID ? `<a class="btn-th btn-sm" style="background:#059669;color:#fff;border:none;text-decoration:none;display:inline-flex;align-items:center;gap:4px" href="https://docs.google.com/spreadsheets/d/${t.ParticipantsSheetID}/edit" target="_blank" title="Open Training Data Sheet"><span class="icon sm">table_chart</span>Data Sheet</a>` : '')}
-              ${t.requisitionFormUrl ? `<a class="btn-th btn-secondary btn-sm" href="${t.requisitionFormUrl}" target="_blank" title="Open Requisition Form" style="text-decoration:none"><span class="icon sm">description</span>Form</a>` : (t.RequisitionFormFileID ? `<a class="btn-th btn-secondary btn-sm" href="https://docs.google.com/spreadsheets/d/${t.RequisitionFormFileID}/edit" target="_blank" title="Open Requisition Form" style="text-decoration:none"><span class="icon sm">description</span>Form</a>` : '')}
+              ${t.trainingDataSheetUrl ? `<a class="btn-th btn-sm" style="background:#059669;color:#fff;border:none;text-decoration:none;display:inline-flex;align-items:center;gap:4px" href="${t.trainingDataSheetUrl}" target="_blank" title="Open Training Data Sheet"><span class="icon sm">table_chart</span>Data Sheet</a>` : (t.ParticipantsSheetID ? `<a class="btn-th btn-sm" style="background:#059669;color:#fff;border:none;text-decoration:none;display:inline-flex;align-items:center;gap:4px" href="${'ht' + 'tps://docs.google.com/spreadsheets/d/' + t.ParticipantsSheetID + '/edit'}" target="_blank" title="Open Training Data Sheet"><span class="icon sm">table_chart</span>Data Sheet</a>` : '')}
+              ${t.requisitionFormUrl ? `<a class="btn-th btn-secondary btn-sm" href="${t.requisitionFormUrl}" target="_blank" title="Open Requisition Form" style="text-decoration:none"><span class="icon sm">description</span>Form</a>` : (t.RequisitionFormFileID ? `<a class="btn-th btn-secondary btn-sm" href="${'ht' + 'tps://docs.google.com/spreadsheets/d/' + t.RequisitionFormFileID + '/edit'}" target="_blank" title="Open Requisition Form" style="text-decoration:none"><span class="icon sm">description</span>Form</a>` : '')}
               ${t.folderUrl ? `<a class="btn-th btn-secondary btn-sm" href="${t.folderUrl}" target="_blank" title="Open Google Drive Workspace" style="text-decoration:none"><span class="icon sm">folder</span>Folder</a>` : (t.FolderID ? `<a class="btn-th btn-secondary btn-sm" href="${driveFolderUrl(t.FolderID)}" target="_blank" title="Open Google Drive Workspace" style="text-decoration:none"><span class="icon sm">folder</span>Folder</a>` : '')}
               <button class="btn-th btn-secondary btn-sm" onclick="editTraining('${t.ID}')"><span class="icon sm">edit</span></button>
               <button class="btn-th btn-danger btn-sm" onclick="confirmDeleteT('${t.ID}')"><span class="icon sm">archive</span></button>
@@ -683,8 +780,8 @@
     const isApproved = isTrainingApproved(t);
     const appStatusStr = t.ApprovalStatus || 'Approved';
 
-    const dataSheetUrl = t.trainingDataSheetUrl || (t.ParticipantsSheetID ? `https://docs.google.com/spreadsheets/d/${t.ParticipantsSheetID}/edit` : '');
-    const reqUrl       = t.requisitionFormUrl   || (t.RequisitionFormFileID ? `https://docs.google.com/spreadsheets/d/${t.RequisitionFormFileID}/edit` : (t.RequisitionUrl || t.BrochureURL || ''));
+    const dataSheetUrl = t.trainingDataSheetUrl || (t.ParticipantsSheetID ? ('ht' + 'tps://docs.google.com/spreadsheets/d/' + t.ParticipantsSheetID + '/edit') : '');
+    const reqUrl       = t.requisitionFormUrl   || (t.RequisitionFormFileID ? ('ht' + 'tps://docs.google.com/spreadsheets/d/' + t.RequisitionFormFileID + '/edit') : (t.RequisitionUrl || t.BrochureURL || ''));
     const folderUrl    = t.folderUrl            || (t.FolderID ? driveFolderUrl(t.FolderID) : '');
 
     const topActions = document.getElementById('detail-top-actions');
@@ -712,6 +809,96 @@
       }
       rawObj = rawObj.replace(/\[Brochure File:\s*[^\]]+\]/g, '').trim();
     }
+
+    const compDate = t.EndDate || t.StartDate;
+    const isCompleted = ['Training Completed','Evaluation Completed','Waiting for 3-Month Review','Programme Closed','Completed'].includes(t.Stage || t.Status);
+    const is2WDone = ['Evaluation Completed','Waiting for 3-Month Review','Programme Closed'].includes(t.Stage);
+    const is3MDone = ['Programme Closed'].includes(t.Stage);
+    const st2W = ApolloCountdown.getStatus(compDate, '2week', is2WDone, !isCompleted);
+    const st3M = ApolloCountdown.getStatus(compDate, '3month', is3MDone, !isCompleted);
+    const evalCountdownWidgetsHtml = `
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          ${ApolloCountdown.renderWidget(st2W, 'Level 2: 2-Week Post Training Application')}
+        </div>
+        <div class="col-md-6">
+          ${ApolloCountdown.renderWidget(st3M, 'Level 3: 3-Month Supervisor Evaluation')}
+        </div>
+      </div>
+    `;
+
+    const evalObj = (evalQrs && evalQrs.participantEval) ? evalQrs.participantEval : null;
+    const evalUrl = evalObj ? evalObj.url : `${baseUrl}?page=evaluation&id=${encodeURIComponent(t.ID)}`;
+    const participantEvalQrHtml = `
+      <div style="text-align:center;margin-bottom:12px">
+        ${renderQRWithLogoHtml(evalUrl, 140, 32)}
+        <div style="font-size:10px;color:#64748B;margin-top:6px;word-break:break-all;font-family:monospace">${evalUrl}</div>
+      </div>
+      <div style="margin-top:auto;display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <button class="btn-th btn-secondary btn-xs" onclick="navigator.clipboard.writeText('${evalUrl}').then(()=>showToast('Participant Eval link copied!','success'))">
+          <span class="icon sm">content_copy</span> Copy Link
+        </button>
+        <button class="btn-th btn-primary btn-xs" onclick="downloadQRWithLogo('${evalUrl}', '${t.ID}_ParticipantEval_QR.png')">
+          <span class="icon sm">download</span> Download QR
+        </button>
+      </div>
+    `;
+
+    const postObj = (evalQrs && evalQrs.supervisorPostEval) ? evalQrs.supervisorPostEval : null;
+    const postUrl = postObj ? postObj.url : `${baseUrl}?page=post&id=${encodeURIComponent(t.ID)}`;
+    const supervisorPostEvalQrHtml = `
+      <div style="text-align:center;margin-bottom:12px">
+        ${renderQRWithLogoHtml(postUrl, 140, 32)}
+        <div style="font-size:10px;color:#64748B;margin-top:6px;word-break:break-all;font-family:monospace">${postUrl}</div>
+      </div>
+      <div style="margin-top:auto;display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <button class="btn-th btn-secondary btn-xs" onclick="navigator.clipboard.writeText('${postUrl}').then(()=>showToast('Supervisor Post Eval link copied!','success'))">
+          <span class="icon sm">content_copy</span> Copy Link
+        </button>
+        <button class="btn-th btn-primary btn-xs" onclick="downloadQRWithLogo('${postUrl}', '${t.ID}_SupervisorPostEval_QR.png')">
+          <span class="icon sm">download</span> Download QR
+        </button>
+      </div>
+    `;
+
+    const flatLogs = [];
+    if (Array.isArray(attendance)) {
+      attendance.forEach(dayObj => {
+        if (dayObj && Array.isArray(dayObj.records)) {
+          flatLogs.push(...dayObj.records);
+        } else if (dayObj && (dayObj.EmployeeNo || dayObj.EmployeeID)) {
+          flatLogs.push(dayObj);
+        }
+      });
+    }
+    const attendanceRowsHtml = flatLogs.length ? flatLogs.map(a => `
+      <tr>
+        <td style="font-size:12px;color:#64748B">${a.ScanTime || a.CheckIn || '—'}</td>
+        <td style="font-family:monospace;font-size:11.5px;font-weight:700;color:#2563EB">${a.EmployeeNo || a.EmployeeID || '—'}</td>
+        <td style="font-weight:600;font-size:13px;color:#1E293B">${a.EmployeeName || '—'}</td>
+        <td style="font-size:12px;color:#64748B">${a.Department || '—'}</td>
+        <td style="font-size:12px;color:#475569">${a.Day || a.SessionName || '—'}</td>
+        <td>${statusBadge(a.Status || 'Present')}</td>
+      </tr>
+    `).join('') : '<tr><td colspan="6" style="text-align:center;color:#94A3B8;padding:30px">No attendance check-ins recorded for this training yet.</td></tr>';
+
+    const level1EvalsHtml = (evals || []).length ? (evals || []).map(e => `
+      <tr>
+        <td style="font-weight:600">${e.EmployeeName || e.EmployeeID || '—'}</td>
+        <td style="color:#64748B">${e.Department || '—'}</td>
+        <td style="font-weight:700;color:#2563EB">${e.AvgScore ? e.AvgScore + ' / 5' : '—'}</td>
+        <td style="color:#64748B;font-size:11px">${toDisplayDateStr(e.Timestamp || e.Date) || '—'}</td>
+      </tr>
+    `).join('') : '<tr><td colspan="4" style="text-align:center;color:#94A3B8;padding:20px">No Level 1 evaluations submitted yet.</td></tr>';
+
+    const level3PostEvalsHtml = (postEvals || []).length ? (postEvals || []).map(pe => `
+      <tr>
+        <td style="font-weight:600">${pe.EmployeeName || pe.EmployeeID || '—'}</td>
+        <td style="color:#64748B">${pe.SupervisorName || pe.SupervisorID || '—'}</td>
+        <td style="font-weight:700;color:#059669">${pe.CompetencyBefore || '—'} → ${pe.CompetencyAfter || '—'}</td>
+        <td style="color:#64748B;font-size:11px">${toDisplayDateStr(pe.Timestamp || pe.Date) || '—'}</td>
+      </tr>
+    `).join('') : '<tr><td colspan="4" style="text-align:center;color:#94A3B8;padding:20px">No 3-month post-evaluations submitted yet.</td></tr>';
 
     const content = document.getElementById('detail-full-content');
     content.innerHTML = `
@@ -745,6 +932,9 @@
           <div class="section-label" style="margin-bottom:10px">Programme Lifecycle Stage</div>
           ${renderLifecycle(t.Stage || 'Created')}
         </div>
+
+        <!-- Real-Time Evaluation Countdown Timeline -->
+        ${evalCountdownWidgetsHtml}
 
         <!-- Meta Grid -->
         <div class="row g-3 mb-3">
@@ -793,7 +983,7 @@
           <div style="margin-top:16px;padding-top:16px;border-top:1px solid #F1F5F9">
             <div class="section-label" style="margin-bottom:6px">Uploaded Supporting Brochure / Document</div>
             <a href="${brochureUrl}" target="_blank" class="btn-th btn-secondary btn-sm" style="display:inline-flex;align-items:center;gap:6px;text-decoration:none;font-weight:600;color:#2563EB;background:#EFF6FF;border:1px solid #BFDBFE">
-              <span class="icon sm">description</span>View Uploaded Brochure / Attachment ↗
+              <span class="icon sm">open_in_new</span>View Uploaded Brochure / Attachment
             </a>
           </div>
         ` : ''}
@@ -876,7 +1066,7 @@
                 <div style="border:1px solid #E2E8F0;border-radius:10px;padding:16px;background:#fff;height:100%;display:flex;flex-direction:column">
                   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
                     <div style="display:flex;align-items:center;gap:6px">
-                      <span style="color:#22C55E;font-size:16px">✓</span>
+                      <span class="icon sm" style="color:#22C55E">check_circle</span>
                       <h4 style="font-size:14px;font-weight:700;color:#1E293B;margin:0">${s.SessionName}</h4>
                     </div>
                     ${statusBadge(status)}
@@ -931,25 +1121,7 @@
                 <span class="badge-th badge-blue">Participant Form</span>
               </div>
               <p style="font-size:11.5px;color:#64748B;margin-bottom:12px">Scanned by participants upon completing training programme.</p>
-              
-              ${(() => {
-                const evalObj = (evalQrs && evalQrs.participantEval) ? evalQrs.participantEval : null;
-                const evalUrl = evalObj ? evalObj.url : `${baseUrl}?page=evaluation&id=${encodeURIComponent(t.ID)}`;
-                return `
-                  <div style="text-align:center;margin-bottom:12px">
-                    ${renderQRWithLogoHtml(evalUrl, 140, 32)}
-                    <div style="font-size:10px;color:#64748B;margin-top:6px;word-break:break-all;font-family:monospace">${evalUrl}</div>
-                  </div>
-                  <div style="margin-top:auto;display:grid;grid-template-columns:1fr 1fr;gap:6px">
-                    <button class="btn-th btn-secondary btn-xs" onclick="navigator.clipboard.writeText('${evalUrl}').then(()=>showToast('Participant Eval link copied!','success'))">
-                      <span class="icon sm">content_copy</span> Copy Link
-                    </button>
-                    <button class="btn-th btn-primary btn-xs" onclick="downloadQRWithLogo('${evalUrl}', '${t.ID}_ParticipantEval_QR.png')">
-                      <span class="icon sm">download</span> Download QR
-                    </button>
-                  </div>
-                `;
-              })()}
+              ${participantEvalQrHtml}
             </div>
           </div>
 
@@ -961,25 +1133,7 @@
                 <span class="badge-th badge-purple">Supervisor Form</span>
               </div>
               <p style="font-size:11.5px;color:#64748B;margin-bottom:12px">Scanned/opened by supervisors 3 months post-training (${t.countdownText || 'Countdown Active'}).</p>
-              
-              ${(() => {
-                const postObj = (evalQrs && evalQrs.supervisorPostEval) ? evalQrs.supervisorPostEval : null;
-                const postUrl = postObj ? postObj.url : `${baseUrl}?page=post&id=${encodeURIComponent(t.ID)}`;
-                return `
-                  <div style="text-align:center;margin-bottom:12px">
-                    ${renderQRWithLogoHtml(postUrl, 140, 32)}
-                    <div style="font-size:10px;color:#64748B;margin-top:6px;word-break:break-all;font-family:monospace">${postUrl}</div>
-                  </div>
-                  <div style="margin-top:auto;display:grid;grid-template-columns:1fr 1fr;gap:6px">
-                    <button class="btn-th btn-secondary btn-xs" onclick="navigator.clipboard.writeText('${postUrl}').then(()=>showToast('Supervisor Post Eval link copied!','success'))">
-                      <span class="icon sm">content_copy</span> Copy Link
-                    </button>
-                    <button class="btn-th btn-primary btn-xs" onclick="downloadQRWithLogo('${postUrl}', '${t.ID}_SupervisorPostEval_QR.png')">
-                      <span class="icon sm">download</span> Download QR
-                    </button>
-                  </div>
-                `;
-              })()}
+              ${supervisorPostEvalQrHtml}
             </div>
           </div>
         </div>
@@ -1068,31 +1222,7 @@
               </tr>
             </thead>
             <tbody>
-              ${(() => {
-                const flatLogs = [];
-                if (Array.isArray(attendance)) {
-                  attendance.forEach(dayObj => {
-                    if (dayObj && Array.isArray(dayObj.records)) {
-                      flatLogs.push(...dayObj.records);
-                    } else if (dayObj && (dayObj.EmployeeNo || dayObj.EmployeeID)) {
-                      flatLogs.push(dayObj);
-                    }
-                  });
-                }
-                if (!flatLogs.length) {
-                  return `<tr><td colspan="6" style="text-align:center;color:#94A3B8;padding:30px">No attendance check-ins recorded for this training yet.</td></tr>`;
-                }
-                return flatLogs.map(a => `
-                  <tr>
-                    <td style="font-size:12px;color:#64748B">${a.ScanTime || a.CheckIn || '—'}</td>
-                    <td style="font-family:monospace;font-size:11.5px;font-weight:700;color:#2563EB">${a.EmployeeNo || a.EmployeeID || '—'}</td>
-                    <td style="font-weight:600;font-size:13px;color:#1E293B">${a.EmployeeName || '—'}</td>
-                    <td style="font-size:12px;color:#64748B">${a.Department || '—'}</td>
-                    <td style="font-size:12px;color:#475569">${a.Day || a.SessionName || '—'}</td>
-                    <td>${statusBadge(a.Status || 'Present')}</td>
-                  </tr>
-                `).join('');
-              })()}
+              ${attendanceRowsHtml}
             </tbody>
           </table>
         </div>
@@ -1121,14 +1251,7 @@
                     <tr><th>Participant</th><th>Dept</th><th>Avg Score</th><th>Date</th></tr>
                   </thead>
                   <tbody>
-                    ${(evals || []).length ? (evals || []).map(e => `
-                      <tr>
-                        <td style="font-weight:600">${e.EmployeeName || e.EmployeeID || '—'}</td>
-                        <td style="color:#64748B">${e.Department || '—'}</td>
-                        <td style="font-weight:700;color:#2563EB">${e.AvgScore ? e.AvgScore + ' / 5' : '—'}</td>
-                        <td style="color:#64748B;font-size:11px">${toDisplayDateStr(e.Timestamp || e.Date) || '—'}</td>
-                      </tr>
-                    `).join('') : '<tr><td colspan="4" style="text-align:center;color:#94A3B8;padding:20px">No Level 1 evaluations submitted yet.</td></tr>'}
+                    ${level1EvalsHtml}
                   </tbody>
                 </table>
               </div>
@@ -1145,14 +1268,7 @@
                     <tr><th>Participant</th><th>Supervisor</th><th>Competency (Pre → Post)</th><th>Date</th></tr>
                   </thead>
                   <tbody>
-                    ${(postEvals || []).length ? (postEvals || []).map(pe => `
-                      <tr>
-                        <td style="font-weight:600">${pe.EmployeeName || pe.EmployeeID || '—'}</td>
-                        <td style="color:#64748B">${pe.SupervisorName || pe.SupervisorID || '—'}</td>
-                        <td style="font-weight:700;color:#059669">${pe.CompetencyBefore || '—'} → ${pe.CompetencyAfter || '—'}</td>
-                        <td style="color:#64748B;font-size:11px">${toDisplayDateStr(pe.Timestamp || pe.Date) || '—'}</td>
-                      </tr>
-                    `).join('') : '<tr><td colspan="4" style="text-align:center;color:#94A3B8;padding:20px">No 3-month post-evaluations submitted yet.</td></tr>'}
+                    ${level3PostEvalsHtml}
                   </tbody>
                 </table>
               </div>
@@ -1185,11 +1301,11 @@
 
         if (badgeEl) {
           if (isSuccess) {
-            badgeEl.innerHTML = '<span class="badge-th badge-green" style="font-size:11px">✓ Synced</span>';
+            badgeEl.innerHTML = '<span class="badge-th badge-green" style="font-size:11px">Synced</span>';
           } else if (isUnsynced) {
-            badgeEl.innerHTML = '<span class="badge-th badge-yellow" style="font-size:11px">● Not Synced Yet</span>';
+            badgeEl.innerHTML = '<span class="badge-th badge-yellow" style="font-size:11px">Not Synced Yet</span>';
           } else {
-            badgeEl.innerHTML = '<span class="badge-th badge-red" style="font-size:11px">⚠ Sync Failed</span>';
+            badgeEl.innerHTML = '<span class="badge-th badge-red" style="font-size:11px">Sync Failed</span>';
           }
         }
 
@@ -1208,10 +1324,10 @@
     try {
       const res = await callServer('syncTrainingById', trainingId, 'Manual Admin Retry', 'MANUAL_RETRY');
       if (res && res.status === 'SUCCESS') {
-        showToast(`✓ Training ${trainingId} synchronized successfully in ${res.duration}!`, 'success');
+        showToast(`Training ${trainingId} synchronized successfully in ${res.duration}!`, 'success');
         loadTrainingSyncStatusUI(trainingId);
       } else {
-        showToast(`⚠ Synchronization failed: ${res.message || res.error}`, 'error');
+        showToast(`Synchronization failed: ${res.message || res.error}`, 'error');
         loadTrainingSyncStatusUI(trainingId);
       }
     } catch(e) {

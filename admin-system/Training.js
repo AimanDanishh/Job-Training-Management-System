@@ -18,6 +18,7 @@ function getTrainings() {
     const rows = autoUpdateTrainingLifecycleStages();
     return ok(rows);
   } catch (e) {
+    Logger.log('getTrainings error: ' + e.message + '\n' + (e.stack || ''));
     return err('Failed to load trainings: ' + e.message);
   }
 }
@@ -58,7 +59,9 @@ function getTrainingById(id) {
 function autoUpdateTrainingLifecycleStages() {
   try {
     const sheet = getSheet(SHEET_NAMES.trainings);
-    if (!sheet) return [];
+    if (!sheet) {
+      throw new Error(`Training database sheet "${SHEET_NAMES.trainings}" could not be found in the configured TrainHub Spreadsheet.`);
+    }
     const headers = ensureTrainingSheetColumns(sheet);
     const rows = sheetToJson(sheet);
     const today = new Date();
@@ -77,11 +80,7 @@ function autoUpdateTrainingLifecycleStages() {
       // Database Auto-Repair: Fix any CourseFee values corrupted by previous date timestamp overwrites
       const rawFee = String(t.CourseFee || '').trim();
       if (rawFee && (rawFee.includes(':') || rawFee.includes('2026') || rawFee.includes('Aug') || rawFee.includes('/'))) {
-        const defaultFee = (t.ID === 'TRN-101' || t.Code === 'TRN-101') ? '1500.00'
-                         : (t.ID === 'TRN-102' || t.Code === 'TRN-102') ? '2800.00'
-                         : (t.ID === 'TRN-103' || t.Code === 'TRN-103') ? '1200.00'
-                         : (t.ID === 'TRN-104' || t.Code === 'TRN-104') ? '2200.00'
-                         : '1000.00';
+        const defaultFee = '0.00';
         t.CourseFee = defaultFee;
         if (t._row && courseFeeCol > 0) {
           sheet.getRange(t._row, courseFeeCol).setValue(defaultFee);
@@ -176,7 +175,7 @@ function autoUpdateTrainingLifecycleStages() {
     });
 
     if (sheetModified) {
-      SpreadsheetApp.flush();
+      try { SpreadsheetApp.flush(); } catch(fErr) {}
       rows.forEach(t => {
         if (t._isLifecycleUpdated && t.ID) {
           try { syncTrainingById(t.ID, 'System Lifecycle Auto-Advance', 'STATUS_CHANGE'); } catch(sErr) {}
@@ -188,7 +187,10 @@ function autoUpdateTrainingLifecycleStages() {
   } catch (e) {
     Logger.log('autoUpdateTrainingLifecycleStages error: ' + e.message);
     const sheet = getSheet(SHEET_NAMES.trainings);
-    const fallbackRows = sheet ? sheetToJson(sheet) : [];
+    if (!sheet) {
+      throw new Error(`Training database sheet "${SHEET_NAMES.trainings}" could not be found: ${e.message}`);
+    }
+    const fallbackRows = sheetToJson(sheet);
     fallbackRows.forEach(t => enrichTrainingWithUrls(t));
     return fallbackRows;
   }
@@ -473,11 +475,16 @@ function updateTrainingStage(trainingId, newStage) {
       return err('Invalid lifecycle stage.');
 
     const sheet = getSheet(SHEET_NAMES.trainings);
+    if (!sheet) return err(`Sheet "${SHEET_NAMES.trainings}" not found.`);
     const row = findRowById(sheet, trainingId);
     if (row === -1) return err('Training not found.');
 
-    sheet.getRange(row, 14).setValue(newStage); // Column N = Stage
-    sheet.getRange(row, 25).setValue(now());    // Column Y = UpdatedDate
+    const headers = ensureTrainingSheetColumns(sheet);
+    const stageCol = headers.indexOf('Stage') + 1;
+    const updatedDateCol = headers.indexOf('UpdatedDate') + 1;
+
+    if (stageCol > 0) sheet.getRange(row, stageCol).setValue(newStage);
+    if (updatedDateCol > 0) sheet.getRange(row, updatedDateCol).setValue(now());
     try { syncTrainingById(trainingId, 'Stage Change (' + newStage + ')', 'STATUS_CHANGE'); } catch(sErr) {}
     return ok({ message: 'Stage updated to: ' + newStage });
   } catch (e) {
@@ -537,6 +544,11 @@ function getTrainingSummary() {
 // ─── Helpers ────────────────────────────────────────────────────────────────────
 function generateTrainingCode(category) {
   const prefix = {
+    'Behavioral Skills':       'BS',
+    'Technical Skills':        'TS',
+    'Compliance Training':     'CT',
+    'Business Skills':         'BUS',
+    'Onboarding':              'ONB',
     'Leadership & Management': 'LM',
     'Compliance & Regulatory': 'CR',
     'Technology & Innovation': 'TI',
@@ -547,13 +559,54 @@ function generateTrainingCode(category) {
   return prefix + '-' + new Date().getFullYear() + '-' + String(Date.now()).slice(-4);
 }
 
+/**
+ * Diagnostic function to verify central database sheet connectivity, headers, and record counts.
+ */
+function debugGetTrainings() {
+  try {
+    const ss = getSpreadsheet();
+    const sheetName = SHEET_NAMES.trainings;
+    const sheet = getSheet(sheetName);
+    if (!sheet) {
+      return {
+        success: false,
+        error: `Sheet "${sheetName}" not found.`,
+        spreadsheetName: ss ? ss.getName() : 'No spreadsheet found',
+        spreadsheetId: ss ? ss.getId() : 'None'
+      };
+    }
+    const lastRow = sheet.getLastRow();
+    const lastCol = sheet.getLastColumn();
+    const headers = lastRow > 0 && lastCol > 0 ? sheet.getRange(1, 1, 1, lastCol).getValues()[0] : [];
+    const rows = sheetToJson(sheet);
+    return {
+      success: true,
+      sheetNameConfigured: sheetName,
+      actualSheetName: sheet.getName(),
+      spreadsheetName: ss.getName(),
+      spreadsheetId: ss.getId(),
+      lastRow: lastRow,
+      lastColumn: lastCol,
+      headers: headers,
+      recordsCount: rows.length,
+      firstRecord: rows.length > 0 ? rows[0] : null
+    };
+  } catch (e) {
+    return {
+      success: false,
+      error: e.message,
+      stack: e.stack
+    };
+  }
+}
+
 // ─── Training Participants Management ──────────────────────────────────────────
 function getTrainingParticipants(trainingId) {
   try {
     if (!trainingId) return ok([]);
     const ss = getTrainingDataSpreadsheet(trainingId);
     if (!ss) return ok([]);
-    const sheet = ss.getSheetByName('TrainingParticipants');
+    const sheet = ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants');
     if (!sheet) return ok([]);
     return ok(sheetToJson(sheet));
   } catch (e) {
@@ -576,11 +629,11 @@ function addTrainingParticipants(trainingId, participants) {
     const ss = getTrainingDataSpreadsheet(trainingId);
     if (!ss) return err('Could not access training data spreadsheet for ID: ' + trainingId);
 
-    let sheet = ss.getSheetByName('TrainingParticipants');
+    let sheet = ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants');
     if (!sheet) {
-      sheet = ss.insertSheet('TrainingParticipants');
-      sheet.appendRow(['ID', 'TrainingID', 'EmployeeID', 'EmployeeName', 'Department', 'Position', 'AddedAt']);
-      sheet.getRange('A1:G1').setFontWeight('bold').setBackground('#2563EB').setFontColor('#FFFFFF');
+      sheet = ss.insertSheet('Participants');
+      sheet.appendRow(['ID', 'TrainingID', 'EmployeeID', 'EmployeeName', 'Department', 'Position', 'AddedAt', 'SupervisorID', 'SupervisorEmail', 'SupervisorName']);
+      sheet.getRange('A1:J1').setFontWeight('bold').setBackground('#2563EB').setFontColor('#FFFFFF');
       sheet.setFrozenRows(1);
     }
 
@@ -641,7 +694,7 @@ function removeTrainingParticipant(trainingId, employeeId) {
     if (!trainingId || !employeeId) return err('Training ID and Employee ID are required.');
     const ss = getTrainingDataSpreadsheet(trainingId);
     if (!ss) return err('Could not access training data spreadsheet.');
-    const sheet = ss.getSheetByName('TrainingParticipants');
+    const sheet = ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants');
     if (!sheet) return err('Participant record not found.');
 
     const data = sheet.getDataRange().getValues();
@@ -673,14 +726,22 @@ function removeTrainingParticipant(trainingId, employeeId) {
 function updateTrainingParticipantCount(trainingId, count) {
   try {
     const tSheet = getSheet(SHEET_NAMES.trainings);
+    if (!tSheet) return;
     const row = findRowById(tSheet, trainingId);
     if (row !== -1) {
-      tSheet.getRange(row, 15).setValue(count);
-      const currentStage = tSheet.getRange(row, 14).getValue();
-      if (currentStage === 'Created' && count > 0) {
-        tSheet.getRange(row, 14).setValue('Participants Imported');
+      const headers = ensureTrainingSheetColumns(tSheet);
+      const partCol = headers.indexOf('Participants') + 1;
+      const stageCol = headers.indexOf('Stage') + 1;
+      const updatedDateCol = headers.indexOf('UpdatedDate') + 1;
+
+      if (partCol > 0) tSheet.getRange(row, partCol).setValue(count);
+      if (stageCol > 0) {
+        const currentStage = tSheet.getRange(row, stageCol).getValue();
+        if ((!currentStage || currentStage === 'Created') && count > 0) {
+          tSheet.getRange(row, stageCol).setValue('Participants Imported');
+        }
       }
-      tSheet.getRange(row, 25).setValue(now());
+      if (updatedDateCol > 0) tSheet.getRange(row, updatedDateCol).setValue(now());
     }
   } catch (e) {
     Logger.log('updateTrainingParticipantCount error: ' + e.message);

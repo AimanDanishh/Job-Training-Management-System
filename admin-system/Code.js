@@ -26,11 +26,11 @@ function doGet(e) {
     template.sessionParam = (e && e.parameter && e.parameter.session) ? e.parameter.session : '';
     template.queryParams = (e && e.parameter) ? JSON.stringify(e.parameter) : '{}';
     const rawPublicUrl = getPublicPortalUrl() || '';
-    template.publicPortalUrl = Utilities.base64Encode(rawPublicUrl, Utilities.Charset.UTF_8);
+    template.publicPortalUrl = String(rawPublicUrl).replace(/"/g, '');
     try {
-      const rawLogo = getCompanyLogoUrl();
-      const directLogo = convertDriveLinkToDirectImageUrl(rawLogo);
-      template.companyLogoUrl = directLogo ? Utilities.base64Encode(directLogo, Utilities.Charset.UTF_8) : '';
+      const rawLogo = getCompanyLogoUrl() || '';
+      const directLogo = convertDriveLinkToDirectImageUrl(rawLogo) || '';
+      template.companyLogoUrl = String(directLogo).replace(/"/g, '');
     } catch(logoErr) {
       template.companyLogoUrl = '';
     }
@@ -95,7 +95,7 @@ function verifyGoogleUser(emailInput) {
     };
   }
 
-  // 2. Check Administrator / HR requirement (ADMIN_EMAILS + HR email tab)
+  // 2. Check Administrator / HR requirement (if ADMIN_EMAILS or HR email tab are configured)
   const isAuthorized = adminEmails.includes(userEmail) || hrEmails.includes(userEmail);
   const hasRestrictions = adminEmails.length > 0 || hrEmails.length > 0;
 
@@ -115,17 +115,14 @@ function verifyGoogleUser(emailInput) {
     success: true,
     authenticated: true,
     email: userEmail,
-    name: hrProfile.name,
-    employeeNo: hrProfile.employeeNo,
-    position: hrProfile.position,
+    name: hrProfile ? hrProfile.name : (userEmail.split('@')[0].replace(/[\._\-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())),
+    employeeNo: hrProfile ? hrProfile.employeeNo : 'ADMIN',
+    position: hrProfile ? hrProfile.position : 'Administrator',
     domain: domain,
     role: 'admin'
   };
 }
 
-/**
- * Gets the active Google user's profile and authentication status on page load.
- */
 function getCurrentUser() {
   let email = '';
   try {
@@ -150,16 +147,75 @@ function getSettingsData() {
     diagnostics: diagnostics,
     databaseId: getConfigProperty('SPREADSHEET_ID', ''),
     employeeSpreadsheetId: getConfigProperty('EMPLOYEE_SPREADSHEET_ID', ''),
+    rootFolderId: getConfigProperty('ROOT_FOLDER_ID', ''),
+    trainingFolder: getConfigProperty('TRAINING_FOLDER', '') || getConfigProperty('TRAINING_FOLDER_ID', ''),
+    requisitionTemplateId: getConfigProperty('TRAINING_REQUISITION_TEMPLATE_ID', ''),
     publicPortalUrl: getConfigProperty('PUBLIC_PORTAL_URL', ''),
     hodPortalUrl: getConfigProperty('HOD_PORTAL_URL', ''),
     allowedDomain: getConfigProperty('ALLOWED_DOMAIN', ''),
     adminEmails: getConfigProperty('ADMIN_EMAILS', ''),
+    companyLogoUrl: getConfigProperty('COMPANY_LOGO_URL', ''),
     appTitle: getConfigProperty('APP_TITLE', '')
   });
 }
 
 /**
- * Runs database setup safely from frontend Settings page.
+ * Saves all system settings and configuration properties to Script Properties.
+ */
+function saveSettings(data) {
+  try {
+    if (!data || typeof data !== 'object') {
+      return err('Invalid configuration data.');
+    }
+
+    if (data.databaseId !== undefined) {
+      setConfigProperty('SPREADSHEET_ID', String(data.databaseId).trim());
+    }
+    if (data.employeeSpreadsheetId !== undefined) {
+      setConfigProperty('EMPLOYEE_SPREADSHEET_ID', String(data.employeeSpreadsheetId).trim());
+    }
+    if (data.rootFolderId !== undefined) {
+      setConfigProperty('ROOT_FOLDER_ID', String(data.rootFolderId).trim());
+    }
+    if (data.trainingFolder !== undefined) {
+      setConfigProperty('TRAINING_FOLDER', String(data.trainingFolder).trim());
+    }
+    if (data.requisitionTemplateId !== undefined) {
+      setConfigProperty('TRAINING_REQUISITION_TEMPLATE_ID', String(data.requisitionTemplateId).trim());
+    }
+    if (data.publicPortalUrl !== undefined) {
+      setConfigProperty('PUBLIC_PORTAL_URL', String(data.publicPortalUrl).trim());
+    }
+    if (data.hodPortalUrl !== undefined) {
+      setConfigProperty('HOD_PORTAL_URL', String(data.hodPortalUrl).trim());
+    }
+    if (data.allowedDomain !== undefined) {
+      setConfigProperty('ALLOWED_DOMAIN', String(data.allowedDomain).trim());
+    }
+    if (data.adminEmails !== undefined) {
+      setConfigProperty('ADMIN_EMAILS', String(data.adminEmails).trim());
+    }
+    if (data.companyLogoUrl !== undefined) {
+      setConfigProperty('COMPANY_LOGO_URL', String(data.companyLogoUrl).trim());
+    }
+    if (data.appTitle !== undefined) {
+      setConfigProperty('APP_TITLE', String(data.appTitle).trim());
+    }
+
+    // Invalidate cached spreadsheet objects so new IDs take effect immediately
+    if (typeof _cachedSpreadsheet !== 'undefined') _cachedSpreadsheet = null;
+    if (typeof _cachedEmployeeSpreadsheet !== 'undefined') _cachedEmployeeSpreadsheet = null;
+
+    Logger.log('System settings successfully saved to Script Properties.');
+    return getSettingsData();
+  } catch (e) {
+    Logger.log('saveSettings error: ' + e.message);
+    return err('Failed to save settings: ' + e.message);
+  }
+}
+
+/**
+ * Runs structural auto-creation setup from Settings page if requested.
  */
 function runDatabaseSetup(spreadsheetId, employeeSpreadsheetId) {
   const result = setupDatabase(spreadsheetId, employeeSpreadsheetId);
@@ -168,4 +224,3 @@ function runDatabaseSetup(spreadsheetId, employeeSpreadsheetId) {
   }
   return err(result.message);
 }
-

@@ -3,8 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Apollo — Dashboard</title>
+  <script>
+    window.__TRAINHUB_PAGE__ = '<?!= currentPage ?>';
+    window.__PUBLIC_PORTAL_URL__ = '<?!= (typeof publicPortalUrl !== "undefined" && publicPortalUrl) ? publicPortalUrl : "" ?>';
+    window.__COMPANY_LOGO_URL__ = '<?!= (typeof companyLogoUrl !== "undefined" && companyLogoUrl) ? companyLogoUrl : "" ?>';
+  </script>
   <?!= include('style') ?>
-  <title>TrainHub — Dashboard</title>
+  <?!= include('script') ?>
 </head>
 <body>
 <div class="app-shell">
@@ -18,10 +24,10 @@
       <div style="flex:1; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px">
         <div>
           <h1 class="topbar-title">Dashboard</h1>
-          <p class="topbar-sub">Welcome back. System overview & real-time training analytics.</p>
+          <p class="topbar-sub">Welcome back. Apollo Job Training Management & real-time analytics.</p>
         </div>
-        <div style="background:#F8FAFC; border:1px solid #E2E8F0; padding:6px 14px; border-radius:20px; font-size:12.5px; font-weight:600; color:#334155; display:flex; align-items:center; gap:6px">
-          <span class="icon sm" style="color:#2563EB">calendar_today</span>
+        <div style="background:#FFF8CF; border:1px solid #FEC30D; padding:6px 14px; border-radius:20px; font-size:12.5px; font-weight:700; color:var(--apollo-dark); display:flex; align-items:center; gap:6px">
+          <span class="icon sm" style="color:#E91C2D">calendar_today</span>
           <span id="dashboard-header-date"></span>
         </div>
       </div>
@@ -31,59 +37,60 @@
       <!-- KPI Row -->
       <div class="row g-3 mb-4" id="kpi-row">
         <div class="col-6 col-md-4 col-xl">
-          <div class="stat-card">
+          <div class="stat-card" style="border-top:3px solid #E91C2D">
             <div class="d-flex align-items-center gap-2 mb-2">
-              <span class="icon filled md" style="color:#2563EB">school</span>
+              <span class="icon filled md" style="color:#E91C2D">school</span>
             </div>
-            <div class="stat-value" style="color:#2563EB" id="kpi-total">—</div>
+            <div class="stat-value" style="color:#E91C2D" id="kpi-total">—</div>
             <div class="stat-label">Total Programmes</div>
           </div>
         </div>
         <div class="col-6 col-md-4 col-xl">
-          <div class="stat-card">
+          <div class="stat-card" style="border-top:3px solid #FEC30D">
             <div class="d-flex align-items-center gap-2 mb-2">
-              <span class="icon filled md" style="color:#F59E0B">event</span>
+              <span class="icon filled md" style="color:#D97706">event</span>
             </div>
-            <div class="stat-value" style="color:#F59E0B" id="kpi-upcoming">—</div>
+            <div class="stat-value" style="color:#D97706" id="kpi-upcoming">—</div>
             <div class="stat-label">Upcoming</div>
           </div>
         </div>
         <div class="col-6 col-md-4 col-xl">
-          <div class="stat-card">
+          <div class="stat-card" style="border-top:3px solid #2563EB">
             <div class="d-flex align-items-center gap-2 mb-2">
-              <span class="icon filled md" style="color:#0284C7">sync</span>
+              <span class="icon filled md" style="color:#2563EB">sync</span>
             </div>
-            <div class="stat-value" style="color:#0284C7" id="kpi-ongoing">—</div>
+            <div class="stat-value" style="color:#2563EB" id="kpi-ongoing">—</div>
             <div class="stat-label">In Progress</div>
           </div>
         </div>
         <div class="col-6 col-md-4 col-xl">
-          <div class="stat-card">
+          <div class="stat-card" style="border-top:3px solid #16A34A">
             <div class="d-flex align-items-center gap-2 mb-2">
-              <span class="icon filled md" style="color:#22C55E">task_alt</span>
+              <span class="icon filled md" style="color:#16A34A">task_alt</span>
             </div>
-            <div class="stat-value" style="color:#22C55E" id="kpi-completed">—</div>
+            <div class="stat-value" style="color:#16A34A" id="kpi-completed">—</div>
             <div class="stat-label">Completed</div>
           </div>
         </div>
         <div class="col-6 col-md-4 col-xl">
-          <div class="stat-card">
+          <div class="stat-card" style="border-top:3px solid #E91C2D">
             <div class="d-flex align-items-center gap-2 mb-2">
-              <span class="icon filled md" style="color:#EF4444">rate_review</span>
+              <span class="icon filled md" style="color:#E91C2D">rate_review</span>
             </div>
-            <div class="stat-value" style="color:#EF4444" id="kpi-eval">—</div>
+            <div class="stat-value" style="color:#E91C2D" id="kpi-eval">—</div>
             <div class="stat-label">Pending Eval</div>
           </div>
         </div>
         <div class="col-6 col-md-4 col-xl">
-          <div class="stat-card">
+          <div class="stat-card" style="border-top:3px solid #7C3AED">
             <div class="d-flex align-items-center gap-2 mb-2">
-              <span class="icon filled md" style="color:#8B5CF6">timeline</span>
+              <span class="icon filled md" style="color:#7C3AED">timeline</span>
             </div>
-            <div class="stat-value" style="color:#8B5CF6" id="kpi-post">—</div>
+            <div class="stat-value" style="color:#7C3AED" id="kpi-post">—</div>
             <div class="stat-label">Pending 3-Mo Review</div>
           </div>
         </div>
+      </div>
         <!-- Multi-Tier Training Approval Status Pipeline Card -->
       <div class="card-th mb-4" style="background:#F8FAFC; border:1px solid #CBD5E1">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px">
@@ -152,6 +159,23 @@
           </div>
         </div>
       </div>
+
+      <!-- Database Connection Status Banner -->
+      <div id="db-config-banner" class="card-th mb-4" style="display:none; background:#FEF2F2; border:1.5px solid #FCA5A5; border-left:5px solid #EF4444">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap">
+          <div style="display:flex; align-items:center; gap:12px">
+            <div style="width:40px; height:40px; border-radius:10px; background:#FEE2E2; display:flex; align-items:center; justify-content:center; flex-shrink:0">
+              <span class="icon filled" style="color:#DC2626">storage</span>
+            </div>
+            <div>
+              <div style="font-size:14px; font-weight:700; color:#991B1B">⚠️ Database Connection Attention Required</div>
+              <div style="font-size:12.5px; color:#7F1D1D" id="db-config-banner-text">Master Spreadsheet ID is not configured. Please paste your Spreadsheet ID in System Settings.</div>
+            </div>
+          </div>
+          <button class="btn-th btn-sm" style="background:#DC2626; color:#fff; border:none" onclick="navTo('settings')">
+            <span class="icon sm">settings</span> Go to System Settings
+          </button>
+        </div>
       </div>
 
       <!-- 3-Month Post Training Evaluation Alert Banner -->
@@ -224,8 +248,6 @@
 </div>
 
 <div id="toast-container"></div>
-<script>window.__TRAINHUB_PAGE__ = '<?!= currentPage ?>';</script>
-<?!= include('script') ?>
 <script>
   function formatMinimalistDate(dInput) {
     if (!dInput) return '';
@@ -241,17 +263,39 @@
   document.addEventListener('DOMContentLoaded', () => {
     const hdrEl = document.getElementById('dashboard-header-date');
     if (hdrEl) hdrEl.textContent = formatMinimalistDate(new Date());
+
+    // Register with real-time countdown timer manager
+    if (window.CountdownTimerManager) {
+      window.CountdownTimerManager.register('dashboard-page', () => {
+        loadDashboard();
+      });
+    }
+
     loadDashboard();
   });
 
   async function loadDashboard() {
     try {
-      const [data, trainings] = await Promise.all([
-        callServer('getDashboardReport'),
-        callServer('getTrainings')
+      const [settingsRes, data, trainings] = await Promise.all([
+        callServer('getSettingsData').catch(() => null),
+        callServer('getDashboardReport').catch(() => ({ summary: {}, approval: {} })),
+        callServer('getTrainings').catch(() => [])
       ]);
-      const s = data.summary || {};
-      const app = data.approval || {};
+
+      if (settingsRes && settingsRes.validation) {
+        const dbValid = settingsRes.validation.database && settingsRes.validation.database.connected;
+        const dbBanner = document.getElementById('db-config-banner');
+        if (dbBanner) {
+          if (!dbValid || !settingsRes.databaseId) {
+            dbBanner.style.display = 'block';
+          } else {
+            dbBanner.style.display = 'none';
+          }
+        }
+      }
+
+      const s = data ? (data.summary || {}) : {};
+      const app = data ? (data.approval || {}) : {};
       const tList = Array.isArray(trainings) ? trainings : [];
 
       document.getElementById('kpi-total').textContent     = s.total      || tList.length || 0;
@@ -301,24 +345,30 @@
       const endFormatted   = formatMinimalistDate(p.EndDate) || p.EndDate || '';
       const dateDisplay    = endFormatted && endFormatted !== startFormatted ? `${startFormatted} — ${endFormatted}` : startFormatted;
 
-      const dataSheetUrl = p.trainingDataSheetUrl || (p.ParticipantsSheetID ? `https://docs.google.com/spreadsheets/d/${p.ParticipantsSheetID}/edit` : '');
-      const reqUrl       = p.requisitionFormUrl   || (p.RequisitionFormFileID ? `https://docs.google.com/spreadsheets/d/${p.RequisitionFormFileID}/edit` : (p.RequisitionUrl || p.BrochureURL || ''));
+      const dataSheetUrl = p.trainingDataSheetUrl || (p.ParticipantsSheetID ? ('ht' + 'tps://docs.google.com/spreadsheets/d/' + p.ParticipantsSheetID + '/edit') : '');
+      const reqUrl       = p.requisitionFormUrl   || (p.RequisitionFormFileID ? ('ht' + 'tps://docs.google.com/spreadsheets/d/' + p.RequisitionFormFileID + '/edit') : (p.RequisitionUrl || p.BrochureURL || ''));
+
+      const compDate = p.EndDate || p.StartDate;
+      const isCompleted = ['Training Completed','Evaluation Completed','Waiting for 3-Month Review','Programme Closed','Completed'].includes(p.Stage || p.Status);
+      const is3MDone = ['Programme Closed'].includes(p.Stage);
+      const st3M = ApolloCountdown.getStatus(compDate, '3month', is3MDone, !isCompleted);
 
       return `
         <div style="display:flex;gap:12px;align-items:center;padding:12px 20px;border-bottom:${i < list.length - 1 ? '1px solid #F1F5F9' : 'none'};transition:background 0.12s"
              onmouseover="this.style.background='#F8FAFC'" onmouseout="this.style.background='transparent'">
-          <div style="width:36px;height:36px;border-radius:10px;background:${p.Status==='In Progress'?'#EFF6FF':p.Status==='Upcoming'?'#FFFBEB':'#F8FAFC'};
+          <div style="width:36px;height:36px;border-radius:10px;background:${p.Status==='In Progress'?'#EFF6FF':p.Status==='Upcoming'?'#FFF8CF':'#F8FAFC'};
                       display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer" onclick="navTo('training', {id:'${p.ID}'})">
             <span class="icon" style="color:${p.Status==='In Progress'?'#2563EB':p.Status==='Upcoming'?'#D97706':'#64748B'}">school</span>
           </div>
           <div style="flex:1;min-width:0;cursor:pointer" onclick="navTo('training', {id:'${p.ID}'})">
-            <div style="font-size:13px;font-weight:700;color:#1E293B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.Name}</div>
+            <div style="font-size:13px;font-weight:700;color:var(--apollo-dark);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.Name}</div>
             <div style="font-size:11.5px;color:#64748B;margin-top:2px">${p.Code} · ${dateDisplay}</div>
           </div>
           <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;flex-wrap:wrap">
             ${dataSheetUrl ? `<a href="${dataSheetUrl}" target="_blank" onclick="event.stopPropagation()" class="btn-th btn-xs" style="background:#059669;color:#fff;border:none;text-decoration:none;display:inline-flex;align-items:center;gap:3px" title="Open Training Data Sheet"><span class="icon sm">table_chart</span>Sheet</a>` : ''}
             ${reqUrl ? `<a href="${reqUrl}" target="_blank" onclick="event.stopPropagation()" class="btn-th btn-secondary btn-xs" style="text-decoration:none;display:inline-flex;align-items:center;gap:3px" title="Open Requisition Form"><span class="icon sm">description</span>Form</a>` : ''}
             <span style="font-size:11.5px;font-weight:600;color:#64748B">${p.Participants || 0} pax</span>
+            ${ApolloCountdown.renderBadge(st3M)}
             ${statusBadge(p.Status)}
             ${approvalStatusBadge(p.ApprovalStatus || 'Approved')}
           </div>

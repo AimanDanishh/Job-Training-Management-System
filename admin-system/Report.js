@@ -232,12 +232,6 @@ function buildHoursReportData(trainingsInput, employeesInput, year, selectedDept
     }
   } catch (err) {}
 
-  if (ccMap.size === 0) {
-    ['Operations & Safety', 'Management & HR', 'IT & Engineering', 'Finance & Admin', 'Sales & Customer Service'].forEach(cc => {
-      ccMap.set(cc.toLowerCase(), cc);
-    });
-  }
-
   let costCentreList = Array.from(ccMap.values());
   if (selectedDept) {
     const fKey = String(selectedDept).trim().toLowerCase();
@@ -526,21 +520,33 @@ function getOrdinalSuffix(day) {
   }
 }
 
+function getOrdinalSuffix(day) {
+  const d = parseInt(day, 10);
+  if (isNaN(d)) return 'th';
+  if (d > 3 && d < 21) return 'th';
+  switch (d % 10) {
+    case 1:  return 'st';
+    case 2:  return 'nd';
+    case 3:  return 'rd';
+    default: return 'th';
+  }
+}
+
 function formatOrdinalDate(dateStrOrObj) {
   if (!dateStrOrObj) return '—';
-  if (typeof dateStrOrObj === 'string' && /^\d{2}(st|nd|rd|th)\s+[A-Za-z]{3}\s+\d{4}$/.test(dateStrOrObj.trim())) {
-    return dateStrOrObj.trim();
-  }
   const d = parseDateObj(dateStrOrObj);
   if (!d || isNaN(d.getTime())) return String(dateStrOrObj);
 
-  const dayStr = String(d.getDate()).padStart(2, '0');
-  const suffix = getOrdinalSuffix(d.getDate());
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const monthStr = months[d.getMonth()];
+  const dayNum = d.getDate();
+  const suffix = getOrdinalSuffix(dayNum);
+  const fullMonths = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+  const monthStr = fullMonths[d.getMonth()];
   const yearStr = d.getFullYear();
 
-  return `${dayStr}${suffix} ${monthStr} ${yearStr}`;
+  return `${dayNum}${suffix} ${monthStr} ${yearStr}`;
 }
 
 function formatTrainingMode(val) {
@@ -666,7 +672,7 @@ function getTrainingParticipantsList(trainingId) {
   try {
     const ss = getTrainingDataSpreadsheet(trainingId);
     if (ss) {
-      const sheet = ss.getSheetByName('TrainingParticipants');
+      const sheet = ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants');
       if (sheet) return sheetToJson(sheet);
     }
   } catch (e) {}
@@ -2196,8 +2202,8 @@ function exportReportExcel(trainingId) {
     sSummary.appendRow(['Venue', t.Venue || '—']);
     sSummary.appendRow(['Course Fee (RM)', t.CourseFee || '0.00']);
     sSummary.appendRow(['Department', t.Department || 'All Departments']);
-    sSummary.appendRow(['Start Date', t.StartDate]);
-    sSummary.appendRow(['End Date', t.EndDate || '—']);
+    sSummary.appendRow(['Start Date', formatOrdinalDate(t.StartDate)]);
+    sSummary.appendRow(['End Date', formatOrdinalDate(t.EndDate || t.StartDate)]);
     sSummary.appendRow(['Duration (Days)', t.Duration]);
     sSummary.appendRow(['Total Hours', t.TotalHours]);
     sSummary.appendRow(['Status', t.Status]);

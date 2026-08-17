@@ -1,16 +1,16 @@
 <aside class="sidebar">
   <div class="sidebar-logo">
-    <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
-      <div style="display:flex;align-items:center;gap:10px;min-width:0">
-        <div class="logo-icon"><span class="icon filled md" style="color:white">corporate_fare</span></div>
-        <div class="sidebar-text-content">
-          <div class="logo-name">TrainHub</div>
-          <div class="logo-sub">Management System</div>
+    <div class="sidebar-logo-container">
+      <div class="logo-box" title="Apollo Job Training System">
+        <img id="sidebar-company-logo" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjIyIiBmaWxsPSIjRTkxQzJEIi8+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iMjgiIGZpbGw9IiNGRkY4Q0YiIHN0cm9rZT0iI0ZFQzMwRCIgc3Ryb2tlLXdpZHRoPSIyIi8+PHRleHQgeD0iNTAiIHk9IjYxIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI5MDAiIGZvbnQtc2l6ZT0iMzIiIGZpbGw9IiNFOTFDMkQiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkE8L3RleHQ+PC9zdmc+" alt="Company Logo" class="sidebar-logo-img" onerror="handleSidebarLogoError(this)">
+        <div id="sidebar-logo-fallback" class="logo-icon-fallback" style="display:none">
+          <span class="icon filled md" style="color:#FFF8CF">corporate_fare</span>
         </div>
       </div>
-      <button id="sidebar-collapse-toggle" class="sidebar-collapse-btn" onclick="toggleSidebarCollapse()" title="Collapse/Expand Sidebar">
-        <span class="icon sm" id="sidebar-collapse-icon">chevron_left</span>
-      </button>
+      <div class="sidebar-text-content">
+        <div class="logo-name">Apollo</div>
+        <div class="logo-sub">Training Management</div>
+      </div>
     </div>
   </div>
   <nav class="sidebar-nav">
@@ -18,7 +18,7 @@
       <span class="icon">dashboard</span><span class="sidebar-text-content nav-label">Dashboard</span>
     </a>
     <a class="nav-item" data-page="training"   href="?page=training"   onclick="navTo('training'); return false;" title="Training Programmes">
-      <span class="icon">school</span><span class="sidebar-text-content nav-label">Training Programmes</span>
+      <span class="icon">school</span><span class="sidebar-text-content nav-label">Trainings</span>
     </a>
     <a class="nav-item" data-page="attendance" href="?page=attendance" onclick="navTo('attendance'); return false;" title="Attendance">
       <span class="icon">fact_check</span><span class="sidebar-text-content nav-label">Attendance</span>
@@ -38,12 +38,10 @@
     </a>
   </nav>
   <div class="sidebar-user">
-    <div style="display:flex;align-items:center;gap:10px">
-      <div class="avatar" id="sidebar-user-avatar" style="background:#2563EB;width:32px;height:32px;font-size:12px">--</div>
-      <div class="sidebar-text-content" style="flex:1;min-width:0">
-        <div id="sidebar-user-name" style="font-size:12.5px;font-weight:600;color:#1E293B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Admin Profile</div>
-        <div id="sidebar-user-email" style="font-size:10.5px;color:#94A3B8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Loading account...</div>
-      </div>
+    <div class="avatar" id="sidebar-user-avatar" title="Administrator">AD</div>
+    <div class="sidebar-text-content">
+      <div id="sidebar-user-name" style="font-size:12.5px;font-weight:700;color:var(--apollo-dark);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Admin Profile</div>
+      <div id="sidebar-user-email" style="font-size:11px;color:var(--apollo-gray-500);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Loading account...</div>
     </div>
   </div>
 </aside>

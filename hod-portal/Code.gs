@@ -952,8 +952,8 @@ function getPendingPostEvalParticipants(trainingId, userEmail) {
         return (!p.SupervisorEmail && !p.SupervisorID) && (dept.includes(hodCc) || hodCc.includes(dept) || targetHodCostCentre === 'ALL');
       });
 
-      // Check completed PostEval records
-      const postSheet = ss.getSheetByName('PostEval');
+      // Check completed Post Evaluation records
+      const postSheet = ss.getSheetByName('Post Evaluation') || ss.getSheetByName('PostEval');
       let evaluatedEmpIds = [];
       if (postSheet) {
         const postRows = sheetToJson(postSheet);
@@ -1013,9 +1013,9 @@ function submitHODPostEval(data) {
     const ss = getTrainingDataSpreadsheet(cleanTId);
     if (!ss) return err('Could not open per-training sheet for ID: ' + cleanTId);
 
-    let postSheet = ss.getSheetByName('PostEval');
+    let postSheet = ss.getSheetByName('Post Evaluation') || ss.getSheetByName('PostEval');
     if (!postSheet) {
-      postSheet = ss.insertSheet('PostEval');
+      postSheet = ss.insertSheet('Post Evaluation');
       postSheet.appendRow(['ID', 'TrainingID', 'EmployeeID', 'EvaluatorName', 'EvaluatorID', 'CompetencyBefore', 'CompetencyAfter', 'Improvement', 'CanApply', 'FurtherTraining', 'Comments', 'SubmittedAt']);
       postSheet.getRange('A1:L1').setFontWeight('bold').setBackground('#2563EB').setFontColor('#FFFFFF');
       postSheet.setFrozenRows(1);
