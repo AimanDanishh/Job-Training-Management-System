@@ -190,19 +190,7 @@
 
 
     function initUserEmail() {
-      if (userEmail && userEmail.trim()) {
-        sessionStorage.setItem('hod_user_email', userEmail.trim());
-      } else {
-        userEmail = sessionStorage.getItem('hod_user_email') || '';
-      }
-      
-      if (!userEmail) {
-        userEmail = prompt('Please enter your registered HOD email address to access Post Evaluation:') || '';
-        if (userEmail && userEmail.trim()) {
-          userEmail = userEmail.trim();
-          sessionStorage.setItem('hod_user_email', userEmail);
-        }
-      }
+      // User identity is strictly resolved from Google Workspace Single Sign-On session
     }
 
     function getObjId(obj) {
@@ -218,10 +206,6 @@
 
     function loadPostEvalData(trainingIdOverride) {
       const targetId = trainingIdOverride || currentTrainingId;
-      if (!userEmail) {
-        alert('No registered HOD email address provided. Access denied.');
-        return;
-      }
 
       showLoading('Loading Post Evaluation Data...');
       google.script.run
@@ -238,7 +222,7 @@
           hideLoading();
           showAlert('Failed to connect to server: ' + err.message, true);
         })
-        .getPendingPostEvalParticipants(targetId, userEmail);
+        .getPendingPostEvalParticipants(targetId, '');
     }
 
     function renderPostEval(data) {

@@ -603,6 +603,7 @@ function submitEmployeeRequisition(data) {
     setCol('PostSheetID', workspace.postSheetId || '');
     setCol('RequisitionFormFileID', reqForm.fileId || '');
     setCol('BrochureURL', brochureUrl);
+    setCol('ParticipantList', JSON.stringify(participantsList));
 
     SpreadsheetApp.flush();
 

@@ -824,27 +824,67 @@ function enrichTrainingWithUrls(t) {
 }
 
 /**
- * Helper to look up a training session across all per-training sheets
+ * Helper to look up a training session across central database sheet and all per-training sheets
  * 
  * @param {string} sessionId - Session ID (e.g. SES0001)
  * @returns {Object|null} { session: Object, training: Object, spreadsheet: Spreadsheet, sessionSheet: Sheet }
  */
 function findTrainingBySessionId(sessionId) {
   if (!sessionId) return null;
-  const cleanSessionId = String(sessionId).trim();
+  const cleanSessionId = String(sessionId).trim().toLowerCase();
 
+  // Tier 1: Check central Main Database spreadsheet first
+  try {
+    const mainSs = getSpreadsheet();
+    if (mainSs) {
+      const centralSessSheet = mainSs.getSheetByName('TrainingSessions') || 
+                               mainSs.getSheetByName('Sessions') || 
+                               mainSs.getSheetByName('Training Sessions') || 
+                               mainSs.getSheetByName('Session');
+      if (centralSessSheet) {
+        const sessions = sheetToJson(centralSessSheet);
+        const session = sessions.find(s => {
+          const sId = String(s.SessionID || s.ID || s.SessionCode || '').trim().toLowerCase();
+          return sId === cleanSessionId;
+        });
+        if (session) {
+          const tSheet = getSheet(SHEET_NAMES.trainings);
+          const trainings = tSheet ? sheetToJson(tSheet) : [];
+          const t = trainings.find(r => {
+            const id = String(r.ID || '').trim().toLowerCase();
+            const code = String(r.Code || '').trim().toLowerCase();
+            const tId = String(r.TrainingID || '').trim().toLowerCase();
+            return id === String(session.TrainingID || '').trim().toLowerCase() ||
+                   code === String(session.TrainingID || '').trim().toLowerCase() ||
+                   tId === String(session.TrainingID || '').trim().toLowerCase();
+          }) || { ID: session.TrainingID };
+
+          const perTrainingSs = getTrainingDataSpreadsheet(t) || mainSs;
+          return { session: session, training: t, spreadsheet: perTrainingSs, sessionSheet: centralSessSheet };
+        }
+      }
+    }
+  } catch(eCentral) {}
+
+  // Tier 2: Check per-training spreadsheets
   const tSheet = getSheet(SHEET_NAMES.trainings);
   if (!tSheet) return null;
 
   const trainings = sheetToJson(tSheet);
   for (const t of trainings) {
-    if (!t.ID) continue;
-    const ss = getTrainingDataSpreadsheet(t.ID);
+    if (!t.ID && !t.Code) continue;
+    const ss = getTrainingDataSpreadsheet(t);
     if (!ss) continue;
-    const sessSheet = ss.getSheetByName('TrainingSessions');
+    const sessSheet = ss.getSheetByName('TrainingSessions') || 
+                      ss.getSheetByName('Sessions') || 
+                      ss.getSheetByName('Training Sessions') || 
+                      ss.getSheetByName('Session');
     if (!sessSheet) continue;
     const sessions = sheetToJson(sessSheet);
-    const session = sessions.find(s => String(s.SessionID || '').trim() === cleanSessionId);
+    const session = sessions.find(s => {
+      const sId = String(s.SessionID || s.ID || s.SessionCode || '').trim().toLowerCase();
+      return sId === cleanSessionId;
+    });
     if (session) {
       return { session: session, training: t, spreadsheet: ss, sessionSheet: sessSheet };
     }

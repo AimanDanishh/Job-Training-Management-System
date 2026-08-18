@@ -10,7 +10,7 @@ function getValidTraining(trainingId) {
   if (!trainingId || String(trainingId).trim() === '') {
     return { valid: false, message: 'Training ID is missing or invalid.' };
   }
-  const cleanId = String(trainingId).trim();
+  const cleanId = String(trainingId).trim().toLowerCase();
   const tSheet = getSheet(SHEET_NAMES.trainings);
   if (!tSheet) {
     if (!getConfigProperty('SPREADSHEET_ID', '')) {
@@ -20,7 +20,12 @@ function getValidTraining(trainingId) {
   }
 
   const rows = sheetToJson(tSheet);
-  const training = rows.find(r => String(r.ID || r.TrainingID || '').trim() === cleanId);
+  const training = rows.find(r => {
+    const id = String(r.ID || '').trim().toLowerCase();
+    const code = String(r.Code || '').trim().toLowerCase();
+    const tId = String(r.TrainingID || '').trim().toLowerCase();
+    return id === cleanId || code === cleanId || tId === cleanId;
+  });
 
   if (!training) {
     return { valid: false, message: `Training programme (${cleanId}) does not exist.` };
@@ -30,55 +35,160 @@ function getValidTraining(trainingId) {
 
 function getValidEmployee(employeeId, trainingId) {
   if (!employeeId || String(employeeId).trim() === '') {
-    return { valid: false, message: 'Employee ID is required.' };
+    return { valid: false, message: 'Employee identifier is required.' };
   }
-  const cleanEmpId = String(employeeId).trim();
+  const cleanInput = String(employeeId).trim();
+  const cleanInputLower = cleanInput.toLowerCase();
   const cleanTId   = trainingId ? String(trainingId).trim() : '';
 
-  // 1. Primary Lookup: Per-Training Spreadsheet's TrainingParticipants Sheet Tab
+  // 1. Primary Lookup: Per-Training Spreadsheet (Participants & Assigned Supervisors)
   if (cleanTId) {
     try {
       const ss = getTrainingDataSpreadsheet(cleanTId);
-      const tpSheet = ss ? (ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants')) : null;
+      const tpSheet = ss ? (ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants') || ss.getSheetByName('ParticipantList')) : null;
       if (tpSheet) {
         const tpRows = sheetToJson(tpSheet);
+        
+        // 1a. Check Participant columns
         const tpEmp = tpRows.find(r => 
-          isSameEmployeeId(r.EmployeeID || r.EmployeeNo || r.ID || '', cleanEmpId) ||
-          (r.EmployeeName && String(r.EmployeeName).toLowerCase().trim() === cleanEmpId.toLowerCase())
+          isSameEmployeeId(r.EmployeeID || r.EmployeeNo || r.ID || r.StaffID || '', cleanInput) ||
+          (r.Email && String(r.Email).trim().toLowerCase() === cleanInputLower) ||
+          (r.EmployeeName && String(r.EmployeeName).toLowerCase().trim() === cleanInputLower) ||
+          (r.Name && String(r.Name).toLowerCase().trim() === cleanInputLower)
         );
         if (tpEmp) {
           return {
             valid: true,
             employee: {
-              ID: tpEmp.EmployeeID || tpEmp.ID || cleanEmpId,
-              Name: tpEmp.EmployeeName || tpEmp.Name || cleanEmpId,
+              ID: tpEmp.EmployeeID || tpEmp.ID || tpEmp.EmployeeNo || cleanInput,
+              Name: tpEmp.EmployeeName || tpEmp.Name || cleanInput,
               Department: tpEmp.Department || tpEmp.CostCentre || '',
-              Position: tpEmp.Position || tpEmp.JobTitle || ''
+              Position: tpEmp.Position || tpEmp.JobTitle || '',
+              Email: tpEmp.Email || tpEmp.EmailAddress || ''
+            }
+          };
+        }
+
+        // 1b. Check Assigned Supervisor columns
+        const supEmp = tpRows.find(r => 
+          isSameEmployeeId(r.SupervisorID || '', cleanInput) ||
+          (r.SupervisorEmail && String(r.SupervisorEmail).trim().toLowerCase() === cleanInputLower) ||
+          (r.SupervisorName && String(r.SupervisorName).trim().toLowerCase() === cleanInputLower)
+        );
+        if (supEmp) {
+          return {
+            valid: true,
+            employee: {
+              ID: supEmp.SupervisorID || cleanInput,
+              Name: supEmp.SupervisorName || cleanInput,
+              Email: supEmp.SupervisorEmail || (cleanInput.includes('@') ? cleanInput : ''),
+              Department: supEmp.Department || 'Supervisor / PIC',
+              Position: 'Supervisor'
             }
           };
         }
       }
     } catch (e) {
-      Logger.log('Per-training participant lookup error: ' + e.message);
+      Logger.log('Per-training lookup error: ' + e.message);
     }
+
+    // Check ParticipantList JSON on training record
+    try {
+      const tCheck = getValidTraining(cleanTId);
+      if (tCheck.valid && tCheck.training) {
+        const rawJson = tCheck.training.ParticipantList || tCheck.training.participants;
+        if (rawJson) {
+          const list = Array.isArray(rawJson) ? rawJson : JSON.parse(rawJson);
+          if (Array.isArray(list)) {
+            const m = list.find(p => 
+              isSameEmployeeId(p.EmployeeID || p.EmployeeNo || p.ID || p.SupervisorID || '', cleanInput) ||
+              (p.SupervisorEmail && String(p.SupervisorEmail).trim().toLowerCase() === cleanInputLower) ||
+              (p.SupervisorName && String(p.SupervisorName).trim().toLowerCase() === cleanInputLower) ||
+              (p.Email && String(p.Email).trim().toLowerCase() === cleanInputLower) ||
+              (p.EmployeeName && String(p.EmployeeName).trim().toLowerCase() === cleanInputLower)
+            );
+            if (m) {
+              return {
+                valid: true,
+                employee: {
+                  ID: m.EmployeeID || m.ID || m.SupervisorID || cleanInput,
+                  Name: m.EmployeeName || m.Name || m.SupervisorName || cleanInput,
+                  Department: m.Department || m.CostCentre || '',
+                  Position: m.Position || m.JobTitle || '',
+                  Email: m.Email || m.SupervisorEmail || ''
+                }
+              };
+            }
+          }
+        }
+      }
+    } catch(jErr) {}
   }
 
-  // 2. Employee-directory lookup is only for displaying identity; it does not
-  // establish enrolment in a training programme.
+  // 2. Employee Master Directory lookup
   const empSheet = getSheet(SHEET_NAMES.employees);
   if (empSheet) {
     const rows = sheetToJson(empSheet);
-    const emp = rows.find(r => isSameEmployeeId(r.ID || r.EmployeeID || r.EmployeeNo || '', cleanEmpId));
+    const emp = rows.find(r => 
+      isSameEmployeeId(r.ID || r.EmployeeID || r.EmployeeNo || r.StaffID || r['Employee ID'] || r['Staff ID'] || r['No'] || '', cleanInput) ||
+      (r.Email && String(r.Email).trim().toLowerCase() === cleanInputLower) ||
+      (r.EmailAddress && String(r.EmailAddress).trim().toLowerCase() === cleanInputLower) ||
+      (r['Email Address'] && String(r['Email Address']).trim().toLowerCase() === cleanInputLower) ||
+      (r['Company Email'] && String(r['Company Email']).trim().toLowerCase() === cleanInputLower) ||
+      (r.Name && String(r.Name).trim().toLowerCase() === cleanInputLower) ||
+      (r.EmployeeName && String(r.EmployeeName).trim().toLowerCase() === cleanInputLower) ||
+      (r['Employee Name'] && String(r['Employee Name']).trim().toLowerCase() === cleanInputLower)
+    );
     if (emp) {
-      return { valid: true, employee: emp };
+      return {
+        valid: true,
+        employee: {
+          ID: emp.ID || emp.EmployeeID || emp.EmployeeNo || cleanInput,
+          Name: emp.Name || emp.EmployeeName || cleanInput,
+          Department: emp.Department || emp.CostCentre || emp['Cost Centre'] || '',
+          Position: emp.Position || emp.JobTitle || emp.Designation || '',
+          Email: emp.Email || emp.EmailAddress || (cleanInput.includes('@') ? cleanInput : '')
+        }
+      };
     }
   }
+
+  // 3. Fallback: Check HOD/HR/C-Suite lists
+  try {
+    const roleSheets = ['HOD email', 'HOD Email', 'HR email', 'HR Email', 'Csuite email', 'Cost Centre'];
+    for (const tab of roleSheets) {
+      const s = getSheet(tab);
+      if (s) {
+        const rows = sheetToJson(s);
+        const match = rows.find(r => 
+          (r.Email && String(r.Email).trim().toLowerCase() === cleanInputLower) ||
+          (r['HOD Email'] && String(r['HOD Email']).trim().toLowerCase() === cleanInputLower) ||
+          (r['HR Email'] && String(r['HR Email']).trim().toLowerCase() === cleanInputLower) ||
+          isSameEmployeeId(r.ID || r.EmployeeID || '', cleanInput) ||
+          (r.Name && String(r.Name).trim().toLowerCase() === cleanInputLower) ||
+          (r['HOD Name'] && String(r['HOD Name']).trim().toLowerCase() === cleanInputLower)
+        );
+        if (match) {
+          return {
+            valid: true,
+            employee: {
+              ID: match.ID || match.EmployeeID || cleanInput,
+              Name: match.Name || match['HOD Name'] || cleanInput,
+              Department: match.Department || match.CostCentre || match['Cost Centre'] || 'Management',
+              Position: 'HOD / Manager',
+              Email: match.Email || match['HOD Email'] || match['HR Email'] || (cleanInput.includes('@') ? cleanInput : '')
+            }
+          };
+        }
+      }
+    }
+  } catch(rErr) {}
 
   if (!empSheet && !getConfigProperty('SPREADSHEET_ID', '')) {
     return { valid: false, message: 'Spreadsheet ID not configured. Please set SPREADSHEET_ID in Apps Script Project Settings.' };
   }
 
-  return { valid: false, message: `Employee ID (${cleanEmpId}) is not registered in the system.` };
+  return { valid: false, message: `Employee (${cleanInput}) is not registered in the system.` };
 }
 
 // ─── 3. Check Employee Enrollment for Training ──────────────────────────────────
@@ -86,9 +196,9 @@ function validateParticipantEnrollment(trainingId, employeeId) {
   const cleanTId   = String(trainingId || '').trim();
   const cleanEmpId = String(employeeId || '').trim();
 
-  // A. Check per-training spreadsheet TrainingParticipants sheet tab
+  // A. Check per-training spreadsheet TrainingParticipants / Participants tab
   const ss = getTrainingDataSpreadsheet(cleanTId);
-  const tpSheet = ss ? (ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants')) : null;
+  const tpSheet = ss ? (ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants') || ss.getSheetByName('ParticipantList')) : null;
   if (tpSheet) {
     const tpRows = sheetToJson(tpSheet);
     const enrolled = tpRows.find(r => 
@@ -98,8 +208,34 @@ function validateParticipantEnrollment(trainingId, employeeId) {
     if (enrolled) return { valid: true, participant: enrolled };
   }
 
-  // The training roster is authoritative. A directory match alone never grants
-  // access to attendance or evaluation for a training.
+  // B. Check ParticipantList JSON on training record
+  try {
+    const tCheck = getValidTraining(cleanTId);
+    if (tCheck.valid && tCheck.training) {
+      const rawJson = tCheck.training.ParticipantList || tCheck.training.participants;
+      if (rawJson) {
+        const list = Array.isArray(rawJson) ? rawJson : JSON.parse(rawJson);
+        if (Array.isArray(list)) {
+          const m = list.find(p => isSameEmployeeId(p.EmployeeID || p.EmployeeNo || p.ID || '', cleanEmpId));
+          if (m) return { valid: true, participant: m };
+        }
+      }
+    }
+  } catch(jErr) {}
+
+  // C. Check central Participants sheet in Main DB
+  try {
+    const dbPartSheet = getSheet('Participants') || getSheet('TrainingParticipants');
+    if (dbPartSheet) {
+      const dbParts = sheetToJson(dbPartSheet);
+      const m = dbParts.find(p => {
+        const pTid = String(p.TrainingID || p.TrainingCode || p.ID || '').trim().toLowerCase();
+        return (pTid === cleanTId.toLowerCase()) && isSameEmployeeId(p.EmployeeID || p.EmployeeNo || p.ID || '', cleanEmpId);
+      });
+      if (m) return { valid: true, participant: m };
+    }
+  } catch(dbErr) {}
+
   return { valid: false, message: `Employee ID (${cleanEmpId}) is not enrolled in this training.` };
 }
 
@@ -367,7 +503,7 @@ function verifyEvaluatorByEmployeeId(evaluatorEmployeeId, trainingId) {
     const cleanEvalEmpId = String(evaluatorEmployeeId).trim();
     let trnIdFilter = String(trainingId || '').trim();
 
-    // 1. Verify Evaluator Employee Record
+    // 1. Verify Evaluator Employee Record from Directory or Per-Training Data
     const empCheck = getValidEmployee(cleanEvalEmpId, trnIdFilter);
     if (!empCheck.valid) {
       return err(`Evaluator Employee ID (${cleanEvalEmpId}) is not registered in the system.`);
@@ -375,13 +511,16 @@ function verifyEvaluatorByEmployeeId(evaluatorEmployeeId, trainingId) {
 
     const evaluator = empCheck.employee;
     const evalName  = evaluator.Name || evaluator.EmployeeName || cleanEvalEmpId;
-    const evalDept  = evaluator.CostCentre || evaluator.Department || 'Supervisor / Manager';
+    const evalDept  = evaluator.CostCentre || evaluator.Department || '';
     const evalEmail = evaluator.Email || evaluator.EmailAddress || '';
 
     // 2. Fetch pending participants needing 3-Month Post Evaluation
     let pendingList = [];
     let completedCount = 0;
     let targetTraining = null;
+    let isParticipantInThisTraining = false;
+    let totalParticipantsCount = 0;
+    let anySupervisorAssigned = false;
 
     if (trnIdFilter) {
       const tCheck = getValidTraining(trnIdFilter);
@@ -395,14 +534,34 @@ function verifyEvaluatorByEmployeeId(evaluatorEmployeeId, trainingId) {
         const tpRows   = tpSheet ? sheetToJson(tpSheet) : [];
         const postRows = postSheet ? sheetToJson(postSheet) : [];
         const completedEmpIds = postRows.map(r => String(r.EmployeeID || '').trim().toLowerCase());
+        totalParticipantsCount = tpRows.length;
 
         tpRows.forEach(p => {
           const empId = String(p.EmployeeID || p.ID || '').trim();
           if (!empId) return;
+
           const pSupId = String(p.SupervisorID || '').trim();
           const pSupEmail = String(p.SupervisorEmail || '').trim().toLowerCase();
-          const matchesSup = !pSupId && !pSupEmail ? true : (isSameEmployeeId(pSupId, cleanEvalEmpId) || (evalEmail && pSupEmail === evalEmail.toLowerCase()));
-          if (!matchesSup) return;
+          const pSupName = String(p.SupervisorName || '').trim().toLowerCase();
+
+          if (pSupId || pSupEmail || pSupName) {
+            anySupervisorAssigned = true;
+          }
+
+          // RULE 1: Self-evaluation is STRICTLY BLOCKED for 3-Month Post Evaluation
+          if (isSameEmployeeId(cleanEvalEmpId, empId)) {
+            isParticipantInThisTraining = true;
+            return; // Cannot evaluate self!
+          }
+
+          // STRICT ASSIGNMENT CHECK: Must be explicitly assigned as supervisor by Admin
+          const isExplicitSupervisor = (
+            (pSupId && isSameEmployeeId(pSupId, cleanEvalEmpId)) ||
+            (pSupEmail && evalEmail && pSupEmail === evalEmail.toLowerCase()) ||
+            (pSupName && pSupName === evalName.toLowerCase())
+          );
+
+          if (!isExplicitSupervisor) return;
 
           if (completedEmpIds.includes(empId.toLowerCase())) {
             completedCount++;
@@ -417,57 +576,103 @@ function verifyEvaluatorByEmployeeId(evaluatorEmployeeId, trainingId) {
         });
       }
     } else {
+      // Loop across recent trainings
       const tSheet = getSheet(SHEET_NAMES.trainings);
       if (tSheet) {
         const trainings = sheetToJson(tSheet);
-        if (trainings.length > 0) {
-          targetTraining = trainings[0];
-          trnIdFilter = targetTraining.ID;
-          const ss = getTrainingDataSpreadsheet(trnIdFilter);
-          if (ss) {
-            const tpSheet   = ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants');
-            const postSheet = ss.getSheetByName('Post Evaluation') || ss.getSheetByName('PostEval');
+        for (const trn of trainings) {
+          if (!trn.ID) continue;
+          const ss = getTrainingDataSpreadsheet(trn);
+          if (!ss) continue;
 
-            const tpRows   = tpSheet ? sheetToJson(tpSheet) : [];
-            const postRows = postSheet ? sheetToJson(postSheet) : [];
-            const completedEmpIds = postRows.map(r => String(r.EmployeeID || '').trim().toLowerCase());
+          const tpSheet   = ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants');
+          const postSheet = ss.getSheetByName('Post Evaluation') || ss.getSheetByName('PostEval');
 
-            tpRows.forEach(p => {
-              const empId = String(p.EmployeeID || p.ID || '').trim();
-              if (!empId) return;
-              const pSupId = String(p.SupervisorID || '').trim();
-              const pSupEmail = String(p.SupervisorEmail || '').trim().toLowerCase();
-              const matchesSup = !pSupId && !pSupEmail ? true : (isSameEmployeeId(pSupId, cleanEvalEmpId) || (evalEmail && pSupEmail === evalEmail.toLowerCase()));
-              if (!matchesSup) return;
+          const tpRows   = tpSheet ? sheetToJson(tpSheet) : [];
+          const postRows = postSheet ? sheetToJson(postSheet) : [];
+          const completedEmpIds = postRows.map(r => String(r.EmployeeID || '').trim().toLowerCase());
+          totalParticipantsCount += tpRows.length;
 
-              if (completedEmpIds.includes(empId.toLowerCase())) {
-                completedCount++;
-              } else {
-                pendingList.push({
-                  EmployeeID: empId,
-                  Name: p.EmployeeName || p.Name || empId,
-                  Department: p.CostCentre || p.Department || '',
-                  Position: p.Position || p.JobTitle || 'Participant'
-                });
-              }
-            });
-          }
+          tpRows.forEach(p => {
+            const empId = String(p.EmployeeID || p.ID || '').trim();
+            if (!empId) return;
+
+            const pSupId = String(p.SupervisorID || '').trim();
+            const pSupEmail = String(p.SupervisorEmail || '').trim().toLowerCase();
+            const pSupName = String(p.SupervisorName || '').trim().toLowerCase();
+
+            if (pSupId || pSupEmail || pSupName) {
+              anySupervisorAssigned = true;
+            }
+
+            if (isSameEmployeeId(cleanEvalEmpId, empId)) {
+              isParticipantInThisTraining = true;
+              return;
+            }
+
+            // STRICT ASSIGNMENT CHECK
+            const isExplicitSupervisor = (
+              (pSupId && isSameEmployeeId(pSupId, cleanEvalEmpId)) ||
+              (pSupEmail && evalEmail && pSupEmail === evalEmail.toLowerCase()) ||
+              (pSupName && pSupName === evalName.toLowerCase())
+            );
+
+            if (!isExplicitSupervisor) return;
+
+            if (completedEmpIds.includes(empId.toLowerCase())) {
+              completedCount++;
+            } else {
+              if (!targetTraining) targetTraining = trn;
+              pendingList.push({
+                TrainingID: trn.ID,
+                TrainingCode: trn.Code || trn.ID,
+                TrainingName: trn.Name || '',
+                EmployeeID: empId,
+                Name: p.EmployeeName || p.Name || empId,
+                Department: p.CostCentre || p.Department || '',
+                Position: p.Position || p.JobTitle || 'Participant'
+              });
+            }
+          });
         }
       }
     }
 
-    // 3. Calculate 3-Month Lock Status & Target Date
-    const endDate = targetTraining ? new Date(targetTraining.EndDate || targetTraining.StartDate || new Date()) : new Date();
-    const unlockTargetDate = new Date(endDate.getTime() + 90 * 24 * 60 * 60 * 1000);
+    // Check if evaluator has NO assigned evaluations
+    if (pendingList.length === 0 && completedCount === 0) {
+      if (!anySupervisorAssigned && totalParticipantsCount > 0) {
+        return err(`Access Denied: No supervisor or person in charge (PIC) has been assigned by the Admin yet for this 3-Month post evaluation.`);
+      } else if (isParticipantInThisTraining) {
+        return err(`Access Denied: Participants are not permitted to fill 3-Month post evaluations for themselves. Post evaluations must be conducted by your assigned Supervisor, Manager, or Person-in-Charge (PIC).`);
+      } else {
+        return err(`Access Denied: You (${evalName}) are not assigned as a Supervisor or Person-in-Charge (PIC) to evaluate participants for this 3-Month post evaluation.`);
+      }
+    }
+
+    // 3. Calculate 3-Month Lock Status & Target Date (Must unlock AFTER 3 months of training completion)
+    const endDateStr = targetTraining ? (targetTraining.EndDate || targetTraining.StartDate || new Date()) : new Date();
+    const completionDate = new Date(endDateStr);
+    completionDate.setHours(23, 59, 59, 999);
     const now = new Date();
-    const isUnlocked = now >= unlockTargetDate;
+
+    if (now.getTime() < completionDate.getTime()) {
+      return err(`Training has not been completed yet (Scheduled completion: ${formatMinimalistDate(endDateStr)}). 3-Month Post Evaluation countdown will begin after the training is completed.`);
+    }
+
+    const unlockTargetDate = new Date(completionDate);
+    unlockTargetDate.setMonth(unlockTargetDate.getMonth() + 3);
+    const isUnlocked = now.getTime() >= unlockTargetDate.getTime();
     const remainingMs = Math.max(0, unlockTargetDate.getTime() - now.getTime());
+
+    if (!isUnlocked) {
+      return err(`3-Month Post-Training Evaluation is locked until ${formatMinimalistDate(unlockTargetDate)} (evaluation unlocks exactly 3 months after training completion on ${formatMinimalistDate(endDateStr)}).`);
+    }
 
     return ok({
       evaluator: {
         EmployeeID: cleanEvalEmpId,
         Name: evalName,
-        Department: evalDept,
+        Department: evalDept || 'Supervisor / Evaluator',
         Email: evalEmail
       },
       training: targetTraining ? {
@@ -555,11 +760,12 @@ function validatePublicEvaluation(trainingId, employeeId) {
 }
 
 // ─── 6. Public Post-Evaluation Validation (3-Month Supervisor Review) ────────────
-function validatePublicPostEvaluation(trainingId, employeeId, token) {
+function validatePublicPostEvaluation(trainingId, employeeId, token, evaluatorId, evaluatorName) {
   try {
     const cleanTId   = String(trainingId || '').trim();
     const cleanEmpId = String(employeeId || '').trim();
     const cleanToken = String(token || '').trim();
+    const cleanEvalId = String(evaluatorId || '').trim();
 
     if (!cleanTId && !cleanToken) {
       return { valid: false, message: 'Training identifier or review token is required.' };
@@ -579,6 +785,14 @@ function validatePublicPostEvaluation(trainingId, employeeId, token) {
       }
     }
 
+    // RULE 1: Self-evaluation is STRICTLY PROHIBITED
+    if (cleanEvalId && isSameEmployeeId(cleanEvalId, effectiveEmpId)) {
+      return {
+        valid: false,
+        message: 'Submission Rejected: Participants are NOT permitted to fill 3-Month post evaluations on themselves. This evaluation must be conducted by an assigned supervisor or person in charge.'
+      };
+    }
+
     // A. Validate Training Existence
     const tCheck = getValidTraining(effectiveTId);
     if (!tCheck.valid) return tCheck;
@@ -591,8 +805,69 @@ function validatePublicPostEvaluation(trainingId, employeeId, token) {
     const enrollCheck = validateParticipantEnrollment(effectiveTId, effectiveEmpId);
     if (!enrollCheck.valid) return enrollCheck;
 
-    // D. Prevent Duplicate Post-Evaluation Submission
+    // D. Validate Evaluator Authorization against Assigned Supervisor
     const ss = getTrainingDataSpreadsheet(effectiveTId);
+    if (ss) {
+      const tpSheet = ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants');
+      if (tpSheet) {
+        const tpRows = sheetToJson(tpSheet);
+        const p = tpRows.find(r => isSameEmployeeId(r.EmployeeID || r.ID || '', effectiveEmpId));
+        if (p) {
+          const pSupId = String(p.SupervisorID || '').trim();
+          const pSupEmail = String(p.SupervisorEmail || '').trim().toLowerCase();
+          const pSupName = String(p.SupervisorName || '').trim().toLowerCase();
+
+          if (!pSupId && !pSupEmail && !pSupName) {
+            return {
+              valid: false,
+              message: 'Submission Rejected: No supervisor or person in charge (PIC) has been assigned by the Admin yet for this participant.'
+            };
+          }
+
+          const evalCheck = cleanEvalId ? getValidEmployee(cleanEvalId, effectiveTId) : { valid: false };
+          const evalObj = evalCheck.valid ? evalCheck.employee : {};
+          const evalEmail = String(evalObj.Email || '').trim().toLowerCase();
+          const evalName = String(evalObj.Name || evaluatorName || '').trim().toLowerCase();
+
+          const isAssigned = (
+            (pSupId && isSameEmployeeId(pSupId, cleanEvalId)) ||
+            (pSupEmail && evalEmail && pSupEmail === evalEmail) ||
+            (pSupName && evalName && pSupName === evalName)
+          );
+
+          if (!isAssigned) {
+            return {
+              valid: false,
+              message: `Submission Rejected: You are not assigned as the supervisor for this participant (${p.EmployeeName || effectiveEmpId}).`
+            };
+          }
+        }
+      }
+    }
+
+    // E. 3-Month Lock Enforcement (Must unlock AFTER 3 months of training completion)
+    const endDateStr = tCheck.training.EndDate || tCheck.training.StartDate || new Date();
+    const completionDate = new Date(endDateStr);
+    completionDate.setHours(23, 59, 59, 999);
+    const now = new Date();
+
+    if (now.getTime() < completionDate.getTime()) {
+      return {
+        valid: false,
+        message: `Submission Rejected: Training has not been completed yet (Scheduled completion: ${formatMinimalistDate(endDateStr)}). 3-Month countdown begins upon course completion.`
+      };
+    }
+
+    const unlockTargetDate = new Date(completionDate);
+    unlockTargetDate.setMonth(unlockTargetDate.getMonth() + 3);
+    if (now.getTime() < unlockTargetDate.getTime()) {
+      return {
+        valid: false,
+        message: `Submission Rejected: 3-Month Post-Training Evaluation is locked until ${formatMinimalistDate(unlockTargetDate)} (evaluation unlocks 3 months after course completion on ${formatMinimalistDate(endDateStr)}).`
+      };
+    }
+
+    // F. Prevent Duplicate Post-Evaluation Submission
     const postSheet = ss ? (ss.getSheetByName('Post Evaluation') || ss.getSheetByName('PostEval')) : null;
     if (postSheet) {
       const postRows = sheetToJson(postSheet);

@@ -170,13 +170,37 @@ function formatDateTime(date) {
  */
 function getTrainingDataSpreadsheet(trainingId) {
   if (!trainingId) return null;
-  const cleanId = String(trainingId).trim();
 
+  // If trainingId is already a training object with ParticipantsSheetID / FolderID
+  if (typeof trainingId === 'object' && trainingId !== null) {
+    if (trainingId.ParticipantsSheetID) {
+      try {
+        return SpreadsheetApp.openById(String(trainingId.ParticipantsSheetID).trim());
+      } catch(e) {}
+    }
+    if (trainingId.FolderID) {
+      try {
+        const folder = DriveApp.getFolderById(String(trainingId.FolderID).trim());
+        let fileIter = folder.getFilesByName('Training Data');
+        if (!fileIter.hasNext()) fileIter = folder.getFilesByName(`${trainingId.Code || trainingId.ID} Training Data`);
+        if (fileIter.hasNext()) {
+          return SpreadsheetApp.openById(fileIter.next().getId());
+        }
+      } catch(e) {}
+    }
+  }
+
+  const cleanId = String(trainingId).trim().toLowerCase();
   const tSheet = getSheet('Trainings');
   if (!tSheet) return null;
 
   const trainings = sheetToJson(tSheet);
-  const t = trainings.find(r => String(r.ID || r.TrainingID || r.Code || '').trim().toLowerCase() === cleanId.toLowerCase());
+  const t = trainings.find(r => {
+    const id = String(r.ID || '').trim().toLowerCase();
+    const code = String(r.Code || '').trim().toLowerCase();
+    const tId = String(r.TrainingID || '').trim().toLowerCase();
+    return id === cleanId || code === cleanId || tId === cleanId;
+  });
   if (!t) return null;
 
   // 1. Direct open by ParticipantsSheetID / SpreadsheetID if present
@@ -216,15 +240,27 @@ function getTrainingDataSpreadsheet(trainingId) {
 
       const code = t.Code || t.ID || cleanId;
       const folderName = `${code} ${t.Name || ''}`.trim();
-      const folders = trainingRoot.getFoldersByName(folderName);
-      if (!folders.hasNext()) return null;
+      let folders = trainingRoot.getFoldersByName(folderName);
+      if (!folders.hasNext()) {
+        const allSubFolders = trainingRoot.getFolders();
+        while (allSubFolders.hasNext()) {
+          const f = allSubFolders.next();
+          if (f.getName().startsWith(code) || (t.Name && f.getName().includes(t.Name))) {
+            let fileIter = f.getFilesByName('Training Data');
+            if (!fileIter.hasNext()) fileIter = f.getFilesByName(`${code} Training Data`);
+            if (fileIter.hasNext()) {
+              return SpreadsheetApp.openById(fileIter.next().getId());
+            }
+          }
+        }
+        return null;
+      }
       const folder = folders.next();
       let fileIter = folder.getFilesByName('Training Data');
       if (!fileIter.hasNext()) fileIter = folder.getFilesByName(`${code} Training Data`);
       if (fileIter.hasNext()) {
         return SpreadsheetApp.openById(fileIter.next().getId());
       }
-      Logger.log('Training Data file not found for ' + cleanId + '. HOD reads do not create replacement files.');
   } catch (e) {
     Logger.log('Error resolving per-training sheet: ' + e.message);
   }
@@ -234,99 +270,144 @@ function getTrainingDataSpreadsheet(trainingId) {
 
 /**
  * Resolves participant list for a training requisition using robust multi-tier fallbacks:
- * 1. Direct open of ParticipantsSheetID / Training Data Spreadsheet (Sheet: Participants or TrainingParticipants)
- * 2. Requisition Form Google Spreadsheet (A15:I38 or A23:F46)
- * 3. Central Database Participants sheet
- * 4. Training record JSON participant list (ParticipantList or participants)
+ * 1. Direct JSON ParticipantList / participants on the training record
+ * 2. Direct open of ParticipantsSheetID / Training Data Spreadsheet (Sheet: Participants or TrainingParticipants)
+ * 3. Requisition Form Google Spreadsheet (A15:I38 or A23:F46)
+ * 4. Central Database Participants sheet
  * 5. Full Employee Master Sheet enrichment (Name, Department, Job Position)
  */
 function getParticipantsForRequisition(training, cleanId) {
   let participants = [];
-  const tId = String((training && (training.ID || training.TrainingID || training.Code)) || cleanId || '').trim();
-  const tCode = String((training && training.Code) || '').trim();
+  const tObj = (typeof training === 'object' && training !== null) ? training : {};
+  const tId = String(tObj.ID || tObj.TrainingID || tObj.Code || cleanId || '').trim();
+  const tCode = String(tObj.Code || tObj.ID || '').trim();
 
-  // Tier 1: Try per-training Training Data Spreadsheet
-  try {
-    const ss = getTrainingDataSpreadsheet(tId || tCode);
-    if (ss) {
-      const partSheet = ss.getSheetByName('Participants') || 
-                        ss.getSheetByName('TrainingParticipants') || 
-                        ss.getSheetByName('ParticipantList') ||
-                        ss.getSheets()[0];
-      if (partSheet) {
-        const rows = sheetToJson(partSheet);
-        if (Array.isArray(rows) && rows.length > 0) {
-          participants = rows.map(p => ({
-            ID: String(p.EmployeeID || p.EmployeeNo || p['Employee No'] || p['Employee ID'] || (p.ID && !String(p.ID).startsWith('TP-') ? p.ID : '') || '').trim(),
-            EmployeeID: String(p.EmployeeID || p.EmployeeNo || p['Employee No'] || p['Employee ID'] || (p.ID && !String(p.ID).startsWith('TP-') ? p.ID : '') || '').trim(),
-            Name: String(p.EmployeeName || p.Name || p['Employee Name'] || p['Name'] || '').trim(),
-            EmployeeName: String(p.EmployeeName || p.Name || p['Employee Name'] || p['Name'] || '').trim(),
-            Department: String(p.Department || p.CostCentre || p['Cost Centre'] || p['Department'] || p.Dept || '').trim(),
-            Position: String(p.Position || p.JobTitle || p['Job Position'] || p['Position'] || p.Designation || '').trim(),
-            SupervisorID: String(p.SupervisorID || p.SupervisorId || '').trim(),
-            SupervisorName: String(p.SupervisorName || '').trim(),
-            SupervisorEmail: String(p.SupervisorEmail || '').trim()
-          })).filter(p => p.EmployeeID || p.EmployeeName);
-        }
+  // Tier 1: Try Direct JSON ParticipantList / participants on the training object
+  const rawList = tObj.ParticipantList || tObj.participants || tObj.ParticipantsList;
+  if (rawList) {
+    try {
+      const parsed = Array.isArray(rawList) ? rawList : (typeof rawList === 'string' ? JSON.parse(rawList) : null);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        participants = parsed.map(p => ({
+          ID: String(p.EmployeeID || p.EmployeeNo || p['Employee No'] || p.ID || '').trim(),
+          EmployeeID: String(p.EmployeeID || p.EmployeeNo || p['Employee No'] || p.ID || '').trim(),
+          Name: String(p.EmployeeName || p.Name || p['Employee Name'] || '').trim(),
+          EmployeeName: String(p.EmployeeName || p.Name || p['Employee Name'] || '').trim(),
+          Department: String(p.Department || p.CostCentre || p['Cost Centre'] || '').trim(),
+          CostCentre: String(p.Department || p.CostCentre || p['Cost Centre'] || '').trim(),
+          Position: String(p.Position || p.JobTitle || p['Job Position'] || '').trim(),
+          SupervisorID: String(p.SupervisorID || p.SupervisorId || '').trim(),
+          SupervisorName: String(p.SupervisorName || '').trim(),
+          SupervisorEmail: String(p.SupervisorEmail || '').trim()
+        })).filter(p => p.EmployeeID || p.EmployeeName);
       }
-    }
-  } catch (e1) {
-    Logger.log('Error reading from Training Data spreadsheet: ' + e1.message);
+    } catch(eJson) {}
   }
 
-  // Tier 2: Try Requisition Form Spreadsheet (AP-HRD-F01-01)
-  if (participants.length === 0 && training && (training.RequisitionFormFileID || training.RequisitionFormId)) {
-    const formFileId = String(training.RequisitionFormFileID || training.RequisitionFormId).trim();
+  // Tier 2: Try per-training Training Data Spreadsheet
+  if (participants.length === 0) {
+    try {
+      const ss = getTrainingDataSpreadsheet(training || tId || tCode);
+      if (ss) {
+        const partSheet = ss.getSheetByName('Participants') || 
+                          ss.getSheetByName('TrainingParticipants') || 
+                          ss.getSheetByName('ParticipantList') ||
+                          ss.getSheets()[0];
+        if (partSheet) {
+          const rows = sheetToJson(partSheet);
+          if (Array.isArray(rows) && rows.length > 0) {
+            participants = rows.map(p => ({
+              ID: String(p.EmployeeID || p.EmployeeNo || p['Employee No'] || p['Employee ID'] || (p.ID && !String(p.ID).startsWith('TP-') ? p.ID : '') || '').trim(),
+              EmployeeID: String(p.EmployeeID || p.EmployeeNo || p['Employee No'] || p['Employee ID'] || (p.ID && !String(p.ID).startsWith('TP-') ? p.ID : '') || '').trim(),
+              Name: String(p.EmployeeName || p.Name || p['Employee Name'] || p['Name'] || '').trim(),
+              EmployeeName: String(p.EmployeeName || p.Name || p['Employee Name'] || p['Name'] || '').trim(),
+              Department: String(p.Department || p.CostCentre || p['Cost Centre'] || p['Department'] || p.Dept || '').trim(),
+              CostCentre: String(p.Department || p.CostCentre || p['Cost Centre'] || p['Department'] || p.Dept || '').trim(),
+              Position: String(p.Position || p.JobTitle || p['Job Position'] || p['Position'] || p.Designation || '').trim(),
+              SupervisorID: String(p.SupervisorID || p.SupervisorId || '').trim(),
+              SupervisorName: String(p.SupervisorName || '').trim(),
+              SupervisorEmail: String(p.SupervisorEmail || '').trim()
+            })).filter(p => p.EmployeeID || p.EmployeeName);
+          }
+        }
+      }
+    } catch (e1) {
+      Logger.log('Error reading from Training Data spreadsheet: ' + e1.message);
+    }
+  }
+
+  // Tier 3: Try Requisition Form Spreadsheet (AP-HRD-F01-01) across all page tabs
+  if (participants.length === 0 && (tObj.RequisitionFormFileID || tObj.RequisitionFormId)) {
+    const formFileId = String(tObj.RequisitionFormFileID || tObj.RequisitionFormId).trim();
     try {
       const formSs = SpreadsheetApp.openById(formFileId);
-      const formSheet = formSs.getSheetByName('Training Form') || 
-                        formSs.getSheetByName('TRAINING REQUISITION FORM') || 
-                        formSs.getSheets()[0];
-      if (formSheet) {
-        const rangesToTry = ['A15:I38', 'A23:F46', 'A14:I40'];
-        for (let rIdx = 0; rIdx < rangesToTry.length; rIdx++) {
-          const rangeValues = formSheet.getRange(rangesToTry[rIdx]).getValues();
-          const extracted = [];
-          rangeValues.forEach(row => {
-            let empId = String(row[0] || '').trim();
-            let empName = String(row[2] || '').trim();
-            let dept = String(row[3] || '').trim();
-            let pos = String(row[7] || row[4] || '').trim();
+      const allFormSheets = formSs.getSheets();
+      const extracted = [];
 
-            if (/^\d{1,2}$/.test(empId) && row[1]) {
-              empId = String(row[1] || '').trim();
-              empName = String(row[2] || '').trim();
-              dept = String(row[3] || '').trim();
-              pos = String(row[4] || '').trim();
+      allFormSheets.forEach(formSheet => {
+        const sName = formSheet.getName();
+        if (sName.startsWith('Training Form') || sName.includes('Form') || allFormSheets.length === 1) {
+          const rangeValues = formSheet.getRange('A14:I40').getValues();
+          rangeValues.forEach(row => {
+            let colA = String(row[0] || '').trim();
+            let colB = String(row[1] || '').trim();
+            let colC = String(row[2] || '').trim();
+            let colD = String(row[3] || '').trim();
+            let colE = String(row[4] || '').trim();
+            let colH = String(row[7] || '').trim();
+
+            let empId = '';
+            let empName = '';
+            let dept = '';
+            let pos = '';
+
+            if (/^\d{1,2}$/.test(colA) && (colB || colC)) {
+              empId = colB;
+              empName = colC;
+              dept = colD;
+              pos = colE || colH;
+            } else if (colA && !/^\d{1,2}$/.test(colA)) {
+              empId = colA;
+              empName = colC || colB;
+              dept = colD;
+              pos = colH || colE;
+            } else if (colC) {
+              empName = colC;
+              empId = colB || colA;
+              dept = colD;
+              pos = colH;
             }
 
             if (empId || empName) {
-              const lower = empId.toLowerCase();
-              if (lower !== 'employee no' && lower !== 'no' && lower !== 'employee id' && lower !== 'name' && lower !== 'bil') {
+              const lowerId = empId.toLowerCase();
+              const lowerName = empName.toLowerCase();
+              const isHeader = lowerId.includes('employee') || lowerId.includes('bil') || lowerId.includes('no') ||
+                               lowerName.includes('name') || lowerName.includes('nama') || lowerId.includes('name');
+              if (!isHeader && (empId || empName)) {
                 extracted.push({
                   ID: empId,
                   EmployeeID: empId,
                   Name: empName,
                   EmployeeName: empName,
                   Department: dept,
+                  CostCentre: dept,
                   Position: pos
                 });
               }
             }
           });
-
-          if (extracted.length > 0) {
-            participants = extracted;
-            break;
-          }
         }
+      });
+
+      if (extracted.length > 0) {
+        participants = extracted;
       }
     } catch (e2) {
       Logger.log('Error reading participants from Requisition Form: ' + e2.message);
     }
   }
 
-  // Tier 3: Try Database sheet 'Participants' or 'TrainingParticipants'
+  // Tier 4: Try Central Database sheet 'Participants' or 'TrainingParticipants'
   if (participants.length === 0) {
     try {
       const dbPartSheet = getSheet('Participants') || getSheet('TrainingParticipants');
@@ -334,7 +415,10 @@ function getParticipantsForRequisition(training, cleanId) {
         const allDbParts = sheetToJson(dbPartSheet);
         const matched = allDbParts.filter(p => {
           const pTid = String(p.TrainingID || p.TrainingCode || p.ID || '').trim().toLowerCase();
-          return pTid && (pTid === tId.toLowerCase() || pTid === tCode.toLowerCase());
+          const target1 = tId.toLowerCase();
+          const target2 = tCode.toLowerCase();
+          const target3 = cleanId.toLowerCase();
+          return pTid && (pTid === target1 || pTid === target2 || pTid === target3);
         });
         if (matched.length > 0) {
           participants = matched.map(p => ({
@@ -343,6 +427,7 @@ function getParticipantsForRequisition(training, cleanId) {
             Name: String(p.EmployeeName || p.Name || p['Employee Name'] || '').trim(),
             EmployeeName: String(p.EmployeeName || p.Name || p['Employee Name'] || '').trim(),
             Department: String(p.Department || p.CostCentre || p['Cost Centre'] || '').trim(),
+            CostCentre: String(p.Department || p.CostCentre || p['Cost Centre'] || '').trim(),
             Position: String(p.Position || p.JobTitle || p['Job Position'] || '').trim(),
             SupervisorID: String(p.SupervisorID || p.SupervisorId || '').trim(),
             SupervisorName: String(p.SupervisorName || '').trim(),
@@ -355,47 +440,34 @@ function getParticipantsForRequisition(training, cleanId) {
     }
   }
 
-  // Tier 4: Try JSON fields on the training record (ParticipantList or participants)
-  if (participants.length === 0 && training) {
-    const rawList = training.ParticipantList || training.participants || training.ParticipantsList;
-    if (rawList) {
-      try {
-        const parsed = Array.isArray(rawList) ? rawList : (typeof rawList === 'string' ? JSON.parse(rawList) : null);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          participants = parsed.map(p => ({
-            ID: String(p.EmployeeID || p.EmployeeNo || p.ID || '').trim(),
-            EmployeeID: String(p.EmployeeID || p.EmployeeNo || p.ID || '').trim(),
-            Name: String(p.EmployeeName || p.Name || '').trim(),
-            EmployeeName: String(p.EmployeeName || p.Name || '').trim(),
-            Department: String(p.Department || p.CostCentre || '').trim(),
-            Position: String(p.Position || p.JobTitle || '').trim()
-          })).filter(p => p.EmployeeID || p.EmployeeName);
-        }
-      } catch (e4) {}
-    }
-  }
-
-  // Tier 5: Enrich participants with Employees master sheet to guarantee full details (Name, Dept, Position)
-  if (participants.length > 0) {
-    try {
-      const empSheet = getSheet('Employees');
-      if (empSheet) {
-        const employees = sheetToJson(empSheet);
+  // Tier 5: Enrich with Employees master sheet to guarantee full details
+  try {
+    const empSheet = getSheet('Employees');
+    if (empSheet) {
+      const employees = sheetToJson(empSheet);
+      if (participants.length > 0) {
         participants = participants.map(p => {
           const empId = p.EmployeeID || p.ID;
+          const empName = p.EmployeeName || p.Name;
           const matchedEmp = employees.find(e => {
             const eId = String(e['Employee No'] || e.EmployeeNo || e.ID || e.EmployeeID || '').toLowerCase().trim();
-            return eId && eId === String(empId).toLowerCase().trim();
+            const eName = String(e.Name || e.EmployeeName || '').toLowerCase().trim();
+            return (empId && eId && eId === String(empId).toLowerCase().trim()) ||
+                   (empName && eName && eName === String(empName).toLowerCase().trim());
           });
           if (matchedEmp) {
+            const resolvedId = empId || String(matchedEmp['Employee No'] || matchedEmp.EmployeeNo || matchedEmp.ID || '').trim();
+            const resolvedName = p.EmployeeName || String(matchedEmp.Name || matchedEmp.EmployeeName || '').trim();
+            const resolvedDept = p.Department || String(matchedEmp['Cost Centre'] || matchedEmp.Department || '').trim();
+            const resolvedPos = p.Position || String(matchedEmp['Job Position'] || matchedEmp.Position || 'Participant').trim();
             return {
-              ID: empId,
-              EmployeeID: empId,
-              Name: p.EmployeeName || String(matchedEmp.Name || matchedEmp.EmployeeName || '').trim(),
-              EmployeeName: p.EmployeeName || String(matchedEmp.Name || matchedEmp.EmployeeName || '').trim(),
-              Department: p.Department || String(matchedEmp['Cost Centre'] || matchedEmp.Department || '').trim(),
-              CostCentre: p.Department || String(matchedEmp['Cost Centre'] || matchedEmp.Department || '').trim(),
-              Position: p.Position || String(matchedEmp['Job Position'] || matchedEmp.Position || 'Participant').trim(),
+              ID: resolvedId,
+              EmployeeID: resolvedId,
+              Name: resolvedName,
+              EmployeeName: resolvedName,
+              Department: resolvedDept,
+              CostCentre: resolvedDept,
+              Position: resolvedPos,
               SupervisorID: p.SupervisorID || '',
               SupervisorName: p.SupervisorName || '',
               SupervisorEmail: p.SupervisorEmail || ''
@@ -404,8 +476,8 @@ function getParticipantsForRequisition(training, cleanId) {
           return p;
         });
       }
-    } catch (e5) {}
-  }
+    }
+  } catch (e5) {}
 
   return participants;
 }
@@ -534,7 +606,11 @@ function updateTrainingRequisitionSignatures(trainingId, step, sigData, targetFo
     if (!formId) return;
 
     const ss = SpreadsheetApp.openById(formId);
-    const sheet = ss.getSheetByName('Training Form') || ss.getSheets()[0];
+    const allSheets = ss.getSheets();
+    const targetSheets = allSheets.filter(s => {
+      const sName = s.getName();
+      return sName.startsWith('Training Form') || sName.includes('Form') || allSheets.length === 1;
+    });
 
     // Preserve original template header rows 39 and 40 (columns A to I) completely untouched
 
@@ -553,85 +629,87 @@ function updateTrainingRequisitionSignatures(trainingId, step, sigData, targetFo
 
     const stepNorm = String(step || '').trim().toLowerCase();
     
-    if (stepNorm === 'request' || stepNorm === 'requested by') {
-      sheet.getRange('A41').setValue(formatSingleColCell('EMPLOYEE NO:', empNo));
-      sheet.getRange('A42').setValue(formatSingleColCell('NAME:', empName));
-      sheet.getRange('A44').setValue(formatSingleColCell('JOB POSITION:', position));
-      sheet.getRange('A46').setValue(formatSingleColCell('DATE:', sigDate));
+    targetSheets.forEach(sheet => {
+      if (stepNorm === 'request' || stepNorm === 'requested by') {
+        sheet.getRange('A41').setValue(formatSingleColCell('EMPLOYEE NO:', empNo));
+        sheet.getRange('A42').setValue(formatSingleColCell('NAME:', empName));
+        sheet.getRange('A44').setValue(formatSingleColCell('JOB POSITION:', position));
+        sheet.getRange('A46').setValue(formatSingleColCell('DATE:', sigDate));
 
-      sheet.getRange('B41').setValue(empNo);
-      sheet.getRange('B42').setValue(empName);
-      sheet.getRange('B43').setValue(empName);
-      sheet.getRange('B44').setValue(position);
-      sheet.getRange('B46').setValue(sigDate);
-    } else if (stepNorm === 'hod' || stepNorm === 'head of department' || stepNorm === 'verified by head of department') {
-      sheet.getRange('C41').setValue(formatSingleColCell('STATUS:', status || 'Verified'));
-      sheet.getRange('C42').setValue(formatSingleColCell('EMPLOYEE NO:', empNo));
-      sheet.getRange('C43').setValue(formatSingleColCell('NAME:', empName));
-      sheet.getRange('C44').setValue(formatSingleColCell('JOB POSITION:', position));
-      sheet.getRange('C46').setValue(formatSingleColCell('DATE:', sigDate));
-    } else if (stepNorm === 'csuite' || stepNorm === 'c-suite' || stepNorm === 'approved by c-suite') {
-      sheet.getRange('D41').setValue(formatSingleColCell('STATUS:', status || 'Approved'));
-      sheet.getRange('D42').setValue(formatSingleColCell('EMPLOYEE NO:', empNo));
-      sheet.getRange('D43').setValue(formatSingleColCell('NAME:', empName));
-      sheet.getRange('D44').setValue(formatSingleColCell('JOB POSITION:', position));
-      sheet.getRange('D46').setValue(formatSingleColCell('DATE:', sigDate));
+        sheet.getRange('B41').setValue(empNo);
+        sheet.getRange('B42').setValue(empName);
+        sheet.getRange('B43').setValue(empName);
+        sheet.getRange('B44').setValue(position);
+        sheet.getRange('B46').setValue(sigDate);
+      } else if (stepNorm === 'hod' || stepNorm === 'head of department' || stepNorm === 'verified by head of department') {
+        sheet.getRange('C41').setValue(formatSingleColCell('STATUS:', status || 'Verified'));
+        sheet.getRange('C42').setValue(formatSingleColCell('EMPLOYEE NO:', empNo));
+        sheet.getRange('C43').setValue(formatSingleColCell('NAME:', empName));
+        sheet.getRange('C44').setValue(formatSingleColCell('JOB POSITION:', position));
+        sheet.getRange('C46').setValue(formatSingleColCell('DATE:', sigDate));
+      } else if (stepNorm === 'csuite' || stepNorm === 'c-suite' || stepNorm === 'approved by c-suite') {
+        sheet.getRange('D41').setValue(formatSingleColCell('STATUS:', status || 'Approved'));
+        sheet.getRange('D42').setValue(formatSingleColCell('EMPLOYEE NO:', empNo));
+        sheet.getRange('D43').setValue(formatSingleColCell('NAME:', empName));
+        sheet.getRange('D44').setValue(formatSingleColCell('JOB POSITION:', position));
+        sheet.getRange('D46').setValue(formatSingleColCell('DATE:', sigDate));
 
-      sheet.getRange('E41').setValue(status || 'Approved');
-      sheet.getRange('E42').setValue(empNo);
-      sheet.getRange('E43').setValue(empName);
-      sheet.getRange('E44').setValue(position);
-      sheet.getRange('E46').setValue(sigDate);
-    } else if (stepNorm === 'hohr' || stepNorm === 'head of hr' || stepNorm === 'approved by hohr') {
-      sheet.getRange('F41').setValue(formatSingleColCell('STATUS:', status || 'Approved'));
-      sheet.getRange('F42').setValue(formatSingleColCell('EMPLOYEE NO:', empNo));
-      sheet.getRange('F43').setValue(formatSingleColCell('NAME:', empName));
-      sheet.getRange('F44').setValue(formatSingleColCell('JOB POSITION:', position));
-      sheet.getRange('F46').setValue(formatSingleColCell('DATE:', sigDate));
+        sheet.getRange('E41').setValue(status || 'Approved');
+        sheet.getRange('E42').setValue(empNo);
+        sheet.getRange('E43').setValue(empName);
+        sheet.getRange('E44').setValue(position);
+        sheet.getRange('E46').setValue(sigDate);
+      } else if (stepNorm === 'hohr' || stepNorm === 'head of hr' || stepNorm === 'approved by hohr') {
+        sheet.getRange('F41').setValue(formatSingleColCell('STATUS:', status || 'Approved'));
+        sheet.getRange('F42').setValue(formatSingleColCell('EMPLOYEE NO:', empNo));
+        sheet.getRange('F43').setValue(formatSingleColCell('NAME:', empName));
+        sheet.getRange('F44').setValue(formatSingleColCell('JOB POSITION:', position));
+        sheet.getRange('F46').setValue(formatSingleColCell('DATE:', sigDate));
 
-      sheet.getRange('G41').setValue(status || 'Approved');
-      sheet.getRange('G42').setValue(empNo);
-      sheet.getRange('G43').setValue(empName);
-      sheet.getRange('G44').setValue(position);
-      sheet.getRange('G46').setValue(sigDate);
-    } else if (stepNorm === 'hr' || stepNorm === 'arina' || stepNorm === 'hr department' || stepNorm === 'acknowledged by hr department') {
-      sheet.getRange('H41').setValue(formatSingleColCell('EMPLOYEE NO:', empNo));
-      sheet.getRange('H42').setValue(formatSingleColCell('NAME:', empName));
-      sheet.getRange('H44').setValue(formatSingleColCell('JOB POSITION:', position));
-      sheet.getRange('H46').setValue(formatSingleColCell('DATE:', sigDate));
+        sheet.getRange('G41').setValue(status || 'Approved');
+        sheet.getRange('G42').setValue(empNo);
+        sheet.getRange('G43').setValue(empName);
+        sheet.getRange('G44').setValue(position);
+        sheet.getRange('G46').setValue(sigDate);
+      } else if (stepNorm === 'hr' || stepNorm === 'arina' || stepNorm === 'hr department' || stepNorm === 'acknowledged by hr department') {
+        sheet.getRange('H41').setValue(formatSingleColCell('EMPLOYEE NO:', empNo));
+        sheet.getRange('H42').setValue(formatSingleColCell('NAME:', empName));
+        sheet.getRange('H44').setValue(formatSingleColCell('JOB POSITION:', position));
+        sheet.getRange('H46').setValue(formatSingleColCell('DATE:', sigDate));
 
-      sheet.getRange('I41').setValue(empNo);
-      sheet.getRange('I42').setValue(empName);
-      sheet.getRange('I43').setValue(empName);
-      sheet.getRange('I44').setValue(position);
-      sheet.getRange('I46').setValue(sigDate);
-    }
+        sheet.getRange('I41').setValue(empNo);
+        sheet.getRange('I42').setValue(empName);
+        sheet.getRange('I43').setValue(empName);
+        sheet.getRange('I44').setValue(position);
+        sheet.getRange('I46').setValue(sigDate);
+      }
 
-    // Auto-check: If step is NOT 'request' but cell B41 is empty, ensure requester signature is populated too
-    if (stepNorm !== 'request' && stepNorm !== 'requested by') {
-      const currentReqVal = sheet.getRange('B41').getValue() || sheet.getRange('B42').getValue();
-      if (!currentReqVal || String(currentReqVal).trim() === '') {
-        const reqIdCol = headers.indexOf('RequestedBy') + 1;
-        const reqNameCol = headers.indexOf('RequestedByName') + 1;
-        const createdDateCol = headers.indexOf('CreatedDate') + 1;
-        const reqId = reqIdCol > 0 ? trainingSheet.getRange(row, reqIdCol).getValue() : '';
-        const reqName = reqNameCol > 0 ? trainingSheet.getRange(row, reqNameCol).getValue() : '';
-        const reqDate = (createdDateCol > 0 ? trainingSheet.getRange(row, createdDateCol).getValue() : '') || sigDate;
-        let reqPos = 'Requester';
-        if (reqId && getSheet('Employees')) {
-          const emps = sheetToJson(getSheet('Employees'));
-          const m = emps.find(e => String(e.ID || e.EmployeeID).toLowerCase() === String(reqId).toLowerCase());
-          if (m) reqPos = m.Position || m.JobTitle || m.PositionTitle || 'Requester';
-        }
-        if (reqId || reqName) {
-          sheet.getRange('B41').setValue(reqId);
-          sheet.getRange('B42').setValue(reqName);
-          sheet.getRange('B43').setValue(reqName);
-          sheet.getRange('B44').setValue(reqPos);
-          sheet.getRange('B46').setValue(getFormattedCurrentDate(reqDate));
+      // Auto-check: If step is NOT 'request' but cell B41 is empty, ensure requester signature is populated too
+      if (stepNorm !== 'request' && stepNorm !== 'requested by') {
+        const currentReqVal = sheet.getRange('B41').getValue() || sheet.getRange('B42').getValue();
+        if (!currentReqVal || String(currentReqVal).trim() === '') {
+          const reqIdCol = headers.indexOf('RequestedBy') + 1;
+          const reqNameCol = headers.indexOf('RequestedByName') + 1;
+          const createdDateCol = headers.indexOf('CreatedDate') + 1;
+          const reqId = reqIdCol > 0 ? trainingSheet.getRange(row, reqIdCol).getValue() : '';
+          const reqName = reqNameCol > 0 ? trainingSheet.getRange(row, reqNameCol).getValue() : '';
+          const reqDate = (createdDateCol > 0 ? trainingSheet.getRange(row, createdDateCol).getValue() : '') || sigDate;
+          let reqPos = 'Requester';
+          if (reqId && getSheet('Employees')) {
+            const emps = sheetToJson(getSheet('Employees'));
+            const m = emps.find(e => String(e.ID || e.EmployeeID).toLowerCase() === String(reqId).toLowerCase());
+            if (m) reqPos = m.Position || m.JobTitle || m.PositionTitle || 'Requester';
+          }
+          if (reqId || reqName) {
+            sheet.getRange('B41').setValue(reqId);
+            sheet.getRange('B42').setValue(reqName);
+            sheet.getRange('B43').setValue(reqName);
+            sheet.getRange('B44').setValue(reqPos);
+            sheet.getRange('B46').setValue(getFormattedCurrentDate(reqDate));
+          }
         }
       }
-    }
+    });
 
     SpreadsheetApp.flush();
   } catch(e) {

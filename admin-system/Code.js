@@ -57,14 +57,12 @@ function include(filename) {
 /**
  * Verifies a Google Account against company domain and administrator requirements.
  */
-function verifyGoogleUser(emailInput) {
-  let email = emailInput;
-  if (!email) {
-    try {
-      email = Session.getActiveUser().getEmail();
-    } catch (e) {
-      Logger.log('Could not fetch active user email: ' + e.message);
-    }
+function verifyGoogleUser() {
+  let email = '';
+  try {
+    email = Session.getActiveUser().getEmail();
+  } catch (e) {
+    Logger.log('Could not fetch active user email: ' + e.message);
   }
 
   const allowedDomain = getConfigProperty('ALLOWED_DOMAIN', '').toLowerCase().trim();

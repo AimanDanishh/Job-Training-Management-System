@@ -604,24 +604,6 @@ function createTrainingRequisitionForm(code, training, targetFolderId, requester
     sheet.getRange('A10').setValue('Reasons for Training:');
     setTemplateValue('A11:I12', tData.Objectives || tData.Reason || '');
 
-    const partList = Array.isArray(tData.ParticipantList) ? tData.ParticipantList : (Array.isArray(tData.participants) ? tData.participants : []);
-    if (partList.length > 0) {
-      try {
-        sheet.getRange('A15:I38').clearContent();
-        partList.slice(0, 24).forEach((p, index) => {
-          const r = 15 + index;
-          setTemplateValue(`A${r}:B${r}`, p.EmployeeID || p.ID || p.EmployeeNo || '');
-          setTemplateValue(`C${r}`, p.EmployeeName || p.Name || '');
-          setTemplateValue(`D${r}:G${r}`, p.Department || p.CostCentre || '');
-          setTemplateValue(`H${r}:I${r}`, p.Position || p.JobTitle || '');
-        });
-      } catch(pErr) {
-        Logger.log('Error populating participants in form creation: ' + pErr.message);
-      }
-    }
-
-    // Preserve original template header rows 39 and 40 (columns A to I) completely untouched
-
     if (requesterSigData) {
       const empNo    = requesterSigData.employeeNo || requesterSigData.EmployeeNo || requesterSigData.EmployeeID || requesterSigData.ID || '';
       const empName  = requesterSigData.name || requesterSigData.EmployeeName || requesterSigData.Name || '';
@@ -642,12 +624,85 @@ function createTrainingRequisitionForm(code, training, targetFolderId, requester
       sheet.getRange('B46').setValue(sigDate);
     }
 
+    const partList = Array.isArray(tData.ParticipantList) ? tData.ParticipantList : (Array.isArray(tData.participants) ? tData.participants : []);
+    populateRequisitionFormParticipantsAndTabs(ss, sheet, partList);
+
     SpreadsheetApp.flush();
     return { fileId: copiedFile.getId(), fileUrl: copiedFile.getUrl(), fileName: fileName };
   } catch(e) {
     Logger.log('createTrainingRequisitionForm error: ' + e.message);
     return { fileId: copiedFile ? copiedFile.getId() : '', fileUrl: copiedFile ? copiedFile.getUrl() : '', fileName: fileName };
   }
+}
+
+/**
+ * Populates participant list in Training Requisition Form.
+ * Automatically paginates > 24 participants across multiple tabs (Training Form, Training Form - Page 2, etc.)
+ * by duplicating the primary template sheet so all header info and signature boxes are preserved.
+ */
+function populateRequisitionFormParticipantsAndTabs(spreadsheet, primarySheet, partList) {
+  if (!spreadsheet || !primarySheet) return;
+  const list = Array.isArray(partList) ? partList : [];
+  const setTemplateValue = (s, area, value) => s.getRange(String(area || '').split(':')[0]).setValue(value == null ? '' : value);
+
+  const PAGE_SIZE = 24;
+  const total = list.length;
+  const numPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const baseSheetName = 'Training Form';
+
+  try {
+    if (primarySheet.getName() !== baseSheetName && !primarySheet.getName().includes('Page')) {
+      primarySheet.setName(baseSheetName);
+    }
+  } catch(nameErr) {}
+
+  // 1. Populate Page 1 (indices 0 to 23)
+  primarySheet.getRange('A15:I38').clearContent();
+  const page1Chunk = list.slice(0, PAGE_SIZE);
+  page1Chunk.forEach((p, index) => {
+    const r = 15 + index;
+    setTemplateValue(primarySheet, `A${r}:B${r}`, p.EmployeeID || p.ID || p.EmployeeNo || '');
+    setTemplateValue(primarySheet, `C${r}`, p.EmployeeName || p.Name || '');
+    setTemplateValue(primarySheet, `D${r}:G${r}`, p.Department || p.CostCentre || '');
+    setTemplateValue(primarySheet, `H${r}:I${r}`, p.Position || p.JobTitle || '');
+  });
+
+  // 2. Handle subsequent pages (Page 2, Page 3, etc.)
+  for (let p = 2; p <= numPages; p++) {
+    const pageName = `${baseSheetName} - Page ${p}`;
+    let pageSheet = spreadsheet.getSheetByName(pageName);
+    if (!pageSheet) {
+      pageSheet = primarySheet.copyTo(spreadsheet);
+      pageSheet.setName(pageName);
+    }
+
+    pageSheet.getRange('A15:I38').clearContent();
+    const pageChunk = list.slice((p - 1) * PAGE_SIZE, p * PAGE_SIZE);
+    pageChunk.forEach((item, index) => {
+      const r = 15 + index;
+      setTemplateValue(pageSheet, `A${r}:B${r}`, item.EmployeeID || item.ID || item.EmployeeNo || '');
+      setTemplateValue(pageSheet, `C${r}`, item.EmployeeName || item.Name || '');
+      setTemplateValue(pageSheet, `D${r}:G${r}`, item.Department || item.CostCentre || '');
+      setTemplateValue(pageSheet, `H${r}:I${r}`, item.Position || item.JobTitle || '');
+    });
+  }
+
+  // 3. Remove obsolete excess page sheets if participant count was reduced
+  const allSheets = spreadsheet.getSheets();
+  allSheets.forEach(s => {
+    const sName = s.getName();
+    const match = sName.match(/^Training Form - Page (\d+)$/i);
+    if (match) {
+      const pageNum = parseInt(match[1], 10);
+      if (pageNum > numPages) {
+        try {
+          spreadsheet.deleteSheet(s);
+        } catch(delErr) {
+          Logger.log('Could not delete excess page sheet ' + sName + ': ' + delErr.message);
+        }
+      }
+    }
+  });
 }
 
 function updateTrainingRequisitionSignatures(trainingId, step, sigData, targetFormId) {
@@ -671,9 +726,11 @@ function updateTrainingRequisitionSignatures(trainingId, step, sigData, targetFo
     if (!formId) return;
 
     const ss = SpreadsheetApp.openById(formId);
-    const sheet = ss.getSheetByName('Training Form') || ss.getSheets()[0];
-
-    // Do not modify or delete template rows 39-40 (columns A to I)
+    const allSheets = ss.getSheets();
+    const targetSheets = allSheets.filter(s => {
+      const sName = s.getName();
+      return sName.startsWith('Training Form') || sName.includes('Form') || allSheets.length === 1;
+    });
 
     const empNo    = sigData.employeeNo || sigData.EmployeeNo || sigData.EmployeeID || sigData.ID || '';
     const empName  = sigData.name || sigData.EmployeeName || sigData.Name || '';
@@ -690,85 +747,87 @@ function updateTrainingRequisitionSignatures(trainingId, step, sigData, targetFo
 
     const stepNorm = String(step || '').trim().toLowerCase();
 
-    if (stepNorm === 'request' || stepNorm === 'requested by') {
-      sheet.getRange('A41').setValue(formatSingleColCell('EMPLOYEE NO:', empNo));
-      sheet.getRange('A42').setValue(formatSingleColCell('NAME:', empName));
-      sheet.getRange('A44').setValue(formatSingleColCell('JOB POSITION:', position));
-      sheet.getRange('A46').setValue(formatSingleColCell('DATE:', sigDate));
+    targetSheets.forEach(sheet => {
+      if (stepNorm === 'request' || stepNorm === 'requested by') {
+        sheet.getRange('A41').setValue(formatSingleColCell('EMPLOYEE NO:', empNo));
+        sheet.getRange('A42').setValue(formatSingleColCell('NAME:', empName));
+        sheet.getRange('A44').setValue(formatSingleColCell('JOB POSITION:', position));
+        sheet.getRange('A46').setValue(formatSingleColCell('DATE:', sigDate));
 
-      sheet.getRange('B41').setValue(empNo);
-      sheet.getRange('B42').setValue(empName);
-      sheet.getRange('B43').setValue(empName);
-      sheet.getRange('B44').setValue(position);
-      sheet.getRange('B46').setValue(sigDate);
-    } else if (stepNorm === 'hod' || stepNorm === 'head of department' || stepNorm === 'verified by head of department') {
-      sheet.getRange('C41').setValue(formatSingleColCell('STATUS:', status || 'Verified'));
-      sheet.getRange('C42').setValue(formatSingleColCell('EMPLOYEE NO:', empNo));
-      sheet.getRange('C43').setValue(formatSingleColCell('NAME:', empName));
-      sheet.getRange('C44').setValue(formatSingleColCell('JOB POSITION:', position));
-      sheet.getRange('C46').setValue(formatSingleColCell('DATE:', sigDate));
-    } else if (stepNorm === 'csuite' || stepNorm === 'c-suite' || stepNorm === 'approved by c-suite') {
-      sheet.getRange('D41').setValue(formatSingleColCell('STATUS:', status || 'Approved'));
-      sheet.getRange('D42').setValue(formatSingleColCell('EMPLOYEE NO:', empNo));
-      sheet.getRange('D43').setValue(formatSingleColCell('NAME:', empName));
-      sheet.getRange('D44').setValue(formatSingleColCell('JOB POSITION:', position));
-      sheet.getRange('D46').setValue(formatSingleColCell('DATE:', sigDate));
+        sheet.getRange('B41').setValue(empNo);
+        sheet.getRange('B42').setValue(empName);
+        sheet.getRange('B43').setValue(empName);
+        sheet.getRange('B44').setValue(position);
+        sheet.getRange('B46').setValue(sigDate);
+      } else if (stepNorm === 'hod' || stepNorm === 'head of department' || stepNorm === 'verified by head of department') {
+        sheet.getRange('C41').setValue(formatSingleColCell('STATUS:', status || 'Verified'));
+        sheet.getRange('C42').setValue(formatSingleColCell('EMPLOYEE NO:', empNo));
+        sheet.getRange('C43').setValue(formatSingleColCell('NAME:', empName));
+        sheet.getRange('C44').setValue(formatSingleColCell('JOB POSITION:', position));
+        sheet.getRange('C46').setValue(formatSingleColCell('DATE:', sigDate));
+      } else if (stepNorm === 'csuite' || stepNorm === 'c-suite' || stepNorm === 'approved by c-suite') {
+        sheet.getRange('D41').setValue(formatSingleColCell('STATUS:', status || 'Approved'));
+        sheet.getRange('D42').setValue(formatSingleColCell('EMPLOYEE NO:', empNo));
+        sheet.getRange('D43').setValue(formatSingleColCell('NAME:', empName));
+        sheet.getRange('D44').setValue(formatSingleColCell('JOB POSITION:', position));
+        sheet.getRange('D46').setValue(formatSingleColCell('DATE:', sigDate));
 
-      sheet.getRange('E41').setValue(status || 'Approved');
-      sheet.getRange('E42').setValue(empNo);
-      sheet.getRange('E43').setValue(empName);
-      sheet.getRange('E44').setValue(position);
-      sheet.getRange('E46').setValue(sigDate);
-    } else if (stepNorm === 'hohr' || stepNorm === 'head of hr' || stepNorm === 'approved by hohr') {
-      sheet.getRange('F41').setValue(formatSingleColCell('STATUS:', status || 'Approved'));
-      sheet.getRange('F42').setValue(formatSingleColCell('EMPLOYEE NO:', empNo));
-      sheet.getRange('F43').setValue(formatSingleColCell('NAME:', empName));
-      sheet.getRange('F44').setValue(formatSingleColCell('JOB POSITION:', position));
-      sheet.getRange('F46').setValue(formatSingleColCell('DATE:', sigDate));
+        sheet.getRange('E41').setValue(status || 'Approved');
+        sheet.getRange('E42').setValue(empNo);
+        sheet.getRange('E43').setValue(empName);
+        sheet.getRange('E44').setValue(position);
+        sheet.getRange('E46').setValue(sigDate);
+      } else if (stepNorm === 'hohr' || stepNorm === 'head of hr' || stepNorm === 'approved by hohr') {
+        sheet.getRange('F41').setValue(formatSingleColCell('STATUS:', status || 'Approved'));
+        sheet.getRange('F42').setValue(formatSingleColCell('EMPLOYEE NO:', empNo));
+        sheet.getRange('F43').setValue(formatSingleColCell('NAME:', empName));
+        sheet.getRange('F44').setValue(formatSingleColCell('JOB POSITION:', position));
+        sheet.getRange('F46').setValue(formatSingleColCell('DATE:', sigDate));
 
-      sheet.getRange('G41').setValue(status || 'Approved');
-      sheet.getRange('G42').setValue(empNo);
-      sheet.getRange('G43').setValue(empName);
-      sheet.getRange('G44').setValue(position);
-      sheet.getRange('G46').setValue(sigDate);
-    } else if (stepNorm === 'hr' || stepNorm === 'arina' || stepNorm === 'hr department' || stepNorm === 'acknowledged by hr department') {
-      sheet.getRange('H41').setValue(formatSingleColCell('EMPLOYEE NO:', empNo));
-      sheet.getRange('H42').setValue(formatSingleColCell('NAME:', empName));
-      sheet.getRange('H44').setValue(formatSingleColCell('JOB POSITION:', position));
-      sheet.getRange('H46').setValue(formatSingleColCell('DATE:', sigDate));
+        sheet.getRange('G41').setValue(status || 'Approved');
+        sheet.getRange('G42').setValue(empNo);
+        sheet.getRange('G43').setValue(empName);
+        sheet.getRange('G44').setValue(position);
+        sheet.getRange('G46').setValue(sigDate);
+      } else if (stepNorm === 'hr' || stepNorm === 'arina' || stepNorm === 'hr department' || stepNorm === 'acknowledged by hr department') {
+        sheet.getRange('H41').setValue(formatSingleColCell('EMPLOYEE NO:', empNo));
+        sheet.getRange('H42').setValue(formatSingleColCell('NAME:', empName));
+        sheet.getRange('H44').setValue(formatSingleColCell('JOB POSITION:', position));
+        sheet.getRange('H46').setValue(formatSingleColCell('DATE:', sigDate));
 
-      sheet.getRange('I41').setValue(empNo);
-      sheet.getRange('I42').setValue(empName);
-      sheet.getRange('I43').setValue(empName);
-      sheet.getRange('I44').setValue(position);
-      sheet.getRange('I46').setValue(sigDate);
-    }
+        sheet.getRange('I41').setValue(empNo);
+        sheet.getRange('I42').setValue(empName);
+        sheet.getRange('I43').setValue(empName);
+        sheet.getRange('I44').setValue(position);
+        sheet.getRange('I46').setValue(sigDate);
+      }
 
-    // Auto-check: if a later approval arrives first, populate the requester value cells too.
-    if (stepNorm !== 'request' && stepNorm !== 'requested by') {
-      const currentReqVal = sheet.getRange('B41').getValue() || sheet.getRange('B42').getValue();
-      if (!currentReqVal || String(currentReqVal).trim() === '') {
-        const reqIdCol = headers.indexOf('RequestedBy') + 1;
-        const reqNameCol = headers.indexOf('RequestedByName') + 1;
-        const createdDateCol = headers.indexOf('CreatedDate') + 1;
-        const reqId = reqIdCol > 0 ? trainingSheet.getRange(row, reqIdCol).getValue() : '';
-        const reqName = reqNameCol > 0 ? trainingSheet.getRange(row, reqNameCol).getValue() : '';
-        const reqDate = (createdDateCol > 0 ? trainingSheet.getRange(row, createdDateCol).getValue() : '') || sigDate;
-        let reqPos = 'Requester';
-        if (reqId && getSheet('Employees')) {
-          const emps = sheetToJson(getSheet('Employees'));
-          const m = emps.find(e => String(e.ID || e.EmployeeID).toLowerCase() === String(reqId).toLowerCase());
-          if (m) reqPos = m.Position || m.JobTitle || m.PositionTitle || 'Requester';
-        }
-        if (reqId || reqName) {
-          sheet.getRange('B41').setValue(reqId);
-          sheet.getRange('B42').setValue(reqName);
-          sheet.getRange('B43').setValue(reqName);
-          sheet.getRange('B44').setValue(reqPos);
-          sheet.getRange('B46').setValue(getFormattedCurrentDate(reqDate));
+      // Auto-check: if a later approval arrives first, populate the requester value cells too.
+      if (stepNorm !== 'request' && stepNorm !== 'requested by') {
+        const currentReqVal = sheet.getRange('B41').getValue() || sheet.getRange('B42').getValue();
+        if (!currentReqVal || String(currentReqVal).trim() === '') {
+          const reqIdCol = headers.indexOf('RequestedBy') + 1;
+          const reqNameCol = headers.indexOf('RequestedByName') + 1;
+          const createdDateCol = headers.indexOf('CreatedDate') + 1;
+          const reqId = reqIdCol > 0 ? trainingSheet.getRange(row, reqIdCol).getValue() : '';
+          const reqName = reqNameCol > 0 ? trainingSheet.getRange(row, reqNameCol).getValue() : '';
+          const reqDate = (createdDateCol > 0 ? trainingSheet.getRange(row, createdDateCol).getValue() : '') || sigDate;
+          let reqPos = 'Requester';
+          if (reqId && getSheet('Employees')) {
+            const emps = sheetToJson(getSheet('Employees'));
+            const m = emps.find(e => String(e.ID || e.EmployeeID).toLowerCase() === String(reqId).toLowerCase());
+            if (m) reqPos = m.Position || m.JobTitle || m.PositionTitle || 'Requester';
+          }
+          if (reqId || reqName) {
+            sheet.getRange('B41').setValue(reqId);
+            sheet.getRange('B42').setValue(reqName);
+            sheet.getRange('B43').setValue(reqName);
+            sheet.getRange('B44').setValue(reqPos);
+            sheet.getRange('B46').setValue(getFormattedCurrentDate(reqDate));
+          }
         }
       }
-    }
+    });
 
     SpreadsheetApp.flush();
   } catch(e) {
@@ -814,17 +873,9 @@ function syncTrainingRequisitionParticipants(trainingId, directParticipantsList)
     }
 
     const formSpreadsheet = SpreadsheetApp.openById(formId);
-    const sheet = formSpreadsheet.getSheetByName('Training Form') || formSpreadsheet.getSheets()[0];
-    const rowCount = 24;
-    sheet.getRange('A15:I38').clearContent();
+    const primarySheet = formSpreadsheet.getSheetByName('Training Form') || formSpreadsheet.getSheets()[0];
 
-    resolved.participants.slice(0, rowCount).forEach((p, index) => {
-      const r = 15 + index;
-      sheet.getRange(`A${r}`).setValue(p.EmployeeID || p.ID || '');
-      sheet.getRange(`C${r}`).setValue(p.EmployeeName || p.Name || '');
-      sheet.getRange(`D${r}`).setValue(p.Department || p.CostCentre || '');
-      sheet.getRange(`H${r}`).setValue(p.Position || p.JobTitle || '');
-    });
+    populateRequisitionFormParticipantsAndTabs(formSpreadsheet, primarySheet, resolved.participants);
 
     const partCountCol = headers.indexOf('Participants') + 1;
     if (partCountCol > 0) trainingSheet.getRange(row, partCountCol).setValue(resolved.participants.length);

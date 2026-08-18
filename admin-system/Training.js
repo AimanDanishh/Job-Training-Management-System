@@ -88,7 +88,45 @@ function autoUpdateTrainingLifecycleStages() {
         }
       }
 
-      const partCount = Number(t.Participants || 0);
+      let partCount = Number(t.Participants || 0);
+
+      // Auto-resolve participant count if 0, NaN, or empty
+      if (isNaN(partCount) || partCount === 0) {
+        // Tier 1: Check ParticipantList JSON string
+        if (t.ParticipantList) {
+          try {
+            const pList = typeof t.ParticipantList === 'string' ? JSON.parse(t.ParticipantList) : t.ParticipantList;
+            if (Array.isArray(pList) && pList.length > 0) {
+              partCount = pList.length;
+            }
+          } catch(e) {}
+        }
+        // Tier 2: Check aliases (TotalPax, Total Participant, Pax, etc.)
+        if (partCount === 0) {
+          const aliasPax = Number(t.TotalPax || t['Total Pax'] || t['Total Participant'] || t.Pax || 0);
+          if (!isNaN(aliasPax) && aliasPax > 0) {
+            partCount = aliasPax;
+          }
+        }
+        // Tier 3: Check training participants sheet in Drive or database
+        if (partCount === 0 && (t.ID || t.Code)) {
+          try {
+            const pList = getTrainingParticipantsList(t.ID || t.Code);
+            if (Array.isArray(pList) && pList.length > 0) {
+              partCount = pList.length;
+            }
+          } catch(e) {}
+        }
+
+        if (partCount > 0) {
+          t.Participants = partCount;
+          const partCol = headers.indexOf('Participants') + 1;
+          if (t._row && partCol > 0) {
+            sheet.getRange(t._row, partCol).setValue(partCount);
+            sheetModified = true;
+          }
+        }
+      }
 
       // Auto-advance Created -> Participants Imported if participants are attached/requested
       if (partCount > 0 && (!t.Stage || t.Stage === 'Created')) {
@@ -604,11 +642,8 @@ function debugGetTrainings() {
 function getTrainingParticipants(trainingId) {
   try {
     if (!trainingId) return ok([]);
-    const ss = getTrainingDataSpreadsheet(trainingId);
-    if (!ss) return ok([]);
-    const sheet = ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants');
-    if (!sheet) return ok([]);
-    return ok(sheetToJson(sheet));
+    const list = getTrainingParticipantsList(trainingId);
+    return ok(list);
   } catch (e) {
     return err('Failed to get training participants: ' + e.message);
   }

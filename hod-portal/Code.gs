@@ -8,7 +8,6 @@
 
 function doGet(e) {
   const pageParam = (e && e.parameter && e.parameter.page) ? String(e.parameter.page).toLowerCase().trim() : 'review';
-  const emailParam = (e && e.parameter && e.parameter.email) ? String(e.parameter.email).trim() : '';
 
   const pageMap = {
     'review':   'HodReview',
@@ -20,24 +19,22 @@ function doGet(e) {
   const templateName = pageMap[pageParam] || 'HodReview';
   const appTitle = getConfigProperty('APP_TITLE', 'TrainHub — Approval Portal');
 
-  // Determine user email strictly from Session if available, fallback to parameter
-  let activeEmail = resolveActiveSessionEmail(emailParam);
+  // Determine user email strictly from authenticated Google Workspace session
+  let activeEmail = resolveActiveSessionEmail();
 
-  // If active user email is available, validate authorization
-  if (activeEmail) {
-    const auth = validateHODAccess(activeEmail);
-    if (!auth.valid) {
-      try {
-        const errTemplate = HtmlService.createTemplateFromFile('Error');
-        errTemplate.params = { 
-          title: 'Access Denied — Non Authorized Account',
-          message: auth.message || `Access Denied: The email address (${activeEmail}) is not registered as an authorized approver.`
-        };
-        return errTemplate.evaluate()
-          .setTitle('Access Denied — TrainHub Approval Portal')
-          .addMetaTag('viewport', 'width=device-width, initial-scale=1');
-      } catch (err) {}
-    }
+  // Validate approver authorization
+  const auth = validateHODAccess(activeEmail);
+  if (!auth.valid) {
+    try {
+      const errTemplate = HtmlService.createTemplateFromFile('Error');
+      errTemplate.params = { 
+        title: 'Access Denied — Unauthorized Account',
+        message: auth.message || (activeEmail ? `Access Denied: The email address (${activeEmail}) is not registered as an authorized approver.` : 'No authenticated Google account detected. Please log in with your authorized company email.')
+      };
+      return errTemplate.evaluate()
+        .setTitle('Access Denied — TrainHub Approval Portal')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+    } catch (err) {}
   }
 
   try {
@@ -79,15 +76,12 @@ function getAppUrl() {
 /**
  * Helper: Resolve active Google Session user email server-side
  */
-function resolveActiveSessionEmail(providedEmail) {
+function resolveActiveSessionEmail() {
   let sessionEmail = '';
   try {
     sessionEmail = Session.getActiveUser().getEmail();
   } catch (e) {}
-  if (sessionEmail && sessionEmail.trim() !== '') {
-    return sessionEmail.trim();
-  }
-  return String(providedEmail || '').trim();
+  return String(sessionEmail || '').trim();
 }
 
 
@@ -114,9 +108,9 @@ function getTrainingCode(t) {
  * SECURITY ENFORCEMENT: Resolves identity server-side.
  * ENFORCES CURRENT ACTIVE APPROVAL STAGE & ASSIGNED APPROVER MATCHING.
  */
-function getApproverDashboardData(userEmailParam) {
+function getApproverDashboardData() {
   try {
-    const auth = resolveAuthenticatedUserServerSide(userEmailParam);
+    const auth = resolveAuthenticatedUserServerSide();
     if (!auth.valid || !auth.hod) {
       return err(auth.message || 'Unable to identify your Google account. Please ensure you are logged into your authorized company account.');
     }
@@ -266,9 +260,9 @@ function getInitialDashboardDataJson(userEmailParam) {
  * API: Fetch complete Training Requisition details.
  * SECURITY ENFORCEMENT: Server-side identity resolution & active stage access control.
  */
-function getRequisitionDetails(trainingId, userEmail) {
+function getRequisitionDetails(trainingId) {
   try {
-    const auth = resolveAuthenticatedUserServerSide(userEmail);
+    const auth = resolveAuthenticatedUserServerSide();
     if (!auth.valid || !auth.hod) return err(auth.message || 'Unauthorized user identity.');
 
     const hodProfile = auth.hod;
@@ -399,8 +393,8 @@ function submitHODDecision(data) {
     }
 
     const cleanId = String(data.trainingId).trim();
-    // STRICT SECURITY: Resolve identity server-side, ignoring client parameter
-    const auth = resolveAuthenticatedUserServerSide(data.userEmail || data.email);
+    // STRICT SECURITY: Resolve identity strictly from server-side session
+    const auth = resolveAuthenticatedUserServerSide();
     if (!auth.valid || !auth.hod) {
       return err(auth.message || 'Unauthorized user identity.');
     }
@@ -417,7 +411,13 @@ function submitHODDecision(data) {
     if (row === -1) return err(`Training request (${cleanId}) not found in database.`);
 
     const trainingsList = sheetToJson(tSheet);
-    const currentT = trainingsList.find(t => String(t.ID || '').toLowerCase() === cleanId.toLowerCase());
+    const currentT = trainingsList.find(t => {
+      const id = String(t.ID || '').trim().toLowerCase();
+      const code = String(t.Code || '').trim().toLowerCase();
+      const tId = String(t.TrainingID || '').trim().toLowerCase();
+      const target = cleanId.toLowerCase();
+      return id === target || code === target || tId === target;
+    });
     if (!currentT) return err(`Training request (${cleanId}) not found.`);
 
     const currentAppStatus = String(currentT.ApprovalStatus || currentT.Status || 'Pending HOD Approval');
@@ -623,8 +623,9 @@ function submitHODDecision(data) {
       let requesterEmail = currentT.RequestedByEmail || currentT['Requested By Email'] || currentT.Email || currentT['Email Address'] || currentT.UserEmail || '';
       const requesterId = currentT.RequestedBy || currentT['Requested By'] || currentT.EmployeeID || currentT['Employee ID'] || '';
       let requesterName = currentT.RequestedByName || currentT['Requested By Name'] || currentT.Trainer || requesterId || 'Employee Requester';
+      let requesterCostCentre = currentT.CostCentre || currentT.Department || currentT['Cost Centre'] || currentT['CostCentre'] || '';
 
-      if (!requesterEmail && getSheet('Employees')) {
+      if ((!requesterEmail || !requesterCostCentre || !requesterName) && getSheet('Employees')) {
         const emps = sheetToJson(getSheet('Employees'));
         const cleanReqId = String(requesterId).toLowerCase().trim();
         const cleanReqName = String(requesterName).toLowerCase().trim();
@@ -636,11 +637,20 @@ function submitHODDecision(data) {
         });
 
         if (empMatch) {
-          requesterEmail = String(empMatch.Email || empMatch.EmailAddress || empMatch['Email Address'] || '').trim();
+          if (!requesterEmail) {
+            requesterEmail = String(empMatch.Email || empMatch.EmailAddress || empMatch['Email Address'] || '').trim();
+          }
           if (!requesterName || requesterName === requesterId) {
             requesterName = String(empMatch.Name || empMatch.EmployeeName || empMatch['Employee Name'] || requesterName).trim();
           }
+          if (!requesterCostCentre) {
+            requesterCostCentre = String(empMatch.Department || empMatch.CostCentre || empMatch['Cost Centre'] || '').trim();
+          }
         }
+      }
+
+      if (!requesterCostCentre) {
+        requesterCostCentre = hodCostCentre || 'N/A';
       }
 
       // Robust Fallback: If requester email is still empty, fallback to HOD's email or active user email
@@ -699,7 +709,6 @@ function submitHODDecision(data) {
       else if (validDecision === 'Approved') {
         // Step 1: HOD Approved -> Pending C-Suite Approval (Only notify C-Suite Executive)
         if (nextApprovalStatus === 'Pending C-Suite Approval') {
-          const requesterCostCentre = currentT.CostCentre || currentT.Department || currentT['Cost Centre'] || currentT['CostCentre'] || hodCostCentre;
           const csProfile = resolveCSuiteProfileForRequester(requesterCostCentre, requesterId);
           const csuiteEmail = csProfile.Email || auth.hod.CsuiteEmail || getConfigProperty('CSUITE_EMAIL', '') || auth.hod.Email;
           const csuiteName = csProfile.Name || auth.hod.CsuiteName || 'C-Suite Executive';
@@ -904,9 +913,12 @@ function authorizeGmailDrafts() {
 function getPendingPostEvalParticipants(trainingId, userEmail) {
   try {
     let auth = validateHODAccess(userEmail);
-    let targetEmail = userEmail || '';
-    let targetEmpId = auth.valid ? (auth.hod.ID || auth.hod.EmployeeID || '') : '';
-    let targetHodCostCentre = auth.valid ? auth.hod.CostCentre : 'ALL';
+    if (!auth.valid || !auth.hod) {
+      return err(auth.message || `Access Denied: The account (${userEmail || 'anonymous'}) is not registered as an authorized approver.`);
+    }
+    let targetEmail = auth.email || userEmail || '';
+    let targetEmpId = auth.hod.ID || auth.hod.EmployeeID || '';
+    let targetHodCostCentre = auth.hod.CostCentre || 'ALL';
 
     const tSheet = getSheet('Trainings');
     if (!tSheet) return err('Trainings sheet unavailable.');

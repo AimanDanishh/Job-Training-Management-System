@@ -35,6 +35,85 @@ function getTrainingInfo(trainingId) {
 }
 
 /**
+ * Fetch 3-Month Post Evaluation Lock Status & Training Details for Landing Page
+ */
+function getPostEvalTrainingStatus(trainingId) {
+  try {
+    let t = null;
+    const cleanId = String(trainingId || '').trim();
+    const tSheet = getSheet(SHEET_NAMES.trainings);
+    if (!tSheet) return err('Trainings sheet unavailable.');
+
+    const trainings = sheetToJson(tSheet);
+    if (cleanId) {
+      t = trainings.find(r => {
+        const id = String(r.ID || '').trim().toLowerCase();
+        const code = String(r.Code || '').trim().toLowerCase();
+        const tId = String(r.TrainingID || '').trim().toLowerCase();
+        return id === cleanId.toLowerCase() || code === cleanId.toLowerCase() || tId === cleanId.toLowerCase();
+      });
+    }
+
+    if (!t && trainings.length > 0) {
+      t = trainings[0];
+    }
+
+    if (!t) return err('Training programme not found.');
+
+    // 3-Month Lock Status Calculation: Must unlock AFTER 3 months of training completion
+    const startDateStr = t.StartDate || t.EndDate || new Date();
+    const completionDateStr = t.EndDate || t.StartDate || new Date();
+    const startDate = new Date(startDateStr);
+    const completionDate = new Date(completionDateStr);
+    completionDate.setHours(23, 59, 59, 999);
+    
+    // Target unlock date is exactly 3 months after course completion
+    const unlockTargetDate = new Date(completionDate);
+    unlockTargetDate.setMonth(unlockTargetDate.getMonth() + 3);
+    
+    const now = new Date();
+    const isTrainingCompleted = now.getTime() >= completionDate.getTime();
+    const isUnlocked = isTrainingCompleted && (now.getTime() >= unlockTargetDate.getTime());
+    const countdownActive = isTrainingCompleted && !isUnlocked;
+    const remainingMs = Math.max(0, unlockTargetDate.getTime() - now.getTime());
+
+    let phase = 'UNLOCKED';
+    if (!isTrainingCompleted) {
+      phase = 'NOT_STARTED'; // Training date not reached yet
+    } else if (!isUnlocked) {
+      phase = 'COUNTDOWN_ACTIVE'; // Training completed, counting down 3 months
+    }
+
+    return ok({
+      training: {
+        ID: t.ID,
+        Code: t.Code || t.ID,
+        Name: t.Name || '',
+        Category: t.Category || '',
+        Trainer: t.Trainer || '',
+        StartDate: formatMinimalistDate(t.StartDate),
+        EndDate: formatMinimalistDate(t.EndDate),
+        CompletionDate: formatMinimalistDate(completionDateStr)
+      },
+      lockInfo: {
+        phase: phase, // 'NOT_STARTED' | 'COUNTDOWN_ACTIVE' | 'UNLOCKED'
+        isTrainingCompleted: isTrainingCompleted,
+        isUnlocked: isUnlocked,
+        countdownActive: countdownActive,
+        startDateFormatted: formatMinimalistDate(startDateStr),
+        completionDateFormatted: formatMinimalistDate(completionDateStr),
+        unlockTargetIso: unlockTargetDate.toISOString(),
+        unlockTargetDateFormatted: formatMinimalistDate(unlockTargetDate),
+        remainingMs: remainingMs
+      }
+    });
+  } catch(e) {
+    Logger.log('getPostEvalTrainingStatus error: ' + e.message);
+    return err('Failed to get post evaluation status: ' + e.message);
+  }
+}
+
+/**
  * Submit public Training Evaluation
  */
 function saveTrainingEvaluation(data) {
@@ -126,7 +205,7 @@ function savePostEvaluation(data) {
     }
 
     // 1. Validate on Server Side
-    const validation = validatePublicPostEvaluation(trainingId, employeeId, token);
+    const validation = validatePublicPostEvaluation(trainingId, employeeId, token, data.EvaluatorID, evaluatorName);
     if (!validation.valid) {
       return err(validation.message);
     }

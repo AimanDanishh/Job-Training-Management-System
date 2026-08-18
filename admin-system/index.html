@@ -71,19 +71,6 @@
         Sign In with Google
       </button>
 
-      <!-- Optional Manual Email Input (for local testing/manual entry) -->
-      <div style="margin-top:20px;padding-top:16px;border-top:1px dashed #E2E8F0;text-align:center">
-        <a href="javascript:void(0)" id="toggle-manual-input" style="font-size:12px;color:#2563EB;text-decoration:none;font-weight:500">
-          Switch account or sign in manually
-        </a>
-        <div id="manual-input-box" style="display:none;margin-top:12px;text-align:left">
-          <label for="manual-email-inp" class="label-th">Company Google Email</label>
-          <div style="display:flex;gap:8px">
-            <input id="manual-email-inp" class="input-th" placeholder="admin@company.com" type="email" aria-label="Company Google Email">
-            <button id="btn-manual-verify" class="btn-th btn-secondary" style="white-space:nowrap">Verify</button>
-          </div>
-        </div>
-      </div>
     </div>
 
     <p style="text-align:center;font-size:11.5px;color:#94A3B8;margin-top:18px">
@@ -122,17 +109,6 @@
       }
     });
 
-    document.getElementById('toggle-manual-input').addEventListener('click', () => {
-      const box = document.getElementById('manual-input-box');
-      box.style.display = box.style.display === 'none' ? 'block' : 'none';
-    });
-
-    document.getElementById('btn-manual-verify').addEventListener('click', () => {
-      const manualEmail = document.getElementById('manual-email-inp').value.trim();
-      if (!manualEmail) return;
-      verifyEmail(manualEmail);
-    });
-
     function checkCurrentUser(autoRedirect = false) {
       google.script.run
         .withSuccessHandler(res => handleAuthResponse(res, autoRedirect))
@@ -140,15 +116,6 @@
           showAuthError('Failed to connect to Google Auth: ' + err.message);
         })
         .getCurrentUser();
-    }
-
-    function verifyEmail(email) {
-      google.script.run
-        .withSuccessHandler(res => handleAuthResponse(res, true))
-        .withFailureHandler(err => {
-          showAuthError('Verification error: ' + err.message);
-        })
-        .verifyGoogleUser(email);
     }
 
     function handleAuthResponse(res, autoRedirect) {

@@ -30,18 +30,72 @@
       <p style="color:var(--text-secondary); font-size:13.5px; font-weight:600;">Preparing evaluator portal...</p>
     </div>
 
-    <!-- Step 1: Evaluator ID Screen -->
+    <!-- Step 1: Evaluator ID Screen (Main Landing Page) -->
     <div id="view-step-evaluator-id" style="display:none;">
+      
+      <!-- Training Programme Overview Card -->
+      <div id="main-training-box" class="info-details-box" style="display:none; margin-bottom: 20px;">
+        <div class="info-row">
+          <span class="info-label">Training Programme</span>
+          <span class="info-value" id="txt-main-training-title" style="font-weight:700;">—</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Completion Date</span>
+          <span class="info-value" id="txt-main-training-completion">—</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">3-Month Unlock Date</span>
+          <span class="info-value" id="txt-main-training-unlock" style="font-weight:700; color:var(--primary);">—</span>
+        </div>
+      </div>
+
+      <!-- Training Not Completed Notice Card (Phase: NOT_STARTED) -->
+      <div id="main-not-started-card" style="display:none; background: linear-gradient(135deg, rgba(59,130,246,0.08), rgba(99,102,241,0.08)); border: 1.5px solid #3B82F6; border-radius: var(--radius-md); padding: 18px; margin-bottom: 20px; text-align: center;">
+        <div style="font-size: 26px; margin-bottom: 6px;">📅</div>
+        <h4 style="font-size: 15px; font-weight: 800; color: #2563EB; margin-bottom: 6px;">Training Not Completed Yet</h4>
+        <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 12px;">
+          The 3-month post-training evaluation countdown will start automatically <strong>after</strong> the course completion date (<span id="txt-not-started-completion-date" style="font-weight:700; color:var(--text-primary);">—</span>).
+        </p>
+        <div style="font-size: 12px; font-weight: 700; color: #1D4ED8; background: var(--bg-card); padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border-color); display: inline-block;">
+          ⏳ Countdown will begin upon training completion
+        </div>
+      </div>
+
+      <!-- Live 3-Month Countdown Lock Card (Phase: COUNTDOWN_ACTIVE) -->
+      <div id="main-countdown-lock" style="display:none; background: linear-gradient(135deg, rgba(239,68,68,0.08), rgba(245,158,11,0.08)); border: 1.5px solid #F59E0B; border-radius: var(--radius-md); padding: 18px; margin-bottom: 20px; text-align: center;">
+        <div style="font-size: 26px; margin-bottom: 6px;">🔒</div>
+        <h4 style="font-size: 15px; font-weight: 800; color: #D97706; margin-bottom: 6px;">3-Month Post-Training Review Period In Progress</h4>
+        <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 12px;">
+          To accurately measure on-the-job skill transfer and retention, post-training evaluation unlocks <strong>after 3 months</strong> of training completion (<span id="txt-main-unlock-target-date" style="font-weight:700; color:var(--text-primary);">—</span>).
+        </p>
+        <div style="font-family: monospace; font-size: 18px; font-weight: 800; color: #B45309; background: var(--bg-card); padding: 10px 16px; border-radius: 8px; border: 1px solid var(--border-color); display: inline-block;" id="txt-main-countdown-timer">
+          00m : 00d : 00h : 00m : 00s
+        </div>
+        <div style="font-size: 11.5px; color: #DC2626; font-weight: 700; margin-top: 10px;">
+          ⏳ Evaluator login will automatically unlock once the 3-month milestone is reached.
+        </div>
+      </div>
+
+      <!-- Unlocked Active Banner (Phase: UNLOCKED) -->
+      <div id="main-unlocked-banner" style="display:none; background: rgba(16,185,129,0.08); border: 1.5px solid #10B981; border-radius: var(--radius-md); padding: 14px 16px; margin-bottom: 20px; text-align: center;">
+        <div style="display:inline-flex; align-items:center; gap:8px; font-size:14px; font-weight:800; color:#059669;">
+          <span>🔓</span> 3-Month Evaluation Window Unlocked
+        </div>
+        <p style="font-size:12px; color:var(--text-secondary); margin-top:4px;">
+          Training completed on <span id="txt-main-completion-date" style="font-weight:700;">—</span>. Authorized Supervisors and PICs can now log in and conduct evaluations.
+        </p>
+      </div>
+
       <div style="text-align:center; margin-bottom: 20px;">
         <h2 style="font-size: 16px; font-weight: 700; color: var(--text-primary);">Evaluator Verification</h2>
-        <p style="font-size: 12.5px; color: var(--text-secondary); margin-top: 4px;">Enter your Supervisor / Manager / PIC Employee ID to access assigned post-evaluations.</p>
+        <p style="font-size: 12.5px; color: var(--text-secondary); margin-top: 4px;">Enter your Supervisor / PIC Employee ID or Work Email to access assigned post-evaluations.</p>
       </div>
 
       <form onsubmit="handleVerifyEvaluator(event)">
         <div class="form-group">
-          <label for="inp-evaluator-empid" class="form-label">Supervisor / PIC Employee ID <span class="req">*</span></label>
-          <input type="text" id="inp-evaluator-empid" class="form-control" placeholder="00000" required autocomplete="off" aria-label="Supervisor / PIC Employee ID">
-          <p style="font-size:11.5px; color:var(--text-secondary); margin-top:6px;">ℹ️ Your email and evaluator authorization will be automatically retrieved from the employee database.</p>
+          <label for="inp-evaluator-empid" class="form-label">Supervisor / PIC Employee ID or Email <span class="req">*</span></label>
+          <input type="text" id="inp-evaluator-empid" class="form-control" placeholder="e.g. 00000 or supervisor@company.com" required autocomplete="off" aria-label="Supervisor / PIC Employee ID or Email">
+          <p style="font-size:11.5px; color:var(--text-secondary); margin-top:6px;">ℹ️ <strong>Note:</strong> Participants cannot evaluate themselves. Only assigned Supervisors, Managers, HODs, or Persons in Charge (PIC) are authorized to conduct 3-Month post-training evaluations.</p>
         </div>
 
         <button type="submit" id="btn-verify-evaluator" class="btn-submit">
@@ -90,18 +144,6 @@
         <p style="font-size:12px; color:var(--text-secondary); margin-top:6px;" id="txt-pending-stats">
           Loading assigned pending evaluations...
         </p>
-      </div>
-
-      <!-- Live 3-Month Countdown Lock Card -->
-      <div id="card-countdown-lock" style="display:none; background: linear-gradient(135deg, rgba(239,68,68,0.08), rgba(245,158,11,0.08)); border: 1.5px solid #F59E0B; border-radius: var(--radius-md); padding: 18px; margin-bottom: 20px; text-align: center;">
-        <div style="font-size: 24px; margin-bottom: 6px;">⏱️</div>
-        <h4 style="font-size: 15px; font-weight: 800; color: #D97706; margin-bottom: 6px;">3-Month Post-Training Review Period In Progress</h4>
-        <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 12px;">
-          To accurately measure on-the-job skill application, evaluations unlock 3 months after course completion (<span id="txt-unlock-target-date" style="font-weight:700;">—</span>).
-        </p>
-        <div style="font-family: monospace; font-size: 18px; font-weight: 800; color: #B45309; background: var(--bg-card); padding: 10px 16px; border-radius: 8px; border: 1px solid var(--border-color); display: inline-block;" id="txt-countdown-timer">
-          00m : 00d : 00h : 00m : 00s
-        </div>
       </div>
 
       <!-- Form Container -->
@@ -215,11 +257,13 @@
   let selectedCompAfter = 0;
   let selectedRadioValues = { improvement: 'High', canApply: 'Yes' };
   let activeTrainingId = '';
+  let activeTrainingObj = null;
   let activeEvaluator = null;
   let pendingParticipants = [];
+  let mainCountdownInterval = null;
 
-  document.addEventListener('DOMContentLoaded', () => {
-    activeTrainingId = getQueryParam('id') || <?!= JSON.stringify((typeof params !== 'undefined' && params && params.id) ? params.id : '') ?>;
+  document.addEventListener('DOMContentLoaded', async () => {
+    activeTrainingId = getQueryParam('id') || getQueryParam('training') || getQueryParam('trainingId') || getQueryParam('trn') || <?!= JSON.stringify((typeof params !== 'undefined' && params && (params.id || params.training || params.trainingId || params.trn)) ? (params.id || params.training || params.trainingId || params.trn) : '') ?>;
     const preEvalEmp = getQueryParam('evaluator') || getQueryParam('emp') || <?!= JSON.stringify((typeof params !== 'undefined' && params && (params.evaluator || params.emp)) ? (params.evaluator || params.emp) : '') ?>;
 
     renderCompetencySelectors();
@@ -228,9 +272,114 @@
       document.getElementById('inp-evaluator-empid').value = preEvalEmp;
     }
 
+    // Load 3-Month Lock Status & Training Details for the Main Landing Page
+    try {
+      const statusRes = await callServer('getPostEvalTrainingStatus', activeTrainingId);
+      if (statusRes && statusRes.training) {
+        activeTrainingObj = statusRes.training;
+        activeTrainingId = statusRes.training.ID;
+        setupMainCountdownLock(statusRes.lockInfo, statusRes.training);
+      }
+    } catch(err) {
+      console.warn('Status load notice: ', err.message);
+    }
+
     document.getElementById('view-loading').style.display = 'none';
     document.getElementById('view-step-evaluator-id').style.display = 'block';
   });
+
+  function setupMainCountdownLock(lockInfo, training) {
+    const notStartedCard = document.getElementById('main-not-started-card');
+    const lockCard = document.getElementById('main-countdown-lock');
+    const unlockedBanner = document.getElementById('main-unlocked-banner');
+    const submitBtn = document.getElementById('btn-verify-evaluator');
+    const inputField = document.getElementById('inp-evaluator-empid');
+
+    if (mainCountdownInterval) clearInterval(mainCountdownInterval);
+
+    if (training) {
+      document.getElementById('main-training-box').style.display = 'block';
+      document.getElementById('txt-main-training-title').textContent = `[${training.Code || training.ID}] ${training.Name}`;
+      document.getElementById('txt-main-training-completion').textContent = (lockInfo && lockInfo.completionDateFormatted) ? lockInfo.completionDateFormatted : (training.EndDate || training.StartDate || '—');
+      document.getElementById('txt-main-training-unlock').textContent = (lockInfo && lockInfo.unlockTargetDateFormatted) ? lockInfo.unlockTargetDateFormatted : '—';
+    }
+
+    const phase = lockInfo ? lockInfo.phase : 'UNLOCKED';
+
+    if (phase === 'NOT_STARTED') {
+      // Training has NOT completed yet: Countdown has NOT started yet
+      if (notStartedCard) notStartedCard.style.display = 'block';
+      if (lockCard) lockCard.style.display = 'none';
+      if (unlockedBanner) unlockedBanner.style.display = 'none';
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '🔒 Locked (Course Not Completed Yet)';
+      }
+      if (inputField) inputField.disabled = true;
+      const compDate = lockInfo ? lockInfo.completionDateFormatted : '—';
+      document.getElementById('txt-not-started-completion-date').textContent = compDate;
+      return;
+    }
+
+    if (phase === 'UNLOCKED') {
+      // 3 Months elapsed: Unlocked
+      if (notStartedCard) notStartedCard.style.display = 'none';
+      if (lockCard) lockCard.style.display = 'none';
+      if (unlockedBanner) unlockedBanner.style.display = 'block';
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = 'Verify & Access Dashboard →';
+      }
+      if (inputField) inputField.disabled = false;
+      document.getElementById('txt-main-completion-date').textContent = lockInfo ? lockInfo.completionDateFormatted : '—';
+      return;
+    }
+
+    // Phase: 'COUNTDOWN_ACTIVE' (Training completed, counting down 3 months)
+    if (notStartedCard) notStartedCard.style.display = 'none';
+    if (lockCard) lockCard.style.display = 'block';
+    if (unlockedBanner) unlockedBanner.style.display = 'none';
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = `🔒 Locked Until ${lockInfo.unlockTargetDateFormatted}`;
+    }
+    if (inputField) inputField.disabled = true;
+    document.getElementById('txt-main-unlock-target-date').textContent = lockInfo.unlockTargetDateFormatted || '—';
+
+    const targetTime = new Date(lockInfo.unlockTargetIso).getTime();
+
+    function updateTimer() {
+      const now = new Date().getTime();
+      const diff = targetTime - now;
+
+      if (diff <= 0) {
+        clearInterval(mainCountdownInterval);
+        if (notStartedCard) notStartedCard.style.display = 'none';
+        if (lockCard) lockCard.style.display = 'none';
+        if (unlockedBanner) unlockedBanner.style.display = 'block';
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = 'Verify & Access Dashboard →';
+        }
+        if (inputField) inputField.disabled = false;
+        showToast('3-Month Milestone Reached! Post Evaluation Unlocked.', 'success');
+        return;
+      }
+
+      const months = Math.floor(diff / (1000 * 60 * 60 * 24 * 30.4375));
+      const days = Math.floor((diff % (1000 * 60 * 60 * 24 * 30.4375)) / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+      const timerStr = `${String(months).padStart(2, '0')}m : ${String(days).padStart(2, '0')}d : ${String(hours).padStart(2, '0')}h : ${String(minutes).padStart(2, '0')}m : ${String(seconds).padStart(2, '0')}s`;
+      const timerElem = document.getElementById('txt-main-countdown-timer');
+      if (timerElem) timerElem.textContent = timerStr;
+    }
+
+    updateTimer();
+    mainCountdownInterval = setInterval(updateTimer, 1000);
+  }
 
   function renderCompetencySelectors() {
     const beforeEl = document.getElementById('group-comp-before');
@@ -272,7 +421,7 @@
     const evaluatorId = document.getElementById('inp-evaluator-empid').value.trim();
 
     if (!evaluatorId) {
-      showToast('Please enter your Supervisor / PIC Employee ID.', 'error');
+      showToast('Please enter your Supervisor / PIC Employee ID or Work Email.', 'error');
       return;
     }
 
@@ -298,8 +447,6 @@
         const eD = formatMinimalistDate(res.training.EndDate);
         document.getElementById('txt-post-training-date').textContent = sD ? (eD && eD !== sD ? `${sD} - ${eD}` : sD) : '—';
       }
-
-      setupPostEvalLockCountdown(res.lockInfo);
 
       pendingParticipants = res.pendingParticipants || [];
       const sel = document.getElementById('sel-participant');
@@ -418,64 +565,6 @@
     document.getElementById('view-success').style.display = 'none';
     document.getElementById('view-error').style.display = 'block';
     document.getElementById('txt-error-msg').textContent = msg;
-  }
-  let countdownInterval = null;
-
-  function setupPostEvalLockCountdown(lockInfo) {
-    const lockCard = document.getElementById('card-countdown-lock');
-    const submitBtn = document.getElementById('btn-submit-post');
-    
-    if (countdownInterval) clearInterval(countdownInterval);
-
-    if (!lockInfo || lockInfo.isUnlocked) {
-      if (lockCard) lockCard.style.display = 'none';
-      if (submitBtn) submitBtn.disabled = false;
-      setFormFieldsDisabled(false);
-      return;
-    }
-
-    if (lockCard) lockCard.style.display = 'block';
-    if (submitBtn) submitBtn.disabled = true;
-    setFormFieldsDisabled(true);
-    document.getElementById('txt-unlock-target-date').textContent = lockInfo.unlockTargetDateFormatted || '—';
-
-    const targetTime = new Date(lockInfo.unlockTargetIso).getTime();
-
-    function updateTimer() {
-      const now = new Date().getTime();
-      const diff = targetTime - now;
-
-      if (diff <= 0) {
-        clearInterval(countdownInterval);
-        if (lockCard) lockCard.style.display = 'none';
-        if (submitBtn) submitBtn.disabled = false;
-        setFormFieldsDisabled(false);
-        showToast('3-Month Milestone Reached! Form Unlocked.', 'success');
-        return;
-      }
-
-      const months = Math.floor(diff / (1000 * 60 * 60 * 24 * 30.4375));
-      const days = Math.floor((diff % (1000 * 60 * 60 * 24 * 30.4375)) / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-
-      const timerStr = `${String(months).padStart(2, '0')}m : ${String(days).padStart(2, '0')}d : ${String(hours).padStart(2, '0')}h : ${String(minutes).padStart(2, '0')}m : ${String(seconds).padStart(2, '0')}s`;
-      const timerElem = document.getElementById('txt-countdown-timer');
-      if (timerElem) timerElem.textContent = timerStr;
-    }
-
-    updateTimer();
-    countdownInterval = setInterval(updateTimer, 1000);
-  }
-
-  function setFormFieldsDisabled(disabled) {
-    const form = document.querySelector('#form-container form');
-    if (!form) return;
-    const inputs = form.querySelectorAll('input, select, textarea');
-    inputs.forEach(i => {
-      i.disabled = disabled;
-    });
   }
 </script>
 

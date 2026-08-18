@@ -102,6 +102,43 @@ function createSession(data) {
 
     sheet.appendRow(sessionRow);
 
+    // Ensure ParticipantsSheetID and SessionsSheetID are persisted to Trainings row
+    try {
+      if (tSheet) {
+        const headers = ensureTrainingSheetColumns(tSheet);
+        const tRow = findRowById(tSheet, data.TrainingID);
+        if (tRow !== -1) {
+          const colIdx = headers.indexOf('ParticipantsSheetID') + 1;
+          if (colIdx > 0 && !tSheet.getRange(tRow, colIdx).getValue()) {
+            tSheet.getRange(tRow, colIdx).setValue(ss.getId());
+          }
+          const sColIdx = headers.indexOf('SessionsSheetID') + 1;
+          if (sColIdx > 0 && !tSheet.getRange(tRow, sColIdx).getValue()) {
+            tSheet.getRange(tRow, sColIdx).setValue(ss.getId());
+          }
+        }
+      }
+    } catch(persistErr) {
+      Logger.log('Could not persist sheet ID to Trainings: ' + persistErr.message);
+    }
+
+    // Sync session record to central TrainingSessions tab in Main Database
+    try {
+      const mainSs = getSpreadsheet();
+      if (mainSs) {
+        let centralSheet = mainSs.getSheetByName('TrainingSessions');
+        if (!centralSheet) {
+          centralSheet = mainSs.insertSheet('TrainingSessions');
+          centralSheet.appendRow(['SessionID', 'TrainingID', 'SessionName', 'SessionDate', 'StartTime', 'EndTime', 'AttendanceURL', 'QRCodeURL', 'QRStatus', 'CreatedDate']);
+          centralSheet.getRange('A1:J1').setFontWeight('bold').setBackground('#2563EB').setFontColor('#FFFFFF');
+          centralSheet.setFrozenRows(1);
+        }
+        centralSheet.appendRow(sessionRow);
+      }
+    } catch(cErr) {
+      Logger.log('Central TrainingSessions append error: ' + cErr.message);
+    }
+
     // Automatically update lifecycle stage to 'Attendance In Progress' when session attendance is created
     try {
       updateTrainingStage(data.TrainingID, 'Attendance In Progress');

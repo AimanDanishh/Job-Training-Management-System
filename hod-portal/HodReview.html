@@ -406,7 +406,7 @@
             showAccessDeniedScreen('Unable to connect to backend server: ' + err.message);
           }
         })
-        .getApproverDashboardData('');
+        .getApproverDashboardData();
     }
 
     function processDashboardData(resInput) {
@@ -689,7 +689,7 @@
           hideLoading();
           alert('Failed to load request details: ' + err.message);
         })
-        .getRequisitionDetails(reqId, currentApprover ? currentApprover.Email : '');
+        .getRequisitionDetails(reqId);
     }
 
     function renderDetailsModal(data) {

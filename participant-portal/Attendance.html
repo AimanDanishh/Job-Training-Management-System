@@ -172,7 +172,7 @@
   let activeSessionObj = null;
 
   document.addEventListener('DOMContentLoaded', async () => {
-    activeSessionId = getQueryParam('session') || <?!= JSON.stringify((typeof params !== 'undefined' && params && params.session) ? params.session : '') ?>;
+    activeSessionId = getQueryParam('session') || getQueryParam('sessionId') || getQueryParam('id') || getQueryParam('s') || <?!= JSON.stringify((typeof params !== 'undefined' && params && (params.session || params.sessionId || params.id || params.s)) ? (params.session || params.sessionId || params.id || params.s) : '') ?>;
     
     if (!activeSessionId) {
       showErrorState('Missing session parameter. Please scan a valid session QR code.');

@@ -489,27 +489,11 @@ function getActiveHODProfile(providedEmail, requesterIdOrName) {
   const realHod = resolveRealHODProfile(userEmail, requesterIdOrName);
 
   if (!realHod) {
-    const allHODs = getAllRealHODProfiles();
-    if (allHODs && allHODs.length > 0) {
-      return {
-        valid: true,
-        email: userEmail || allHODs[0].Email,
-        hod: allHODs[0]
-      };
-    }
-    const hodSheet = getSheet('HOD email');
-    if (!hodSheet) {
-      return {
-        valid: false,
-        email: userEmail,
-        message: `Database Error: Could not locate the 'HOD email' tab in the connected Google Spreadsheet. Please verify the tab name.`
-      };
-    }
-    const emailList = allHODs.map(x => x.email).filter(Boolean);
     return {
       valid: false,
       email: userEmail,
-      message: `Access Denied: The email address (${userEmail}) is not registered in the HOD email directory. ${emailList.length > 0 ? 'Registered emails: ' + emailList.join(', ') : 'No emails found in HOD email tab.'}`
+      hod: null,
+      message: `Access Denied: The email address (${userEmail}) is not registered as an authorized approver in the system directory.`
     };
   }
 
@@ -537,16 +521,16 @@ function validateHODAccess(userEmail, requesterIdOrName) {
  * STRICT SECURITY REQUIREMENT: Never trust client-supplied email/ID parameters.
  * Uses Session.getActiveUser().getEmail() as authoritative source of identity.
  */
-function resolveAuthenticatedUserServerSide(fallbackEmail) {
+function resolveAuthenticatedUserServerSide() {
   let sessionEmail = '';
   try {
     sessionEmail = Session.getActiveUser().getEmail();
   } catch (e) {}
 
-  let targetEmail = (sessionEmail && sessionEmail.trim() !== '') ? sessionEmail.trim() : String(fallbackEmail || '').trim();
+  let targetEmail = String(sessionEmail || '').trim();
 
   if (!targetEmail) {
-    return { valid: false, email: '', hod: null, message: 'No authenticated user identity detected. Please log in with your company account.' };
+    return { valid: false, email: '', hod: null, message: 'No authenticated user identity detected. Please sign in with your authorized company account.' };
   }
 
   const auth = validateHODAccess(targetEmail);

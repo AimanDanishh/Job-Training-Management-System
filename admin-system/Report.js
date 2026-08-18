@@ -669,13 +669,51 @@ function buildAnnualTrainingPlanData(trainingsInput, selectedDept) {
 
 // --- Helper to fetch participants for a training ------------------------------
 function getTrainingParticipantsList(trainingId) {
+  if (!trainingId) return [];
+  const cleanId = String(trainingId).trim().toLowerCase();
+
+  // Tier 1: Check per-training spreadsheet
   try {
     const ss = getTrainingDataSpreadsheet(trainingId);
     if (ss) {
       const sheet = ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants');
-      if (sheet) return sheetToJson(sheet);
+      if (sheet) {
+        const rows = sheetToJson(sheet);
+        if (rows && rows.length > 0) return rows;
+      }
     }
   } catch (e) {}
+
+  // Tier 2: Check central database sheet 'Participants'
+  try {
+    const pSheet = getSheet(SHEET_NAMES.trainingParticipants || 'Participants') || getSheet('TrainingParticipants');
+    if (pSheet) {
+      const pRows = sheetToJson(pSheet);
+      const matched = pRows.filter(p => {
+        const pTid = String(p.TrainingID || p.TrainingCode || p.ID || '').trim().toLowerCase();
+        return pTid === cleanId;
+      });
+      if (matched.length > 0) return matched;
+    }
+  } catch(e) {}
+
+  // Tier 3: Check ParticipantList JSON on training row
+  try {
+    const tSheet = getSheet(SHEET_NAMES.trainings);
+    if (tSheet) {
+      const tRows = sheetToJson(tSheet);
+      const t = tRows.find(r => {
+        const tid = String(r.ID || '').trim().toLowerCase();
+        const tcode = String(r.Code || '').trim().toLowerCase();
+        return tid === cleanId || tcode === cleanId;
+      });
+      if (t && t.ParticipantList) {
+        const parsed = typeof t.ParticipantList === 'string' ? JSON.parse(t.ParticipantList) : t.ParticipantList;
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    }
+  } catch(e) {}
+
   return [];
 }
 
