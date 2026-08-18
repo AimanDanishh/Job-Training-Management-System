@@ -4,22 +4,29 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <?!= include('style') ?>
-  <title>Training Attendance — TrainHub</title>
+  <title data-i18n="docTitle">Training Attendance — TrainHub</title>
 </head>
 <body>
 
-<!-- Fixed Top-Right Theme Toggle Button -->
-<button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle Light / Dark Theme">
-  <span id="themeToggleIcon">🌙</span>
-  <span id="themeToggleLabel">Dark</span>
-</button>
+<!-- Fixed Top-Right Actions (Language Toggle BM/ENG & Theme Toggle) -->
+<div class="top-actions-container">
+  <button class="lang-toggle-btn" id="langToggleBtn" onclick="toggleLanguage()" title="Tukar Bahasa / Change Language" aria-label="Toggle Language BM / ENG">
+    <span id="langToggleIcon">🌐</span>
+    <span id="langToggleLabel">BM</span>
+  </button>
+
+  <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle Light / Dark Theme">
+    <span id="themeToggleIcon">🌙</span>
+    <span id="themeToggleLabel">Dark</span>
+  </button>
+</div>
 
 <div class="portal-container">
   <div class="portal-card">
     
     <!-- Header -->
     <div class="brand-header">
-      <span class="badge-pillar" id="badge-session">TRAINING ATTENDANCE</span>
+      <span class="badge-pillar" id="badge-session" data-i18n="badgeSession">TRAINING ATTENDANCE</span>
       <h1 class="portal-title" id="txt-training-title">Loading Training...</h1>
       <p class="portal-subtitle" id="txt-session-name" style="color:var(--primary);">Verifying session details...</p>
       
@@ -32,26 +39,26 @@
     <!-- Loading Spinner View -->
     <div id="view-loading" style="text-align:center; padding: 24px 0;">
       <div class="spinner"></div>
-      <p style="color:var(--text-secondary); font-size:13.5px; font-weight:600;">Validating session context...</p>
+      <p style="color:var(--text-secondary); font-size:13.5px; font-weight:600;" data-i18n="loadingContext">Validating session context...</p>
     </div>
 
     <!-- Step 1: Employee ID Screen -->
     <div id="view-step-id" style="display:none;">
       <div style="text-align:center; margin-bottom: 20px;">
-        <h2 style="font-size: 16px; font-weight: 700; color: var(--text-primary);">Enter your Employee ID</h2>
-        <p style="font-size: 12.5px; color: var(--text-secondary); margin-top: 4px;">Please enter your registered Employee ID to verify attendance eligibility.</p>
+        <h2 style="font-size: 16px; font-weight: 700; color: var(--text-primary);" data-i18n="step1Title">Enter your Employee ID</h2>
+        <p style="font-size: 12.5px; color: var(--text-secondary); margin-top: 4px;" data-i18n="step1Subtitle">Please enter your registered Employee ID to verify attendance eligibility.</p>
       </div>
 
       <form onsubmit="handleVerifyEmployee(event)">
         <div class="form-group">
-          <label for="inp-emp-id" class="form-label">Employee ID <span class="req">*</span></label>
+          <label for="inp-emp-id" class="form-label"><span data-i18n="lblEmpId">Employee ID</span> <span class="req">*</span></label>
           <input type="text" id="inp-emp-id" class="form-control" placeholder="00000" required autocomplete="off" oninput="onEmployeeIdTyping()" aria-label="Employee ID">
           <div id="emp-name-preview" style="display:none; margin-top:8px; padding:8px 12px; background:var(--primary-light, #EFF6FF); border:1px solid var(--primary, #2563EB); border-radius:8px; font-size:13px; font-weight:700; color:var(--primary, #2563EB);">
-            <span class="icon sm" style="margin-right:4px">person</span> Name: <span id="txt-preview-name">Lookup...</span>
+            <span class="icon sm" style="margin-right:4px">person</span> <span data-i18n="lblPreviewName">Name:</span> <span id="txt-preview-name" data-i18n="previewLookup">Lookup...</span>
           </div>
         </div>
 
-        <button type="submit" id="btn-verify-emp" class="btn-submit" style="margin-top:12px">
+        <button type="submit" id="btn-verify-emp" class="btn-submit" style="margin-top:12px" data-i18n="btnContinue">
           Continue →
         </button>
       </form>
@@ -60,7 +67,7 @@
     <!-- Step 2: Employee Verified Screen -->
     <div id="view-step-confirm" style="display:none;">
       <div style="text-align:center; margin-bottom: 20px;">
-        <span style="display:inline-block; padding: 4px 12px; background: var(--success-bg); color: var(--success); border: 1px solid rgba(52,211,153,0.3); border-radius: var(--radius-full); font-size: 12px; font-weight: 800; text-transform: uppercase; margin-bottom: 8px;">
+        <span style="display:inline-block; padding: 4px 12px; background: var(--success-bg); color: var(--success); border: 1px solid rgba(52,211,153,0.3); border-radius: var(--radius-full); font-size: 12px; font-weight: 800; text-transform: uppercase; margin-bottom: 8px;" data-i18n="badgeVerified">
           Employee Verified ✓
         </span>
         <h2 style="font-size: 20px; font-weight: 800; color: var(--text-primary);" id="txt-verify-name">—</h2>
@@ -68,32 +75,32 @@
 
       <div class="info-details-box">
         <div class="info-row">
-          <span class="info-label">Employee ID</span>
+          <span class="info-label" data-i18n="lblVerifyEmpId">Employee ID</span>
           <span class="info-value" id="txt-verify-empid">—</span>
         </div>
         <div class="info-row">
-          <span class="info-label">Position / Job Title</span>
+          <span class="info-label" data-i18n="lblVerifyPosition">Position / Job Title</span>
           <span class="info-value" id="txt-verify-position">—</span>
         </div>
         <div class="info-row">
-          <span class="info-label">Department / Cost Centre</span>
+          <span class="info-label" data-i18n="lblVerifyDept">Department / Cost Centre</span>
           <span class="info-value" id="txt-verify-dept">—</span>
         </div>
         <div class="info-row">
-          <span class="info-label">Training Programme</span>
+          <span class="info-label" data-i18n="lblVerifyTraining">Training Programme</span>
           <span class="info-value" id="txt-verify-training">—</span>
         </div>
         <div class="info-row">
-          <span class="info-label">Session</span>
+          <span class="info-label" data-i18n="lblVerifySession">Session</span>
           <span class="info-value" id="txt-verify-session">—</span>
         </div>
       </div>
 
-      <button type="button" id="btn-mark-att" class="btn-submit" onclick="handleMarkAttendance()">
+      <button type="button" id="btn-mark-att" class="btn-submit" onclick="handleMarkAttendance()" data-i18n="btnMarkAtt">
         ✓ Mark Attendance
       </button>
 
-      <button type="button" class="btn-submit btn-secondary" style="margin-top: 10px;" onclick="resetToStepId()">
+      <button type="button" class="btn-submit btn-secondary" style="margin-top: 10px;" onclick="resetToStepId()" data-i18n="btnChangeEmpId">
         ← Change Employee ID
       </button>
     </div>
@@ -103,29 +110,29 @@
       <div style="width: 64px; height: 64px; background: var(--success-bg); border: 2px solid var(--success); border-radius: 50%; color: var(--success); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 32px; font-weight: 800;">
         ✓
       </div>
-      <h3 style="font-size: 20px; font-weight: 800; color: var(--success); margin-bottom: 6px;">✓ Attendance Recorded</h3>
-      <p style="font-size: 14px; color: var(--text-primary); margin-bottom: 16px;" id="txt-success-msg">Thank you.</p>
+      <h3 style="font-size: 20px; font-weight: 800; color: var(--success); margin-bottom: 6px;" data-i18n="successTitle">✓ Attendance Recorded</h3>
+      <p style="font-size: 14px; color: var(--text-primary); margin-bottom: 16px;" id="txt-success-msg" data-i18n="successSubtitle">Thank you.</p>
       
       <div class="info-details-box" style="text-align:left; margin-bottom: 20px;">
         <div class="info-row">
-          <span class="info-label">Employee</span>
+          <span class="info-label" data-i18n="lblSuccessEmp">Employee</span>
           <span class="info-value" id="txt-success-emp-name">—</span>
         </div>
         <div class="info-row">
-          <span class="info-label">Training</span>
+          <span class="info-label" data-i18n="lblSuccessTraining">Training</span>
           <span class="info-value" id="txt-success-training-name">—</span>
         </div>
         <div class="info-row">
-          <span class="info-label">Session / Day</span>
+          <span class="info-label" data-i18n="lblSuccessSession">Session / Day</span>
           <span class="info-value" id="txt-success-session-name">—</span>
         </div>
         <div class="info-row">
-          <span class="info-label">Recorded At</span>
+          <span class="info-label" data-i18n="lblSuccessTime">Recorded At</span>
           <span class="info-value" id="txt-success-time">—</span>
         </div>
       </div>
 
-      <p style="font-size: 13px; color: var(--text-secondary);">You may close this page.</p>
+      <p style="font-size: 13px; color: var(--text-secondary);" data-i18n="successFooter">You may close this page.</p>
     </div>
 
     <!-- Already Recorded View -->
@@ -133,21 +140,21 @@
       <div style="width: 64px; height: 64px; background: var(--primary-light); border: 2px solid var(--primary); border-radius: 50%; color: var(--primary); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 30px; font-weight: 800;">
         ℹ
       </div>
-      <h3 style="font-size: 19px; font-weight: 800; color: var(--primary); margin-bottom: 6px;">✓ Attendance Already Recorded</h3>
-      <p style="font-size: 13.5px; color: var(--text-secondary); margin-bottom: 18px;" id="txt-already-msg">You have already checked into this session.</p>
+      <h3 style="font-size: 19px; font-weight: 800; color: var(--primary); margin-bottom: 6px;" data-i18n="alreadyTitle">✓ Attendance Already Recorded</h3>
+      <p style="font-size: 13.5px; color: var(--text-secondary); margin-bottom: 18px;" id="txt-already-msg" data-i18n="alreadySubtitle">You have already checked into this session.</p>
       
       <div class="info-details-box" style="text-align:left; margin-bottom: 16px;">
         <div class="info-row">
-          <span class="info-label">Employee</span>
+          <span class="info-label" data-i18n="lblSuccessEmp">Employee</span>
           <span class="info-value" id="txt-already-emp">—</span>
         </div>
         <div class="info-row">
-          <span class="info-label">Recorded At</span>
+          <span class="info-label" data-i18n="lblSuccessTime">Recorded At</span>
           <span class="info-value" id="txt-already-time">—</span>
         </div>
       </div>
 
-      <p style="font-size: 12.5px; color: var(--text-muted);">Your check-in status for this session is already confirmed. No duplicate entry is created.</p>
+      <p style="font-size: 12.5px; color: var(--text-muted);" data-i18n="alreadyFooter">Your check-in status for this session is already confirmed. No duplicate entry is created.</p>
     </div>
 
     <!-- Error View -->
@@ -155,9 +162,9 @@
       <div style="width: 64px; height: 64px; background: var(--danger-bg); border: 2px solid var(--danger); border-radius: 50%; color: var(--danger); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 30px; font-weight: 800;">
         ✕
       </div>
-      <h3 style="font-size: 19px; font-weight: 800; color: var(--danger); margin-bottom: 6px;">Check-In Rejected</h3>
+      <h3 style="font-size: 19px; font-weight: 800; color: var(--danger); margin-bottom: 6px;" data-i18n="errorTitle">Check-In Rejected</h3>
       <p style="font-size: 13.5px; color: var(--text-secondary); margin-bottom: 20px;" id="txt-error-msg">Failed to validate attendance submission.</p>
-      <button class="btn-submit btn-secondary" style="max-width:180px; margin:0 auto;" onclick="resetToStepId()">Try Again</button>
+      <button class="btn-submit btn-secondary" style="max-width:180px; margin:0 auto;" onclick="resetToStepId()" data-i18n="btnTryAgain">Try Again</button>
     </div>
 
   </div>
@@ -167,15 +174,154 @@
 <?!= include('script') ?>
 
 <script>
+  // ─── Bilingual Language Dictionary (BM / ENG) for Attendance Form ─────────
+  const TRANSLATIONS = {
+    en: {
+      docTitle: 'Training Attendance — TrainHub',
+      badgeSession: 'TRAINING ATTENDANCE',
+      loadingTraining: 'Loading Training...',
+      loadingSession: 'Verifying session details...',
+      loadingContext: 'Validating session context...',
+      step1Title: 'Enter your Employee ID',
+      step1Subtitle: 'Please enter your registered Employee ID to verify attendance eligibility.',
+      lblEmpId: 'Employee ID',
+      lblPreviewName: 'Name:',
+      previewLookup: 'Lookup...',
+      btnContinue: 'Continue →',
+      btnVerifying: 'Verifying Employee...',
+      badgeVerified: 'Employee Verified ✓',
+      lblVerifyEmpId: 'Employee ID',
+      lblVerifyPosition: 'Position / Job Title',
+      lblVerifyDept: 'Department / Cost Centre',
+      lblVerifyTraining: 'Training Programme',
+      lblVerifySession: 'Session',
+      btnMarkAtt: '✓ Mark Attendance',
+      btnMarking: 'Recording Attendance...',
+      btnChangeEmpId: '← Change Employee ID',
+      successTitle: '✓ Attendance Recorded',
+      successSubtitle: 'Thank you.',
+      lblSuccessEmp: 'Employee',
+      lblSuccessTraining: 'Training',
+      lblSuccessSession: 'Session / Day',
+      lblSuccessTime: 'Recorded At',
+      successFooter: 'You may close this page.',
+      alreadyTitle: '✓ Attendance Already Recorded',
+      alreadySubtitle: 'You have already checked into this session.',
+      alreadyFooter: 'Your check-in status for this session is already confirmed. No duplicate entry is created.',
+      errorTitle: 'Check-In Rejected',
+      btnTryAgain: 'Try Again',
+      toastEnterEmpId: 'Please enter your Employee ID.',
+      toastNoVerifiedEmp: 'No verified employee selected.',
+      toastMissingSession: 'Missing session parameter. Please scan a valid session QR code.',
+      toastSessionClosed: 'This session is currently closed for attendance.',
+      successMsgTpl: 'Your attendance for {training} has been recorded successfully.'
+    },
+    bm: {
+      docTitle: 'Kehadiran Latihan — TrainHub',
+      badgeSession: 'KEHADIRAN LATIHAN',
+      loadingTraining: 'Memuatkan Latihan...',
+      loadingSession: 'Mengesahkan butiran sesi...',
+      loadingContext: 'Mengesahkan maklumat sesi...',
+      step1Title: 'Masukkan No. Pekerja Anda',
+      step1Subtitle: 'Sila masukkan No. Pekerja berdaftar anda untuk mengesahkan kelayakan kehadiran.',
+      lblEmpId: 'No. Pekerja',
+      lblPreviewName: 'Nama:',
+      previewLookup: 'Carian nama...',
+      btnContinue: 'Teruskan →',
+      btnVerifying: 'Mengesahkan Pekerja...',
+      badgeVerified: 'Pekerja Disahkan ✓',
+      lblVerifyEmpId: 'No. Pekerja',
+      lblVerifyPosition: 'Jawatan',
+      lblVerifyDept: 'Jabatan / Pusat Kos',
+      lblVerifyTraining: 'Program Latihan',
+      lblVerifySession: 'Sesi',
+      btnMarkAtt: '✓ Sahkan Kehadiran',
+      btnMarking: 'Merekod Kehadiran...',
+      btnChangeEmpId: '← Tukar No. Pekerja',
+      successTitle: '✓ Kehadiran Direkodkan',
+      successSubtitle: 'Terima kasih.',
+      lblSuccessEmp: 'Pekerja',
+      lblSuccessTraining: 'Latihan',
+      lblSuccessSession: 'Sesi / Hari',
+      lblSuccessTime: 'Masa Rekod',
+      successFooter: 'Anda boleh menutup halaman ini.',
+      alreadyTitle: '✓ Kehadiran Telah Direkodkan',
+      alreadySubtitle: 'Anda telah mendaftar masuk untuk sesi ini sebelum ini.',
+      alreadyFooter: 'Status pendaftaran kehadiran anda untuk sesi ini telah disahkan. Tiada rekod pendua dibuat.',
+      errorTitle: 'Pendaftaran Ditolak',
+      btnTryAgain: 'Cuba Lagi',
+      toastEnterEmpId: 'Sila masukkan No. Pekerja anda.',
+      toastNoVerifiedEmp: 'Tiada pekerja yang disahkan dipilih.',
+      toastMissingSession: 'Parameter sesi tiada. Sila imbas kod QR sesi yang sah.',
+      toastSessionClosed: 'Pendaftaran kehadiran untuk sesi ini telah ditutup.',
+      successMsgTpl: 'Kehadiran anda untuk {training} telah berjaya direkodkan.'
+    }
+  };
+
+  let currentLang = localStorage.getItem('trainhub_att_lang') || 'en';
   let activeSessionId = '';
   let verifiedEmployee = null;
   let activeSessionObj = null;
 
+  function t(key) {
+    const dict = TRANSLATIONS[currentLang] || TRANSLATIONS['en'];
+    return dict[key] || (TRANSLATIONS['en'][key] || key);
+  }
+
+  function applyLanguage(lang) {
+    currentLang = lang;
+    localStorage.setItem('trainhub_att_lang', lang);
+
+    // Update Language Toggle Button Label (If EN, show BM to toggle; if BM, show ENG to toggle)
+    const langBtnLabel = document.getElementById('langToggleLabel');
+    if (langBtnLabel) {
+      langBtnLabel.textContent = (currentLang === 'en') ? 'BM' : 'ENG';
+    }
+
+    // Instantly translate all static labels with data-i18n
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      const key = el.getAttribute('data-i18n');
+      if (key && TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang][key]) {
+        el.textContent = TRANSLATIONS[currentLang][key];
+      }
+    });
+
+    // If training details are loaded, preserve the actual Training Title & Session Name
+    if (activeSessionObj) {
+      const elTrn = document.getElementById('txt-training-title');
+      const elSess = document.getElementById('txt-session-name');
+      if (elTrn && activeSessionObj.TrainingTitle) {
+        elTrn.textContent = activeSessionObj.TrainingTitle;
+      }
+      if (elSess && activeSessionObj.SessionName) {
+        elSess.textContent = activeSessionObj.SessionName;
+      }
+    }
+
+    // If employee is verified, maintain position translation if generic
+    if (verifiedEmployee) {
+      const elPos = document.getElementById('txt-verify-position');
+      if (elPos && (!verifiedEmployee.Position || verifiedEmployee.Position === 'Employee' || verifiedEmployee.Position === 'Pekerja')) {
+        elPos.textContent = (currentLang === 'bm') ? 'Pekerja' : 'Employee';
+      }
+    }
+
+    document.title = t('docTitle');
+  }
+
+  function toggleLanguage() {
+    const newLang = (currentLang === 'en') ? 'bm' : 'en';
+    applyLanguage(newLang);
+    showToast(newLang === 'bm' ? 'Bahasa ditukar ke Bahasa Melayu' : 'Language switched to English', 'info');
+  }
+
   document.addEventListener('DOMContentLoaded', async () => {
+    applyLanguage(currentLang);
+
     activeSessionId = getQueryParam('session') || getQueryParam('sessionId') || getQueryParam('id') || getQueryParam('s') || <?!= JSON.stringify((typeof params !== 'undefined' && params && (params.session || params.sessionId || params.id || params.s)) ? (params.session || params.sessionId || params.id || params.s) : '') ?>;
     
     if (!activeSessionId) {
-      showErrorState('Missing session parameter. Please scan a valid session QR code.');
+      showErrorState(t('toastMissingSession'));
       return;
     }
 
@@ -183,39 +329,8 @@
       const session = await callServer('getSessionInfo', activeSessionId);
       activeSessionObj = session;
 
-      const formatAppDate = (val) => {
-        if (!val) return '—';
-        const str = String(val).trim();
-        if (/^\d{2}\/\d{2}\/\d{4}/.test(str)) return str;
-        const ymdMatch = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
-        if (ymdMatch) {
-          return `${ymdMatch[3].padStart(2, '0')}/${ymdMatch[2].padStart(2, '0')}/${ymdMatch[1]}`;
-        }
-        const d = new Date(str);
-        if (!isNaN(d.getTime())) {
-          return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-        }
-        return str;
-      };
-
-      const formatTimeOnly = (val, defaultTime = '09:00') => {
-        if (!val) return defaultTime;
-        const str = String(val).replace(/GMT.*$/, '').replace(/\(.*\)$/, '').trim();
-        const simpleMatch = str.match(/^(\d{1,2}:\d{2}(?::\d{2})?)/);
-        if (simpleMatch && !str.includes('1899') && !str.includes('Singapore') && !str.includes('Standard')) {
-          return simpleMatch[1];
-        }
-        const d = new Date(str);
-        if (!isNaN(d.getTime())) {
-          return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-        }
-        const match = str.match(/(\d{2}:\d{2})/);
-        if (match) return match[1];
-        return defaultTime;
-      };
-
-      document.getElementById('txt-training-title').textContent = session.TrainingTitle || 'Training Programme';
-      document.getElementById('txt-session-name').textContent = session.SessionName || 'Attendance Registration';
+      document.getElementById('txt-training-title').textContent = session.TrainingTitle || (currentLang === 'bm' ? 'Program Latihan' : 'Training Programme');
+      document.getElementById('txt-session-name').textContent = session.SessionName || (currentLang === 'bm' ? 'Pendaftaran Kehadiran' : 'Attendance Registration');
       document.getElementById('txt-session-date').textContent = formatMinimalistDate(session.SessionDate);
       document.getElementById('txt-session-time').textContent = formatSessionTimeRange(session.StartTime, session.EndTime);
 
@@ -223,13 +338,13 @@
       document.getElementById('view-loading').style.display = 'none';
 
       if (session.QRStatus === 'Expired' || session.QRStatus === 'Inactive') {
-        showErrorState(`This session is currently ${session.QRStatus}. Attendance registration is closed.`);
+        showErrorState(t('toastSessionClosed'));
         return;
       }
 
       document.getElementById('view-step-id').style.display = 'block';
     } catch(e) {
-      showErrorState(e.message || 'Failed to verify session link.');
+      showErrorState(e.message || (currentLang === 'bm' ? 'Gagal mengesahkan pautan sesi.' : 'Failed to verify session link.'));
     }
   });
 
@@ -281,12 +396,12 @@
     const empId = document.getElementById('inp-emp-id').value.trim();
 
     if (!empId) {
-      showToast('Please enter your Employee ID.', 'error');
+      showToast(t('toastEnterEmpId'), 'error');
       return;
     }
 
     const btn = document.getElementById('btn-verify-emp');
-    setBtnLoading(btn, true, 'Verifying Employee...');
+    setBtnLoading(btn, true, t('btnVerifying'));
 
     try {
       const res = await callServer('verifyEmployeeForAttendance', activeSessionId, empId);
@@ -295,21 +410,21 @@
 
       if (res.alreadyRecorded) {
         document.getElementById('view-already-recorded').style.display = 'block';
-        document.getElementById('txt-already-msg').textContent = res.message || 'You have already checked into this session.';
+        document.getElementById('txt-already-msg').textContent = res.message || t('alreadySubtitle');
         document.getElementById('txt-already-emp').textContent = `${res.employee ? res.employee.Name : empId} (${empId})`;
         document.getElementById('txt-already-time').textContent = formatCleanTime(res.scanTime);
       } else if (res.valid) {
         verifiedEmployee = res.employee;
         document.getElementById('txt-verify-name').textContent = res.employee.Name || empId;
         document.getElementById('txt-verify-empid').textContent = res.employee.ID || empId;
-        document.getElementById('txt-verify-position').textContent = res.employee.Position || res.employee.JobTitle || 'Employee';
+        document.getElementById('txt-verify-position').textContent = res.employee.Position || res.employee.JobTitle || (currentLang === 'bm' ? 'Pekerja' : 'Employee');
         document.getElementById('txt-verify-dept').textContent = res.employee.CostCentre || res.employee.Department || '—';
-        document.getElementById('txt-verify-training').textContent = activeSessionObj ? activeSessionObj.TrainingTitle : 'Training';
-        document.getElementById('txt-verify-session').textContent = activeSessionObj ? activeSessionObj.SessionName : 'Session';
+        document.getElementById('txt-verify-training').textContent = activeSessionObj ? activeSessionObj.TrainingTitle : (currentLang === 'bm' ? 'Latihan' : 'Training');
+        document.getElementById('txt-verify-session').textContent = activeSessionObj ? activeSessionObj.SessionName : (currentLang === 'bm' ? 'Sesi' : 'Session');
 
         document.getElementById('view-step-confirm').style.display = 'block';
       } else {
-        showErrorState(res.message || 'Employee verification failed.');
+        showErrorState(res.message || (currentLang === 'bm' ? 'Pengesahan pekerja gagal.' : 'Employee verification failed.'));
       }
     } catch(err) {
       showErrorState(err.message);
@@ -320,12 +435,12 @@
 
   async function handleMarkAttendance() {
     if (!verifiedEmployee) {
-      showToast('No verified employee selected.', 'error');
+      showToast(t('toastNoVerifiedEmp'), 'error');
       return;
     }
 
     const btn = document.getElementById('btn-mark-att');
-    setBtnLoading(btn, true, 'Recording Attendance...');
+    setBtnLoading(btn, true, t('btnMarking'));
 
     try {
       const res = await callServer('submitAttendance', {
@@ -343,7 +458,8 @@
         document.getElementById('txt-already-time').textContent = formatCleanTime(res.scanTime);
       } else {
         document.getElementById('view-success').style.display = 'block';
-        document.getElementById('txt-success-msg').textContent = `Your attendance for ${res.trainingTitle || 'this training'} has been recorded successfully.`;
+        const trainingName = res.trainingTitle || (activeSessionObj ? activeSessionObj.TrainingTitle : (currentLang === 'bm' ? 'latihan ini' : 'this training'));
+        document.getElementById('txt-success-msg').textContent = t('successMsgTpl').replace('{training}', trainingName);
         document.getElementById('txt-success-emp-name').textContent = `${verifiedEmployee.Name} (${verifiedEmployee.ID})`;
         document.getElementById('txt-success-training-name').textContent = res.trainingTitle || (activeSessionObj ? activeSessionObj.TrainingTitle : '—');
         document.getElementById('txt-success-session-name').textContent = res.sessionName || (activeSessionObj ? activeSessionObj.SessionName : '—');

@@ -78,7 +78,46 @@
     --shadow-inset-deep: inset 4px 4px 8px #bec9db, inset -4px -4px 8px #ffffff;
   }
 
-  /* Fixed Top-Right Theme Toggle Button */
+  /* Fixed Top-Right Theme & Language Toggle Buttons */
+  .top-actions-container {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .top-actions-container .theme-toggle-btn {
+    position: static;
+  }
+
+  .lang-toggle-btn {
+    padding: 8px 14px;
+    border-radius: var(--radius-full);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    box-shadow: var(--shadow-raised-sm);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    transition: all 0.25s ease;
+    font-size: 13px;
+    font-weight: 700;
+    font-family: inherit;
+    outline: none;
+  }
+
+  .lang-toggle-btn:hover {
+    box-shadow: var(--shadow-hover);
+    transform: translateY(-2px);
+    border-color: var(--primary);
+    color: var(--primary);
+  }
+
   .theme-toggle-btn {
     position: fixed;
     top: 16px;
