@@ -12,6 +12,7 @@
 
   window.addEventListener('DOMContentLoaded', () => {
     initTheme();
+    loadCostCentres();
     // Focus Employee ID input on initial page load
     const empInput = document.getElementById('employeeIdInput');
     if (empInput) empInput.focus();
@@ -227,6 +228,7 @@
     document.getElementById('autoDate').innerText = activeEmployee.RequestDate || getTodayFormatted();
 
     // Trigger async data loading
+    clearRequisitionForm();
     loadCostCentres();
     loadMasterParticipants();
     fetchLoggedInUserEmail();
@@ -273,19 +275,26 @@
       .getLoggedInUserEmail();
   }
 
+  let cachedCostCentres = [];
   function loadCostCentres() {
     google.script.run
       .withSuccessHandler(resStr => {
         try {
-          const res = JSON.parse(resStr);
-          if (res.success && Array.isArray(res.data)) {
+          const res = typeof resStr === 'string' ? JSON.parse(resStr) : resStr;
+          if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
+            cachedCostCentres = res.data;
             const sel = document.getElementById('reqCostCentreSelect');
             if (sel) {
               sel.innerHTML = '<option value="" disabled selected>Select Department / Cost Centre...</option>' +
                 res.data.map(c => `<option value="${c}">${c}</option>`).join('');
             }
           }
-        } catch (e) {}
+        } catch (e) {
+          console.warn('loadCostCentres error:', e);
+        }
+      })
+      .withFailureHandler(err => {
+        console.warn('loadCostCentres failure:', err);
       })
       .getCostCentres();
   }
@@ -327,8 +336,8 @@
     google.script.run
       .withSuccessHandler(resStr => {
         try {
-          const res = JSON.parse(resStr);
-          if (res.success && Array.isArray(res.data)) {
+          const res = typeof resStr === 'string' ? JSON.parse(resStr) : resStr;
+          if (res && res.success && Array.isArray(res.data)) {
             masterParticipants = res.data.map((p, idx) => ({
               _uid: p.ID ? String(p.ID).trim() : `EMP-IDX-${idx}`,
               ID: String(p.ID || '').trim(),
@@ -336,6 +345,17 @@
               Department: String(p.Department || '').trim(),
               Position: String(p.Position || '').trim()
             }));
+            if (cachedCostCentres.length === 0) {
+              const dbDepts = Array.from(new Set(masterParticipants.map(p => p.Department).filter(Boolean))).sort();
+              if (dbDepts.length > 0) {
+                cachedCostCentres = dbDepts;
+                const sel = document.getElementById('reqCostCentreSelect');
+                if (sel) {
+                  sel.innerHTML = '<option value="" disabled selected>Select Department...</option>' +
+                    dbDepts.map(c => `<option value="${c}">${c}</option>`).join('');
+                }
+              }
+            }
           }
         } catch (e) {}
       })
@@ -807,7 +827,39 @@
     switchMainTab('history');
   }
 
+  function clearRequisitionForm() {
+    document.getElementById('editingTrainingId').value = '';
+    const banner = document.getElementById('editResubmitBanner');
+    if (banner) { banner.style.display = 'none'; banner.textContent = ''; }
+    document.getElementById('reqTrainingName').value = '';
+    document.getElementById('reqCategory').value = '';
+    document.getElementById('reqTrainingType').value = '';
+    document.getElementById('reqStartDate').value = '';
+    document.getElementById('reqEndDate').value = '';
+    document.getElementById('reqHours').value = '';
+    document.getElementById('reqFee').value = '';
+    document.getElementById('reqVenue').value = '';
+    document.getElementById('reqCostCentreSelect').value = '';
+    selectedCostCentres = [];
+    renderCostCentreChips();
+    document.getElementById('reqTrainer').value = '';
+    document.getElementById('reqProvider').value = '';
+    document.getElementById('reqCertExpiry').value = '';
+    document.getElementById('reqReason').value = '';
+    document.getElementById('reqBrochureUrl').value = '';
+    if (document.getElementById('reqBrochureFile')) document.getElementById('reqBrochureFile').value = '';
+    if (document.getElementById('fileUploadStatus')) document.getElementById('fileUploadStatus').textContent = '';
+    selectedBrochureBase64 = null;
+    selectedBrochureFileName = null;
+    selectedParticipants = [];
+    document.getElementById('reqTotalPax').value = '';
+    renderParticipantChips();
+    const subBtn = document.getElementById('btnSubmitForm');
+    if (subBtn) subBtn.innerHTML = '<span>Submit Training Request</span><span>➔</span>';
+  }
+
   function resetFormForNewSubmission() {
+    clearRequisitionForm();
     document.getElementById('successScreen').style.display = 'none';
     document.getElementById('mainPortalScreen').style.display = 'block';
     switchMainTab('form');

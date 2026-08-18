@@ -301,32 +301,56 @@ function getHodPortalUrl() {
  * @param {string} input - Google Drive link (e.g. https://drive.google.com/file/d/FILE_ID/view) or File ID or image URL
  * @returns {string} Direct public image URL (e.g. https://lh3.googleusercontent.com/d/FILE_ID)
  */
+/**
+ * Convert any Google Drive link, File ID, or image URL into a high-performance direct CDN image URL.
+ * Supports drive.google.com/file/d/..., drive.google.com/open?id=..., drive.google.com/uc?id=..., and direct file IDs.
+ * 
+ * @param {string} input - Google Drive link or File ID or image URL
+ * @returns {string} Direct public image URL
+ */
+function extractDriveFileIdFromUrl(url) {
+  if (!url) return '';
+  const str = String(url).trim();
+  const match = str.match(/\/d\/([a-zA-Z0-9_-]{20,})/);
+  if (match && match[1]) return match[1];
+  const match2 = str.match(/[?&]id=([a-zA-Z0-9_-]{20,})/);
+  if (match2 && match2[1]) return match2[1];
+  const match3 = str.match(/googleusercontent\.com\/d\/([a-zA-Z0-9_-]{20,})/);
+  if (match3 && match3[1]) return match3[1];
+  if (/^[a-zA-Z0-9_-]{20,}$/.test(str)) return str;
+  return '';
+}
+
 function convertDriveLinkToDirectImageUrl(input) {
   if (!input) return '';
   const str = String(input).trim();
 
-  // If already a direct image host URL (not drive.google.com), return directly
-  if (!str.includes('drive.google.com') && str.startsWith('http')) {
+  // If already a base64 data URI, return directly
+  if (str.startsWith('data:image/')) {
     return str;
   }
 
-  let fileId = '';
-  // Extract File ID from drive.google.com links
-  const fileIdMatch = str.match(/\/d\/([a-zA-Z0-9_-]{25,})/);
-  if (fileIdMatch && fileIdMatch[1]) {
-    fileId = fileIdMatch[1];
-  } else {
-    const idParamMatch = str.match(/id=([a-zA-Z0-9_-]{25,})/);
-    if (idParamMatch && idParamMatch[1]) {
-      fileId = idParamMatch[1];
-    } else if (/^[a-zA-Z0-9_-]{25,}$/.test(str)) {
-      fileId = str;
-    }
+  // If external non-Drive URL, return directly
+  if (!str.includes('drive.google.com') && !str.includes('googleusercontent.com') && str.startsWith('http')) {
+    return str;
   }
 
+  const fileId = extractDriveFileIdFromUrl(str);
   if (fileId) {
-    // High performance Google Drive image CDN URL format
-    return `https://lh3.googleusercontent.com/d/${fileId}`;
+    // Convert to inline base64 image data URI via DriveApp for guaranteed 100% load success with zero CORS/referrer blocks
+    try {
+      const file = DriveApp.getFileById(fileId);
+      const blob = file.getBlob();
+      const mime = blob.getContentType() || 'image/png';
+      const bytes = blob.getBytes();
+      if (bytes && bytes.length > 0 && bytes.length < 3145728) {
+        const base64 = Utilities.base64Encode(bytes);
+        return `data:${mime};base64,${base64}`;
+      }
+    } catch(e) {
+      Logger.log('DriveApp base64 fetch note: ' + e.message);
+    }
+    return `https://drive.google.com/thumbnail?id=${fileId}&sz=w500`;
   }
 
   return str;

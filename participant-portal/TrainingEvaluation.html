@@ -49,7 +49,25 @@
       </form>
     </div>
 
-    <!-- Step 2A: Access Denied / Not Attended View -->
+    <!-- Step 2A: Training In Progress / Not Finished View -->
+    <div id="view-not-finished" style="display:none; text-align:center; padding: 20px 0;">
+      <div style="width: 64px; height: 64px; background: #EFF6FF; border: 2px solid #3B82F6; border-radius: 50%; color: #2563EB; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 32px; font-weight: 800;">
+        ⏳
+      </div>
+      <h3 style="font-size: 20px; font-weight: 800; color: #1E40AF; margin-bottom: 8px;">Training Programme In Progress</h3>
+      
+      <div style="background: var(--bg-input); border: 1px solid var(--border-color); box-shadow: var(--shadow-inset); border-radius: var(--radius-md); padding: 18px; margin-bottom: 20px; text-align: left; line-height: 1.6; font-size: 13.5px; color: var(--text-primary);">
+        <p style="margin-bottom: 10px;">The evaluation form is not available yet.</p>
+        <p style="color: var(--text-secondary); margin-bottom: 10px;">Training evaluation can only be submitted <strong>after the training programme has finished</strong>.</p>
+        <p style="font-weight: 700; color: #2563EB;">Scheduled Completion: <span id="txt-not-finished-date">—</span></p>
+      </div>
+
+      <button type="button" class="btn-submit btn-secondary" style="max-width:180px; margin:0 auto;" onclick="resetToStepId()">
+        Close
+      </button>
+    </div>
+
+    <!-- Step 2B: Access Denied / Not Attended View -->
     <div id="view-no-attendance" style="display:none; text-align:center; padding: 20px 0;">
       <div style="width: 64px; height: 64px; background: var(--warning-bg); border: 2px solid var(--warning); border-radius: 50%; color: var(--warning); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 32px; font-weight: 800;">
         ⚠️
@@ -249,7 +267,10 @@
 
       document.getElementById('view-step-id').style.display = 'none';
 
-      if (res.noAttendance) {
+      if (res.notFinished) {
+        document.getElementById('view-not-finished').style.display = 'block';
+        document.getElementById('txt-not-finished-date').textContent = res.completionDate || 'Scheduled date';
+      } else if (res.noAttendance) {
         document.getElementById('view-no-attendance').style.display = 'block';
       } else if (res.alreadySubmitted) {
         document.getElementById('view-already-submitted').style.display = 'block';
@@ -318,6 +339,7 @@
 
   function resetToStepId() {
     document.getElementById('view-loading').style.display = 'none';
+    document.getElementById('view-not-finished').style.display = 'none';
     document.getElementById('view-no-attendance').style.display = 'none';
     document.getElementById('view-already-submitted').style.display = 'none';
     document.getElementById('view-form').style.display = 'none';
@@ -328,6 +350,7 @@
   function showErrorState(msg) {
     document.getElementById('view-loading').style.display = 'none';
     document.getElementById('view-step-id').style.display = 'none';
+    document.getElementById('view-not-finished').style.display = 'none';
     document.getElementById('view-no-attendance').style.display = 'none';
     document.getElementById('view-already-submitted').style.display = 'none';
     document.getElementById('view-form').style.display = 'none';

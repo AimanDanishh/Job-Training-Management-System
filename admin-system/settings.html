@@ -249,7 +249,7 @@
                 <div class="col-12 col-md-4">
                   <div style="display:flex; align-items:center; gap:14px; padding:12px 14px; background:#FFF8CF; border:1.5px solid #FEC30D; border-radius:10px">
                     <div style="width:48px; height:48px; border-radius:8px; background:#fff; border:1px solid #E2E8F0; display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0">
-                      <img id="company-logo-preview" src="" alt="Logo Preview" style="max-width:100%; max-height:100%; object-fit:contain" onerror="handleLogoPreviewError(this)">
+                      <img id="company-logo-preview" src="" alt="Logo Preview" referrerpolicy="no-referrer" style="max-width:100%; max-height:100%; object-fit:contain" onerror="handleLogoPreviewError(this)">
                     </div>
                     <div>
                       <div style="font-size:12.5px; font-weight:700; color:var(--apollo-dark)">Live Logo Preview</div>
@@ -393,8 +393,9 @@
     if (!preview) return;
     const clean = String(url || '').trim();
     if (clean) {
-      preview.src = clean;
-      if (previewText) previewText.textContent = 'Custom logo loaded from URL.';
+      const directUrl = convertDriveToDirectImage(clean);
+      preview.src = directUrl;
+      if (previewText) previewText.textContent = 'Custom logo loaded.';
       setBadgeStatus('st-company-logo', clean);
     } else {
       preview.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0MCA0MCI+PHJlY3Qgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiByeD0iOCIgZmlsbD0iI0U5MUMyRCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTYlIiBmb250LWZhbWlseT0iQXJpYWwsc2Fucy1zZXJpZiIgZm9udC13ZWlnaHQ9IjkwMCIgZm9udC1zaXplPSIyMCIgZmlsbD0iI0ZGRjhDRiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSI+QTwvdGV4dD48L3N2Zz4=';
@@ -406,7 +407,7 @@
   function handleLogoPreviewError(img) {
     img.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0MCA0MCI+PHJlY3Qgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiByeD0iOCIgZmlsbD0iI0U5MUMyRCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTYlIiBmb250LWZhbWlseT0iQXJpYWwsc2Fucy1zZXJpZiIgZm9udC13ZWlnaHQ9IjkwMCIgZm9udC1zaXplPSIyMCIgZmlsbD0iI0ZGRjhDRiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSI+QTwvdGV4dD48L3N2Zz4=';
     const previewText = document.getElementById('company-logo-preview-text');
-    if (previewText) previewText.textContent = 'Logo URL unavailable - using default Apollo fallback.';
+    if (previewText) previewText.textContent = 'Logo URL loading failed - ensure Drive file sharing is "Anyone with the link can view".';
   }
 
   function setBadgeStatus(elementId, val) {

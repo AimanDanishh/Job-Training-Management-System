@@ -91,7 +91,9 @@
       <div class="col-md-6">
         <label for="emp-status" class="label-th">Status</label>
         <select id="emp-status" class="input-th">
-          <option>Active</option><option>Inactive</option>
+          <option value="" disabled selected>Select status</option>
+          <option value="Active">Active</option>
+          <option value="Inactive">Inactive</option>
         </select>
       </div>
       <div class="col-md-6">
@@ -235,7 +237,7 @@
   function clearForm() {
     ['emp-id','emp-name','emp-position','emp-email','emp-phone'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('emp-dept').value   = '';
-    document.getElementById('emp-status').value = 'Active';
+    document.getElementById('emp-status').value = '';
     document.getElementById('modal-title').textContent = 'Add Employee';
   }
 </script>

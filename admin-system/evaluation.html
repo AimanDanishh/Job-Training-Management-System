@@ -48,9 +48,6 @@
         </div>
       </div>
 
-      <!-- Real-Time Evaluation Countdown Banner (Updates dynamically per active tab) -->
-      <div id="eval-countdown-banner" class="mb-4" style="display:none"></div>
-
       <!-- Sub-tabs (2 Unified Evaluation Tabs) -->
       <div class="subtab-row" id="eval-subtabs" style="display:none">
         <button class="subtab active" data-tab="training-eval" onclick="switchTab(this)"><span class="icon sm">rate_review</span>Training Evaluation (2-Week Deadline)</button>
@@ -76,7 +73,7 @@
               <div style="display:flex;gap:8px;flex-wrap:wrap">
                 <button class="btn-th btn-secondary btn-sm" onclick="copyEvalUrl('l1')"><span class="icon sm">content_copy</span> Copy Link</button>
                 <button class="btn-th btn-primary btn-sm" onclick="downloadQRWithLogo(activeEvalUrls.l1, 'Apollo_Training_Eval_QR.png')"><span class="icon sm">download</span> Download QR Code</button>
-                <button class="btn-th btn-secondary btn-sm" onclick="openModal('modal-eval')"><span class="icon sm">add_circle</span> Manual Input</button>
+                <button class="btn-th btn-secondary btn-sm" onclick="openCreateEvalModal()"><span class="icon sm">add_circle</span> Manual Input</button>
               </div>
             </div>
           </div>
@@ -164,7 +161,7 @@
               <div style="display:flex;gap:8px;flex-wrap:wrap">
                 <button class="btn-th btn-secondary btn-sm" onclick="copyEvalUrl('l3')"><span class="icon sm">content_copy</span> Copy Link</button>
                 <button class="btn-th btn-primary btn-sm" onclick="downloadQRWithLogo(activeEvalUrls.l3, 'Apollo_Supervisor_Eval_QR.png')"><span class="icon sm">download</span> Download QR Code</button>
-                <button class="btn-th btn-secondary btn-sm" onclick="openModal('modal-post-eval')"><span class="icon sm">add_circle</span> Manual Input</button>
+                <button class="btn-th btn-secondary btn-sm" onclick="openCreatePostEvalModal()"><span class="icon sm">add_circle</span> Manual Input</button>
               </div>
             </div>
           </div>
@@ -395,6 +392,28 @@
   let activeTrainingObj = null;
   let activeEvalSummary = null;
 
+  function openCreateEvalModal() {
+    document.getElementById('eval-empid').value = '';
+    document.getElementById('eval-empname').value = '';
+    document.getElementById('eval-b1').value = '';
+    document.getElementById('eval-b2').value = '';
+    document.getElementById('eval-b3').value = '';
+    likertScores = Array(7).fill(0);
+    buildLikert();
+    openModal('modal-eval');
+  }
+
+  function openCreatePostEvalModal() {
+    document.getElementById('post-empid').value = '';
+    document.getElementById('post-evname').value = '';
+    document.getElementById('post-evid').value = '';
+    document.getElementById('post-comments').value = '';
+    buildCompetency('comp-before', 'cb');
+    buildCompetency('comp-after', 'ca');
+    buildImprovementQs();
+    openModal('modal-post-eval');
+  }
+
   // Build likert form
   function buildLikert() {
     const el = document.getElementById('likert-questions');
@@ -467,16 +486,10 @@
     const t = activeTrainingObj;
     const compDate = t.EndDate || t.StartDate;
     const isCompleted = ['Training Completed','Evaluation Completed','Waiting for 3-Month Review','Programme Closed','Completed'].includes((t && t.Stage) || (t && t.Status));
-    const bannerEl = document.getElementById('eval-countdown-banner');
-
-    if (!bannerEl) return;
-    bannerEl.style.display = 'block';
 
     if (currentActiveTab === 'training-eval') {
       const is2WeekDone = ['Evaluation Completed','Waiting for 3-Month Review','Programme Closed'].includes(t.Stage);
       const st = ApolloCountdown.getStatus(compDate, '2week', is2WeekDone, !isCompleted);
-
-      bannerEl.innerHTML = ApolloCountdown.renderWidget(st, 'Training Evaluation (Must be completed within 2 weeks after training)');
 
       const widgetBox = document.getElementById('training-eval-2week-widget');
       if (widgetBox) {
@@ -485,8 +498,6 @@
     } else if (currentActiveTab === 'supervisor-eval') {
       const is3MoDone = ['Programme Closed'].includes(t.Stage);
       const st = ApolloCountdown.getStatus(compDate, '3month', is3MoDone, !isCompleted);
-
-      bannerEl.innerHTML = ApolloCountdown.renderWidget(st, 'Supervisor Evaluation (3-Month Competency Assessment)');
 
       const widgetBox = document.getElementById('supervisor-eval-3month-widget');
       if (widgetBox) {

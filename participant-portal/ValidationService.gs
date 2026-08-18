@@ -427,6 +427,46 @@ function verifyEmployeeForAttendance(sessionId, employeeId) {
   }
 }
 
+function isTrainingFinished(training) {
+  if (!training) return false;
+  const status = String(training.Status || '').trim().toLowerCase();
+  const stage  = String(training.Stage || '').trim().toLowerCase();
+
+  if (status === 'completed' || stage === 'training completed' || stage === 'evaluation completed' || stage === 'waiting for 3-month review' || stage === 'programme closed') {
+    return true;
+  }
+
+  const dateVal = training.EndDate || training.StartDate;
+  if (!dateVal) return true;
+
+  let compDate = null;
+  if (dateVal instanceof Date) {
+    compDate = isNaN(dateVal.getTime()) ? null : new Date(dateVal);
+  } else {
+    const str = String(dateVal).trim();
+    const ymd = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+    if (ymd) {
+      compDate = new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]), 23, 59, 59, 999);
+    } else {
+      const dmy = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+      if (dmy) {
+        compDate = new Date(Number(dmy[3]), Number(dmy[2]) - 1, Number(dmy[1]), 23, 59, 59, 999);
+      } else {
+        const d = new Date(str);
+        if (!isNaN(d.getTime())) {
+          d.setHours(23, 59, 59, 999);
+          compDate = d;
+        }
+      }
+    }
+  }
+
+  if (!compDate) return true;
+
+  const now = new Date();
+  return now.getTime() >= compDate.getTime();
+}
+
 function verifyEmployeeForEvaluation(trainingId, employeeId) {
   try {
     if (!trainingId || String(trainingId).trim() === '') {
@@ -451,7 +491,20 @@ function verifyEmployeeForEvaluation(trainingId, employeeId) {
     const enrollCheck = validateParticipantEnrollment(cleanTId, cleanEmpId);
     if (!enrollCheck.valid) return err(enrollCheck.message);
 
-    // D. Validate Attendance Eligibility (CRITICAL REQUIREMENT: Must have attended at least 1 session)
+    // D. Validate Training Completion: Training must be finished before evaluation is allowed
+    if (!isTrainingFinished(tCheck.training)) {
+      const compDateStr = formatMinimalistDate(tCheck.training.EndDate || tCheck.training.StartDate);
+      return ok({
+        eligible: false,
+        notFinished: true,
+        completionDate: compDateStr,
+        message: `Training evaluation is not available yet. This evaluation can only be submitted after the training programme has finished (Scheduled completion: ${compDateStr}).`,
+        training: tCheck.training,
+        employee: empCheck.employee
+      });
+    }
+
+    // E. Validate Attendance Eligibility (CRITICAL REQUIREMENT: Must have attended at least 1 session)
     const attCheck = checkEmployeeAttendanceEligibility(cleanTId, cleanEmpId);
     if (!attCheck.eligible) {
       return ok({
@@ -722,7 +775,16 @@ function validatePublicEvaluation(trainingId, employeeId) {
     const enrollCheck = validateParticipantEnrollment(cleanTId, cleanEmpId);
     if (!enrollCheck.valid) return enrollCheck;
 
-    // D. Attendance Verification: Disallow evaluation for participants without attendance
+    // D1. Validate Training Completion: Training must be finished before evaluation is allowed
+    if (!isTrainingFinished(tCheck.training)) {
+      const compDateStr = formatMinimalistDate(tCheck.training.EndDate || tCheck.training.StartDate);
+      return {
+        valid: false,
+        message: `Submission Rejected: Training evaluation can only be submitted after the training programme has finished (Scheduled completion: ${compDateStr}).`
+      };
+    }
+
+    // D2. Attendance Verification: Disallow evaluation for participants without attendance
     const attCheck = checkEmployeeAttendanceEligibility(cleanTId, cleanEmpId);
     if (!attCheck.eligible) {
       return {

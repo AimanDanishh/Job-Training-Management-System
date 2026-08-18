@@ -56,35 +56,54 @@ function getLoggedInUserEmail() {
  * API: Get real Cost Centres from EMPLOYEE_SPREADSHEET_ID
  */
 function getCostCentres() {
+  const ccMap = new Map();
+
+  const addIfValid = (val) => {
+    if (!val) return;
+    const str = String(val).trim();
+    if (!str || str === 'All Departments / Cost Centres' || str.toLowerCase() === 'all departments' || str.toLowerCase() === 'all') return;
+    const key = str.toLowerCase();
+    if (!ccMap.has(key)) {
+      ccMap.set(key, str);
+    }
+  };
+
   try {
     const ss = getEmployeeSpreadsheet();
     if (ss) {
       const ccSheet = ss.getSheetByName('Cost Centre') || ss.getSheetByName('CostCentre') || ss.getSheetByName('Cost Centres');
       if (ccSheet && ccSheet.getLastRow() > 1) {
         const data = ccSheet.getDataRange().getValues();
-        const list = [];
         for (let i = 1; i < data.length; i++) {
-          const val = String(data[i][0] || data[i][1] || '').trim();
-          if (val && !list.includes(val)) list.push(val);
+          addIfValid(data[i][0] || data[i][1]);
         }
-        if (list.length > 0) return ok(list);
       }
 
-      const empSheet = getSheet('Employees');
-      if (empSheet) {
+      const empSheet = ss.getSheetByName('Employees') || ss.getSheetByName('Employee');
+      if (empSheet && empSheet.getLastRow() > 1) {
         const rows = sheetToJson(empSheet);
-        const uniqueCC = new Set();
         rows.forEach(r => {
-          const dept = String(r.Department || r.CostCentre || '').trim();
-          if (dept) uniqueCC.add(dept);
+          addIfValid(r.Department || r.CostCentre || r['Cost Centre'] || r.Dept);
         });
-        if (uniqueCC.size > 0) return ok(Array.from(uniqueCC));
       }
     }
   } catch (e) {
-    Logger.log('getCostCentres error: ' + e.message);
+    Logger.log('getCostCentres external spreadsheet error: ' + e.message);
   }
-  return ok(['Cost Centre 101 - Engineering', 'Cost Centre 102 - HR', 'Cost Centre 103 - Finance', 'Cost Centre 104 - Operations', 'Cost Centre 105 - IT', 'Cost Centre 106 - Sales']);
+
+  try {
+    const localEmpSheet = getSheet('Employees');
+    if (localEmpSheet && localEmpSheet.getLastRow() > 1) {
+      const rows = sheetToJson(localEmpSheet);
+      rows.forEach(r => {
+        addIfValid(r.Department || r.CostCentre || r['Cost Centre'] || r.Dept);
+      });
+    }
+  } catch (e2) {
+    Logger.log('getCostCentres local employee error: ' + e2.message);
+  }
+
+  return ok(Array.from(ccMap.values()).sort());
 }
 
 /**

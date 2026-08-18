@@ -16,7 +16,7 @@
   <div class="main-area">
     <header class="topbar">
       <div style="flex:1"><h1 class="topbar-title">Training Programmes</h1><p class="topbar-sub">Manage the full lifecycle of all training programmes</p></div>
-      <button class="btn-th btn-primary" onclick="openModal('modal-training')"><span class="icon sm">add</span>New Programme</button>
+      <button class="btn-th btn-primary" onclick="openCreateTrainingModal()"><span class="icon sm">add</span>New Programme</button>
     </header>
 
     <main class="page-content">
@@ -52,12 +52,6 @@
               <option value="Compliance Training">Compliance Training</option>
               <option value="Business Skills">Business Skills</option>
               <option value="Onboarding">Onboarding</option>
-              <option value="Leadership & Management">Leadership & Management</option>
-              <option value="Compliance & Regulatory">Compliance & Regulatory</option>
-              <option value="Technology & Innovation">Technology & Innovation</option>
-              <option value="Project Management">Project Management</option>
-              <option value="Data & Analytics">Data & Analytics</option>
-              <option value="Customer Experience">Customer Experience</option>
             </select>
           </div>
           <button class="btn-th btn-secondary btn-sm" onclick="loadTrainings()"><span class="icon sm">refresh</span>Refresh</button>
@@ -96,27 +90,23 @@
       </div>
       <div class="col-12">
         <label for="t-name" class="label-th">Programme Name / Title <span class="required">*</span></label>
-        <input id="t-name" class="input-th" placeholder="e.g. Leadership Excellence & Strategic Management">
+        <input id="t-name" class="input-th" placeholder="e.g. Training Programme">
       </div>
       <div class="col-md-4">
         <label for="t-cat" class="label-th">Training Category</label>
         <select id="t-cat" class="input-th">
+          <option value="" disabled selected>Select Category</option>
           <option value="Behavioral Skills">Behavioral Skills</option>
           <option value="Technical Skills">Technical Skills</option>
           <option value="Compliance Training">Compliance Training</option>
           <option value="Business Skills">Business Skills</option>
           <option value="Onboarding">Onboarding</option>
-          <option value="Leadership & Management">Leadership & Management</option>
-          <option value="Compliance & Regulatory">Compliance & Regulatory</option>
-          <option value="Technology & Innovation">Technology & Innovation</option>
-          <option value="Project Management">Project Management</option>
-          <option value="Data & Analytics">Data & Analytics</option>
-          <option value="Customer Experience">Customer Experience</option>
         </select>
       </div>
       <div class="col-md-4">
         <label for="t-mode" class="label-th">Training Type / Mode</label>
         <select id="t-mode" class="input-th">
+          <option value="" disabled selected>Select Mode</option>
           <option value="In-House Training">In-House Training</option>
           <option value="Public">Public Training</option>
           <option value="On-Job Training">On-Job Training</option>
@@ -125,12 +115,9 @@
       <div class="col-md-4">
         <label for="t-tna" class="label-th">TNA Source</label>
         <select id="t-tna" class="input-th">
+          <option value="" disabled selected>Select TNA Source</option>
           <option value="Training Requisition Form">Training Requisition Form</option>
           <option value="Training Procedure">Training Procedure</option>
-          <option value="Annual Training Need Analysis">Annual Training Need Analysis</option>
-          <option value="Management Directive">Management Directive</option>
-          <option value="Performance Review">Performance Review</option>
-          <option value="Skill Gap">Skill Gap</option>
         </select>
       </div>
 
@@ -148,11 +135,11 @@
       </div>
       <div class="col-md-2">
         <label for="t-duration" class="label-th">Days</label>
-        <input id="t-duration" class="input-th" type="number" min="1" value="1">
+        <input id="t-duration" class="input-th" type="number" min="1" placeholder="e.g. 1">
       </div>
       <div class="col-md-2">
         <label for="t-hours" class="label-th">Total Hours</label>
-        <input id="t-hours" class="input-th" type="number" min="0.5" step="0.5" value="8">
+        <input id="t-hours" class="input-th" type="number" min="0.5" step="0.5" placeholder="e.g. 8">
       </div>
       <div class="col-md-6">
         <label for="t-fee" class="label-th">Course Fee (RM)</label>
@@ -195,12 +182,8 @@
         <input id="t-brochure" class="input-th" type="url" placeholder="https://drive.google.com/...">
       </div>
       <div class="col-12">
-        <label for="t-reason" class="label-th">Reason for Training / Business Justification</label>
-        <textarea id="t-reason" class="input-th" rows="2" placeholder="State business justification, operational need, or skill gap..."></textarea>
-      </div>
-      <div class="col-12">
-        <label for="t-obj" class="label-th">Programme Objectives</label>
-        <textarea id="t-obj" class="input-th" rows="2" placeholder="Describe key learning outcomes and objectives..."></textarea>
+        <label for="t-reason" class="label-th">Reasons for Training</label>
+        <textarea id="t-reason" class="input-th" rows="3" placeholder="State reasons for training, programme objectives, business justification, or operational need..."></textarea>
       </div>
 
       <!-- Section 5: Lifecycle & Status Controls -->
@@ -210,12 +193,17 @@
       <div class="col-md-4">
         <label for="t-status" class="label-th">Status</label>
         <select id="t-status" class="input-th">
-          <option>Draft</option><option>Upcoming</option><option>In Progress</option><option>Completed</option>
+          <option value="" disabled selected>Select Status</option>
+          <option value="Draft">Draft</option>
+          <option value="Upcoming">Upcoming</option>
+          <option value="In Progress">In Progress</option>
+          <option value="Completed">Completed</option>
         </select>
       </div>
       <div class="col-md-4">
         <label for="t-stage" class="label-th">Lifecycle Stage</label>
         <select id="t-stage" class="input-th">
+          <option value="" disabled selected>Select Stage</option>
           <option value="Created">Created</option>
           <option value="Participants Imported">Participants Imported</option>
           <option value="Attendance In Progress">Attendance In Progress</option>
@@ -228,6 +216,7 @@
       <div class="col-md-4">
         <label for="t-app-status" class="label-th">Approval Status</label>
         <select id="t-app-status" class="input-th">
+          <option value="" disabled selected>Select Approval Status</option>
           <option value="Approved">Approved</option>
           <option value="Pending HOD Approval">Pending HOD Approval</option>
           <option value="Pending C-Suite Approval">Pending C-Suite Approval</option>
@@ -495,25 +484,25 @@
     'Compliance Training':     '#EF4444',
     'Business Skills':         '#0891B2',
     'Onboarding':              '#22C55E',
-    'Leadership & Management': '#F59E0B',
-    'Compliance & Regulatory': '#DC2626',
-    'Technology & Innovation': '#3B82F6',
-    'Project Management':      '#10B981',
-    'Data & Analytics':        '#6366F1',
-    'Customer Experience':     '#EC4899'
   };
 
+  let cachedCostCentres = [];
   async function loadCostCentres() {
     try {
       const depts = await callServer('getCostCentres');
       if (Array.isArray(depts) && depts.length > 0) {
+        cachedCostCentres = depts;
         const select = document.getElementById('t-dept');
         if (select) {
+          const curVal = select.value;
           select.innerHTML = '<option value="">All Departments / Cost Centres</option>' +
             depts.map(d => `<option value="${d}">${d}</option>`).join('');
+          if (curVal) select.value = curVal;
         }
       }
-    } catch(e) {}
+    } catch(e) {
+      console.warn('loadCostCentres error:', e);
+    }
   }
 
   function driveFolderUrl(folderId) {
@@ -620,7 +609,7 @@
             ${getTrainingRequisitionButton(t)}
             ${getTrainingFolderButton(t)}
             <button class="btn-th btn-secondary btn-sm" onclick="editTraining('${t.ID}')"><span class="icon sm">edit</span></button>
-            <button class="btn-th btn-danger btn-sm" onclick="confirmDeleteT('${t.ID}')"><span class="icon sm">archive</span></button>
+            <button class="btn-th btn-danger btn-sm" onclick="confirmDeleteT('${t.ID}')" title="Delete Programme"><span class="icon sm">delete</span></button>
           </div>
         </div>
       </div>
@@ -683,33 +672,73 @@
   }
 
 
+  function openCreateTrainingModal() {
+    loadCostCentres();
+    document.getElementById('t-modal-title').textContent = 'New Training Programme';
+    document.getElementById('t-id').value       = '';
+    document.getElementById('t-name').value     = '';
+    document.getElementById('t-cat').value      = '';
+    document.getElementById('t-mode').value     = '';
+    document.getElementById('t-tna').value      = '';
+    document.getElementById('t-trainer').value  = '';
+    document.getElementById('t-venue').value    = '';
+    document.getElementById('t-provider').value = '';
+    document.getElementById('t-fee').value      = '';
+    document.getElementById('t-dept').value     = '';
+    document.getElementById('t-start').value    = '';
+    document.getElementById('t-end').value      = '';
+    document.getElementById('t-duration').value = '';
+    document.getElementById('t-hours').value    = '';
+    document.getElementById('t-cert-expiry').value = '';
+    document.getElementById('t-brochure').value = '';
+    document.getElementById('t-reason').value   = '';
+    document.getElementById('t-status').value   = '';
+    const stageEl = document.getElementById('t-stage');
+    if (stageEl) stageEl.value = '';
+    const appSelect = document.getElementById('t-app-status');
+    if (appSelect) appSelect.value = '';
+    openModal('modal-training');
+  }
+
   function editTraining(idOrObj) {
     const t = typeof idOrObj === 'object' ? idOrObj : allTrainings.find(x => x.ID === idOrObj);
     if (!t) return;
     document.getElementById('t-modal-title').textContent = 'Edit Training Programme';
     document.getElementById('t-id').value       = t.ID;
     document.getElementById('t-name').value     = t.Name || '';
-    document.getElementById('t-cat').value      = t.Category || 'Behavioral Skills';
-    document.getElementById('t-mode').value     = t.TrainingMode || t.Mode || 'In-House Training';
-    document.getElementById('t-tna').value      = t.TnaSource || 'Training Requisition Form';
+    document.getElementById('t-cat').value      = t.Category || '';
+    document.getElementById('t-mode').value     = t.TrainingMode || t.Mode || '';
+    document.getElementById('t-tna').value      = t.TnaSource || '';
     document.getElementById('t-trainer').value  = t.Trainer || '';
     document.getElementById('t-venue').value    = t.Venue || '';
     document.getElementById('t-provider').value = t.TrainingProvider || t.Vendor || '';
     document.getElementById('t-fee').value      = t.CourseFee || '';
-    document.getElementById('t-dept').value     = t.Department || '';
+
+    const deptSelect = document.getElementById('t-dept');
+    if (t.Department && deptSelect) {
+      if (!Array.from(deptSelect.options).some(opt => opt.value === t.Department)) {
+        const opt = document.createElement('option');
+        opt.value = t.Department;
+        opt.textContent = t.Department;
+        deptSelect.appendChild(opt);
+      }
+      deptSelect.value = t.Department;
+    } else if (deptSelect) {
+      deptSelect.value = '';
+    }
+
     document.getElementById('t-start').value    = toInputDateStr(t.StartDate);
     document.getElementById('t-end').value      = toInputDateStr(t.EndDate);
-    document.getElementById('t-duration').value = t.Duration  || 1;
-    document.getElementById('t-hours').value    = t.TotalHours|| 8;
+    document.getElementById('t-duration').value = t.Duration  || '';
+    document.getElementById('t-hours').value    = t.TotalHours|| '';
     document.getElementById('t-cert-expiry').value = toInputDateStr(t.ExpiryDate || t.CertificateExpiryDate);
     document.getElementById('t-brochure').value = t.RequisitionUrl || t.BrochureUrl || '';
-    document.getElementById('t-reason').value   = t.Reason || t.Justification || '';
-    document.getElementById('t-obj').value      = t.Objectives || '';
-    document.getElementById('t-status').value   = t.Status    || 'Draft';
+    document.getElementById('t-reason').value   = t.Reason || t.Objectives || t.Justification || '';
+    document.getElementById('t-status').value   = t.Status    || '';
     const stageEl = document.getElementById('t-stage');
-    if (stageEl) stageEl.value = t.Stage || 'Created';
+    if (stageEl) stageEl.value = t.Stage || '';
     const appSelect = document.getElementById('t-app-status');
-    if (appSelect) appSelect.value = t.ApprovalStatus || 'Approved';
+    if (appSelect) appSelect.value = t.ApprovalStatus || '';
     openModal('modal-training');
   }
 
@@ -725,6 +754,8 @@
 
     const appSelect = document.getElementById('t-app-status');
     const appStatusVal = appSelect ? appSelect.value : 'Approved';
+
+    const reasonVal = document.getElementById('t-reason').value.trim();
 
     const data = {
       ID: id, Name: name,
@@ -742,8 +773,8 @@
       TotalHours:       document.getElementById('t-hours').value || 8,
       ExpiryDate:       document.getElementById('t-cert-expiry').value,
       RequisitionUrl:   document.getElementById('t-brochure').value.trim(),
-      Reason:           document.getElementById('t-reason').value.trim(),
-      Objectives:       document.getElementById('t-obj').value.trim(),
+      Reason:           reasonVal,
+      Objectives:       reasonVal,
       Status:           document.getElementById('t-status').value,
       ApprovalStatus:   appStatusVal,
       Stage:            document.getElementById('t-stage') ? document.getElementById('t-stage').value : 'Created',
@@ -769,9 +800,14 @@
   }
 
   async function confirmDeleteT(id) {
-    if (!confirm('Archive this programme?')) return;
-    try { await callServer('deleteTraining', id); showToast('Programme archived.', 'success'); loadTrainings(); }
-    catch(e) { showToast(e.message, 'error'); }
+    if (!confirm('Are you sure you want to delete this programme? This will remove the training record and move its Drive workspace to Trash.')) return;
+    try {
+      await callServer('deleteTraining', id);
+      showToast('Programme deleted.', 'success');
+      loadTrainings();
+    } catch(e) {
+      showToast(e.message, 'error');
+    }
   }
 
   async function openDetail(id) {
@@ -830,7 +866,7 @@
       ? portalUrlStr.split('?')[0]
       : String(window.location.href || '').split('?')[0];
 
-    let rawObj = t.Objectives || '';
+    let rawObj = t.Reason || t.Objectives || t.Justification || '';
     let brochureUrl = t.BrochureURL || t.BrochureUrl || t.AttachmentURL || '';
     if (!brochureUrl && rawObj.includes('[Brochure File:')) {
       const match = rawObj.match(/\[Brochure File:\s*([^\]]+)\]/);
@@ -1003,7 +1039,7 @@
 
         ${rawObj ? `
           <div style="margin-top:16px;padding-top:16px;border-top:1px solid #F1F5F9">
-            <div class="section-label" style="margin-bottom:4px">Programme Objectives</div>
+            <div class="section-label" style="margin-bottom:4px">Reasons for Training</div>
             <p style="font-size:13px;color:#374151;line-height:1.6;margin:0">${rawObj}</p>
           </div>
         ` : ''}

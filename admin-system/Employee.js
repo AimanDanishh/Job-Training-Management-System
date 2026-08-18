@@ -17,29 +17,64 @@ function getEmployees() {
  * Get list of Cost Centres / Departments from EMPLOYEE_SPREADSHEET_ID or Employees sheet
  */
 function getCostCentres() {
+  const ccMap = new Map();
+
+  const addIfValid = (val) => {
+    if (!val) return;
+    const str = String(val).trim();
+    if (!str || str === 'All Departments / Cost Centres' || str.toLowerCase() === 'all departments' || str.toLowerCase() === 'all') return;
+    const key = str.toLowerCase();
+    if (!ccMap.has(key)) {
+      ccMap.set(key, str);
+    }
+  };
+
   try {
     const ss = getEmployeeSpreadsheet();
     if (ss) {
       const ccSheet = ss.getSheetByName('Cost Centre') || ss.getSheetByName('CostCentre') || ss.getSheetByName('Cost Centres');
       if (ccSheet && ccSheet.getLastRow() > 1) {
         const data = ccSheet.getDataRange().getValues();
-        const ccMap = new Map(); // key: lowercased, val: canonical name
         for (let i = 1; i < data.length; i++) {
-          const val = String(data[i][0] || data[i][1] || '').trim();
-          if (val && val !== 'All Departments / Cost Centres') {
-            const key = val.toLowerCase();
-            if (!ccMap.has(key)) {
-              ccMap.set(key, val);
-            }
-          }
+          addIfValid(data[i][0] || data[i][1]);
         }
-        if (ccMap.size > 0) return ok(Array.from(ccMap.values()));
+      }
+
+      const empSheet = ss.getSheetByName(SHEET_NAMES.employees) || ss.getSheetByName('Employees');
+      if (empSheet && empSheet.getLastRow() > 1) {
+        const rows = sheetToJson(empSheet);
+        rows.forEach(r => {
+          addIfValid(r.Department || r.CostCentre || r['Cost Centre'] || r.Dept);
+        });
       }
     }
   } catch (e) {
-    Logger.log('getCostCentres error: ' + e.message);
+    Logger.log('getCostCentres external spreadsheet error: ' + e.message);
   }
-  return ok([]);
+
+  try {
+    const localEmpSheet = getSheet(SHEET_NAMES.employees);
+    if (localEmpSheet && localEmpSheet.getLastRow() > 1) {
+      const rows = sheetToJson(localEmpSheet);
+      rows.forEach(r => {
+        addIfValid(r.Department || r.CostCentre || r['Cost Centre'] || r.Dept);
+      });
+    }
+  } catch (e2) {
+    Logger.log('getCostCentres local employee error: ' + e2.message);
+  }
+
+  try {
+    const trainSheet = getSheet(SHEET_NAMES.trainings);
+    if (trainSheet && trainSheet.getLastRow() > 1) {
+      const rows = sheetToJson(trainSheet);
+      rows.forEach(r => {
+        addIfValid(r.Department || r.CostCentre);
+      });
+    }
+  } catch (e3) {}
+
+  return ok(Array.from(ccMap.values()).sort());
 }
 
 /**

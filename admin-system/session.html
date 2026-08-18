@@ -140,15 +140,16 @@
       </div>
       <div class="col-md-3">
         <label for="s-start-time" class="label-th">Start Time</label>
-        <input id="s-start-time" class="input-th" type="time" value="09:00">
+        <input id="s-start-time" class="input-th" type="time">
       </div>
       <div class="col-md-3">
         <label for="s-end-time" class="label-th">End Time</label>
-        <input id="s-end-time" class="input-th" type="time" value="17:00">
+        <input id="s-end-time" class="input-th" type="time">
       </div>
       <div class="col-12">
         <label for="s-status" class="label-th">QR Status</label>
         <select id="s-status" class="input-th">
+          <option value="" disabled selected>Select Status</option>
           <option value="Active">Active (Ready for check-in)</option>
           <option value="Expired">Expired (Check-in closed)</option>
           <option value="Inactive">Inactive</option>
@@ -377,10 +378,14 @@
         return;
       }
       document.getElementById('s-training-id').value = preTrainingId;
+    } else {
+      document.getElementById('s-training-id').value = '';
     }
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('s-date').value = today;
+    document.getElementById('s-date').value = '';
     document.getElementById('s-name').value = '';
+    document.getElementById('s-start-time').value = '';
+    document.getElementById('s-end-time').value = '';
+    document.getElementById('s-status').value = '';
     openModal('modal-session');
   }
 

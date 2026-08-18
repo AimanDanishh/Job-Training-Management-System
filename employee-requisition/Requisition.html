@@ -191,6 +191,7 @@
               <div class="form-group">
                 <label class="form-label" for="reqCategory">Training Category *</label>
                 <select id="reqCategory" class="form-control">
+                  <option value="" disabled selected>Select Category...</option>
                   <option value="Behavioral Skills (Soft Skills + Leadership + Customer Service)">Behavioral Skills (Soft Skills + Leadership + Customer Service)</option>
                   <option value="Technical Skills (Technical + Quality + SHE + Digital)">Technical Skills (Technical + Quality + SHE + Digital)</option>
                   <option value="Compliance Training (Compliance + Safety)">Compliance Training (Compliance + Safety)</option>
@@ -201,6 +202,7 @@
               <div class="form-group">
                 <label class="form-label" for="reqTrainingType">Training Type *</label>
                 <select id="reqTrainingType" class="form-control">
+                  <option value="" disabled selected>Select Training Type...</option>
                   <option value="In-House Training">In-House Training</option>
                   <option value="Public">Public Training</option>
                 </select>
@@ -218,7 +220,7 @@
               </div>
               <div class="form-group">
                 <label class="form-label" for="reqHours">Duration (Hours) *</label>
-                <input type="number" id="reqHours" class="form-control" value="8" min="0.5" step="0.5">
+                <input type="number" id="reqHours" class="form-control" placeholder="e.g. 8" min="0.5" step="0.5">
               </div>
             </div>
 
@@ -231,8 +233,6 @@
                 <label class="form-label" for="reqVenue">Training Venue *</label>
                 <input type="text" id="reqVenue" class="form-control" placeholder="e.g. Training Room A / Hotel Ballroom">
               </div>
-
-              <!-- Department Dropdown with Bubble Chips -->
               <div class="form-group">
                 <label class="form-label" for="reqCostCentreSelect">Department (Cost Centre) *</label>
                 <select id="reqCostCentreSelect" class="form-control" onchange="addCostCentreTag(this.value)">
@@ -294,7 +294,7 @@
             <div class="grid-2" style="margin-bottom:16px;">
               <div>
                 <label class="form-label" for="reqTotalPax">Total Participants (Pax) *</label>
-                <input type="number" id="reqTotalPax" class="form-control" min="1" value="0">
+                <input type="number" id="reqTotalPax" class="form-control" min="1" placeholder="0">
               </div>
               <div style="display:flex;align-items:flex-end;">
                 <button type="button" class="btn btn-neo btn-block" style="padding:11px;" onclick="openParticipantPicker()">

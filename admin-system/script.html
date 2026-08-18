@@ -6,18 +6,26 @@ function safeExternalUrl(domainAndPath) {
   return 'https://' + clean;
 }
 
-(function() {
+function readTrainHubConfig() {
   var cfg = window.__TRAINHUB_CONFIG__ || {};
   var el = document.getElementById('__trainhub_config__');
   if (el && el.getAttribute && el.getAttribute('data-config')) {
     try {
-      cfg = JSON.parse(decodeURIComponent(el.getAttribute('data-config')));
+      var raw = el.getAttribute('data-config');
+      if (raw) {
+        cfg = JSON.parse(decodeURIComponent(raw));
+        window.__TRAINHUB_CONFIG__ = cfg;
+        if (cfg.page) window.__TRAINHUB_PAGE__ = cfg.page;
+        if (cfg.publicPortalUrl) window.__PUBLIC_PORTAL_URL__ = cfg.publicPortalUrl;
+        if (cfg.companyLogoUrl) window.__COMPANY_LOGO_URL__ = cfg.companyLogoUrl;
+      }
     } catch(e) {}
   }
-  window.__TRAINHUB_CONFIG__ = cfg;
-  window.__TRAINHUB_PAGE__ = cfg.page || window.__TRAINHUB_PAGE__ || '';
-  window.__PUBLIC_PORTAL_URL__ = cfg.publicPortalUrl || window.__PUBLIC_PORTAL_URL__ || '';
-  window.__COMPANY_LOGO_URL__ = cfg.companyLogoUrl || window.__COMPANY_LOGO_URL__ || '';
+  return cfg;
+}
+
+(function() {
+  readTrainHubConfig();
 })();
 
 // ===============================================================================
@@ -218,10 +226,36 @@ document.addEventListener('click', e => {
 // ===============================================================================
 const DEFAULT_FALLBACK_LOGO = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjIyIiBmaWxsPSIjRTkxQzJEIi8+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iMjgiIGZpbGw9IiNGRkY4Q0YiIHN0cm9rZT0iI0ZFQzMwRCIgc3Ryb2tlLXdpZHRoPSIyIi8+PHRleHQgeD0iNTAiIHk9IjYxIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI5MDAiIGZvbnQtc2l6ZT0iMzIiIGZpbGw9IiNFOTFDMkQiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkE8L3RleHQ+PC9zdmc+';
 
+function extractDriveFileId(url) {
+  if (!url) return '';
+  var str = String(url).trim();
+  var match = str.match(/\/d\/([a-zA-Z0-9_-]{20,})/);
+  if (match && match[1]) return match[1];
+  var match2 = str.match(/[?&]id=([a-zA-Z0-9_-]{20,})/);
+  if (match2 && match2[1]) return match2[1];
+  var match3 = str.match(/googleusercontent\.com\/d\/([a-zA-Z0-9_-]{20,})/);
+  if (match3 && match3[1]) return match3[1];
+  if (/^[a-zA-Z0-9_-]{20,}$/.test(str)) return str;
+  return '';
+}
+
+function convertDriveToDirectImage(url) {
+  if (!url) return '';
+  var clean = String(url).trim();
+  if (clean.includes('drive.google.com') || clean.includes('googleusercontent.com') || /^[a-zA-Z0-9_-]{20,}$/.test(clean)) {
+    var fId = extractDriveFileId(clean);
+    if (fId) {
+      return 'https://drive.google.com/thumbnail?id=' + fId + '&sz=w500';
+    }
+  }
+  return clean;
+}
+
 function getApolloLogoUrl() {
+  readTrainHubConfig();
   var url = (typeof window.__COMPANY_LOGO_URL__ === 'string') ? window.__COMPANY_LOGO_URL__.trim() : '';
   if (url && !url.startsWith('<?') && !url.includes('<?!=')) {
-    return url;
+    return convertDriveToDirectImage(url);
   }
   return DEFAULT_FALLBACK_LOGO;
 }
@@ -236,7 +270,15 @@ function handleSidebarLogoError(imgEl) {
   }
 }
 
+function handleLogoFallbackError(img) {
+  if (img && img.src !== DEFAULT_FALLBACK_LOGO) {
+    img.onerror = null;
+    img.src = DEFAULT_FALLBACK_LOGO;
+  }
+}
+
 function initSidebarLogo() {
+  readTrainHubConfig();
   var logoImg = document.getElementById('sidebar-company-logo');
   var logoFb  = document.getElementById('sidebar-logo-fallback');
   var logoUrl = getApolloLogoUrl();
@@ -247,7 +289,7 @@ function initSidebarLogo() {
   }
 }
 
-// --- QR Code Engine (with Apollo Logo Centered) ------------------------------
+// --- QR Code Engine (with Centered Company Logo) -----------------------------
 function getQuickChartBaseUrl(attUrl) {
   const cleanUrl = String(attUrl || '').trim();
   return safeExternalUrl(`quickchart.io/qr?size=400&ecLevel=H&text=${encodeURIComponent(cleanUrl)}`);
@@ -258,72 +300,75 @@ function ensureQRLogoUrl(existingQrUrl, attUrl) {
 }
 
 function renderQRWithLogoHtml(attUrl, imgSize = 140, logoSize = 34) {
-  const qrSrc = getQuickChartBaseUrl(attUrl);
+  const cleanUrl = String(attUrl || '').trim();
   const logoSrc = getApolloLogoUrl();
+  const qrSrc = safeExternalUrl(`quickchart.io/qr?size=400&ecLevel=H&text=${encodeURIComponent(cleanUrl)}`);
 
   return `
     <div class="qr-logo-wrapper" style="position:relative;display:inline-block;background:#fff;padding:6px;border-radius:10px;border:1.5px solid #E2E8F0;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
       <img src="${qrSrc}" alt="QR Code" style="width:${imgSize}px;height:${imgSize}px;display:block;border-radius:6px">
-      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:${logoSize}px;height:${logoSize}px;background:#FFF8CF;border-radius:7px;border:1px solid #FEC30D;padding:2px;box-shadow:0 2px 6px rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;overflow:hidden;z-index:2">
-        <img src="${logoSrc}" alt="Logo" style="max-width:100%;max-height:100%;object-fit:contain" onerror="this.style.display='none'">
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:${logoSize}px;height:${logoSize}px;background:#FFFFFF;border-radius:7px;border:1.5px solid #CBD5E1;padding:2px;box-shadow:0 2px 6px rgba(0,0,0,0.18);display:flex;align-items:center;justify-content:center;overflow:hidden;z-index:2">
+        <img src="${logoSrc}" alt="Logo" referrerpolicy="no-referrer" style="max-width:100%;max-height:100%;object-fit:contain" onerror="handleLogoFallbackError(this)">
       </div>
     </div>
   `;
 }
 
-function downloadQRWithLogo(attUrl, filename = 'Apollo_QR_Code.png') {
-  const qrSrc = getQuickChartBaseUrl(attUrl);
+function downloadQRWithLogo(attUrl, filename = 'TrainHub_QR_Code.png') {
+  const cleanUrl = String(attUrl || '').trim();
   const logoSrc = getApolloLogoUrl();
+  const qrSrc = safeExternalUrl(`quickchart.io/qr?size=400&ecLevel=H&text=${encodeURIComponent(cleanUrl)}`);
 
   const canvas = document.createElement('canvas');
   canvas.width = 400;
   canvas.height = 400;
   const ctx = canvas.getContext('2d');
 
-  const drawLogoOnCanvas = (targetLogoSrc) => {
-    const logoImg = new Image();
-    if (!targetLogoSrc.startsWith('data:')) logoImg.crossOrigin = 'Anonymous';
-    logoImg.onload = () => {
-      const lSize = 88;
-      const x = (400 - lSize) / 2;
-      const y = (400 - lSize) / 2;
-
-      ctx.fillStyle = '#FFF8CF';
-      ctx.strokeStyle = '#FEC30D';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      if (ctx.roundRect) {
-        ctx.roundRect(x - 6, y - 6, lSize + 12, lSize + 12, 10);
-      } else {
-        ctx.fillRect(x - 6, y - 6, lSize + 12, lSize + 12);
-      }
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.drawImage(logoImg, x, y, lSize, lSize);
-
-      const link = document.createElement('a');
-      link.download = filename;
-      link.href = canvas.toDataURL('image/png');
-      link.click();
-    };
-    logoImg.onerror = () => {
-      if (targetLogoSrc !== DEFAULT_FALLBACK_LOGO) {
-        drawLogoOnCanvas(DEFAULT_FALLBACK_LOGO);
-      } else {
-        const link = document.createElement('a');
-        link.download = filename;
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-      }
-    };
-    logoImg.src = targetLogoSrc;
-  };
-
   const qrImg = new Image();
   qrImg.crossOrigin = 'Anonymous';
   qrImg.onload = () => {
     ctx.drawImage(qrImg, 0, 0, 400, 400);
+
+    const drawLogoOnCanvas = (targetLogoSrc) => {
+      const logoImg = new Image();
+      if (!targetLogoSrc.startsWith('data:')) logoImg.crossOrigin = 'Anonymous';
+      logoImg.onload = () => {
+        const lSize = 84;
+        const x = (400 - lSize) / 2;
+        const y = (400 - lSize) / 2;
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.strokeStyle = '#CBD5E1';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        if (ctx.roundRect) {
+          ctx.roundRect(x - 6, y - 6, lSize + 12, lSize + 12, 10);
+        } else {
+          ctx.fillRect(x - 6, y - 6, lSize + 12, lSize + 12);
+        }
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.drawImage(logoImg, x, y, lSize, lSize);
+
+        const link = document.createElement('a');
+        link.download = filename;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      };
+      logoImg.onerror = () => {
+        if (targetLogoSrc !== DEFAULT_FALLBACK_LOGO) {
+          drawLogoOnCanvas(DEFAULT_FALLBACK_LOGO);
+        } else {
+          const link = document.createElement('a');
+          link.download = filename;
+          link.href = canvas.toDataURL('image/png');
+          link.click();
+        }
+      };
+      logoImg.src = targetLogoSrc;
+    };
+
     drawLogoOnCanvas(logoSrc);
   };
   qrImg.onerror = () => {
