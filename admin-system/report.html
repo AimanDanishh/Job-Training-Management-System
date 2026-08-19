@@ -263,9 +263,6 @@
         <button class="btn-th btn-secondary btn-sm" onclick="refreshReportDataUI()">
           <span class="icon sm">refresh</span> Refresh Data
         </button>
-        <button class="btn-th btn-sm" style="background:#059669; color:#fff; border:none; font-weight:700" onclick="exportCurrentFilteredDataset()">
-          <span class="icon sm">download</span> Export Filtered Results
-        </button>
         <button class="btn-th btn-secondary btn-sm" onclick="triggerManualFullRecoverySync()" style="color:#7C3AED; border-color:#DDD6FE; background:#F5F3FF" title="Rebuild & reconcile all report sheets">
           <span class="icon sm">published_with_changes</span> Full Sync
         </button>
@@ -982,7 +979,8 @@
       else if (canonical === 'Ongoing') ongoing++;
       else if (canonical === 'Completed') completed++;
 
-      const fee = parseFloat(String(t.CourseFee || 0).replace(/[^0-9\.-]/g, '')) || 0;
+      const rawFee = t.CourseFee !== undefined ? t.CourseFee : (t.TotalCost !== undefined ? t.TotalCost : (t['Course Fee'] || 0));
+      const fee = parseFloat(String(rawFee || 0).replace(/[^0-9\.-]/g, '')) || 0;
       totalCost += fee;
     });
 
@@ -998,6 +996,9 @@
     if (elApproved) elApproved.textContent = approved;
     if (elOngoing) elOngoing.textContent = ongoing;
     if (elCompleted) elCompleted.textContent = completed;
+    if (elCost) {
+      elCost.textContent = 'RM ' + totalCost.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
   }
 
   function formatOrdinalDateStr(val) {
@@ -1644,14 +1645,17 @@
     const currentYrStr = String(new Date().getFullYear());
     const yrInput = document.getElementById('filter-year');
     const yr = (yrInput && yrInput.value) ? yrInput.value : currentYrStr;
-    showToast(`Running Full Master Recovery Sync for ${yr}...`, 'info');
-    try {
-      const res = await callServer('syncAllTrainings', yr);
-      showToast(res.message || 'Full Master Recovery Sync complete!', 'success');
+    showToast(`Master Annual Report sync started in background for ${yr}...`, 'info');
+
+    // Non-blocking background sync execution
+    callServer('syncAllTrainings', yr).then((res) => {
+      const msg = (res && res.message) ? res.message : `✓ Master Annual Training Report (${yr}) with 5 tabs generated successfully!`;
+      showToast(msg, 'success');
       loadSyncHistoryUI();
-    } catch(e) {
+      loadReportsFolderLinks();
+    }).catch((e) => {
       showToast('Full sync error: ' + e.message, 'error');
-    }
+    });
   }
 
   function onReportTypeChange() {

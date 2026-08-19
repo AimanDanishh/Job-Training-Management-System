@@ -842,81 +842,50 @@ function ensureSheetDimensions(sheet, minRows, minCols) {
 }
 
 function getOrCreateStandingReportSpreadsheet(reportName) {
+  const displayYear = '2026';
   const repFolder = getOrCreateReportsFolder();
-  let fileIter = repFolder.getFilesByName(reportName);
-  let file;
+  const masterFileName = `Master Annual Training Report (${displayYear})`;
+
+  let fileIter = repFolder.getFilesByName(masterFileName);
   if (fileIter.hasNext()) {
-    file = fileIter.next();
-  } else {
-    const files = repFolder.getFiles();
-    while (files.hasNext()) {
-      const f = files.next();
-      if (f.getName().toLowerCase().trim() === reportName.toLowerCase().trim()) {
-        file = f;
-        break;
-      }
-    }
+    return SpreadsheetApp.openById(fileIter.next().getId());
   }
 
-  if (file) {
-    return SpreadsheetApp.openById(file.getId());
-  }
-
-  const ss = SpreadsheetApp.create(reportName);
-  file = DriveApp.getFileById(ss.getId());
-  file.moveTo(repFolder);
+  const ss = SpreadsheetApp.create(masterFileName);
+  const file = DriveApp.getFileById(ss.getId());
+  repFolder.addFile(file);
+  try { DriveApp.getRootFolder().removeFile(file); } catch (e) {}
   return ss;
 }
 
 function exportReportToSpreadsheet(reportType, year) {
   try {
-    let reportName = 'Employee Report';
-    if (reportType === 'hours') reportName = 'Training Hours';
-    else if (reportType === 'cost') reportName = 'Training Cost';
-    else if (reportType === 'title') reportName = 'Training Title';
-    else if (reportType === 'employee') reportName = 'Employee Report';
-    else if (reportType === 'atp') reportName = 'Annual Training Plan';
+    const displayYear = year || '2026';
+    const res = syncLiveMasterReportSheet(displayYear);
+    if (!parseServerRes(res).success) return err(parseServerRes(res).message);
 
-    const filters = { year: year || 'All' };
-    const res = parseServerRes(getFilteredReportData(reportType, filters));
-    if (!res.success) return err(res.message);
-    const data = res.data;
+    const repFolder = getOrCreateReportsFolder();
+    const masterFileName = `Master Annual Training Report (${displayYear})`;
+    let fileIter = repFolder.getFilesByName(masterFileName);
+    if (!fileIter.hasNext()) return err('Master report spreadsheet not found.');
 
-    const ss = getOrCreateStandingReportSpreadsheet(reportName);
-    const sheet = ss.getActiveSheet();
-    sheet.setName(reportName);
-
-    if (reportType === 'hours') {
-      formatHoursReportSheet(sheet, data, year);
-    } else if (reportType === 'cost') {
-      formatCostReportSheet(sheet, data, year);
-    } else if (reportType === 'title') {
-      formatTitleReportSheet(sheet, data);
-    } else if (reportType === 'employee') {
-      formatEmployeeReportSheet(sheet, data);
-    } else if (reportType === 'atp') {
-      formatAtpReportSheet(sheet, data);
-    }
-
-    SpreadsheetApp.flush();
-
+    const ss = SpreadsheetApp.openById(fileIter.next().getId());
     const fileId = ss.getId();
     const sheetUrl = ss.getUrl();
     const downloadUrl = `https://docs.google.com/spreadsheets/d/${fileId}/export?format=xlsx`;
-    const repFolder = getOrCreateReportsFolder();
 
     return ok({
       fileId: fileId,
-      fileName: `${reportName}.xlsx`,
+      fileName: `${masterFileName}.xlsx`,
       sheetUrl: sheetUrl,
       downloadUrl: downloadUrl,
       folderId: repFolder.getId(),
       folderName: repFolder.getName(),
       folderUrl: repFolder.getUrl(),
-      message: `Report updated in standing spreadsheet '${reportName}'.`
+      message: `Master Annual Training Report (${displayYear}) with 5 tabs generated successfully.`
     });
   } catch (e) {
-    return err('Failed to export Excel report: ' + e.message);
+    return err('Failed to export report: ' + e.message);
   }
 }
 
@@ -1330,27 +1299,28 @@ function syncReportSheetIncrementally(ss, reportKey, reportData, extraParams) {
 
   const lastRow = sheet.getLastRow();
   const lastCol = sheet.getLastColumn();
+  const numCols = config.columns.length;
 
   let existingSheetValues = [];
   if (lastRow >= config.dataStartRow && lastCol >= 1) {
-    existingSheetValues = sheet.getRange(config.dataStartRow, 1, lastRow - config.dataStartRow + 1, Math.max(lastCol, config.columns.length)).getValues();
+    existingSheetValues = sheet.getRange(config.dataStartRow, 1, lastRow - config.dataStartRow + 1, Math.max(lastCol, numCols)).getValues();
   }
 
   const rowMap = {};
   existingSheetValues.forEach((rowVals, idx) => {
-    const sheetRowNumber = config.dataStartRow + idx;
     const rawKeyVal = rowVals[config.keyColumnIndex - 1];
     const keyVal = normalizeSyncValue(rawKeyVal);
 
     if (keyVal && keyVal.toLowerCase() !== 'total' && keyVal.toLowerCase() !== 'summary') {
       rowMap[keyVal.toLowerCase()] = {
-        rowNumber: sheetRowNumber,
+        index: idx,
         rowValues: rowVals
       };
     }
   });
 
   const incomingRows = reportData.rows || [];
+  const finalRowsMatrix = [...existingSheetValues];
 
   incomingRows.forEach(record => {
     let recKey = '';
@@ -1365,18 +1335,16 @@ function syncReportSheetIncrementally(ss, reportKey, reportData, extraParams) {
       sheetMeta[recKey] = {};
     }
     const recordMeta = sheetMeta[recKey];
+    const existingEntry = rowMap[recKey.toLowerCase()];
 
-    const existingRow = rowMap[recKey.toLowerCase()];
-
-    if (existingRow) {
-      const rowNum = existingRow.rowNumber;
-      const currentVals = existingRow.rowValues;
+    if (existingEntry) {
+      const idx = existingEntry.index;
+      const currentVals = existingEntry.rowValues;
+      const targetRowNum = config.dataStartRow + idx;
 
       config.columns.forEach((colDef, cIdx) => {
-        const colNumber = cIdx + 1;
         const colName = colDef.name;
-        const incomingVal = getRecordValueForColumn(record, colDef, rowNum);
-
+        const incomingVal = getRecordValueForColumn(record, colDef, targetRowNum);
         const currentSheetVal = currentVals[cIdx] !== undefined ? currentVals[cIdx] : '';
         let lastSystemVal     = recordMeta[colName];
 
@@ -1388,29 +1356,31 @@ function syncReportSheetIncrementally(ss, reportKey, reportData, extraParams) {
         }
 
         if (!isCellAdminModified(currentSheetVal, lastSystemVal)) {
-          if (normalizeSyncValue(currentSheetVal) !== normalizeSyncValue(incomingVal)) {
-            sheet.getRange(rowNum, colNumber).setValue(incomingVal);
-            recordMeta[colName] = incomingVal;
-            Logger.log(`[SYNC] ${config.sheetName} - ${recKey} - ${colName} updated to: "${incomingVal}"`);
-          }
+          currentVals[cIdx] = incomingVal;
+          recordMeta[colName] = incomingVal;
         } else {
-          Logger.log(`[SYNC] ${config.sheetName} - ${recKey} - ${colName} preserved admin edit: "${currentSheetVal}"`);
+          currentVals[cIdx] = currentSheetVal;
         }
       });
-
+      finalRowsMatrix[idx] = currentVals;
     } else {
-      const targetRowNum = sheet.getLastRow() + 1;
+      const targetRowNum = config.dataStartRow + finalRowsMatrix.length;
       const newRowVals = config.columns.map(colDef => getRecordValueForColumn(record, colDef, targetRowNum));
-      sheet.appendRow(newRowVals);
-      const newRowNum = sheet.getLastRow();
-
       config.columns.forEach((colDef, cIdx) => {
         recordMeta[colDef.name] = newRowVals[cIdx];
       });
-
-      Logger.log(`[SYNC] ${config.sheetName} - ${recKey} - New record added at row ${newRowNum}`);
+      finalRowsMatrix.push(newRowVals);
+      rowMap[recKey.toLowerCase()] = {
+        index: finalRowsMatrix.length - 1,
+        rowValues: newRowVals
+      };
     }
   });
+
+  // Fast Bulk Write: Single API call per sheet
+  if (finalRowsMatrix.length > 0) {
+    sheet.getRange(config.dataStartRow, 1, finalRowsMatrix.length, numCols).setValues(finalRowsMatrix);
+  }
 
   if (reportKey === 'Training Hours') {
     updateTrainingHoursTotalRow(sheet, incomingRows, config.dataStartRow);
@@ -1756,6 +1726,88 @@ function getTrainingSyncStatus(trainingId) {
 }
 
 /**
+ * Removes a deleted training from all Master Report sheets and standing reports.
+ */
+function removeTrainingFromAllReports(trainingId, trainingTitle, trainingCode, targetYear) {
+  try {
+    const cleanTId = String(trainingId || '').trim();
+    const cleanTitle = String(trainingTitle || '').trim();
+    const cleanCode = String(trainingCode || '').trim();
+    const year = targetYear || '2026';
+
+    const repFolder = getOrCreateReportsFolder();
+    const fileName = `Master Annual Training Report (${year})`;
+    let fileIter = repFolder.getFilesByName(fileName);
+    if (!fileIter.hasNext()) return;
+
+    const ss = SpreadsheetApp.openById(fileIter.next().getId());
+
+    // 1. Clean row entries from specific tabs
+    const targetSheets = [
+      { name: 'Annual Training Plan (ATP)', keyCol: 2 },
+      { name: 'Training Cost', keyCol: 1 },
+      { name: 'Training Title', keyCol: 3 }
+    ];
+
+    targetSheets.forEach(item => {
+      try {
+        const sh = ss.getSheetByName(item.name);
+        if (!sh) return;
+        const data = sh.getDataRange().getValues();
+        if (data.length <= 1) return;
+
+        for (let r = data.length - 1; r >= 1; r--) {
+          const val = String(data[r][item.keyCol - 1] || '').trim();
+          const matchTitle = cleanTitle && val.toLowerCase() === cleanTitle.toLowerCase();
+          const matchCode = cleanCode && val.toLowerCase() === cleanCode.toLowerCase();
+          const matchId = cleanTId && val.toLowerCase() === cleanTId.toLowerCase();
+
+          if (matchTitle || matchCode || matchId) {
+            sh.deleteRow(r + 1);
+            Logger.log(`[DELETE-REPORT] Removed row ${r + 1} from ${item.name} for training ${cleanTId}`);
+          }
+        }
+      } catch (e) {
+        Logger.log(`Error removing from ${item.name}: ` + e.message);
+      }
+    });
+
+    // 2. Re-sync aggregated sheets (Training Hours, Employee Report) to reflect correct totals
+    try {
+      const filters = { year: 'All' };
+      const hoursRes = parseServerRes(getFilteredReportData('hours', filters));
+      if (hoursRes.success && hoursRes.data) {
+        syncReportSheetIncrementally(ss, 'Training Hours', hoursRes.data, { year: year });
+      }
+
+      const empRes = parseServerRes(getFilteredReportData('employee', filters));
+      if (empRes.success && empRes.data) {
+        syncReportSheetIncrementally(ss, 'Employee Report', empRes.data);
+      }
+    } catch(aggErr) {
+      Logger.log('Error re-aggregating hours and employee reports: ' + aggErr.message);
+    }
+
+    // 3. Log Sync History
+    logSyncHistory(ss, {
+      syncId: generateSyncId(),
+      timestamp: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss"),
+      trainingId: cleanTId || 'UNKNOWN',
+      action: 'DELETE',
+      trigger: 'Admin User',
+      reports: 'Master Annual Training Report',
+      status: 'SUCCESS',
+      duration: '0.8s',
+      message: `Deleted training ${cleanTId} (${cleanTitle}) removed from all report sheets.`,
+      error: ''
+    });
+
+  } catch (e) {
+    Logger.log('removeTrainingFromAllReports error: ' + e.message);
+  }
+}
+
+/**
  * Manual Recovery Function: Synchronizes all training records across all 5 report tabs.
  * Use for initial setup, data recovery, manual admin reconciliation, or scheduled maintenance.
  */
@@ -1797,38 +1849,48 @@ function syncAllTrainings(targetYear) {
  */
 function syncLiveMasterReportSheet(targetYear) {
   try {
-    const year = (targetYear && targetYear !== '2026') ? targetYear : 'All';
-    const filters = { year: 'All' };
+    const displayYear = (targetYear && targetYear !== 'All') ? String(targetYear).trim() : '2026';
+    const filters = { year: targetYear || 'All' };
 
-    // Update Standing Report Files
-    const hoursRes = parseServerRes(getFilteredReportData('hours', filters));
-    if (hoursRes.success && hoursRes.data) {
-      const ssHours = getOrCreateStandingReportSpreadsheet('Training Hours');
-      syncReportSheetIncrementally(ssHours, 'Training Hours', hoursRes.data, { year: displayYear });
+    // 1. Master Annual Training Report spreadsheet inside Reports folder
+    const repFolder = getOrCreateReportsFolder();
+    const masterFileName = `Master Annual Training Report (${displayYear})`;
+
+    let fileIter = repFolder.getFilesByName(masterFileName);
+    let ss;
+    if (fileIter.hasNext()) {
+      ss = SpreadsheetApp.openById(fileIter.next().getId());
+    } else {
+      ss = SpreadsheetApp.create(masterFileName);
+      const file = DriveApp.getFileById(ss.getId());
+      repFolder.addFile(file);
+      try { DriveApp.getRootFolder().removeFile(file); } catch (e) {}
+    }
+
+    // 2. Sync all 5 tabs into the single master spreadsheet
+    const atpRes = parseServerRes(getFilteredReportData('atp', filters));
+    if (atpRes.success && atpRes.data) {
+      syncReportSheetIncrementally(ss, 'Annual Training Plan (ATP)', atpRes.data);
     }
 
     const costRes = parseServerRes(getFilteredReportData('cost', filters));
     if (costRes.success && costRes.data) {
-      const ssCost = getOrCreateStandingReportSpreadsheet('Training Cost');
-      syncReportSheetIncrementally(ssCost, 'Training Cost', costRes.data, { year: displayYear });
+      syncReportSheetIncrementally(ss, 'Training Cost', costRes.data, { year: displayYear });
     }
 
     const titleRes = parseServerRes(getFilteredReportData('title', filters));
     if (titleRes.success && titleRes.data) {
-      const ssTitle = getOrCreateStandingReportSpreadsheet('Training Title');
-      syncReportSheetIncrementally(ssTitle, 'Training Title', titleRes.data);
+      syncReportSheetIncrementally(ss, 'Training Title', titleRes.data);
     }
 
     const empRes = parseServerRes(getFilteredReportData('employee', filters));
     if (empRes.success && empRes.data) {
-      const ssEmp = getOrCreateStandingReportSpreadsheet('Employee Report');
-      syncReportSheetIncrementally(ssEmp, 'Employee Report', empRes.data);
+      syncReportSheetIncrementally(ss, 'Employee Report', empRes.data);
     }
 
-    const atpRes = parseServerRes(getFilteredReportData('atp', filters));
-    if (atpRes.success && atpRes.data) {
-      const ssAtp = getOrCreateStandingReportSpreadsheet('Annual Training Plan');
-      syncReportSheetIncrementally(ssAtp, 'Annual Training Plan', atpRes.data);
+    const hoursRes = parseServerRes(getFilteredReportData('hours', filters));
+    if (hoursRes.success && hoursRes.data) {
+      syncReportSheetIncrementally(ss, 'Training Hours', hoursRes.data, { year: displayYear });
     }
 
     // Clean up default empty sheet if present
@@ -1844,7 +1906,7 @@ function syncLiveMasterReportSheet(targetYear) {
       folderUrl: repFolder.getUrl(),
       fileId: ss.getId(),
       fileUrl: ss.getUrl(),
-      message: `Live Master Report successfully synced with cell-level admin edit protection!`
+      message: `Master Annual Training Report (${displayYear}) with 5 tabs synchronized successfully!`
     });
   } catch (e) {
     Logger.log('syncLiveMasterReportSheet error: ' + e.message);

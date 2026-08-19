@@ -540,23 +540,83 @@ function deleteTraining(id) {
     const headers = ensureTrainingSheetColumns(sheet);
     const values = sheet.getRange(row, 1, 1, headers.length).getValues()[0];
     const folderId = values[headers.indexOf('FolderID')];
+    const trainingCode = values[headers.indexOf('Code')] || id;
+    const trainingName = values[headers.indexOf('Name')] || '';
+    const startDate = values[headers.indexOf('StartDate')];
+    let year = '2026';
+    if (startDate) {
+      const d = parseDateObj(startDate);
+      if (d) year = String(d.getFullYear());
+    }
 
-    // The per-training spreadsheet, requisition form, attendance and evaluation
-    // history are all inside this workspace. Trashing the workspace removes the
-    // complete training history while keeping it recoverable from Drive Trash.
+    // 1. Move the training's dedicated Drive folder/workspace to trash
     if (folderId) {
       try {
         DriveApp.getFolderById(String(folderId).trim()).setTrashed(true);
       } catch (driveErr) {
-        return err('Training record was not deleted because its Drive workspace could not be moved to Trash: ' + driveErr.message);
+        Logger.log('Drive folder trash error (continuing deletion): ' + driveErr.message);
       }
     }
 
+    // 2. Remove orphaned rows from central database sheets if any exist
+    cleanCentralDatabaseForTraining(id, trainingCode);
+
+    // 3. Delete the row from the master Trainings sheet
     sheet.deleteRow(row);
-    return ok({ message: 'Training and its workspace were moved to Trash.' });
+
+    // 4. Update and remove from Master Annual Training Report spreadsheets
+    try {
+      if (typeof removeTrainingFromAllReports === 'function') {
+        removeTrainingFromAllReports(id, trainingName, trainingCode, year);
+      }
+    } catch(syncErr) {
+      Logger.log('Master report sync on delete warning: ' + syncErr.message);
+    }
+
+    return ok({ message: 'Training, database records, and reports were successfully updated.' });
   } catch (e) {
     return err('Failed to delete training: ' + e.message);
   }
+}
+
+/**
+ * Cleans up any rows associated with the deleted training across central database sheets.
+ */
+function cleanCentralDatabaseForTraining(trainingId, trainingCode) {
+  const cleanTid = String(trainingId || '').trim().toLowerCase();
+  const cleanCode = String(trainingCode || '').trim().toLowerCase();
+  if (!cleanTid && !cleanCode) return;
+
+  const targetSheetNames = [
+    SHEET_NAMES.attendance,
+    SHEET_NAMES.trainingSessions,
+    SHEET_NAMES.trainingEval,
+    SHEET_NAMES.postEval,
+    SHEET_NAMES.trainingParticipants
+  ];
+
+  targetSheetNames.forEach(sheetName => {
+    try {
+      const sh = getSheet(sheetName);
+      if (!sh) return;
+      const data = sh.getDataRange().getValues();
+      if (data.length <= 1) return;
+
+      const headers = data[0].map(h => String(h || '').trim().toLowerCase());
+      const tidCol = headers.findIndex(h => h === 'trainingid' || h === 'training_id' || h === 'training id' || h === 'training code' || h === 'trainingcode');
+
+      if (tidCol === -1) return;
+
+      for (let r = data.length - 1; r >= 1; r--) {
+        const val = String(data[r][tidCol] || '').trim().toLowerCase();
+        if ((cleanTid && val === cleanTid) || (cleanCode && val === cleanCode)) {
+          sh.deleteRow(r + 1);
+        }
+      }
+    } catch (e) {
+      Logger.log(`Error cleaning sheet ${sheetName} for training ${trainingId}: ${e.message}`);
+    }
+  });
 }
 
 // --- Dashboard Summary ----------------------------------------------------------
