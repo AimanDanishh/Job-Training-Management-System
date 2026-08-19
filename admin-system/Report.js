@@ -676,17 +676,49 @@ function getTrainingParticipantsList(trainingId) {
   try {
     const ss = getTrainingDataSpreadsheet(trainingId);
     if (ss) {
-      const sheet = ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants');
+      const allSheets = ss.getSheets();
+      const sheet = allSheets.find(s => {
+        const clean = s.getName().toLowerCase().replace(/[^a-z0-9]/g, '');
+        return clean === 'participants' || clean === 'trainingparticipants' || clean === 'participant';
+      });
       if (sheet) {
         const rows = sheetToJson(sheet);
         if (rows && rows.length > 0) return rows;
       }
+
+      // Check Attendance tab if Participants tab is empty/missing
+      const attSheet = allSheets.find(s => {
+        const clean = s.getName().toLowerCase().replace(/[^a-z0-9]/g, '');
+        return clean === 'attendance' || clean === 'attendances';
+      });
+      if (attSheet) {
+        const attRows = sheetToJson(attSheet);
+        if (attRows && attRows.length > 0) {
+          const uniqueEmp = new Map();
+          attRows.forEach(a => {
+            const empId = String(a.EmployeeNo || a.EmployeeID || a.EmpID || a.ID || '').trim();
+            if (empId && !uniqueEmp.has(empId.toLowerCase())) {
+              uniqueEmp.set(empId.toLowerCase(), {
+                ID: empId,
+                EmployeeID: empId,
+                EmployeeName: a.EmployeeName || a.Name || empId,
+                Department: a.Department || '-',
+                Position: a.Position || 'Participant',
+                SupervisorID: a.SupervisorID || '',
+                SupervisorName: a.SupervisorName || '',
+                SupervisorEmail: a.SupervisorEmail || ''
+              });
+            }
+          });
+          if (uniqueEmp.size > 0) return Array.from(uniqueEmp.values());
+        }
+      }
     }
   } catch (e) {}
 
-  // Tier 2: Check central database sheet 'Participants'
+  // Tier 2: Check central database sheet 'Participants' / 'TrainingParticipants'
   try {
-    const pSheet = getSheet(SHEET_NAMES.trainingParticipants || 'Participants') || getSheet('TrainingParticipants');
+    const pSheet = getSheet(SHEET_NAMES.trainingParticipants || 'Participants') || getSheet('TrainingParticipants') || getSheet('Participants');
     if (pSheet) {
       const pRows = sheetToJson(pSheet);
       const matched = pRows.filter(p => {
@@ -697,7 +729,38 @@ function getTrainingParticipantsList(trainingId) {
     }
   } catch(e) {}
 
-  // Tier 3: Check ParticipantList JSON on training row
+  // Tier 3: Check central database sheet 'Attendance'
+  try {
+    const aSheet = getSheet(SHEET_NAMES.attendance || 'Attendance');
+    if (aSheet) {
+      const aRows = sheetToJson(aSheet);
+      const matched = aRows.filter(a => {
+        const aTid = String(a.TrainingID || a.TrainingCode || '').trim().toLowerCase();
+        return aTid === cleanId;
+      });
+      if (matched.length > 0) {
+        const uniqueEmp = new Map();
+        matched.forEach(a => {
+          const empId = String(a.EmployeeNo || a.EmployeeID || a.EmpID || a.ID || '').trim();
+          if (empId && !uniqueEmp.has(empId.toLowerCase())) {
+            uniqueEmp.set(empId.toLowerCase(), {
+              ID: empId,
+              EmployeeID: empId,
+              EmployeeName: a.EmployeeName || a.Name || empId,
+              Department: a.Department || '-',
+              Position: a.Position || 'Participant',
+              SupervisorID: a.SupervisorID || '',
+              SupervisorName: a.SupervisorName || '',
+              SupervisorEmail: a.SupervisorEmail || ''
+            });
+          }
+        });
+        if (uniqueEmp.size > 0) return Array.from(uniqueEmp.values());
+      }
+    }
+  } catch(e) {}
+
+  // Tier 4: Check ParticipantList JSON on training row
   try {
     const tSheet = getSheet(SHEET_NAMES.trainings);
     if (tSheet) {
@@ -707,9 +770,21 @@ function getTrainingParticipantsList(trainingId) {
         const tcode = String(r.Code || '').trim().toLowerCase();
         return tid === cleanId || tcode === cleanId;
       });
-      if (t && t.ParticipantList) {
-        const parsed = typeof t.ParticipantList === 'string' ? JSON.parse(t.ParticipantList) : t.ParticipantList;
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (t) {
+        if (t.ParticipantList) {
+          const parsed = typeof t.ParticipantList === 'string' ? JSON.parse(t.ParticipantList) : t.ParticipantList;
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+        if (t.ParticipantsList) {
+          const parsed = typeof t.ParticipantsList === 'string' ? JSON.parse(t.ParticipantsList) : t.ParticipantsList;
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+        if (typeof t.Participants === 'string' && t.Participants.trim().startsWith('[')) {
+          try {
+            const parsed = JSON.parse(t.Participants.trim());
+            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+          } catch(e) {}
+        }
       }
     }
   } catch(e) {}
@@ -2326,4 +2401,4 @@ function buildDeptData(rows) {
     .map(([dept, count]) => ({ dept, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 8);
-}
+}

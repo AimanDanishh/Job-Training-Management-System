@@ -142,4 +142,4 @@ function deleteEmployee(id) {
   } catch(e) {
     return err('Failed to delete employee: ' + e.message);
   }
-}
+}

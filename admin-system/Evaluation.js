@@ -284,45 +284,69 @@ function ensureTrainingParticipantsColumns(sheet) {
 function getAttendedParticipantsForPostEval(trainingId) {
   try {
     if (!trainingId) return ok({ training: null, participants: [] });
+    const cleanTId = String(trainingId).trim();
 
-    // 1. Get official participants using getTrainingParticipants directly
-    const tpRes = getTrainingParticipants(trainingId);
-    let tpRows = [];
-    if (tpRes && tpRes.success && Array.isArray(tpRes.data)) {
-      tpRows = tpRes.data;
-    } else if (Array.isArray(tpRes)) {
-      tpRows = tpRes;
-    }
+    // 1. Get official participants using robust multi-tier resolver
+    let tpRows = getTrainingParticipantsList(cleanTId) || [];
 
     // 2. Fetch Attendance and Post Evaluation rows
-    const ss = getTrainingDataSpreadsheet(trainingId);
+    const ss = getTrainingDataSpreadsheet(cleanTId);
     let attRows = [];
     let postRows = [];
     if (ss) {
-      const attSheet = ss.getSheetByName('Attendance');
+      const allSheets = ss.getSheets();
+      const attSheet = allSheets.find(s => s.getName().toLowerCase().replace(/[^a-z0-9]/g, '') === 'attendance');
       if (attSheet) attRows = sheetToJson(attSheet);
 
-      const postSheet = ss.getSheetByName('Post Evaluation') || ss.getSheetByName('PostEval');
+      const postSheet = allSheets.find(s => {
+        const clean = s.getName().toLowerCase().replace(/[^a-z0-9]/g, '');
+        return clean === 'postevaluation' || clean === 'posteval';
+      });
       if (postSheet) postRows = sheetToJson(postSheet);
     }
 
     // 3. Get master training record for 3-month milestone date
     const tSheet = getSheet(SHEET_NAMES.trainings);
     const trainings = tSheet ? sheetToJson(tSheet) : [];
-    const cleanTId = String(trainingId).trim();
     const training = trainings.find(t => 
-      String(t.ID || '').trim() === cleanTId ||
-      String(t.Code || '').trim() === cleanTId ||
-      String(t.TrainingID || '').trim() === cleanTId ||
+      String(t.ID || '').trim().toLowerCase() === cleanTId.toLowerCase() ||
+      String(t.Code || '').trim().toLowerCase() === cleanTId.toLowerCase() ||
+      String(t.TrainingID || '').trim().toLowerCase() === cleanTId.toLowerCase() ||
       (t.Name && String(t.Name).trim().toLowerCase() === cleanTId.toLowerCase())
     );
+
+    // If tpRows is still empty, check if Attendance sheet has participants
+    if (tpRows.length === 0 && attRows.length > 0) {
+      const uniqueFromAtt = new Map();
+      attRows.forEach(a => {
+        const empId = String(a.EmployeeNo || a.EmployeeID || a.EmpID || a.ID || '').trim();
+        if (empId && !uniqueFromAtt.has(empId.toLowerCase())) {
+          uniqueFromAtt.set(empId.toLowerCase(), {
+            ID: empId,
+            EmployeeID: empId,
+            EmployeeName: a.EmployeeName || a.Name || empId,
+            Department: a.Department || '-',
+            Position: a.Position || 'Participant',
+            SupervisorID: a.SupervisorID || '',
+            SupervisorName: a.SupervisorName || '',
+            SupervisorEmail: a.SupervisorEmail || ''
+          });
+        }
+      });
+      tpRows = Array.from(uniqueFromAtt.values());
+    }
 
     // 4. Map tpRows to display objects
     const participantsMap = new Map();
 
     tpRows.forEach(p => {
-      const empId = String(p.EmployeeID || p.ID || p.EmployeeNo || p.EmpID || '').trim();
+      let empId = String(p.EmployeeID || p.EmployeeNo || p.EmpID || p.ID || '').trim();
+      if (!empId && typeof p === 'string' && !/^\d+$/.test(p.trim())) empId = p.trim();
       if (!empId) return;
+      // Guard: Ignore if empId is purely a participant count (e.g. "47")
+      if (/^\d+$/.test(empId) && (!p.EmployeeName || p.EmployeeName === empId) && !p.Department && tpRows.length === 1) {
+        return;
+      }
 
       const empKey = empId.toLowerCase();
       const empName = String(p.EmployeeName || p.Name || empId).trim();
@@ -385,19 +409,19 @@ function getAttendedParticipantsForPostEval(trainingId) {
       });
     });
 
-    // Fallback: If tpRows is empty, parse from master training.Participants
-    if (participantsMap.size === 0 && training && training.Participants) {
+    // Fallback: If participantsMap is still empty, parse from master training.ParticipantList
+    if (participantsMap.size === 0 && training) {
       try {
-        let rawParts = training.Participants;
+        let rawParts = training.ParticipantList || training.ParticipantsList;
         if (typeof rawParts === 'string') {
           const trimmed = rawParts.trim();
           if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
-            try { rawParts = JSON.parse(trimmed); } catch(e) { rawParts = trimmed.split(',').map(s => s.trim()).filter(Boolean); }
+            try { rawParts = JSON.parse(trimmed); } catch(e) { rawParts = []; }
           } else {
-            rawParts = trimmed.split(',').map(s => s.trim()).filter(Boolean);
+            rawParts = [];
           }
         }
-        if (Array.isArray(rawParts)) {
+        if (Array.isArray(rawParts) && rawParts.length > 0) {
           const directory = getOfficialEmployeeDirectory();
           rawParts.forEach(pItem => {
             let pEmpId = typeof pItem === 'object' ? (pItem.EmployeeID || pItem.ID || '') : String(pItem || '').trim();
@@ -648,83 +672,569 @@ function sendSupervisorPostEvalNotificationSingle(trainingId, employeeId) {
   }
 }
 
-function sendSupervisorPostEvalEmail(trainingId, supervisor, trainingObj) {
-  try {
-    if (!supervisor || !supervisor.Email) return;
-    const publicUrl = getPublicPortalUrl() || getAppUrl();
-    const reviewUrl = `${publicUrl}?page=posteval&id=${trainingId}&eval=${encodeURIComponent(supervisor.ID || supervisor.Email)}`;
-    const tName = trainingObj ? trainingObj.Name : trainingId;
-
-    const subject = `[TrainHub] 3-Month Post-Training Competency Review Required - ${tName}`;
-    const body = `Dear ${supervisor.Name || 'Supervisor / PIC'},\n\n` +
-      `The 3-month milestone after course completion has elapsed for training programme:\n` +
-      `Training Name: ${tName} (${trainingObj ? (trainingObj.Code || trainingId) : trainingId})\n\n` +
-      `You have been assigned as the Supervisor / Person In Charge to evaluate assigned participant(s).\n\n` +
-      `Please click the link below to access the 3-Month Competency Review Portal:\n` +
-      `${reviewUrl}\n\n` +
-      `Thank you,\nTrainHub Training Management System`;
-
-    MailApp.sendEmail(supervisor.Email, subject, body);
-  } catch (e) {
-    Logger.log('sendSupervisorPostEvalEmail error: ' + e.message);
+/**
+ * Sends a supervisor Post Evaluation email using Apollo's established styling and subject format.
+ * Supports consolidated multi-participant formatting.
+ * 
+ * @param {string} trainingId - Unique training ID
+ * @param {Object} supervisor - { ID, Name, Email }
+ * @param {Object} trainingObj - Training record
+ * @param {Array} participantsList - Optional list of participants assigned to this supervisor
+ * @param {string} testRecipientEmail - Optional test recipient email for safe redirection in Test Mode
+ */
+function sendSupervisorPostEvalEmail(trainingId, supervisor, trainingObj, participantsList, testRecipientEmail) {
+  if (!supervisor || !supervisor.Email) {
+    throw new Error('Supervisor email address is missing or invalid.');
   }
+
+  const cleanTId = String(trainingId || '').trim();
+  const tName = trainingObj ? String(trainingObj.Name || cleanTId) : cleanTId;
+  const tCode = trainingObj ? String(trainingObj.Code || cleanTId) : cleanTId;
+  const compDateStr = trainingObj ? String(trainingObj.EndDate || trainingObj.StartDate || '') : '';
+  const compDateFormatted = formatMinimalistDate(compDateStr) || compDateStr || 'Recently';
+
+  const publicUrl = getPublicPortalUrl() || getAppUrl();
+  const reviewUrl = `${publicUrl}?page=post&id=${encodeURIComponent(cleanTId)}&eval=${encodeURIComponent(supervisor.ID || supervisor.Email)}`;
+
+  const isTestMode = Boolean(testRecipientEmail);
+  const targetEmail = isTestMode ? String(testRecipientEmail).trim() : supervisor.Email;
+  const subjectPrefix = isTestMode ? '[TEST MODE - REDIRECTED] ' : '';
+  const subject = `${subjectPrefix}[Apollo] 3-Month Post-Training Competency Review Required - ${tName}`;
+
+  // Build participants table/list
+  let participantListText = '';
+  let participantListHtml = '';
+
+  if (Array.isArray(participantsList) && participantsList.length > 0) {
+    participantListText = '\nAssigned Participant(s):\n' +
+      participantsList.map((p, idx) => `  ${idx + 1}. ${p.EmployeeName || p.Name || 'Employee'} (${p.EmployeeID || p.EmployeeNo || p.ID || '-'}) - ${p.Department || 'Department'}`).join('\n') + '\n\n';
+
+    participantListHtml = `
+      <div style="margin: 16px 0; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px 16px;">
+        <div style="font-size: 13px; font-weight: 700; color: #1E293B; margin-bottom: 8px;">Assigned Participant(s) for Review:</div>
+        <table style="width: 100%; border-collapse: collapse; font-size: 12.5px; color: #334155;">
+          <thead>
+            <tr style="border-bottom: 1px solid #CBD5E1; text-align: left;">
+              <th style="padding: 6px 8px; font-size: 11.5px; color: #64748B;">No.</th>
+              <th style="padding: 6px 8px; font-size: 11.5px; color: #64748B;">Employee Name</th>
+              <th style="padding: 6px 8px; font-size: 11.5px; color: #64748B;">Employee ID</th>
+              <th style="padding: 6px 8px; font-size: 11.5px; color: #64748B;">Department</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${participantsList.map((p, idx) => `
+              <tr style="border-bottom: 1px solid #F1F5F9;">
+                <td style="padding: 6px 8px; font-weight: 600;">${idx + 1}</td>
+                <td style="padding: 6px 8px; font-weight: 700; color: #0F172A;">${p.EmployeeName || p.Name || 'Employee'}</td>
+                <td style="padding: 6px 8px; color: #475569;">${p.EmployeeID || p.EmployeeNo || p.ID || '-'}</td>
+                <td style="padding: 6px 8px; color: #64748B;">${p.Department || '-'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  const plainText = `Dear ${supervisor.Name || 'Supervisor / PIC'},\n\n` +
+    `The 3-month milestone after course completion has elapsed for training programme:\n` +
+    `Training Name: ${tName} (${tCode})\n` +
+    `Course Completed: ${compDateFormatted}\n\n` +
+    `You have been assigned as the Supervisor / Person In Charge to evaluate the performance and competency improvement of the assigned participant(s).\n` +
+    participantListText +
+    `Please click the link below to access the 3-Month Competency Review Portal:\n` +
+    `${reviewUrl}\n\n` +
+    `Thank you,\nApollo Job Training Management System`;
+
+  const htmlBody = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1E293B; line-height: 1.5;">
+      <div style="background: #2563EB; padding: 18px 24px; border-radius: 8px 8px 0 0; color: #FFFFFF;">
+        <h2 style="margin: 0; font-size: 18px; font-weight: 800;">Apollo Job Training Management System</h2>
+        <div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">3-Month Post-Training Competency Review Notification</div>
+      </div>
+      <div style="border: 1px solid #E2E8F0; border-top: none; padding: 24px; border-radius: 0 0 8px 8px; background: #FFFFFF;">
+        <p style="font-size: 14px; margin-top: 0;">Dear <strong>${supervisor.Name || 'Supervisor / PIC'}</strong>,</p>
+        <p style="font-size: 13px; color: #475569;">
+          The <strong>3-month post-training milestone</strong> has been reached for the following training programme.
+          As the designated supervisor, please complete the competency review for your assigned participant(s).
+        </p>
+
+        <div style="background: #F8FAFC; border-left: 4px solid #2563EB; padding: 12px 16px; border-radius: 4px; margin: 16px 0;">
+          <div style="font-size: 14px; font-weight: 800; color: #1E293B;">${tName}</div>
+          <div style="font-size: 12px; color: #64748B; margin-top: 3px;">
+            Training Code: <strong>${tCode}</strong> &bull; Completed: <strong>${compDateFormatted}</strong>
+          </div>
+        </div>
+
+        ${participantListHtml}
+
+        <div style="text-align: center; margin: 24px 0;">
+          <a href="${reviewUrl}" target="_blank" style="background: #2563EB; color: #FFFFFF; text-decoration: none; padding: 12px 28px; border-radius: 6px; font-size: 14px; font-weight: 700; display: inline-block;">
+            Open 3-Month Competency Review Portal &rarr;
+          </a>
+        </div>
+
+        <p style="font-size: 11.5px; color: #94A3B8; margin-bottom: 0;">
+          If the button above does not work, copy and paste this link into your browser:<br/>
+          <a href="${reviewUrl}" style="color: #2563EB; word-break: break-all;">${reviewUrl}</a>
+        </p>
+        <hr style="border: none; border-top: 1px solid #E2E8F0; margin: 20px 0 14px;" />
+        <div style="font-size: 11px; color: #94A3B8; text-align: center;">
+          This is an automated system email from the Apollo Job Training Management System. Please do not reply directly.
+        </div>
+      </div>
+    </div>
+  `;
+
+  MailApp.sendEmail({
+    to: targetEmail,
+    subject: subject,
+    body: plainText,
+    htmlBody: htmlBody
+  });
+
+  Logger.log(`Post Eval Email sent to ${targetEmail} (Supervisor: ${supervisor.Name || supervisor.Email}) for training ${cleanTId}`);
+  return { success: true, targetEmail: targetEmail };
 }
 
 /**
- * Daily Cron Task: Checks all active trainings. If 3-month milestone (90 days post EndDate) is reached,
- * emails all assigned supervisors who haven't completed post-evaluation yet.
+ * Processes and sends 3-Month Post Evaluation emails for a specific training programme.
+ * Enforces supervisor validation, per-supervisor grouping, idempotency, and detailed state logging.
+ * 
+ * @param {string} trainingId - Training programme ID
+ * @param {Object} options - { simulatedDate, testEmailRecipient, forceResend }
  */
-function cronCheck3MonthPostEvalNotifications() {
+function sendSupervisorPostEvaluationEmailsForTraining(trainingId, options) {
+  options = options || {};
+  const cleanTId = String(trainingId || '').trim();
+  if (!cleanTId) return err('Training ID is required.');
+
+  const tSheet = getSheet(SHEET_NAMES.trainings);
+  if (!tSheet) return err('Trainings database sheet not found.');
+
+  const headers = ensureTrainingSheetColumns(tSheet);
+  const trainings = sheetToJson(tSheet);
+  const tObj = trainings.find(tr => String(tr.ID || tr.Code || '').trim() === cleanTId);
+  if (!tObj) return err(`Training record '${cleanTId}' not found.`);
+
+  const now = options.simulatedDate ? new Date(options.simulatedDate) : new Date();
+  const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  // Check 3-month milestone using the standard single source of truth
+  const compDateRaw = tObj.EndDate || tObj.StartDate;
+  let compDate = null;
+  if (compDateRaw instanceof Date) {
+    compDate = !isNaN(compDateRaw.getTime()) ? new Date(compDateRaw.getFullYear(), compDateRaw.getMonth(), compDateRaw.getDate()) : null;
+  } else {
+    const str = String(compDateRaw || '').trim();
+    const ymd = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+    if (ymd) {
+      compDate = new Date(parseInt(ymd[1], 10), parseInt(ymd[2], 10) - 1, parseInt(ymd[3], 10));
+    } else {
+      const dmy = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+      if (dmy) {
+        compDate = new Date(parseInt(dmy[3], 10), parseInt(dmy[2], 10) - 1, parseInt(dmy[1], 10));
+      } else {
+        const d = new Date(str);
+        if (!isNaN(d.getTime())) compDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      }
+    }
+  }
+
+  if (!compDate) {
+    return err('Cannot determine training completion date for 3-month milestone check.');
+  }
+
+  const targetY = compDate.getFullYear() + Math.floor((compDate.getMonth() + 3) / 12);
+  const targetM = (compDate.getMonth() + 3) % 12;
+  const daysInTargetMonth = new Date(targetY, targetM + 1, 0).getDate();
+  const targetDay = Math.min(compDate.getDate(), daysInTargetMonth);
+  const threeMonthMidnight = new Date(targetY, targetM, targetDay);
+
+  const isMilestoneReached = todayMidnight.getTime() >= threeMonthMidnight.getTime();
+  if (!isMilestoneReached && !options.forceResend) {
+    return err(`3-Month milestone has not yet been reached for this training (Due: ${formatMinimalistDate(threeMonthMidnight)}).`);
+  }
+
+  // 1. Fetch participants
+  let participants = [];
+  try {
+    participants = getTrainingParticipantsList(cleanTId);
+  } catch(pErr) {
+    return err('Failed to retrieve training participants: ' + pErr.message);
+  }
+
+  if (!participants || participants.length === 0) {
+    return ok({
+      trainingId: cleanTId,
+      status: 'NO_PARTICIPANTS',
+      message: 'No participants enrolled in this training programme.'
+    });
+  }
+
+  // 2. Detect missing supervisor assignments
+  const unassignedParticipants = participants.filter(p => {
+    const supId = String(p.SupervisorID || '').trim();
+    const supEmail = String(p.SupervisorEmail || '').trim();
+    const supName = String(p.SupervisorName || '').trim();
+    return !supId && !supEmail && !supName;
+  });
+
+  const statusCol = headers.indexOf('PostEvalEmailStatus') + 1;
+  const sentAtCol = headers.indexOf('PostEvalEmailSentAt') + 1;
+  const errorCol  = headers.indexOf('PostEvalEmailError') + 1;
+  const logCol    = headers.indexOf('PostEvalEmailLog') + 1;
+
+  if (unassignedParticipants.length > 0) {
+    if (tObj._row && statusCol > 0) {
+      tSheet.getRange(tObj._row, statusCol).setValue('SUPERVISOR_MISSING');
+      if (errorCol > 0) tSheet.getRange(tObj._row, errorCol).setValue(`${unassignedParticipants.length} participant(s) require supervisor assignment.`);
+    }
+    return ok({
+      trainingId: cleanTId,
+      status: 'SUPERVISOR_MISSING',
+      unassignedCount: unassignedParticipants.length,
+      message: `Post Evaluation email cannot be sent for ${unassignedParticipants.length} participant(s) because supervisors have not been assigned.`
+    });
+  }
+
+  // 3. Group participants by Supervisor Email
+  const supervisorMap = {};
+  participants.forEach(p => {
+    let email = String(p.SupervisorEmail || '').trim().toLowerCase();
+    if (!email && p.SupervisorID) {
+      email = String(p.SupervisorID).trim().toLowerCase();
+      if (!email.includes('@')) email = `${email}@apollofood.com.my`;
+    }
+    if (!email) return;
+
+    if (!supervisorMap[email]) {
+      supervisorMap[email] = {
+        ID: String(p.SupervisorID || email).trim(),
+        Name: String(p.SupervisorName || p.SupervisorID || email).trim(),
+        Email: email,
+        participants: []
+      };
+    }
+    supervisorMap[email].participants.push(p);
+  });
+
+  const supervisorEmails = Object.keys(supervisorMap);
+  if (supervisorEmails.length === 0) {
+    return err('No valid supervisor email addresses found for participants.');
+  }
+
+  // 4. Parse existing dispatch log
+  let currentLog = {};
+  try {
+    if (tObj.PostEvalEmailLog) {
+      currentLog = typeof tObj.PostEvalEmailLog === 'string' ? JSON.parse(tObj.PostEvalEmailLog) : tObj.PostEvalEmailLog;
+    }
+  } catch(e) {
+    currentLog = {};
+  }
+  if (!currentLog || typeof currentLog !== 'object') currentLog = {};
+  if (!currentLog.supervisors) currentLog.supervisors = {};
+
+  let successCount = 0;
+  let failCount = 0;
+  let skippedCount = 0;
+  const dispatchErrors = [];
+
+  // 5. Send consolidated email per supervisor
+  supervisorEmails.forEach(supEmail => {
+    const supObj = supervisorMap[supEmail];
+    const prevEntry = currentLog.supervisors[supEmail];
+
+    // Idempotency: Skip if already SENT unless forced
+    if (prevEntry && prevEntry.status === 'SENT' && !options.forceResend) {
+      skippedCount++;
+      return;
+    }
+
+    try {
+      sendSupervisorPostEvalEmail(cleanTId, supObj, tObj, supObj.participants, options.testEmailRecipient);
+      currentLog.supervisors[supEmail] = {
+        supervisorId: supObj.ID,
+        supervisorName: supObj.Name,
+        email: supEmail,
+        status: 'SENT',
+        sentAt: now(),
+        participantCount: supObj.participants.length
+      };
+      successCount++;
+    } catch(sendErr) {
+      const errMsg = sendErr.message || 'Unknown email service error';
+      currentLog.supervisors[supEmail] = {
+        supervisorId: supObj.ID,
+        supervisorName: supObj.Name,
+        email: supEmail,
+        status: 'FAILED',
+        error: errMsg,
+        attemptedAt: now(),
+        participantCount: supObj.participants.length
+      };
+      failCount++;
+      dispatchErrors.push(`${supObj.Name || supEmail}: ${errMsg}`);
+    }
+  });
+
+  // 6. Update overall state in database
+  let overallStatus = 'PENDING';
+  let overallError = '';
+  const totalSupervisors = supervisorEmails.length;
+  const allSent = supervisorEmails.every(e => currentLog.supervisors[e] && currentLog.supervisors[e].status === 'SENT');
+
+  if (allSent) {
+    overallStatus = 'SENT';
+    overallError = '';
+  } else if (failCount > 0) {
+    overallStatus = 'FAILED';
+    overallError = dispatchErrors.join('; ');
+  } else {
+    overallStatus = tObj.PostEvalEmailStatus || 'PENDING';
+  }
+
+  currentLog.lastUpdated = now();
+  currentLog.milestoneDate = threeMonthMidnight.toISOString();
+
+  if (tObj._row) {
+    if (statusCol > 0) tSheet.getRange(tObj._row, statusCol).setValue(overallStatus);
+    if (allSent && sentAtCol > 0) tSheet.getRange(tObj._row, sentAtCol).setValue(now());
+    if (errorCol > 0) tSheet.getRange(tObj._row, errorCol).setValue(overallError);
+    if (logCol > 0) tSheet.getRange(tObj._row, logCol).setValue(JSON.stringify(currentLog));
+  }
+
+  return ok({
+    trainingId: cleanTId,
+    status: overallStatus,
+    totalSupervisors: totalSupervisors,
+    sentCount: successCount,
+    failedCount: failCount,
+    skippedCount: skippedCount,
+    error: overallError,
+    log: currentLog,
+    message: allSent
+      ? `3-Month Post Evaluation email successfully dispatched to ${totalSupervisors} supervisor(s).`
+      : (failCount > 0 ? `Failed to send email to ${failCount} supervisor(s): ${overallError}` : `Dispatched ${successCount} emails, ${skippedCount} previously sent.`)
+  });
+}
+
+/**
+ * Hourly / Daily Scheduled Task: Evaluates all completed training programmes.
+ * Automatically dispatches 3-Month Post Evaluation emails to supervisors upon reaching the milestone.
+ * Completely server-side and independent of the Admin Dashboard.
+ */
+function processAutomated3MonthPostEvaluationEmails(simulatedDate, testEmailRecipient) {
   try {
     const tSheet = getSheet(SHEET_NAMES.trainings);
-    if (!tSheet) return;
+    if (!tSheet) return ok({ processed: 0, sent: 0, skipped: 0, errors: [] });
+
+    ensureTrainingSheetColumns(tSheet);
     const trainings = sheetToJson(tSheet);
-    const now = new Date();
+    if (!trainings || trainings.length === 0) return ok({ processed: 0, sent: 0, skipped: 0, errors: [] });
+
+    const now = simulatedDate ? new Date(simulatedDate) : new Date();
+    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    let processedCount = 0;
+    let sentCount = 0;
+    let skippedCount = 0;
+    let missingSupCount = 0;
+    const errors = [];
 
     trainings.forEach(t => {
       const tId = String(t.ID || t.Code || '').trim();
       if (!tId) return;
 
-      const endDate = parseDateObj(t.EndDate || t.StartDate);
-      if (!endDate) return;
+      const stage = String(t.Stage || '').trim();
+      const status = String(t.Status || '').trim();
 
-      const target3MonthDate = new Date(endDate.getTime() + 90 * 24 * 60 * 60 * 1000);
-      if (now < target3MonthDate) return;
+      const startDateStr = t.StartDate;
+      const endDateStr = t.EndDate || t.StartDate;
+      if (!startDateStr && !endDateStr) return;
 
-      const ss = getTrainingDataSpreadsheet(tId);
-      if (!ss) return;
+      const compDateRaw = endDateStr || startDateStr;
+      let compDate = null;
+      if (compDateRaw instanceof Date) {
+        compDate = !isNaN(compDateRaw.getTime()) ? new Date(compDateRaw.getFullYear(), compDateRaw.getMonth(), compDateRaw.getDate()) : null;
+      } else {
+        const str = String(compDateRaw).trim();
+        const ymd = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+        if (ymd) {
+          compDate = new Date(parseInt(ymd[1], 10), parseInt(ymd[2], 10) - 1, parseInt(ymd[3], 10));
+        } else {
+          const dmy = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+          if (dmy) {
+            compDate = new Date(parseInt(dmy[3], 10), parseInt(dmy[2], 10) - 1, parseInt(dmy[1], 10));
+          } else {
+            const d = new Date(str);
+            if (!isNaN(d.getTime())) compDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+          }
+        }
+      }
+      if (!compDate) return;
 
-      const tpSheet = ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants');
-      if (!tpSheet) return;
+      const isCompleted = ['Training Completed', 'Evaluation Completed', 'Waiting for 3-Month Review', 'Programme Closed', 'Completed'].includes(stage) ||
+                          status === 'Completed' ||
+                          (todayMidnight.getTime() > compDate.getTime());
+      if (!isCompleted) return;
 
-      const tpRows = sheetToJson(tpSheet);
-      const postSheet = ss.getSheetByName('Post Evaluation') || ss.getSheetByName('PostEval');
-      const postRows = postSheet ? sheetToJson(postSheet) : [];
+      // 3-Month Milestone calculation
+      const targetY = compDate.getFullYear() + Math.floor((compDate.getMonth() + 3) / 12);
+      const targetM = (compDate.getMonth() + 3) % 12;
+      const daysInTargetMonth = new Date(targetY, targetM + 1, 0).getDate();
+      const targetDay = Math.min(compDate.getDate(), daysInTargetMonth);
+      const threeMonthMidnight = new Date(targetY, targetM, targetDay);
 
-      const notifiedSupervisors = new Set();
+      const daysUntil3Mo = Math.round((threeMonthMidnight.getTime() - todayMidnight.getTime()) / (1000 * 60 * 60 * 24));
 
-      tpRows.forEach(p => {
-        const empId = String(p.EmployeeID || p.ID || '').trim();
-        if (!empId) return;
+      // Only process when 3-month milestone is reached or passed (daysUntil3Mo <= 0)
+      if (daysUntil3Mo <= 0) {
+        processedCount++;
 
-        const postCompleted = postRows.some(pr => isSameEmployeeId(pr.EmployeeID || pr.ID || '', empId));
-        if (postCompleted) return;
+        // Idempotency: Skip if already successfully sent
+        const emailStatus = String(t.PostEvalEmailStatus || '').trim().toUpperCase();
+        if (emailStatus === 'SENT' && !testEmailRecipient) {
+          skippedCount++;
+          return;
+        }
 
-        const supEmail = String(p.SupervisorEmail || '').trim();
-        const supId = String(p.SupervisorID || '').trim();
-        const supName = String(p.SupervisorName || supId || supEmail).trim();
+        try {
+          const res = sendSupervisorPostEvaluationEmailsForTraining(tId, {
+            simulatedDate: simulatedDate,
+            testEmailRecipient: testEmailRecipient
+          });
+          const resData = (res && typeof res === 'object') ? (res.data || res) : {};
+          if (resData.status === 'SENT') {
+            sentCount++;
+          } else if (resData.status === 'SUPERVISOR_MISSING') {
+            missingSupCount++;
+          } else if (resData.status === 'FAILED') {
+            errors.push(`${tId}: ${resData.error || 'Email dispatch failed'}`);
+          }
+        } catch(autoErr) {
+          errors.push(`${tId}: ${autoErr.message}`);
+        }
+      }
+    });
 
-        if (!supEmail || notifiedSupervisors.has(supEmail.toLowerCase())) return;
-
-        const supervisorObj = { ID: supId || supEmail, Name: supName, Email: supEmail };
-        sendSupervisorPostEvalEmail(tId, supervisorObj, t);
-        notifiedSupervisors.add(supEmail.toLowerCase());
-        Logger.log(`Automated 3-Month Post Eval Email sent to ${supEmail} for training ${tId}`);
-      });
+    Logger.log(`processAutomated3MonthPostEvaluationEmails complete: Processed ${processedCount}, Sent ${sentCount}, Skipped ${skippedCount}, Missing Sup ${missingSupCount}, Errors: ${errors.length}`);
+    return ok({
+      processedCount: processedCount,
+      sentCount: sentCount,
+      skippedCount: skippedCount,
+      missingSupCount: missingSupCount,
+      errors: errors
     });
 
   } catch(e) {
-    Logger.log('cronCheck3MonthPostEvalNotifications error: ' + e.message);
+    Logger.log('processAutomated3MonthPostEvaluationEmails error: ' + e.message);
+    return err('Failed to execute automated post evaluation emails: ' + e.message);
+  }
+}
+
+/**
+ * Developer / Test Mode: Simulates 3-Month Post Evaluation automation for any date.
+ * Safely redirects emails to a test recipient to prevent accidental live supervisor messaging.
+ * 
+ * @param {string} trainingId - Specific training ID to test (or empty for all)
+ * @param {string} simulatedDateStr - e.g. '2026-11-19'
+ * @param {string} testEmailRecipient - Email address to receive redirected test emails
+ */
+function runPostEvaluationAutomationTest(trainingId, simulatedDateStr, testEmailRecipient) {
+  try {
+    const simDate = simulatedDateStr ? new Date(simulatedDateStr) : new Date();
+    if (isNaN(simDate.getTime())) return err('Invalid simulated date format. Use YYYY-MM-DD.');
+
+    const testEmail = testEmailRecipient || getConfigProperty('ADMIN_EMAILS', '') || 'test@apollofood.com.my';
+
+    if (trainingId) {
+      return sendSupervisorPostEvaluationEmailsForTraining(trainingId, {
+        simulatedDate: simDate,
+        testEmailRecipient: testEmail,
+        forceResend: true
+      });
+    } else {
+      return processAutomated3MonthPostEvaluationEmails(simDate, testEmail);
+    }
+  } catch(e) {
+    return err('runPostEvaluationAutomationTest error: ' + e.message);
+  }
+}
+
+/**
+ * API: Manually trigger or retry sending Post Evaluation emails from Admin Dashboard.
+ */
+function triggerPostEvaluationEmailSend(trainingId) {
+  try {
+    if (!trainingId) return err('Training ID is required.');
+    return sendSupervisorPostEvaluationEmailsForTraining(trainingId, { forceResend: false });
+  } catch(e) {
+    return err('Failed to send Post Evaluation email: ' + e.message);
+  }
+}
+
+/**
+ * Automations & Trigger Setup: Hourly Trigger for Apps Script
+ */
+function setupAutomatedLifecycleTrigger() {
+  try {
+    const allTriggers = ScriptApp.getProjectTriggers();
+    allTriggers.forEach(tr => {
+      if (tr.getHandlerFunction() === 'runTrainingLifecycleAutomation' || tr.getHandlerFunction() === 'cronCheck3MonthPostEvalNotifications') {
+        ScriptApp.deleteTrigger(tr);
+      }
+    });
+
+    ScriptApp.newTrigger('runTrainingLifecycleAutomation')
+      .timeBased()
+      .everyHours(1)
+      .create();
+
+    Logger.log('Created hourly trigger for runTrainingLifecycleAutomation');
+    return ok({
+      message: 'Hourly trigger configured successfully for runTrainingLifecycleAutomation.',
+      frequency: 'HOURLY',
+      count: 1
+    });
+  } catch(e) {
+    Logger.log('setupAutomatedLifecycleTrigger error: ' + e.message);
+    return err('Failed to configure trigger: ' + e.message);
+  }
+}
+
+/**
+ * Inspects and returns the status of Apps Script time-driven triggers.
+ */
+function getAutomationTriggerStatus() {
+  try {
+    const allTriggers = ScriptApp.getProjectTriggers();
+    const lifecycleTriggers = allTriggers.filter(tr => tr.getHandlerFunction() === 'runTrainingLifecycleAutomation');
+
+    return ok({
+      exists: lifecycleTriggers.length > 0,
+      count: lifecycleTriggers.length,
+      frequency: 'HOURLY',
+      hasDuplicates: lifecycleTriggers.length > 1,
+      handler: 'runTrainingLifecycleAutomation'
+    });
+  } catch(e) {
+    return err('Failed to inspect project triggers: ' + e.message);
+  }
+}
+
+function runTrainingLifecycleAutomation() {
+  try {
+    autoUpdateTrainingLifecycleStages();
+  } catch(e) {
+    Logger.log('autoUpdateTrainingLifecycleStages error: ' + e.message);
+  }
+
+  try {
+    processAutomated3MonthPostEvaluationEmails();
+  } catch(e) {
+    Logger.log('processAutomated3MonthPostEvaluationEmails error: ' + e.message);
   }
 }
 

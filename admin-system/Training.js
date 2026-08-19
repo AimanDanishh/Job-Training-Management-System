@@ -782,3 +782,516 @@ function updateTrainingParticipantCount(trainingId, count) {
     Logger.log('updateTrainingParticipantCount error: ' + e.message);
   }
 }
+
+/**
+ * Returns actionable reminders and notifications for upcoming training evaluations,
+ * supervisor assignments, and 3-month post-evaluations.
+ * Purely read-only calculation without mutating or adding any database sheets.
+ */
+function getTrainingActionNotifications() {
+  try {
+    const tSheet = getSheet(SHEET_NAMES.trainings);
+    if (!tSheet) return ok({ count: 0, notifications: [] });
+
+    const tRows = sheetToJson(tSheet);
+    if (!tRows || tRows.length === 0) return ok({ count: 0, notifications: [] });
+
+    const now = new Date();
+    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    let publicBaseUrl = '';
+    try {
+      const pUrl = getPublicPortalUrl();
+      if (pUrl) publicBaseUrl = String(pUrl).split('?')[0];
+    } catch(e) {}
+
+    const notifications = [];
+
+    tRows.forEach(t => {
+      const trainingId = String(t.ID || t.Code || '').trim();
+      if (!trainingId) return;
+
+      const trainingTitle = String(t.Name || 'Untitled Programme').trim();
+      const trainingCode  = String(t.Code || trainingId).trim();
+      const status        = String(t.Status || '').trim();
+      const stage         = String(t.Stage || '').trim();
+      const approvalStatus = String(t.ApprovalStatus || 'Approved').trim();
+
+      const startDateStr = t.StartDate;
+      const endDateStr   = t.EndDate || t.StartDate;
+      if (!startDateStr && !endDateStr) return;
+
+      const compDateRaw = endDateStr || startDateStr;
+      let compDate = null;
+      if (compDateRaw instanceof Date) {
+        compDate = !isNaN(compDateRaw.getTime()) ? new Date(compDateRaw.getFullYear(), compDateRaw.getMonth(), compDateRaw.getDate()) : null;
+      } else {
+        const str = String(compDateRaw).trim();
+        const ymd = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+        if (ymd) {
+          compDate = new Date(parseInt(ymd[1], 10), parseInt(ymd[2], 10) - 1, parseInt(ymd[3], 10));
+        } else {
+          const dmy = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+          if (dmy) {
+            compDate = new Date(parseInt(dmy[3], 10), parseInt(dmy[2], 10) - 1, parseInt(dmy[1], 10));
+          } else {
+            const d = new Date(str);
+            if (!isNaN(d.getTime())) compDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+          }
+        }
+      }
+      if (!compDate) return;
+
+      // Determine if training has completed
+      const isCompleted = ['Training Completed', 'Evaluation Completed', 'Waiting for 3-Month Review', 'Programme Closed', 'Completed'].includes(stage) ||
+                          status === 'Completed' ||
+                          (todayMidnight.getTime() > compDate.getTime());
+
+      if (!isCompleted) {
+        return;
+      }
+
+      const evalPublicUrl = publicBaseUrl ? `${publicBaseUrl}?page=evaluation&id=${encodeURIComponent(trainingId)}` : '';
+      const postPublicUrl = publicBaseUrl ? `${publicBaseUrl}?page=post&id=${encodeURIComponent(trainingId)}` : '';
+
+      // -------------------------------------------------------------------------
+      // 1. Participant Training Evaluation (2-Week Window)
+      // -------------------------------------------------------------------------
+      const isEvalCompleted = ['Evaluation Completed', 'Waiting for 3-Month Review', 'Programme Closed'].includes(stage);
+
+      if (!isEvalCompleted) {
+        // Calculate 2-Week evaluation deadline (14 days after completion date)
+        const evalDeadline = new Date(compDate.getFullYear(), compDate.getMonth(), compDate.getDate() + 14, 23, 59, 59, 999);
+        const evalDeadlineMidnight = new Date(compDate.getFullYear(), compDate.getMonth(), compDate.getDate() + 14);
+        const daysRemaining = Math.round((evalDeadlineMidnight.getTime() - todayMidnight.getTime()) / (1000 * 60 * 60 * 24));
+        const deadlineFormatted = formatMinimalistDate(evalDeadline);
+
+        if (daysRemaining < 0) {
+          // Overdue
+          const overdueDays = Math.abs(daysRemaining);
+          notifications.push({
+            id: `${trainingId}_EVALUATION`,
+            category: 'EVALUATION',
+            type: 'EVALUATION_OVERDUE',
+            priority: 'OVERDUE',
+            priorityRank: 1,
+            trainingId: trainingId,
+            trainingTitle: trainingTitle,
+            trainingCode: trainingCode,
+            status: status,
+            stage: stage,
+            title: `Training Evaluation overdue by ${overdueDays} day${overdueDays > 1 ? 's' : ''}`,
+            message: `Participant evaluation deadline passed on ${deadlineFormatted}. Review completed submissions.`,
+            countdownText: `Overdue by ${overdueDays} day${overdueDays > 1 ? 's' : ''}`,
+            daysRemaining: daysRemaining,
+            deadlineDate: evalDeadline.toISOString(),
+            deadlineFormatted: deadlineFormatted,
+            action: 'VIEW_EVALUATION',
+            actionLabel: 'View Evaluation',
+            evalUrl: evalPublicUrl
+          });
+        } else if (daysRemaining === 0) {
+          // Due Today
+          notifications.push({
+            id: `${trainingId}_EVALUATION`,
+            category: 'EVALUATION',
+            type: 'EVALUATION_DUE_TODAY',
+            priority: 'CRITICAL',
+            priorityRank: 2,
+            trainingId: trainingId,
+            trainingTitle: trainingTitle,
+            trainingCode: trainingCode,
+            status: status,
+            stage: stage,
+            title: 'Training Evaluation due today',
+            message: 'Participants have until the end of today to complete the 2-week training evaluation.',
+            countdownText: 'Due today',
+            daysRemaining: 0,
+            deadlineDate: evalDeadline.toISOString(),
+            deadlineFormatted: deadlineFormatted,
+            action: 'SHARE_EVALUATION_QR',
+            actionLabel: 'Share Evaluation QR',
+            secondaryAction: 'VIEW_EVALUATION',
+            secondaryActionLabel: 'View Evaluation',
+            evalUrl: evalPublicUrl
+          });
+        } else if (daysRemaining === 1) {
+          // 1 Day Remaining (Tomorrow)
+          notifications.push({
+            id: `${trainingId}_EVALUATION`,
+            category: 'EVALUATION',
+            type: 'EVALUATION_1_DAY',
+            priority: 'CRITICAL',
+            priorityRank: 2,
+            trainingId: trainingId,
+            trainingTitle: trainingTitle,
+            trainingCode: trainingCode,
+            status: status,
+            stage: stage,
+            title: 'Tomorrow: Training Evaluation deadline',
+            message: 'Participant evaluation deadline is tomorrow. Ensure attendees have received the evaluation QR.',
+            countdownText: 'Tomorrow',
+            daysRemaining: 1,
+            deadlineDate: evalDeadline.toISOString(),
+            deadlineFormatted: deadlineFormatted,
+            action: 'SHARE_EVALUATION_QR',
+            actionLabel: 'Share Evaluation QR',
+            evalUrl: evalPublicUrl
+          });
+        } else if (daysRemaining <= 3) {
+          // 3 Days Remaining
+          notifications.push({
+            id: `${trainingId}_EVALUATION`,
+            category: 'EVALUATION',
+            type: 'EVALUATION_3_DAYS',
+            priority: 'CRITICAL',
+            priorityRank: 2,
+            trainingId: trainingId,
+            trainingTitle: trainingTitle,
+            trainingCode: trainingCode,
+            status: status,
+            stage: stage,
+            title: `${daysRemaining} days left for Training Evaluation`,
+            message: `Participant evaluation deadline is in ${daysRemaining} days. Consider sharing the Evaluation QR.`,
+            countdownText: `${daysRemaining} days remaining`,
+            daysRemaining: daysRemaining,
+            deadlineDate: evalDeadline.toISOString(),
+            deadlineFormatted: deadlineFormatted,
+            action: 'SHARE_EVALUATION_QR',
+            actionLabel: 'Share Evaluation QR',
+            evalUrl: evalPublicUrl
+          });
+        } else if (daysRemaining <= 7) {
+          // 7 Days Remaining (1 week)
+          notifications.push({
+            id: `${trainingId}_EVALUATION`,
+            category: 'EVALUATION',
+            type: 'EVALUATION_1_WEEK',
+            priority: 'HIGH',
+            priorityRank: 3,
+            trainingId: trainingId,
+            trainingTitle: trainingTitle,
+            trainingCode: trainingCode,
+            status: status,
+            stage: stage,
+            title: '1 week left for Training Evaluation',
+            message: `Participants have ${daysRemaining} days remaining to complete their evaluation. Consider sharing the Evaluation QR.`,
+            countdownText: `${daysRemaining} days remaining`,
+            daysRemaining: daysRemaining,
+            deadlineDate: evalDeadline.toISOString(),
+            deadlineFormatted: deadlineFormatted,
+            action: 'SHARE_EVALUATION_QR',
+            actionLabel: 'Share Evaluation QR',
+            evalUrl: evalPublicUrl
+          });
+        }
+      }
+
+      // -------------------------------------------------------------------------
+      // 2. Supervisor Assignment (Approaching 3-Month Milestone)
+      // -------------------------------------------------------------------------
+      const targetY = compDate.getFullYear() + Math.floor((compDate.getMonth() + 3) / 12);
+      const targetM = (compDate.getMonth() + 3) % 12;
+      const daysInTargetMonth = new Date(targetY, targetM + 1, 0).getDate();
+      const targetDay = Math.min(compDate.getDate(), daysInTargetMonth);
+      const threeMonthDate = new Date(targetY, targetM, targetDay, 23, 59, 59, 999);
+      const threeMonthMidnight = new Date(targetY, targetM, targetDay);
+      const daysUntil3Mo = Math.round((threeMonthMidnight.getTime() - todayMidnight.getTime()) / (1000 * 60 * 60 * 24));
+      const milestoneFormatted = formatMinimalistDate(threeMonthDate);
+
+      const isClosed = stage === 'Programme Closed';
+
+      if (!isClosed && daysUntil3Mo <= 14) {
+        let participants = [];
+        try {
+          participants = getTrainingParticipantsList(trainingId);
+        } catch(pErr) {}
+
+        const unassignedParticipants = participants.filter(p => {
+          const supId = String(p.SupervisorID || '').trim();
+          const supEmail = String(p.SupervisorEmail || '').trim();
+          const supName = String(p.SupervisorName || '').trim();
+          return !supId && !supEmail && !supName;
+        });
+
+        const unassignedCount = unassignedParticipants.length;
+
+        if (participants.length > 0 && unassignedCount > 0) {
+          if (daysUntil3Mo < 0) {
+            // Overdue
+            const overdueDays = Math.abs(daysUntil3Mo);
+            notifications.push({
+              id: `${trainingId}_SUPERVISOR_ASSIGNMENT`,
+              category: 'SUPERVISOR',
+              type: 'SUPERVISOR_ASSIGNMENT_OVERDUE',
+              priority: 'OVERDUE',
+              priorityRank: 1,
+              trainingId: trainingId,
+              trainingTitle: trainingTitle,
+              trainingCode: trainingCode,
+              status: status,
+              stage: stage,
+              title: `Supervisor assignment overdue by ${overdueDays} day${overdueDays > 1 ? 's' : ''}`,
+              message: `${unassignedCount} participant${unassignedCount > 1 ? 's' : ''} still require supervisor assignment. 3-Month post evaluation is now active.`,
+              countdownText: `Overdue by ${overdueDays} day${overdueDays > 1 ? 's' : ''}`,
+              daysRemaining: daysUntil3Mo,
+              deadlineDate: threeMonthDate.toISOString(),
+              deadlineFormatted: milestoneFormatted,
+              unassignedCount: unassignedCount,
+              action: 'ASSIGN_SUPERVISOR',
+              actionLabel: 'Assign Supervisor'
+            });
+          } else if (daysUntil3Mo === 0) {
+            // Due Today
+            notifications.push({
+              id: `${trainingId}_SUPERVISOR_ASSIGNMENT`,
+              category: 'SUPERVISOR',
+              type: 'SUPERVISOR_ASSIGNMENT_DUE_TODAY',
+              priority: 'CRITICAL',
+              priorityRank: 2,
+              trainingId: trainingId,
+              trainingTitle: trainingTitle,
+              trainingCode: trainingCode,
+              status: status,
+              stage: stage,
+              title: 'Supervisor assignment due today',
+              message: `${unassignedCount} participant${unassignedCount > 1 ? 's' : ''} require supervisor assignment before 3-Month Post Evaluation unlocks today.`,
+              countdownText: 'Due today',
+              daysRemaining: 0,
+              deadlineDate: threeMonthDate.toISOString(),
+              deadlineFormatted: milestoneFormatted,
+              unassignedCount: unassignedCount,
+              action: 'ASSIGN_SUPERVISOR',
+              actionLabel: 'Assign Supervisor'
+            });
+          } else if (daysUntil3Mo <= 3) {
+            // 3 Days Remaining
+            notifications.push({
+              id: `${trainingId}_SUPERVISOR_ASSIGNMENT`,
+              category: 'SUPERVISOR',
+              type: 'SUPERVISOR_ASSIGNMENT_3_DAYS',
+              priority: 'CRITICAL',
+              priorityRank: 2,
+              trainingId: trainingId,
+              trainingTitle: trainingTitle,
+              trainingCode: trainingCode,
+              status: status,
+              stage: stage,
+              title: '3 days left to assign Supervisor',
+              message: `3-Month Post Evaluation milestone is in ${daysUntil3Mo} days. ${unassignedCount} participant${unassignedCount > 1 ? 's' : ''} still require a supervisor.`,
+              countdownText: `${daysUntil3Mo} days remaining`,
+              daysRemaining: daysUntil3Mo,
+              deadlineDate: threeMonthDate.toISOString(),
+              deadlineFormatted: milestoneFormatted,
+              unassignedCount: unassignedCount,
+              action: 'ASSIGN_SUPERVISOR',
+              actionLabel: 'Assign Supervisor'
+            });
+          } else if (daysUntil3Mo <= 7) {
+            // 1 Week Remaining
+            notifications.push({
+              id: `${trainingId}_SUPERVISOR_ASSIGNMENT`,
+              category: 'SUPERVISOR',
+              type: 'SUPERVISOR_ASSIGNMENT_1_WEEK',
+              priority: 'HIGH',
+              priorityRank: 3,
+              trainingId: trainingId,
+              trainingTitle: trainingTitle,
+              trainingCode: trainingCode,
+              status: status,
+              stage: stage,
+              title: '1 week left to assign Supervisor',
+              message: `Post Evaluation will begin on ${milestoneFormatted}. Please assign supervisors for ${unassignedCount} participant${unassignedCount > 1 ? 's' : ''}.`,
+              countdownText: `${daysUntil3Mo} days remaining`,
+              daysRemaining: daysUntil3Mo,
+              deadlineDate: threeMonthDate.toISOString(),
+              deadlineFormatted: milestoneFormatted,
+              unassignedCount: unassignedCount,
+              action: 'ASSIGN_SUPERVISOR',
+              actionLabel: 'Assign Supervisor'
+            });
+          } else if (daysUntil3Mo <= 14) {
+            // 2 Weeks Remaining
+            notifications.push({
+              id: `${trainingId}_SUPERVISOR_ASSIGNMENT`,
+              category: 'SUPERVISOR',
+              type: 'SUPERVISOR_ASSIGNMENT_2_WEEKS',
+              priority: 'MEDIUM',
+              priorityRank: 4,
+              trainingId: trainingId,
+              trainingTitle: trainingTitle,
+              trainingCode: trainingCode,
+              status: status,
+              stage: stage,
+              title: '2 weeks left to assign Supervisor',
+              message: `Post Evaluation begins on ${milestoneFormatted}. ${unassignedCount} participant${unassignedCount > 1 ? 's' : ''} currently have no assigned supervisor.`,
+              countdownText: `${daysUntil3Mo} days remaining`,
+              daysRemaining: daysUntil3Mo,
+              deadlineDate: threeMonthDate.toISOString(),
+              deadlineFormatted: milestoneFormatted,
+              unassignedCount: unassignedCount,
+              action: 'ASSIGN_SUPERVISOR',
+              actionLabel: 'Assign Supervisor'
+            });
+          }
+        }
+      }
+
+      // -------------------------------------------------------------------------
+      // 3. Three-Month Post Evaluation (Active / Due Milestone & Email Status)
+      // -------------------------------------------------------------------------
+      if (!isClosed && (daysUntil3Mo <= 0 || stage === 'Waiting for 3-Month Review')) {
+        let isPostDone = false;
+        try {
+          const ss = getTrainingDataSpreadsheet(trainingId);
+          if (ss) {
+            const postSheet = ss.getSheetByName('Post Evaluation') || ss.getSheetByName('PostEval');
+            const tpSheet   = ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants');
+            if (postSheet && tpSheet) {
+              const postRows = sheetToJson(postSheet);
+              const tpRows   = sheetToJson(tpSheet);
+              if (tpRows.length > 0 && postRows.length >= tpRows.length) {
+                isPostDone = true;
+              }
+            }
+          }
+        } catch(postErr) {}
+
+        let participants = [];
+        try {
+          participants = getTrainingParticipantsList(trainingId);
+        } catch(pErr) {}
+
+        const unassignedParticipants = participants.filter(p => {
+          const supId = String(p.SupervisorID || '').trim();
+          const supEmail = String(p.SupervisorEmail || '').trim();
+          const supName = String(p.SupervisorName || '').trim();
+          return !supId && !supEmail && !supName;
+        });
+
+        const unassignedCount = unassignedParticipants.length;
+        const emailStatus = String(t.PostEvalEmailStatus || '').trim().toUpperCase();
+
+        if (unassignedCount > 0) {
+          // Critical: Supervisor Required Before Post Evaluation Email
+          notifications.push({
+            id: `${trainingId}_POST_EVAL_EMAIL_SUPERVISOR_MISSING`,
+            category: 'POST_EVALUATION',
+            type: 'SUPERVISOR_REQUIRED_BEFORE_EMAIL',
+            priority: 'CRITICAL',
+            priorityRank: 1,
+            isActionRequired: true,
+            trainingId: trainingId,
+            trainingTitle: trainingTitle,
+            trainingCode: trainingCode,
+            status: status,
+            stage: stage,
+            title: 'Supervisor Required Before Post Evaluation Email',
+            message: `Post Evaluation email cannot be sent for ${unassignedCount} participant${unassignedCount > 1 ? 's' : ''} because supervisors have not been assigned.`,
+            countdownText: '3-Month Milestone Reached',
+            daysRemaining: 0,
+            deadlineDate: threeMonthDate.toISOString(),
+            deadlineFormatted: milestoneFormatted,
+            unassignedCount: unassignedCount,
+            action: 'ASSIGN_SUPERVISOR',
+            actionLabel: 'Assign Supervisor'
+          });
+        } else if (emailStatus === 'FAILED') {
+          // Critical: Post Evaluation Email Failed
+          notifications.push({
+            id: `${trainingId}_POST_EVAL_EMAIL_FAILED`,
+            category: 'POST_EVALUATION',
+            type: 'POST_EVALUATION_EMAIL_FAILED',
+            priority: 'CRITICAL',
+            priorityRank: 1,
+            isActionRequired: true,
+            trainingId: trainingId,
+            trainingTitle: trainingTitle,
+            trainingCode: trainingCode,
+            status: status,
+            stage: stage,
+            title: 'Post Evaluation Email Failed',
+            message: `The supervisor Post Evaluation email could not be sent${t.PostEvalEmailError ? ': ' + t.PostEvalEmailError : '.'}`,
+            countdownText: 'Email Failed',
+            daysRemaining: 0,
+            deadlineDate: threeMonthDate.toISOString(),
+            deadlineFormatted: milestoneFormatted,
+            action: 'RETRY_POST_EVAL_EMAIL',
+            actionLabel: 'Retry Email',
+            errorDetails: t.PostEvalEmailError || ''
+          });
+        } else if (emailStatus === 'SENT') {
+          // Informational: Post Evaluation Email Sent
+          notifications.push({
+            id: `${trainingId}_POST_EVAL_EMAIL_SENT`,
+            category: 'POST_EVALUATION',
+            type: 'POST_EVALUATION_EMAIL_SENT',
+            priority: 'INFORMATIONAL',
+            priorityRank: 5,
+            isActionRequired: false,
+            trainingId: trainingId,
+            trainingTitle: trainingTitle,
+            trainingCode: trainingCode,
+            status: status,
+            stage: stage,
+            title: 'Post Evaluation Email Sent',
+            message: `The 3-month Post Evaluation email was successfully sent to assigned supervisor(s)${t.PostEvalEmailSentAt ? ' on ' + t.PostEvalEmailSentAt : ''}.`,
+            countdownText: 'Email Sent',
+            daysRemaining: 0,
+            deadlineDate: threeMonthDate.toISOString(),
+            deadlineFormatted: milestoneFormatted,
+            emailSentAt: t.PostEvalEmailSentAt || '',
+            action: 'VIEW_POST_EVALUATION',
+            actionLabel: 'View Post Evaluation',
+            postUrl: postPublicUrl
+          });
+        } else {
+          // High: Post Evaluation Email Pending
+          notifications.push({
+            id: `${trainingId}_POST_EVAL_EMAIL_PENDING`,
+            category: 'POST_EVALUATION',
+            type: 'POST_EVALUATION_EMAIL_PENDING',
+            priority: 'HIGH',
+            priorityRank: 2,
+            isActionRequired: true,
+            trainingId: trainingId,
+            trainingTitle: trainingTitle,
+            trainingCode: trainingCode,
+            status: status,
+            stage: stage,
+            title: 'Post Evaluation Email Pending',
+            message: 'The 3-month milestone has been reached. System is ready to send the supervisor evaluation email.',
+            countdownText: '3-Month Milestone Reached',
+            daysRemaining: 0,
+            deadlineDate: threeMonthDate.toISOString(),
+            deadlineFormatted: milestoneFormatted,
+            action: 'SEND_POST_EVAL_EMAIL',
+            actionLabel: 'Send Email Now',
+            postUrl: postPublicUrl
+          });
+        }
+      }
+    });
+
+    // Sort notifications: Priority rank (1 to 5), then earliest deadline, then training title
+    notifications.sort((a, b) => {
+      if (a.priorityRank !== b.priorityRank) return a.priorityRank - b.priorityRank;
+      const dateA = a.deadlineDate ? new Date(a.deadlineDate).getTime() : 0;
+      const dateB = b.deadlineDate ? new Date(b.deadlineDate).getTime() : 0;
+      if (dateA !== dateB) return dateA - dateB;
+      return String(a.trainingTitle).localeCompare(String(b.trainingTitle));
+    });
+
+    const actionCount = notifications.filter(n => n.isActionRequired !== false).length;
+
+    return ok({
+      count: actionCount,
+      totalCount: notifications.length,
+      notifications: notifications
+    });
+
+  } catch (e) {
+    Logger.log('getTrainingActionNotifications error: ' + e.message);
+    return err('Failed to calculate training notifications: ' + e.message);
+  }
+}

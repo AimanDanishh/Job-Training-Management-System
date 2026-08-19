@@ -156,6 +156,32 @@
         </div>
       </div>
 
+      <!-- Training Actions & Reminders Section (Smart Alerts) -->
+      <div id="dash-action-reminders-section" class="card-th mb-4" style="background:#FFFFFF; border:1px solid #E2E8F0; border-top:3px solid #2563EB">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px">
+          <div>
+            <div style="font-size:15px; font-weight:800; color:#1E293B; display:flex; align-items:center; gap:8px">
+              <span class="icon sm filled" style="color:#2563EB">notifications_active</span>
+              Training Actions &amp; Reminders
+              <span id="dash-action-count-badge" class="badge-th" style="display:none; background:#E91C2D; color:#fff; font-size:11px; font-weight:800; padding:2px 8px; border-radius:12px">0</span>
+            </div>
+            <div style="font-size:12px; color:#64748B; margin-top:2px">Proactive alerts for evaluation deadlines, supervisor assignments, and milestones</div>
+          </div>
+          <div id="dash-action-filters" style="display:flex; gap:6px; flex-wrap:wrap">
+            <button class="btn-th btn-xs active" data-filter="all" style="border-radius:20px">All (<span id="count-filter-all">0</span>)</button>
+            <button class="btn-th btn-xs btn-secondary" data-filter="urgent" style="border-radius:20px">Urgent / Overdue (<span id="count-filter-urgent">0</span>)</button>
+            <button class="btn-th btn-xs btn-secondary" data-filter="evaluation" style="border-radius:20px">Evaluations (<span id="count-filter-eval">0</span>)</button>
+            <button class="btn-th btn-xs btn-secondary" data-filter="supervisor" style="border-radius:20px">Supervisors (<span id="count-filter-sup">0</span>)</button>
+          </div>
+        </div>
+
+        <div id="dash-action-notifications-list" style="display:flex; flex-direction:column; gap:10px">
+          <div style="padding:20px 16px; text-align:center; background:#F8FAFC; border:1px dashed #CBD5E1; border-radius:10px">
+            <div style="font-size:13px; font-weight:600; color:#64748B">Checking training actions...</div>
+          </div>
+        </div>
+      </div>
+
       <!-- Database Connection Status Banner -->
       <div id="db-config-banner" class="card-th mb-4" style="display:none; background:#FEF2F2; border:1.5px solid #FCA5A5; border-left:5px solid #EF4444">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap">
@@ -243,164 +269,753 @@
   </div>
 </div>
 
-<div id="toast-container"></div>
-<script>
-  function formatMinimalistDate(dInput) {
-    if (!dInput) return '';
-    const d = (dInput instanceof Date) ? dInput : new Date(dInput);
-    if (isNaN(d.getTime())) return String(dInput);
+  <!-- Modal: Share Evaluation QR Code (Dashboard) -->
+  <div id="modal-dashboard-qr" class="modal-overlay" style="display:none">
+    <div class="modal-box" style="max-width:440px; text-align:left">
+      <div class="modal-header" style="background:#F8FAFC">
+        <div style="display:flex; align-items:center; gap:8px">
+          <div style="width:32px; height:32px; border-radius:8px; background:#EFF6FF; display:flex; align-items:center; justify-content:center">
+            <span class="icon sm" style="color:#2563EB">qr_code</span>
+          </div>
+          <div>
+            <div class="modal-title" style="font-size:14px; font-weight:800; color:#1E293B; margin:0">Share Training Evaluation QR</div>
+            <div class="modal-sub" style="font-size:11px; color:#64748B">Participant Evaluation Portal Access</div>
+          </div>
+        </div>
+        <button class="modal-close" id="btn-close-modal-qr">&times;</button>
+      </div>
+      <div class="modal-body" style="text-align:center; padding:20px">
+        <div style="margin-bottom:14px">
+          <div id="modal-qr-training-title" style="font-size:13.5px; font-weight:700; color:#1E293B"></div>
+          <div id="modal-qr-training-code" style="font-size:11.5px; color:#64748B; margin-top:2px"></div>
+        </div>
+        <div style="display:inline-block; padding:12px; background:#fff; border:1px solid #E2E8F0; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.06); margin-bottom:14px" id="modal-qr-code-img-container"></div>
+        <p style="font-size:11.5px; color:#64748B; margin:0 0 14px">Scan with mobile camera to complete the Participant Evaluation</p>
+        <div style="display:flex; gap:6px; margin-bottom:12px">
+          <input type="text" id="modal-qr-url-input" class="form-control-th" style="font-size:11.5px; padding:6px 10px; background:#F8FAFC" readonly />
+          <button class="btn-th btn-primary btn-sm" id="btn-copy-modal-qr" title="Copy Link"><span class="icon sm">content_copy</span></button>
+        </div>
+        <div style="font-size:11px; color:#94A3B8">
+          Or <a id="modal-qr-direct-link" href="#" target="_blank" style="color:#2563EB; font-weight:600">open evaluation link directly</a>
+        </div>
+      </div>
+      <div class="modal-footer" style="background:#F8FAFC; display:flex; justify-content:space-between; padding:12px 16px; border-top:1px solid #E2E8F0">
+        <button class="btn-th btn-secondary btn-sm" id="btn-download-modal-qr"><span class="icon sm">download</span> Download QR</button>
+        <button class="btn-th btn-secondary btn-sm" id="btn-close-modal-qr-2">Close</button>
+      </div>
+    </div>
+  </div>
 
-    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    
-    return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
-  }
+  <div id="toast-container"></div>
+  <script>
+    let allActionNotifications = [];
+    let currentActionFilter = 'all';
+    let activeDashboardQR = { url: '', title: '', code: '' };
 
-  onReady(() => {
-    const hdrEl = document.getElementById('dashboard-header-date');
-    if (hdrEl) hdrEl.textContent = formatMinimalistDate(new Date());
+    function formatMinimalistDate(dInput) {
+      if (!dInput) return '';
+      const d = (dInput instanceof Date) ? dInput : new Date(dInput);
+      if (isNaN(d.getTime())) return String(dInput);
 
-    // Register with real-time countdown timer manager
-    if (window.CountdownTimerManager) {
-      window.CountdownTimerManager.register('dashboard-page', () => {
-        loadDashboard();
-      });
+      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      
+      return days[d.getDay()] + ', ' + d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
     }
 
-    loadDashboard();
-  });
+    onReady(() => {
+      const hdrEl = document.getElementById('dashboard-header-date');
+      if (hdrEl) hdrEl.textContent = formatMinimalistDate(new Date());
 
-  async function loadDashboard() {
-    try {
-      const [settingsRes, data, trainings] = await Promise.all([
-        callServer('getSettingsData').catch(() => null),
-        callServer('getDashboardReport').catch(() => ({ summary: {}, approval: {} })),
-        callServer('getTrainings').catch(() => [])
-      ]);
+      // Setup filter buttons
+      const filterContainer = document.getElementById('dash-action-filters');
+      if (filterContainer) {
+        filterContainer.addEventListener('click', (e) => {
+          const btn = e.target.closest('button[data-filter]');
+          if (!btn) return;
+          currentActionFilter = btn.getAttribute('data-filter') || 'all';
+          filterContainer.querySelectorAll('button').forEach(b => {
+            b.classList.remove('active');
+            b.classList.add('btn-secondary');
+          });
+          btn.classList.remove('btn-secondary');
+          btn.classList.add('active');
+          renderTrainingActionNotifications(allActionNotifications, currentActionFilter);
+        });
+      }
 
-      if (settingsRes && settingsRes.validation) {
-        const dbValid = settingsRes.validation.database && settingsRes.validation.database.connected;
-        const dbBanner = document.getElementById('db-config-banner');
-        if (dbBanner) {
-          if (!dbValid || !settingsRes.databaseId) {
-            dbBanner.style.display = 'block';
-          } else {
-            dbBanner.style.display = 'none';
+      // QR Modal buttons
+      const btnClose1 = document.getElementById('btn-close-modal-qr');
+      const btnClose2 = document.getElementById('btn-close-modal-qr-2');
+      const btnCopy = document.getElementById('btn-copy-modal-qr');
+      const btnDownload = document.getElementById('btn-download-modal-qr');
+      if (btnClose1) btnClose1.addEventListener('click', () => closeModal('modal-dashboard-qr'));
+      if (btnClose2) btnClose2.addEventListener('click', () => closeModal('modal-dashboard-qr'));
+      if (btnCopy) btnCopy.addEventListener('click', copyDashboardEvalUrl);
+      if (btnDownload) btnDownload.addEventListener('click', downloadDashboardQR);
+
+      // Register with real-time countdown timer manager
+      if (window.CountdownTimerManager) {
+        window.CountdownTimerManager.register('dashboard-page', () => {
+          loadDashboard();
+        });
+      }
+
+      loadDashboard();
+    });
+
+    async function loadDashboard() {
+      // 1. Load Core Dashboard KPIs and Data
+      try {
+        const [settingsRes, data, trainings] = await Promise.all([
+          callServer('getSettingsData').catch(() => null),
+          callServer('getDashboardReport').catch(() => ({ summary: {}, approval: {} })),
+          callServer('getTrainings').catch(() => [])
+        ]);
+
+        if (settingsRes && settingsRes.validation) {
+          const dbValid = settingsRes.validation.database && settingsRes.validation.database.connected;
+          const dbBanner = document.getElementById('db-config-banner');
+          if (dbBanner) {
+            if (!dbValid || !settingsRes.databaseId) {
+              dbBanner.style.display = 'block';
+            } else {
+              dbBanner.style.display = 'none';
+            }
           }
+        }
+
+        const s = data ? (data.summary || {}) : {};
+        const app = data ? (data.approval || {}) : {};
+        const tList = Array.isArray(trainings) ? trainings : [];
+
+        document.getElementById('kpi-total').textContent     = s.total      || tList.length || 0;
+        document.getElementById('kpi-upcoming').textContent  = s.upcoming   || 0;
+        document.getElementById('kpi-ongoing').textContent   = s.ongoing    || 0;
+        document.getElementById('kpi-completed').textContent = s.completed  || 0;
+        document.getElementById('kpi-eval').textContent      = s.pendingEval|| 0;
+        document.getElementById('kpi-post').textContent      = s.pendingPost|| 0;
+
+        // Approval status pipeline counts
+        document.getElementById('app-hod-count').textContent      = app.pendingHod || 0;
+        document.getElementById('app-csuite-count').textContent   = app.pendingCsuite || 0;
+        document.getElementById('app-hohr-count').textContent     = app.pendingHohr || 0;
+        document.getElementById('app-approved-count').textContent = app.approved || 0;
+
+        // Active/upcoming programmes list
+        const active = tList.filter(t => t.Status === 'In Progress' || t.Status === 'Upcoming' || t.Status === 'Draft').slice(0, 6);
+        renderActiveProgrammes(active);
+
+        // Render recent activities
+        renderActivityFeed(tList);
+
+      } catch(e) {
+        console.error('Error loading dashboard:', e);
+        showToast('Failed to load dashboard: ' + e.message, 'error');
+      }
+
+      // 2. Load Smart Training Actions & Reminders independently
+      loadTrainingActionNotifications();
+    }
+
+    async function loadTrainingActionNotifications() {
+      try {
+        const notiRes = await callServer('getTrainingActionNotifications');
+        allActionNotifications = (notiRes && Array.isArray(notiRes.notifications)) ? notiRes.notifications : [];
+        renderTrainingActionNotifications(allActionNotifications, currentActionFilter);
+      } catch(err) {
+        console.error('Training Action Notifications error:', err);
+        const listEl = document.getElementById('dash-action-notifications-list');
+        if (listEl) {
+          listEl.innerHTML = '';
+          const errCard = document.createElement('div');
+          errCard.style.cssText = 'padding:16px; text-align:center; background:#FEF2F2; border:1px solid #FECACA; border-radius:10px';
+          const errTitle = document.createElement('div');
+          errTitle.style.cssText = 'font-size:13px; font-weight:700; color:#991B1B';
+          errTitle.textContent = 'Unable to load training reminders';
+          const errMsg = document.createElement('div');
+          errMsg.style.cssText = 'font-size:11.5px; color:#7F1D1D; margin:4px 0 8px';
+          errMsg.textContent = err.message || 'Server request failed';
+          const retryBtn = document.createElement('button');
+          retryBtn.className = 'btn-th btn-xs';
+          retryBtn.style.cssText = 'background:#DC2626; color:#fff; border:none';
+          retryBtn.textContent = 'Retry';
+          retryBtn.addEventListener('click', () => loadTrainingActionNotifications());
+          errCard.appendChild(errTitle);
+          errCard.appendChild(errMsg);
+          errCard.appendChild(retryBtn);
+          listEl.appendChild(errCard);
+        }
+      }
+    }
+
+    function renderTrainingActionNotifications(list, filter) {
+      filter = filter || currentActionFilter || 'all';
+      const listEl = document.getElementById('dash-action-notifications-list');
+      const badgeEl = document.getElementById('dash-action-count-badge');
+      const sideBadge = document.getElementById('sidebar-action-badge');
+
+      const actionRequiredList = list.filter(n => n.isActionRequired !== false);
+      const actionCount = actionRequiredList.length;
+      const urgentCount = actionRequiredList.filter(n => n.priority === 'OVERDUE' || n.priority === 'CRITICAL').length;
+      const evalCount = list.filter(n => n.category === 'EVALUATION').length;
+      const supCount = list.filter(n => n.category === 'SUPERVISOR' || n.category === 'POST_EVALUATION').length;
+
+      const fAll = document.getElementById('count-filter-all');
+      const fUrg = document.getElementById('count-filter-urgent');
+      const fEv = document.getElementById('count-filter-eval');
+      const fSup = document.getElementById('count-filter-sup');
+      if (fAll) fAll.textContent = list.length;
+      if (fUrg) fUrg.textContent = urgentCount;
+      if (fEv) fEv.textContent = evalCount;
+      if (fSup) fSup.textContent = supCount;
+
+      if (badgeEl) {
+        if (actionCount > 0) {
+          badgeEl.textContent = actionCount + (actionCount > 1 ? ' Actions Required' : ' Action Required');
+          badgeEl.style.background = '#E91C2D';
+          badgeEl.style.display = 'inline-block';
+        } else {
+          badgeEl.textContent = 'All Caught Up';
+          badgeEl.style.background = '#16A34A';
+          badgeEl.style.display = 'inline-block';
         }
       }
 
-      const s = data ? (data.summary || {}) : {};
-      const app = data ? (data.approval || {}) : {};
-      const tList = Array.isArray(trainings) ? trainings : [];
-
-      document.getElementById('kpi-total').textContent     = s.total      || tList.length || 0;
-      document.getElementById('kpi-upcoming').textContent  = s.upcoming   || 0;
-      document.getElementById('kpi-ongoing').textContent   = s.ongoing    || 0;
-      document.getElementById('kpi-completed').textContent = s.completed  || 0;
-      document.getElementById('kpi-eval').textContent      = s.pendingEval|| 0;
-      document.getElementById('kpi-post').textContent      = s.pendingPost|| 0;
-
-      // Approval status pipeline counts
-      document.getElementById('app-hod-count').textContent      = app.pendingHod || 0;
-      document.getElementById('app-csuite-count').textContent   = app.pendingCsuite || 0;
-      document.getElementById('app-hohr-count').textContent     = app.pendingHohr || 0;
-      document.getElementById('app-approved-count').textContent = app.approved || 0;
-
-      // 3-Month Post Evaluation Notification Banner Check
-      const threeMonthTrainings = tList.filter(t => t.isThreeMonthsReached || t.Stage === 'Waiting for 3-Month Review');
-      const banner = document.getElementById('noti-6month-banner');
-      const bannerText = document.getElementById('noti-6month-text');
-      if (threeMonthTrainings.length > 0) {
-        bannerText.textContent = `${threeMonthTrainings.length} training programme(s) have reached the 3-month milestone and require supervisor post-evaluations: ${threeMonthTrainings.map(x => x.Code || x.Name).join(', ')}`;
-        banner.style.display = 'block';
-      } else {
-        banner.style.display = 'none';
+      if (sideBadge) {
+        sideBadge.textContent = actionCount;
+        sideBadge.style.display = actionCount > 0 ? 'inline-block' : 'none';
       }
 
-      // Active/upcoming programmes list
-      const active = tList.filter(t => t.Status === 'In Progress' || t.Status === 'Upcoming' || t.Status === 'Draft').slice(0, 6);
-      renderActiveProgrammes(active);
+      if (!listEl) return;
+      listEl.innerHTML = '';
 
-      // Render recent activities
-      renderActivityFeed(tList);
+      let filtered = list;
+      if (filter === 'urgent') {
+        filtered = list.filter(n => n.priority === 'OVERDUE' || n.priority === 'CRITICAL');
+      } else if (filter === 'evaluation') {
+        filtered = list.filter(n => n.category === 'EVALUATION');
+      } else if (filter === 'supervisor') {
+        filtered = list.filter(n => n.category === 'SUPERVISOR' || n.category === 'POST_EVALUATION');
+      }
 
-    } catch(e) {
-      showToast('Failed to load dashboard: ' + e.message, 'error');
+      if (!filtered.length) {
+        const emptyCard = document.createElement('div');
+        emptyCard.style.cssText = 'padding:24px 16px; text-align:center; background:#F8FAFC; border:1px dashed #CBD5E1; border-radius:10px';
+
+        const iconWrap = document.createElement('div');
+        iconWrap.style.cssText = 'width:36px; height:36px; border-radius:50%; background:#DCFCE7; display:flex; align-items:center; justify-content:center; margin:0 auto 8px';
+        const iconSpan = document.createElement('span');
+        iconSpan.className = 'icon';
+        iconSpan.style.color = '#16A34A';
+        iconSpan.textContent = 'check_circle';
+        iconWrap.appendChild(iconSpan);
+
+        const emptyTitle = document.createElement('div');
+        emptyTitle.style.cssText = 'font-size:13.5px; font-weight:800; color:#1E293B';
+        emptyTitle.textContent = 'All caught up';
+
+        const emptySub = document.createElement('div');
+        emptySub.style.cssText = 'font-size:11.5px; color:#64748B; margin-top:2px';
+        emptySub.textContent = 'No training actions require your attention right now.';
+
+        emptyCard.appendChild(iconWrap);
+        emptyCard.appendChild(emptyTitle);
+        emptyCard.appendChild(emptySub);
+        listEl.appendChild(emptyCard);
+        return;
+      }
+
+      filtered.forEach((n) => {
+        const card = document.createElement('div');
+
+        let cardBorder = '#CBD5E1';
+        let cardBg = '#FFFFFF';
+        let iconName = 'notifications';
+        let iconColor = '#2563EB';
+        let iconBg = '#EFF6FF';
+        let countdownBg = '#2563EB';
+
+        if (n.priority === 'OVERDUE') {
+          cardBorder = '#DC2626';
+          cardBg = '#FEF2F2';
+          iconName = 'warning';
+          iconColor = '#DC2626';
+          iconBg = '#FEE2E2';
+          countdownBg = '#DC2626';
+        } else if (n.priority === 'CRITICAL') {
+          cardBorder = '#EA580C';
+          cardBg = '#FFF7ED';
+          iconName = (n.type === 'EVALUATION_DUE_TODAY' || n.type === 'SUPERVISOR_ASSIGNMENT_DUE_TODAY') ? 'timer' : 'notification_important';
+          iconColor = '#EA580C';
+          iconBg = '#FFEDD5';
+          countdownBg = '#EA580C';
+        } else if (n.priority === 'HIGH') {
+          cardBorder = '#D97706';
+          cardBg = '#FFFBEB';
+          iconName = (n.category === 'POST_EVALUATION') ? 'timeline' : 'alarm';
+          iconColor = '#D97706';
+          iconBg = '#FEF3C7';
+          countdownBg = '#D97706';
+        } else if (n.priority === 'MEDIUM') {
+          cardBorder = '#2563EB';
+          cardBg = '#EFF6FF';
+          iconName = (n.category === 'SUPERVISOR') ? 'supervised_user_circle' : 'rate_review';
+          iconColor = '#2563EB';
+          iconBg = '#DBEAFE';
+          countdownBg = '#2563EB';
+        } else if (n.priority === 'INFORMATIONAL') {
+          cardBorder = '#16A34A';
+          cardBg = '#F0FDF4';
+          iconName = 'check_circle';
+          iconColor = '#16A34A';
+          iconBg = '#DCFCE7';
+          countdownBg = '#16A34A';
+        }
+
+        card.style.cssText = 'background:' + cardBg + '; border:1px solid #E2E8F0; border-left:5px solid ' + cardBorder + '; border-radius:10px; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; gap:14px; flex-wrap:wrap';
+
+        // Left info wrapper
+        const leftWrap = document.createElement('div');
+        leftWrap.style.cssText = 'display:flex; gap:12px; align-items:flex-start; flex:1; min-width:260px';
+
+        const iconBox = document.createElement('div');
+        iconBox.style.cssText = 'width:34px; height:34px; border-radius:8px; background:' + iconBg + '; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:2px';
+        const cIcon = document.createElement('span');
+        cIcon.className = 'icon sm filled';
+        cIcon.style.color = iconColor;
+        cIcon.textContent = iconName;
+        iconBox.appendChild(cIcon);
+
+        const infoBox = document.createElement('div');
+        infoBox.style.cssText = 'flex:1; min-width:0';
+
+        const topRow = document.createElement('div');
+        topRow.style.cssText = 'display:flex; align-items:center; gap:8px; flex-wrap:wrap';
+
+        const titleSpan = document.createElement('span');
+        titleSpan.style.cssText = 'font-size:13px; font-weight:800; color:var(--apollo-dark)';
+        titleSpan.textContent = n.title || '';
+
+        const codeSpan = document.createElement('span');
+        codeSpan.className = 'badge-th';
+        codeSpan.style.cssText = 'background:#F1F5F9; color:#475569; font-size:10.5px; font-weight:600';
+        codeSpan.textContent = n.trainingCode || n.trainingId || '';
+
+        topRow.appendChild(titleSpan);
+        topRow.appendChild(codeSpan);
+
+        if (n.status) {
+          const stSpan = document.createElement('span');
+          stSpan.className = 'badge-th';
+          stSpan.style.cssText = 'background:#E0F2FE; color:#0369A1; font-size:10px';
+          stSpan.textContent = n.status;
+          topRow.appendChild(stSpan);
+        }
+
+        const tTitleDiv = document.createElement('div');
+        tTitleDiv.style.cssText = 'font-size:12px; font-weight:700; color:#334155; margin-top:2px';
+        tTitleDiv.textContent = n.trainingTitle || '';
+
+        const msgDiv = document.createElement('div');
+        msgDiv.style.cssText = 'font-size:11.5px; color:#64748B; margin-top:2px; line-height:1.4';
+        msgDiv.textContent = n.message || '';
+
+        const btmRow = document.createElement('div');
+        btmRow.style.cssText = 'display:flex; align-items:center; gap:8px; margin-top:6px; flex-wrap:wrap';
+
+        const countBadge = document.createElement('span');
+        countBadge.style.cssText = 'font-size:10.5px; font-weight:800; background:' + countdownBg + '; color:#fff; padding:2px 8px; border-radius:12px; display:inline-flex; align-items:center; gap:3px';
+        const clkIcon = document.createElement('span');
+        clkIcon.className = 'icon sm';
+        clkIcon.style.fontSize = '12px';
+        clkIcon.textContent = 'schedule';
+        countBadge.appendChild(clkIcon);
+        const countTxt = document.createTextNode(n.countdownText || '');
+        countBadge.appendChild(countTxt);
+        btmRow.appendChild(countBadge);
+
+        if (n.deadlineFormatted) {
+          const dlSpan = document.createElement('span');
+          dlSpan.style.cssText = 'font-size:11px; color:#64748B';
+          dlSpan.textContent = 'Deadline: ' + n.deadlineFormatted;
+          btmRow.appendChild(dlSpan);
+        }
+
+        infoBox.appendChild(topRow);
+        infoBox.appendChild(tTitleDiv);
+        infoBox.appendChild(msgDiv);
+        infoBox.appendChild(btmRow);
+
+        leftWrap.appendChild(iconBox);
+        leftWrap.appendChild(infoBox);
+
+        // Right Action Buttons
+        const btnWrap = document.createElement('div');
+        btnWrap.style.cssText = 'display:flex; gap:6px; align-items:center; flex-shrink:0; flex-wrap:wrap';
+
+        if (n.action === 'SHARE_EVALUATION_QR') {
+          const shareBtn = document.createElement('button');
+          shareBtn.className = 'btn-th btn-sm';
+          shareBtn.style.cssText = 'background:#2563EB; color:#fff; border:none; white-space:nowrap';
+          const bIcon = document.createElement('span');
+          bIcon.className = 'icon sm';
+          bIcon.textContent = 'qr_code';
+          shareBtn.appendChild(bIcon);
+          shareBtn.appendChild(document.createTextNode(' ' + (n.actionLabel || 'Share Evaluation QR')));
+          shareBtn.addEventListener('click', () => {
+            openShareEvalQRModal(n.trainingId, n.trainingTitle, n.trainingCode, n.evalUrl);
+          });
+          btnWrap.appendChild(shareBtn);
+
+          if (n.secondaryAction === 'VIEW_EVALUATION') {
+            const secBtn = document.createElement('button');
+            secBtn.className = 'btn-th btn-secondary btn-sm';
+            secBtn.style.whiteSpace = 'nowrap';
+            const sIcon = document.createElement('span');
+            sIcon.className = 'icon sm';
+            sIcon.textContent = 'rate_review';
+            secBtn.appendChild(sIcon);
+            secBtn.appendChild(document.createTextNode(' View Evaluation'));
+            secBtn.addEventListener('click', () => {
+              navTo('evaluation', { id: n.trainingId, tab: 'training-eval' });
+            });
+            btnWrap.appendChild(secBtn);
+          }
+        } else if (n.action === 'VIEW_EVALUATION') {
+          const viewBtn = document.createElement('button');
+          viewBtn.className = 'btn-th btn-sm';
+          viewBtn.style.cssText = 'background:#DC2626; color:#fff; border:none; white-space:nowrap';
+          const vIcon = document.createElement('span');
+          vIcon.className = 'icon sm';
+          vIcon.textContent = 'rate_review';
+          viewBtn.appendChild(vIcon);
+          viewBtn.appendChild(document.createTextNode(' ' + (n.actionLabel || 'View Evaluation')));
+          viewBtn.addEventListener('click', () => {
+            navTo('evaluation', { id: n.trainingId, tab: 'training-eval' });
+          });
+          btnWrap.appendChild(viewBtn);
+        } else if (n.action === 'ASSIGN_SUPERVISOR') {
+          const supBtn = document.createElement('button');
+          supBtn.className = 'btn-th btn-sm';
+          supBtn.style.cssText = 'background:#D97706; color:#fff; border:none; white-space:nowrap';
+          const aIcon = document.createElement('span');
+          aIcon.className = 'icon sm';
+          aIcon.textContent = 'person_add';
+          supBtn.appendChild(aIcon);
+          supBtn.appendChild(document.createTextNode(' ' + (n.actionLabel || 'Assign Supervisor')));
+          supBtn.addEventListener('click', () => {
+            navTo('training', { id: n.trainingId, action: 'participants' });
+          });
+          btnWrap.appendChild(supBtn);
+        } else if (n.action === 'VIEW_POST_EVALUATION') {
+          const postBtn = document.createElement('button');
+          postBtn.className = 'btn-th btn-sm';
+          postBtn.style.cssText = 'background:#7C3AED; color:#fff; border:none; white-space:nowrap';
+          const pIcon = document.createElement('span');
+          pIcon.className = 'icon sm';
+          pIcon.textContent = 'timeline';
+          postBtn.appendChild(pIcon);
+          postBtn.appendChild(document.createTextNode(' ' + (n.actionLabel || 'View Post Evaluation')));
+          postBtn.addEventListener('click', () => {
+            navTo('evaluation', { id: n.trainingId, tab: 'supervisor-eval' });
+          });
+          btnWrap.appendChild(postBtn);
+        } else if (n.action === 'RETRY_POST_EVAL_EMAIL' || n.action === 'SEND_POST_EVAL_EMAIL') {
+          const sendBtn = document.createElement('button');
+          sendBtn.className = 'btn-th btn-sm';
+          const isRetry = n.action === 'RETRY_POST_EVAL_EMAIL';
+          sendBtn.style.cssText = isRetry
+            ? 'background:#DC2626; color:#fff; border:none; white-space:nowrap'
+            : 'background:#2563EB; color:#fff; border:none; white-space:nowrap';
+          const sIcon = document.createElement('span');
+          sIcon.className = 'icon sm';
+          sIcon.textContent = isRetry ? 'refresh' : 'send';
+          sendBtn.appendChild(sIcon);
+          sendBtn.appendChild(document.createTextNode(' ' + (n.actionLabel || (isRetry ? 'Retry Email' : 'Send Email Now'))));
+          sendBtn.addEventListener('click', async () => {
+            try {
+              sendBtn.disabled = true;
+              sendBtn.textContent = 'Sending...';
+              showToast('Dispatching 3-Month Post Evaluation email...', 'info');
+              const res = await callServer('triggerPostEvaluationEmailSend', n.trainingId);
+              if (res && (res.success || res.status === 'SENT')) {
+                showToast(res.message || 'Post Evaluation email sent successfully!', 'success');
+              } else {
+                showToast(res ? res.message : 'Email dispatch failed.', 'error');
+              }
+              loadTrainingActionNotifications();
+            } catch(sendErr) {
+              showToast('Failed to trigger email send: ' + sendErr.message, 'error');
+              sendBtn.disabled = false;
+              sendBtn.innerHTML = '';
+              sendBtn.appendChild(sIcon);
+              sendBtn.appendChild(document.createTextNode(' ' + (n.actionLabel || 'Retry Email')));
+            }
+          });
+          btnWrap.appendChild(sendBtn);
+        }
+
+        card.appendChild(leftWrap);
+        card.appendChild(btnWrap);
+        listEl.appendChild(card);
+      });
     }
-  }
 
-  function renderActiveProgrammes(list) {
-    const el = document.getElementById('active-programmes');
-    if (!list.length) {
-      el.innerHTML = '<div class="empty-state"><span class="icon">school</span><p style="color:#94A3B8">No active or upcoming programmes</p></div>';
-      return;
-    }
-    el.innerHTML = list.map((p, i) => {
-      const startFormatted = formatMinimalistDate(p.StartDate) || p.StartDate || '-';
-      const endFormatted   = formatMinimalistDate(p.EndDate) || p.EndDate || '';
-      const dateDisplay    = endFormatted && endFormatted !== startFormatted ? `${startFormatted} - ${endFormatted}` : startFormatted;
+    function openShareEvalQRModal(trainingId, title, code, evalUrl) {
+      if (!evalUrl) {
+        const baseUrl = (typeof window.__PUBLIC_PORTAL_URL__ === 'string' && window.__PUBLIC_PORTAL_URL__)
+          ? window.__PUBLIC_PORTAL_URL__.split('?')[0]
+          : String(window.location.href || '').split('?')[0];
+        evalUrl = baseUrl + '?page=evaluation&id=' + encodeURIComponent(trainingId);
+      }
 
-      const dataSheetUrl = p.trainingDataSheetUrl || (p.ParticipantsSheetID ? ('https://docs.google.com/spreadsheets/d/' + p.ParticipantsSheetID + '/edit') : '');
-      const reqUrl       = p.requisitionFormUrl   || (p.RequisitionFormFileID ? ('https://docs.google.com/spreadsheets/d/' + p.RequisitionFormFileID + '/edit') : (p.RequisitionUrl || p.BrochureURL || ''));
+      activeDashboardQR = {
+        url: evalUrl,
+        title: title || 'Training_Evaluation',
+        code: code || trainingId
+      };
 
-      const compDate = p.EndDate || p.StartDate;
-      const isCompleted = ['Training Completed','Evaluation Completed','Waiting for 3-Month Review','Programme Closed','Completed'].includes(p.Stage || p.Status);
-      const is3MDone = ['Programme Closed'].includes(p.Stage);
-      const st3M = ApolloCountdown.getStatus(compDate, '3month', is3MDone, !isCompleted);
+      const titleEl = document.getElementById('modal-qr-training-title');
+      const codeEl = document.getElementById('modal-qr-training-code');
+      const inputEl = document.getElementById('modal-qr-url-input');
+      const linkEl = document.getElementById('modal-qr-direct-link');
+      const imgContainer = document.getElementById('modal-qr-code-img-container');
 
-      return `
-        <div style="display:flex;gap:12px;align-items:center;padding:12px 20px;border-bottom:${i < list.length - 1 ? '1px solid #F1F5F9' : 'none'};transition:background 0.12s"
-             onmouseover="this.style.background='#F8FAFC'" onmouseout="this.style.background='transparent'">
-          <div style="width:36px;height:36px;border-radius:10px;background:${p.Status==='In Progress'?'#EFF6FF':p.Status==='Upcoming'?'#FFF8CF':'#F8FAFC'};
-                      display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer" onclick="navTo('training', {id:'${p.ID}'})">
-            <span class="icon" style="color:${p.Status==='In Progress'?'#2563EB':p.Status==='Upcoming'?'#D97706':'#64748B'}">school</span>
-          </div>
-          <div style="flex:1;min-width:0;cursor:pointer" onclick="navTo('training', {id:'${p.ID}'})">
-            <div style="font-size:13px;font-weight:700;color:var(--apollo-dark);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.Name}</div>
-            <div style="font-size:11.5px;color:#64748B;margin-top:2px">${p.Code} | ${dateDisplay}</div>
-          </div>
-          <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;flex-wrap:wrap">
-            ${dataSheetUrl ? `<a href="${dataSheetUrl}" target="_blank" onclick="event.stopPropagation()" class="btn-th btn-xs" style="background:#059669;color:#fff;border:none;text-decoration:none;display:inline-flex;align-items:center;gap:3px" title="Open Training Data Sheet"><span class="icon sm">table_chart</span>Sheet</a>` : ''}
-            ${reqUrl ? `<a href="${reqUrl}" target="_blank" onclick="event.stopPropagation()" class="btn-th btn-secondary btn-xs" style="text-decoration:none;display:inline-flex;align-items:center;gap:3px" title="Open Requisition Form"><span class="icon sm">description</span>Form</a>` : ''}
-            <span style="font-size:11.5px;font-weight:600;color:#64748B">${p.Participants || 0} pax</span>
-            ${ApolloCountdown.renderBadge(st3M)}
-            ${statusBadge(p.Status)}
-            ${approvalStatusBadge(p.ApprovalStatus || 'Approved')}
-          </div>
-        </div>
-      `;
-    }).join('');
-  }
+      if (titleEl) titleEl.textContent = title || 'Training Programme';
+      if (codeEl) codeEl.textContent = 'ID: ' + (code || trainingId);
+      if (inputEl) inputEl.value = evalUrl;
+      if (linkEl) linkEl.href = evalUrl;
 
-  function renderActivityFeed(trainings) {
-    const feed = document.getElementById('activity-feed');
-    if (!trainings || !trainings.length) {
-      feed.innerHTML = '<div class="p-4 text-center" style="color:#94A3B8">No recent activity logs.</div>';
-      return;
+      if (imgContainer) {
+        imgContainer.innerHTML = '';
+        const img = document.createElement('img');
+        img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(evalUrl);
+        img.alt = 'Evaluation QR Code';
+        img.style.cssText = 'width:180px; height:180px; border-radius:6px; display:block';
+        imgContainer.appendChild(img);
+      }
+
+      openModal('modal-dashboard-qr');
     }
 
-    const items = trainings.slice(0, 5).map(t => ({
-      title: `Programme Created: ${t.Name}`,
-      sub: `${t.Code} | Stage: ${t.Stage || 'Created'}`,
-      icon: 'school',
-      color: '#2563EB',
-      time: formatMinimalistDate(t.CreatedDate || t.StartDate) || 'Recently'
-    }));
+    function copyDashboardEvalUrl() {
+      const input = document.getElementById('modal-qr-url-input');
+      if (!input || !input.value) return;
+      navigator.clipboard.writeText(input.value).then(() => {
+        showToast('Participant Evaluation link copied to clipboard!', 'success');
+      }).catch(() => {
+        input.select();
+        document.execCommand('copy');
+        showToast('Participant Evaluation link copied!', 'success');
+      });
+    }
 
-    feed.innerHTML = items.map((item, idx) => `
-      <div style="padding:12px 16px;display:flex;gap:12px;align-items:flex-start;border-bottom:${idx<items.length-1?'1px solid #F8FAFC':'none'}">
-        <div style="width:30px;height:30px;border-radius:8px;background:${item.color}15;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px">
-          <span class="icon sm" style="color:${item.color}">${item.icon}</span>
-        </div>
-        <div style="flex:1;min-width:0">
-          <div style="font-size:12.5px;font-weight:600;color:#1E293B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.title}</div>
-          <div style="font-size:11px;color:#64748B;margin-top:1px">${item.sub}</div>
-        </div>
-        <span style="font-size:10.5px;color:#94A3B8;flex-shrink:0">${item.time}</span>
-      </div>
-    `).join('');
-  }
-</script>
+    function downloadDashboardQR() {
+      if (!activeDashboardQR.url) return;
+      const filename = 'Apollo_Evaluation_QR_' + (activeDashboardQR.code || 'Training') + '.png';
+      if (typeof downloadQRWithLogo === 'function') {
+        downloadQRWithLogo(activeDashboardQR.url, filename);
+      } else {
+        const qrSrc = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(activeDashboardQR.url);
+        const a = document.createElement('a');
+        a.href = qrSrc;
+        a.download = filename;
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        showToast('Downloading Evaluation QR code...', 'info');
+      }
+    }
+
+    function renderActiveProgrammes(list) {
+      const el = document.getElementById('active-programmes');
+      if (!el) return;
+      el.innerHTML = '';
+      if (!list || !list.length) {
+        const empty = document.createElement('div');
+        empty.className = 'empty-state';
+        const icon = document.createElement('span');
+        icon.className = 'icon';
+        icon.textContent = 'school';
+        const p = document.createElement('p');
+        p.style.color = '#94A3B8';
+        p.textContent = 'No active or upcoming programmes';
+        empty.appendChild(icon);
+        empty.appendChild(p);
+        el.appendChild(empty);
+        return;
+      }
+
+      const total = list.length;
+      list.forEach((p, i) => {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex; gap:12px; align-items:center; justify-content:space-between; padding:12px 20px; border-bottom:' + (i !== total - 1 ? '1px solid #F1F5F9' : 'none') + '; transition:background 0.12s; flex-wrap:wrap';
+        row.addEventListener('mouseover', () => row.style.background = '#F8FAFC');
+        row.addEventListener('mouseout', () => row.style.background = 'transparent');
+
+        const statusBg = p.Status === 'In Progress' ? '#EFF6FF' : (p.Status === 'Upcoming' ? '#FFF8CF' : '#F8FAFC');
+        const statusIconColor = p.Status === 'In Progress' ? '#2563EB' : (p.Status === 'Upcoming' ? '#D97706' : '#64748B');
+
+        const leftCol = document.createElement('div');
+        leftCol.style.cssText = 'display:flex; gap:12px; align-items:center; flex:1; min-width:240px';
+
+        const iconBox = document.createElement('div');
+        iconBox.style.cssText = 'width:36px; height:36px; border-radius:10px; background:' + statusBg + '; display:flex; align-items:center; justify-content:center; flex-shrink:0; cursor:pointer';
+        const ic = document.createElement('span');
+        ic.className = 'icon';
+        ic.style.color = statusIconColor;
+        ic.textContent = 'school';
+        iconBox.appendChild(ic);
+        iconBox.addEventListener('click', () => navTo('training', { id: p.ID }));
+
+        const textWrap = document.createElement('div');
+        textWrap.style.cssText = 'flex:1; min-width:0; cursor:pointer';
+        textWrap.addEventListener('click', () => navTo('training', { id: p.ID }));
+
+        const nameDiv = document.createElement('div');
+        nameDiv.style.cssText = 'font-size:13px; font-weight:700; color:var(--apollo-dark); line-height:1.35; word-break:break-word';
+        nameDiv.textContent = p.Name || '';
+
+        const startFormatted = formatMinimalistDate(p.StartDate) || p.StartDate || '-';
+        const endFormatted = formatMinimalistDate(p.EndDate) || p.EndDate || '';
+        const dateDisplay = (endFormatted && endFormatted !== startFormatted) ? (startFormatted + ' - ' + endFormatted) : startFormatted;
+
+        const codeDiv = document.createElement('div');
+        codeDiv.style.cssText = 'font-size:11.5px; color:#64748B; margin-top:2px';
+        codeDiv.textContent = (p.Code || '') + ' | ' + dateDisplay;
+
+        textWrap.appendChild(nameDiv);
+        textWrap.appendChild(codeDiv);
+
+        leftCol.appendChild(iconBox);
+        leftCol.appendChild(textWrap);
+
+        const rightWrap = document.createElement('div');
+        rightWrap.style.cssText = 'display:flex; gap:6px; align-items:center; flex-shrink:0; flex-wrap:wrap';
+
+        const dataSheetUrl = p.trainingDataSheetUrl || (p.ParticipantsSheetID ? ('https://docs.google.com/spreadsheets/d/' + p.ParticipantsSheetID + '/edit') : '');
+        const reqUrl = p.requisitionFormUrl || (p.RequisitionFormFileID ? ('https://docs.google.com/spreadsheets/d/' + p.RequisitionFormFileID + '/edit') : (p.RequisitionUrl || p.BrochureURL || ''));
+
+        if (dataSheetUrl) {
+          const sheetA = document.createElement('a');
+          sheetA.href = dataSheetUrl;
+          sheetA.target = '_blank';
+          sheetA.className = 'btn-th btn-xs';
+          sheetA.style.cssText = 'background:#059669; color:#fff; border:none; text-decoration:none; display:inline-flex; align-items:center; gap:3px';
+          sheetA.title = 'Open Training Data Sheet';
+          const sIc = document.createElement('span');
+          sIc.className = 'icon sm';
+          sIc.textContent = 'table_chart';
+          sheetA.appendChild(sIc);
+          sheetA.appendChild(document.createTextNode('Sheet'));
+          sheetA.addEventListener('click', (e) => e.stopPropagation());
+          rightWrap.appendChild(sheetA);
+        }
+
+        if (reqUrl) {
+          const reqA = document.createElement('a');
+          reqA.href = reqUrl;
+          reqA.target = '_blank';
+          reqA.className = 'btn-th btn-secondary btn-xs';
+          reqA.style.cssText = 'text-decoration:none; display:inline-flex; align-items:center; gap:3px';
+          reqA.title = 'Open Requisition Form';
+          const rIc = document.createElement('span');
+          rIc.className = 'icon sm';
+          rIc.textContent = 'description';
+          reqA.appendChild(rIc);
+          reqA.appendChild(document.createTextNode('Form'));
+          reqA.addEventListener('click', (e) => e.stopPropagation());
+          rightWrap.appendChild(reqA);
+        }
+
+        const paxSpan = document.createElement('span');
+        paxSpan.style.cssText = 'font-size:11.5px; font-weight:600; color:#64748B';
+        paxSpan.textContent = (p.Participants || 0) + ' pax';
+        rightWrap.appendChild(paxSpan);
+
+        const compDate = p.EndDate || p.StartDate;
+        const isCompleted = ['Training Completed','Evaluation Completed','Waiting for 3-Month Review','Programme Closed','Completed'].includes(p.Stage || p.Status);
+        const is3MDone = ['Programme Closed'].includes(p.Stage);
+        const st3M = ApolloCountdown.getStatus(compDate, '3month', is3MDone, !isCompleted);
+
+        const badgeSpan = document.createElement('span');
+        badgeSpan.innerHTML = ApolloCountdown.renderBadge(st3M);
+        rightWrap.appendChild(badgeSpan);
+
+        const stBadgeSpan = document.createElement('span');
+        stBadgeSpan.innerHTML = statusBadge(p.Status);
+        rightWrap.appendChild(stBadgeSpan);
+
+        const appBadgeSpan = document.createElement('span');
+        appBadgeSpan.innerHTML = approvalStatusBadge(p.ApprovalStatus || 'Approved');
+        rightWrap.appendChild(appBadgeSpan);
+
+        row.appendChild(leftCol);
+        row.appendChild(rightWrap);
+        el.appendChild(row);
+      });
+    }
+
+    function renderActivityFeed(trainings) {
+      const feed = document.getElementById('activity-feed');
+      if (!feed) return;
+      feed.innerHTML = '';
+      if (!trainings || !trainings.length) {
+        const empty = document.createElement('div');
+        empty.className = 'p-4 text-center';
+        empty.style.color = '#94A3B8';
+        empty.textContent = 'No recent activity logs.';
+        feed.appendChild(empty);
+        return;
+      }
+
+      const items = trainings.slice(0, 5).map(t => ({
+        title: 'Programme Created: ' + (t.Name || ''),
+        sub: (t.Code || '') + ' | Stage: ' + (t.Stage || 'Created'),
+        icon: 'school',
+        color: '#2563EB',
+        time: formatMinimalistDate(t.CreatedDate || t.StartDate) || 'Recently'
+      }));
+
+      const total = items.length;
+      items.forEach((item, idx) => {
+        const row = document.createElement('div');
+        row.style.cssText = 'padding:12px 16px; display:flex; gap:12px; align-items:flex-start; border-bottom:' + (idx !== total - 1 ? '1px solid #F8FAFC' : 'none');
+
+        const iconBox = document.createElement('div');
+        iconBox.style.cssText = 'width:30px; height:30px; border-radius:8px; background:' + item.color + '15; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:2px';
+        const ic = document.createElement('span');
+        ic.className = 'icon sm';
+        ic.style.color = item.color;
+        ic.textContent = item.icon;
+        iconBox.appendChild(ic);
+
+        const textWrap = document.createElement('div');
+        textWrap.style.cssText = 'flex:1; min-width:0';
+
+        const titleDiv = document.createElement('div');
+        titleDiv.style.cssText = 'font-size:12.5px; font-weight:600; color:#1E293B; line-height:1.35; word-break:break-word';
+        titleDiv.textContent = item.title;
+
+        const subDiv = document.createElement('div');
+        subDiv.style.cssText = 'font-size:11px; color:#64748B; margin-top:1px';
+        subDiv.textContent = item.sub;
+
+        textWrap.appendChild(titleDiv);
+        textWrap.appendChild(subDiv);
+
+        const timeSpan = document.createElement('span');
+        timeSpan.style.cssText = 'font-size:10.5px; color:#94A3B8; flex-shrink:0';
+        timeSpan.textContent = item.time;
+
+        row.appendChild(iconBox);
+        row.appendChild(textWrap);
+        row.appendChild(timeSpan);
+        feed.appendChild(row);
+      });
+    }
+  </script>
 </body>
 </html>

@@ -804,6 +804,37 @@
                 PostEvalCompleted: false
               };
             });
+          } else if (allAttRecords.length > 0) {
+            const uniqueFromAtt = new Map();
+            allAttRecords.forEach(a => {
+              const eId = String(a.EmployeeNo || a.EmployeeID || a.ID || '').trim();
+              if (eId && !uniqueFromAtt.has(eId.toLowerCase())) {
+                const rawStatus = String(a.Status || 'Present').trim().toLowerCase();
+                let attStatusText = 'Attended';
+                let attColor = 'green';
+                let hasAttended = true;
+                if (rawStatus === 'absent' || rawStatus === 'did not attend') {
+                  attStatusText = 'Did Not Attend'; attColor = 'red'; hasAttended = false;
+                } else if (rawStatus === 'late' || rawStatus === 'partial') {
+                  attStatusText = 'Late / Partial'; attColor = 'yellow'; hasAttended = true;
+                }
+                uniqueFromAtt.set(eId.toLowerCase(), {
+                  ID: eId,
+                  EmployeeID: eId,
+                  EmployeeName: String(a.EmployeeName || a.Name || eId).trim(),
+                  Department: String(a.Department || a.Dept || '-').trim(),
+                  Position: String(a.Position || a.JobTitle || 'Participant').trim(),
+                  SupervisorID: String(a.SupervisorID || '').trim(),
+                  SupervisorName: String(a.SupervisorName || '').trim(),
+                  SupervisorEmail: String(a.SupervisorEmail || '').trim(),
+                  Attended: hasAttended,
+                  AttendanceStatus: attStatusText,
+                  AttendanceColor: attColor,
+                  PostEvalCompleted: false
+                });
+              }
+            });
+            participantsList = Array.from(uniqueFromAtt.values());
           }
         } catch(directErr) {}
       }
