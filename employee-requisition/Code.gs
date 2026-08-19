@@ -8,6 +8,13 @@ function doGet(e) {
   try {
     const template = HtmlService.createTemplateFromFile('Requisition');
     template.params = (e && e.parameter) ? e.parameter : {};
+    try {
+      const rawSysLogo = getSystemLogoUrl() || '';
+      const directSysLogo = rawSysLogo ? (convertDriveLinkToDirectImageUrl(rawSysLogo) || rawSysLogo) : '';
+      template.systemLogoUrl = String(directSysLogo);
+    } catch(sysLogoErr) {
+      template.systemLogoUrl = '';
+    }
 
     return template.evaluate()
       .setTitle(appTitle)
@@ -424,11 +431,17 @@ function submitEmployeeRequisition(data) {
     const objectivesVal = String(data.Objectives || data.Reason || '').trim();
 
     const requestedParticipants = Array.isArray(data.ParticipantList) ? data.ParticipantList : (Array.isArray(data.participants) ? data.participants : []);
+    if (!requestedParticipants || requestedParticipants.length === 0) {
+      return err('At least one participant is required for the training requisition.');
+    }
     const participantResolution = canonicalizeTrainingParticipants(requestedParticipants);
     if (participantResolution.rejected.length > 0) {
       return err('The following participant(s) do not match an Employee-sheet record: ' + participantResolution.rejected.join(', '));
     }
     const participantsList = participantResolution.participants;
+    if (!participantsList || participantsList.length === 0) {
+      return err('At least one valid employee participant is required for the training requisition.');
+    }
 
     let workspace = { folderId: '', folderUrl: '', partSheetId: '', sessionSheetId: '', attendanceSheetId: '', evaluationSheetId: '', postSheetId: '' };
     let reqForm = { fileId: '', fileUrl: '' };
@@ -599,13 +612,15 @@ function submitEmployeeRequisition(data) {
     setCol('Participants', data.TotalPax || participantsList.length || 0);
     setCol('CourseFee', data.CourseFee || '0.00');
     setCol('UpdatedDate', timeNow);
+    setCol('Status', currentApprovalStatus === 'Approved' ? 'Upcoming' : 'Draft');
+    setCol('Stage', 'Created');
     setCol('ApprovalStatus', currentApprovalStatus);
     setCol('HOD', hodName || 'Pending');
-    setCol('HODStatus', 'Pending');
+    setCol('HODStatus', isHodBypassed ? 'Approved' : 'Pending');
     setCol('Csuite', csuiteName || 'N/A');
-    setCol('CsuiteStatus', 'N/A');
+    setCol('CsuiteStatus', isCsuiteBypassed ? 'Approved' : (isHodBypassed ? 'Pending' : 'N/A'));
     setCol('HOHR', hohrName || 'N/A');
-    setCol('HOHRStatus', 'N/A');
+    setCol('HOHRStatus', isHohrBypassed ? 'Approved' : (isCsuiteBypassed ? 'Pending' : 'N/A'));
     setCol('ApprovedBy', approvedByVal);
     setCol('ApprovedCostCentre', approvedCostCentreVal);
     setCol('ApprovedAt', approvedAtVal);

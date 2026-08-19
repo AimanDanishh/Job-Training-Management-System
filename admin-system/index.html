@@ -35,25 +35,32 @@
     }
 
     .logo-badge {
-      width: 72px;
-      height: 72px;
+      width: 115px;
+      height: 115px;
       background: #FFFFFF;
-      border-radius: 18px;
+      border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      margin: 0 auto 14px;
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04);
-      border: 1px solid rgba(226, 232, 240, 0.8);
+      margin: 0 auto;
+      border: 1px solid rgba(226, 232, 240, 0.9);
       padding: 6px;
       box-sizing: border-box;
+      overflow: hidden;
+      box-shadow: 8px 8px 18px #d5dde8, -8px -8px 18px #ffffff, 0 8px 20px rgba(233, 28, 45, 0.16);
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+    }
+
+    .logo-badge:hover {
+      transform: translateY(-2px) scale(1.02);
+      box-shadow: 10px 10px 22px #c8d4e2, -10px -10px 22px #ffffff, 0 12px 26px rgba(233, 28, 45, 0.22);
     }
 
     .logo-badge img {
       width: 100%;
       height: 100%;
       object-fit: contain;
-      border-radius: 12px;
+      border-radius: 50%;
     }
 
     .company-title {
@@ -167,16 +174,21 @@
   </style>
 </head>
 <body>
-<div id="__trainhub_config__" style="display:none" data-config="<?!= encodeURIComponent(JSON.stringify({ page: currentPage || '', publicPortalUrl: (typeof publicPortalUrl !== 'undefined' && publicPortalUrl) ? publicPortalUrl : '', companyLogoUrl: (typeof companyLogoUrl !== 'undefined' && companyLogoUrl) ? companyLogoUrl : '' })) ?>"></div>
+<div id="__trainhub_config__" style="display:none" data-config="<?!= encodeURIComponent(JSON.stringify({ page: currentPage || '', publicPortalUrl: (typeof publicPortalUrl !== 'undefined' && publicPortalUrl) ? publicPortalUrl : '', systemLogoUrl: (typeof systemLogoUrl !== 'undefined' && systemLogoUrl) ? systemLogoUrl : '' })) ?>"></div>
 
   <div class="login-wrapper">
-    <!-- Brand Header with Logo -->
+    <!-- Brand Header with Logo as Primary Subject -->
     <div class="logo-container">
-      <div class="logo-badge">
-        <img id="login-company-logo" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjIyIiBmaWxsPSIjRTkxQzJEIi8+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iMjgiIGZpbGw9IiNGRkY4Q0YiIHN0cm9rZT0iI0ZFQzMwRCIgc3Ryb2tlLXdpZHRoPSIyIi8+PHRleHQgeD0iNTAiIHk9IjYxIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI5MDAiIGZvbnQtc2l6ZT0iMzIiIGZpbGw9IiNFOTFDMkQiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkE8L3RleHQ+PC9zdmc+" alt="Apollo Company Logo" referrerpolicy="no-referrer" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjIyIiBmaWxsPSIjRTkxQzJEIi8+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iMjgiIGZpbGw9IiNGRkY4Q0YiIHN0cm9rZT0iI0ZFQzMwRCIgc3Ryb2tlLXdpZHRoPSIyIi8+PHRleHQgeD0iNTAiIHk9IjYxIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI5MDAiIGZvbnQtc2l6ZT0iMzIiIGZpbGw9IiNFOTFDMkQiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkE8L3RleHQ+PC9zdmc+'">
+      <div class="logo-badge" id="login-logo-badge">
+        <img id="login-system-logo" alt="Apollo System Logo" referrerpolicy="no-referrer" style="display:none;width:100%;height:100%;object-fit:contain;border-radius:50%">
+        <div id="login-logo-fallback" style="display:flex;align-items:center;justify-content:center;width:100%;height:100%">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+            <circle cx="50" cy="50" r="48" fill="#E91C2D" />
+            <circle cx="50" cy="50" r="40" fill="none" stroke="#FFFFFF" stroke-width="2.5" opacity="0.4" />
+            <text x="50" y="63" font-family="'Segoe UI', -apple-system, sans-serif" font-weight="900" font-size="38" fill="#FFFFFF" text-anchor="middle">A</text>
+          </svg>
+        </div>
       </div>
-      <h1 class="company-title">Apollo Job Training Hub</h1>
-      <p class="company-subtitle">Apollo Food Industries (M) Sdn Bhd</p>
     </div>
 
     <!-- Login Card -->
@@ -246,14 +258,30 @@
       }
     }
 
-    onReady(() => {
-      // Dynamic company logo application if configured in system settings
-      if (window.__COMPANY_LOGO_URL__) {
-        const logoImg = document.getElementById('login-company-logo');
-        if (logoImg) {
-          logoImg.src = window.__COMPANY_LOGO_URL__;
-        }
+    function applyLoginSystemLogo() {
+      const sysLogo = window.__SYSTEM_LOGO_URL__;
+      const logoImg = document.getElementById('login-system-logo');
+      const fallbackEl = document.getElementById('login-logo-fallback');
+
+      if (sysLogo && String(sysLogo).trim() !== '') {
+        logoImg.onload = function() {
+          logoImg.style.display = 'block';
+          if (fallbackEl) fallbackEl.style.display = 'none';
+        };
+        logoImg.onerror = function() {
+          logoImg.style.display = 'none';
+          if (fallbackEl) fallbackEl.style.display = 'flex';
+        };
+        logoImg.src = String(sysLogo).trim();
+      } else {
+        logoImg.style.display = 'none';
+        if (fallbackEl) fallbackEl.style.display = 'flex';
       }
+    }
+
+    onReady(() => {
+      // Apply SYSTEM_LOGO_URL exclusively to login page with resilient fallback
+      applyLoginSystemLogo();
 
       checkCurrentUser();
       const signinBtn = document.getElementById('btn-google-signin');

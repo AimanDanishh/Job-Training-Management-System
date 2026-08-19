@@ -207,10 +207,10 @@
             <div class="card-th-body">
               <div class="mb-3">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px">
-                  <label for="cfg-allowed-domain" class="label-th" style="margin:0">Allowed Company Domain (ALLOWED_DOMAIN)</label>
+                  <label for="cfg-allowed-domain" class="label-th" style="margin:0">Allowed Company Domain(s) (ALLOWED_DOMAIN)</label>
                   <span id="st-allowed-domain" class="badge-th badge-neutral">Checking...</span>
                 </div>
-                <input type="text" id="cfg-allowed-domain" class="input-th" style="font-size:12.5px" placeholder="e.g. company.com (leave empty for any domain)" aria-label="Allowed Company Domain">
+                <input type="text" id="cfg-allowed-domain" class="input-th" style="font-size:12.5px" placeholder="e.g. company1.com, company2.com (leave empty for any domain)" aria-label="Allowed Company Domain">
               </div>
 
               <div class="mb-2">
@@ -234,7 +234,8 @@
               <p class="card-th-sub">Custom dynamic logo URL loaded into sidebar, headers, and QR codes.</p>
             </div>
             <div class="card-th-body">
-              <div class="row g-3 align-items-center">
+              <!-- Company Logo (Authenticated App) -->
+              <div class="row g-3 align-items-center mb-4">
                 <div class="col-12 col-md-8">
                   <div class="mb-2">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px">
@@ -242,7 +243,7 @@
                       <span id="st-company-logo" class="badge-th badge-neutral">Checking...</span>
                     </div>
                     <input type="url" id="cfg-company-logo-url" class="input-th" style="font-size:12px" placeholder="https://domain.com/path/to/company-logo.png" oninput="previewCompanyLogo(this.value)" aria-label="Company Logo Image URL">
-                    <div style="font-size:11px; color:#64748B; margin-top:4px">Direct PNG, JPG, or SVG image URL. If unset, the default Apollo emblem is displayed with zero layout disruption.</div>
+                    <div style="font-size:11px; color:#64748B; margin-top:4px">Used throughout the authenticated application (sidebar, dashboard, headers, and certificates).</div>
                   </div>
                 </div>
 
@@ -252,8 +253,34 @@
                       <img id="company-logo-preview" src="" alt="Logo Preview" referrerpolicy="no-referrer" style="max-width:100%; max-height:100%; object-fit:contain" onerror="handleLogoPreviewError(this)">
                     </div>
                     <div>
-                      <div style="font-size:12.5px; font-weight:700; color:var(--apollo-dark)">Live Logo Preview</div>
+                      <div style="font-size:12.5px; font-weight:700; color:var(--apollo-dark)">Company Logo</div>
                       <div style="font-size:11px; color:#92400E" id="company-logo-preview-text">Default Apollo emblem active.</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- System Logo (Login Page Only) -->
+              <div class="row g-3 align-items-center pt-3" style="border-top:1px solid #F1F5F9">
+                <div class="col-12 col-md-8">
+                  <div class="mb-2">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px">
+                      <label for="cfg-system-logo-url" class="label-th" style="margin:0">Login Page System Logo URL (SYSTEM_LOGO_URL)</label>
+                      <span id="st-system-logo" class="badge-th badge-neutral">Checking...</span>
+                    </div>
+                    <input type="url" id="cfg-system-logo-url" class="input-th" style="font-size:12px" placeholder="https://domain.com/path/to/circular-system-logo.png" oninput="previewSystemLogo(this.value)" aria-label="Login Page System Logo URL">
+                    <div style="font-size:11px; color:#64748B; margin-top:4px">Used exclusively on the login page above the sign-in card. Supports direct PNG, SVG, or Google Drive share link.</div>
+                  </div>
+                </div>
+
+                <div class="col-12 col-md-4">
+                  <div style="display:flex; align-items:center; gap:14px; padding:12px 14px; background:#FEF2F2; border:1.5px solid #FECACA; border-radius:10px">
+                    <div style="width:48px; height:48px; border-radius:50%; background:#fff; border:1px solid #E2E8F0; display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0; box-shadow:0 2px 6px rgba(233,28,45,0.15)">
+                      <img id="system-logo-preview" src="" alt="System Logo Preview" referrerpolicy="no-referrer" style="max-width:100%; max-height:100%; object-fit:contain; border-radius:50%" onerror="handleSystemLogoPreviewError(this)">
+                    </div>
+                    <div>
+                      <div style="font-size:12.5px; font-weight:700; color:#991B1B">Login System Logo</div>
+                      <div style="font-size:11px; color:#7F1D1D" id="system-logo-preview-text">Default circular red emblem active.</div>
                     </div>
                   </div>
                 </div>
@@ -325,6 +352,13 @@
       previewCompanyLogo(data.companyLogoUrl);
     }
 
+    // System Logo (Login Page)
+    const sysLogoInput = document.getElementById('cfg-system-logo-url');
+    if (sysLogoInput) {
+      sysLogoInput.value = data.systemLogoUrl || '';
+      previewSystemLogo(data.systemLogoUrl);
+    }
+
     // 2. Database Status Banner & Pill
     const dbPill = document.getElementById('db-status-pill');
     const banner = document.getElementById('settings-status-banner');
@@ -385,6 +419,7 @@
     setBadgeStatus('st-allowed-domain', data.allowedDomain);
     setBadgeStatus('st-admin-emails', data.adminEmails);
     setBadgeStatus('st-company-logo', data.companyLogoUrl);
+    setBadgeStatus('st-system-logo', data.systemLogoUrl);
   }
 
   function previewCompanyLogo(url) {
@@ -395,7 +430,7 @@
     if (clean) {
       const directUrl = convertDriveToDirectImage(clean);
       preview.src = directUrl;
-      if (previewText) previewText.textContent = 'Custom logo loaded.';
+      if (previewText) previewText.textContent = 'Custom company logo loaded.';
       setBadgeStatus('st-company-logo', clean);
     } else {
       preview.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0MCA0MCI+PHJlY3Qgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiByeD0iOCIgZmlsbD0iI0U5MUMyRCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTYlIiBmb250LWZhbWlseT0iQXJpYWwsc2Fucy1zZXJpZiIgZm9udC13ZWlnaHQ9IjkwMCIgZm9udC1zaXplPSIyMCIgZmlsbD0iI0ZGRjhDRiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSI+QTwvdGV4dD48L3N2Zz4=';
@@ -408,6 +443,29 @@
     img.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0MCA0MCI+PHJlY3Qgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiByeD0iOCIgZmlsbD0iI0U5MUMyRCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTYlIiBmb250LWZhbWlseT0iQXJpYWwsc2Fucy1zZXJpZiIgZm9udC13ZWlnaHQ9IjkwMCIgZm9udC1zaXplPSIyMCIgZmlsbD0iI0ZGRjhDRiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSI+QTwvdGV4dD48L3N2Zz4=';
     const previewText = document.getElementById('company-logo-preview-text');
     if (previewText) previewText.textContent = 'Logo URL loading failed - ensure Drive file sharing is "Anyone with the link can view".';
+  }
+
+  function previewSystemLogo(url) {
+    const preview = document.getElementById('system-logo-preview');
+    const previewText = document.getElementById('system-logo-preview-text');
+    if (!preview) return;
+    const clean = String(url || '').trim();
+    if (clean) {
+      const directUrl = convertDriveToDirectImage(clean);
+      preview.src = directUrl;
+      if (previewText) previewText.textContent = 'Custom login logo loaded.';
+      setBadgeStatus('st-system-logo', clean);
+    } else {
+      preview.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0MCA0MCI+PGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iMTgiIGZpbGw9IiNFOTFDMkQiLz48dGV4dCB4PSI1MCUiIHk9IjU2JSIgZm9udC1mYW1pbHk9IkFyaWFsLHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI5MDAiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiNGRkZGRkYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiPkE8L3RleHQ+PC9zdmc+';
+      if (previewText) previewText.textContent = 'Default circular red emblem active.';
+      setBadgeStatus('st-system-logo', '');
+    }
+  }
+
+  function handleSystemLogoPreviewError(img) {
+    img.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0MCA0MCI+PGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iMTgiIGZpbGw9IiNFOTFDMkQiLz48dGV4dCB4PSI1MCUiIHk9IjU2JSIgZm9udC1mYW1pbHk9IkFyaWFsLHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI5MDAiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiNGRkZGRkYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiPkE8L3RleHQ+PC9zdmc+';
+    const previewText = document.getElementById('system-logo-preview-text');
+    if (previewText) previewText.textContent = 'System Logo URL loading failed - ensure file permissions.';
   }
 
   function setBadgeStatus(elementId, val) {
@@ -435,7 +493,8 @@
       hodPortalUrl: document.getElementById('cfg-hod-url').value.trim(),
       allowedDomain: document.getElementById('cfg-allowed-domain').value.trim(),
       adminEmails: document.getElementById('cfg-admin-emails').value.trim(),
-      companyLogoUrl: document.getElementById('cfg-company-logo-url') ? document.getElementById('cfg-company-logo-url').value.trim() : ''
+      companyLogoUrl: document.getElementById('cfg-company-logo-url') ? document.getElementById('cfg-company-logo-url').value.trim() : '',
+      systemLogoUrl: document.getElementById('cfg-system-logo-url') ? document.getElementById('cfg-system-logo-url').value.trim() : ''
     };
 
     if (!data.databaseId) {

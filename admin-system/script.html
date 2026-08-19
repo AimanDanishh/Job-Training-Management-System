@@ -18,6 +18,7 @@ function readTrainHubConfig() {
         if (cfg.page) window.__TRAINHUB_PAGE__ = cfg.page;
         if (cfg.publicPortalUrl) window.__PUBLIC_PORTAL_URL__ = cfg.publicPortalUrl;
         if (cfg.companyLogoUrl) window.__COMPANY_LOGO_URL__ = cfg.companyLogoUrl;
+        if (cfg.systemLogoUrl) window.__SYSTEM_LOGO_URL__ = cfg.systemLogoUrl;
       }
     } catch(e) {}
   }
@@ -761,22 +762,23 @@ function statusBadge(status) {
 
 function approvalStatusBadge(status) {
   const s = String(status || '').trim();
-  if (s.toLowerCase().includes('return')) {
-    return `<span class="badge-th badge-yellow" style="display:inline-flex;align-items:center;gap:4px;background:#FFF8CF;color:#92400E;border:1px solid #FEC30D"><span class="icon sm" style="font-size:13px">undo</span>Returned</span>`;
-  }
-  if (!s || s === 'Approved' || s === 'Auto-Approved' || s === 'Fully Approved') {
+  const sLower = s.toLowerCase();
+  if (sLower === 'approved' || sLower === 'auto-approved' || sLower === 'fully approved' || (!s && s !== '0')) {
     return `<span class="badge-th badge-green" style="display:inline-flex;align-items:center;gap:4px"><span class="icon sm" style="font-size:13px">check_circle</span>Approved</span>`;
   }
-  if (s === 'Pending HOD Approval') {
+  if (sLower.includes('return')) {
+    return `<span class="badge-th badge-yellow" style="display:inline-flex;align-items:center;gap:4px;background:#FFF8CF;color:#92400E;border:1px solid #FEC30D"><span class="icon sm" style="font-size:13px">undo</span>Returned</span>`;
+  }
+  if (s === 'Pending HOD Approval' || sLower.includes('hod')) {
     return `<span class="badge-th badge-yellow" style="display:inline-flex;align-items:center;gap:4px;background:#FFFBEB;color:#92400E;border:1px solid #FCD34D"><span class="icon sm" style="font-size:13px">hourglass_empty</span>Needs HOD Approval</span>`;
   }
-  if (s === 'Pending C-Suite Approval') {
+  if (s === 'Pending C-Suite Approval' || sLower.includes('c-suite') || sLower.includes('csuite')) {
     return `<span class="badge-th badge-yellow" style="display:inline-flex;align-items:center;gap:4px;background:#FFEDD5;color:#9A3412;border:1px solid #FDBA74"><span class="icon sm" style="font-size:13px">gavel</span>Needs C-Suite Approval</span>`;
   }
-  if (s === 'Pending HOHR Approval') {
+  if (s === 'Pending HOHR Approval' || sLower.includes('hohr') || sLower.includes('hr')) {
     return `<span class="badge-th badge-yellow" style="display:inline-flex;align-items:center;gap:4px;background:#FFF8CF;color:#78350F;border:1px solid #FEC30D"><span class="icon sm" style="font-size:13px">badge</span>Needs HOHR Approval</span>`;
   }
-  if (s === 'Rejected') {
+  if (sLower.includes('reject')) {
     return `<span class="badge-th badge-red" style="display:inline-flex;align-items:center;gap:4px"><span class="icon sm" style="font-size:13px">cancel</span>Rejected</span>`;
   }
   return `<span class="badge-th badge-yellow">${s}</span>`;
@@ -785,8 +787,9 @@ function approvalStatusBadge(status) {
 function isTrainingApproved(training) {
   if (!training) return false;
   const s = String(training.ApprovalStatus || '').trim().toLowerCase();
-  if (s.includes('return') || s.includes('reject')) return false;
-  if (!s || s === 'approved' || s === 'auto-approved' || s === 'fully approved') return true;
+  if (s === 'approved' || s === 'auto-approved' || s === 'fully approved') return true;
+  if (s.includes('return') || s.includes('reject') || s.includes('pending')) return false;
+  if (!s) return true;
   return false;
 }
 

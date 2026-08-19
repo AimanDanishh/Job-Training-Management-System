@@ -18,7 +18,24 @@
 
     <header class="portal-header">
       <div class="brand-logo">
-        <div class="brand-icon">🛡️</div>
+        <div class="brand-logo-img-wrap" style="width:44px;height:44px;border-radius:50%;background:transparent;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;filter:drop-shadow(0 4px 10px rgba(233,28,45,0.25));">
+          <? if (typeof systemLogoUrl !== 'undefined' && systemLogoUrl) { ?>
+            <img src="<?= systemLogoUrl ?>" alt="System Logo" style="width:100%;height:100%;object-fit:contain;border-radius:50%;" referrerpolicy="no-referrer" onerror="this.style.display='none';document.getElementById('hod-header-logo-fallback').style.display='flex';">
+            <div id="hod-header-logo-fallback" style="display:none;align-items:center;justify-content:center;width:100%;height:100%;">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+                <circle cx="50" cy="50" r="48" fill="#E91C2D" />
+                <circle cx="50" cy="50" r="40" fill="none" stroke="#FFFFFF" stroke-width="2.5" opacity="0.4" />
+                <text x="50" y="63" font-family="'Segoe UI', -apple-system, sans-serif" font-weight="900" font-size="36" fill="#FFFFFF" text-anchor="middle">A</text>
+              </svg>
+            </div>
+          <? } else { ?>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+              <circle cx="50" cy="50" r="48" fill="#E91C2D" />
+              <circle cx="50" cy="50" r="40" fill="none" stroke="#FFFFFF" stroke-width="2.5" opacity="0.4" />
+              <text x="50" y="63" font-family="'Segoe UI', -apple-system, sans-serif" font-weight="900" font-size="36" fill="#FFFFFF" text-anchor="middle">A</text>
+            </svg>
+          <? } ?>
+        </div>
         <div>
           <div class="brand-title">JOB TRAINING MANAGEMENT SYSTEM</div>
           <div class="brand-subtitle">Approval Portal</div>
@@ -94,9 +111,6 @@
           </button>
           <button class="nav-tab-btn" onclick="openEmployeePortal()">
             <span>📝</span> New Request
-          </button>
-          <button class="nav-tab-btn" onclick="openPostEvalPage()">
-            <span>📋</span> Post Evaluation
           </button>
         </div>
 

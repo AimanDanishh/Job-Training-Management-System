@@ -10,8 +10,46 @@
   let uploadedFileObject = null;
   let loggedInUserEmail = '';
 
+  function readPortalConfig() {
+    var el = document.getElementById('__trainhub_config__');
+    if (el && el.getAttribute && el.getAttribute('data-config')) {
+      try {
+        var raw = el.getAttribute('data-config');
+        if (raw) {
+          var cfg = JSON.parse(decodeURIComponent(raw));
+          if (cfg.systemLogoUrl) window.__SYSTEM_LOGO_URL__ = cfg.systemLogoUrl;
+        }
+      } catch(e) {}
+    }
+  }
+
+  function applyPortalSystemLogo() {
+    readPortalConfig();
+    const sysLogo = window.__SYSTEM_LOGO_URL__;
+    const logoImg = document.getElementById('systemLogoImg');
+    const fallbackEl = document.getElementById('systemLogoFallback');
+
+    if (sysLogo && String(sysLogo).trim() !== '') {
+      if (logoImg) {
+        logoImg.onload = function() {
+          logoImg.style.display = 'block';
+          if (fallbackEl) fallbackEl.style.display = 'none';
+        };
+        logoImg.onerror = function() {
+          logoImg.style.display = 'none';
+          if (fallbackEl) fallbackEl.style.display = 'flex';
+        };
+        logoImg.src = String(sysLogo).trim();
+      }
+    } else {
+      if (logoImg) logoImg.style.display = 'none';
+      if (fallbackEl) fallbackEl.style.display = 'flex';
+    }
+  }
+
   window.addEventListener('DOMContentLoaded', () => {
     initTheme();
+    applyPortalSystemLogo();
     loadCostCentres();
     // Focus Employee ID input on initial page load
     const empInput = document.getElementById('employeeIdInput');
@@ -746,6 +784,15 @@
       return;
     }
 
+    if (!selectedParticipants || selectedParticipants.length === 0) {
+      showAlert('Participant selection is required. Please add at least one participant before submitting.', true);
+      const paxSection = document.getElementById('paxChipContainer') || document.getElementById('emptyPaxMsg');
+      if (paxSection) {
+        paxSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return;
+    }
+
     const submitBtn = document.getElementById('btnSubmitRequisition');
     if (submitBtn) submitBtn.disabled = true;
 
@@ -807,18 +854,7 @@
   }
 
   function clearFormFields() {
-    document.getElementById('reqTrainingName').value = '';
-    document.getElementById('reqVenue').value = '';
-    document.getElementById('reqFee').value = '';
-    document.getElementById('reqReason').value = '';
-    document.getElementById('reqBrochureUrl').value = '';
-    document.getElementById('reqTrainer').value = '';
-    document.getElementById('reqProvider').value = '';
-    document.getElementById('reqCertExpiry').value = '';
-    selectedCostCentres = [];
-    renderCostCentreChips();
-    selectedParticipants = [];
-    renderSelectedChips();
+    clearRequisitionForm();
   }
 
   function goToHistoryFromSuccess() {
@@ -828,7 +864,9 @@
   }
 
   function clearRequisitionForm() {
-    document.getElementById('editingTrainingId').value = '';
+    editingTrainingId = '';
+    const idInput = document.getElementById('editingTrainingId');
+    if (idInput) idInput.value = '';
     const banner = document.getElementById('editResubmitBanner');
     if (banner) { banner.style.display = 'none'; banner.textContent = ''; }
     document.getElementById('reqTrainingName').value = '';
@@ -839,7 +877,8 @@
     document.getElementById('reqHours').value = '';
     document.getElementById('reqFee').value = '';
     document.getElementById('reqVenue').value = '';
-    document.getElementById('reqCostCentreSelect').value = '';
+    const costSel = document.getElementById('reqCostCentreSelect');
+    if (costSel) costSel.value = '';
     selectedCostCentres = [];
     renderCostCentreChips();
     document.getElementById('reqTrainer').value = '';
@@ -852,10 +891,11 @@
     selectedBrochureBase64 = null;
     selectedBrochureFileName = null;
     selectedParticipants = [];
-    document.getElementById('reqTotalPax').value = '';
-    renderParticipantChips();
-    const subBtn = document.getElementById('btnSubmitForm');
-    if (subBtn) subBtn.innerHTML = '<span>Submit Training Request</span><span>➔</span>';
+    const paxInput = document.getElementById('reqTotalPax');
+    if (paxInput) paxInput.value = '';
+    renderSelectedChips();
+    const subBtn = document.getElementById('btnSubmitRequisition') || document.getElementById('btnSubmitForm');
+    if (subBtn) subBtn.innerHTML = '<span>📤</span> Submit Training Requisition for HOD Approval';
   }
 
   function resetFormForNewSubmission() {

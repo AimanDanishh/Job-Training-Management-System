@@ -920,39 +920,52 @@
     if (typeof t === 'string') {
       const s = t.toLowerCase();
       if (s.includes('reject')) return 'Rejected';
+      if (s.includes('approved') || s.includes('acknowledged') || s.includes('upcoming')) return 'Approved';
+      if (s.includes('return')) return 'Returned';
       if (s.includes('pending') || s.includes('review') || s.includes('draft') || s.includes('plan')) return 'Pending Approval';
       if (s.includes('completed') || s.includes('complete') || s.includes('closed')) return 'Completed';
       if (s.includes('progress') || s.includes('ongoing') || s.includes('going') || s.includes('active') || s.includes('attendance')) return 'Ongoing';
-      if (s.includes('approved') || s.includes('acknowledged') || s.includes('upcoming')) return 'Approved';
       return 'Pending Approval';
     }
 
-    const appStatus = String(t.ApprovalStatus || t.Status || '').trim().toLowerCase();
+    const appStatus = String(t.ApprovalStatus || '').trim().toLowerCase();
     const statusStr = String(t.Status || '').trim().toLowerCase();
     const stageStr = String(t.Stage || '').trim().toLowerCase();
 
-    // 1. Rejected
+    // 1. Explicitly Approved
+    if (appStatus === 'approved' || appStatus === 'auto-approved' || appStatus === 'fully approved') {
+      if (statusStr.includes('progress') || statusStr.includes('ongoing') || stageStr.includes('attendance')) return 'Ongoing';
+      if (statusStr.includes('completed') || stageStr.includes('complete') || stageStr.includes('closed') || stageStr.includes('review')) return 'Completed';
+      return 'Approved';
+    }
+
+    // 2. Rejected
     if (appStatus.includes('reject') || statusStr.includes('reject')) {
       return 'Rejected';
     }
 
-    // 2. Pending Approval
+    // 3. Returned
+    if (appStatus.includes('return') || (statusStr.includes('return') && !appStatus.includes('pending') && !appStatus.includes('approved'))) {
+      return 'Returned';
+    }
+
+    // 4. Pending Approval
     if (appStatus.includes('pending') || appStatus.includes('review') || statusStr.includes('draft') || statusStr.includes('planning') || statusStr.includes('plan')) {
       return 'Pending Approval';
     }
 
-    // 3. Completed
+    // 5. Completed
     if (statusStr.includes('completed') || statusStr.includes('complete') || stageStr.includes('completed') || stageStr.includes('closed') || stageStr.includes('review')) {
       return 'Completed';
     }
 
-    // 4. Ongoing / Active
+    // 6. Ongoing / Active
     if (statusStr.includes('progress') || statusStr.includes('ongoing') || statusStr.includes('going') || statusStr.includes('active') || stageStr.includes('attendance')) {
       return 'Ongoing';
     }
 
-    // 5. Approved
-    if (appStatus.includes('approved') || appStatus.includes('acknowledged') || statusStr.includes('approved') || statusStr.includes('upcoming')) {
+    // 7. Fallback Approved
+    if (appStatus.includes('acknowledged') || statusStr.includes('approved') || statusStr.includes('upcoming')) {
       return 'Approved';
     }
 

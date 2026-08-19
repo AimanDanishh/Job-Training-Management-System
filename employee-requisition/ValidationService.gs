@@ -19,7 +19,11 @@ function getValidEmployee(employeeId) {
 }
 
 function validateCompanyEmail(email) {
-  const allowedDomain = getConfigProperty('ALLOWED_DOMAIN', '');
+  const allowedDomainStr = getConfigProperty('ALLOWED_DOMAIN', '').toLowerCase().trim();
+  const allowedDomains = allowedDomainStr
+    ? allowedDomainStr.split(',').map(d => d.trim().replace(/^@/, '')).filter(Boolean)
+    : [];
+
   let cleanEmail = String(email || '').trim();
 
   if (!cleanEmail) {
@@ -28,10 +32,11 @@ function validateCompanyEmail(email) {
     } catch (e) {}
   }
 
-  if (allowedDomain && cleanEmail && cleanEmail.includes('@')) {
-    const domain = cleanEmail.split('@')[1] || '';
-    if (domain.toLowerCase() !== allowedDomain.toLowerCase()) {
-      return { valid: false, message: `Access restricted. Only company email accounts (@${allowedDomain}) can fill & submit the Training Requisition Form.` };
+  if (allowedDomains.length > 0 && cleanEmail && cleanEmail.includes('@')) {
+    const domain = (cleanEmail.split('@')[1] || '').toLowerCase().trim();
+    if (!allowedDomains.includes(domain)) {
+      const domainLabels = allowedDomains.map(d => '@' + d).join(' or ');
+      return { valid: false, message: `Access restricted. Only company email accounts (${domainLabels}) can fill & submit the Training Requisition Form.` };
     }
   }
 

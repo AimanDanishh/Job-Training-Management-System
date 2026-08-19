@@ -35,6 +35,13 @@ function doGet(e) {
     } catch(logoErr) {
       template.companyLogoUrl = '';
     }
+    try {
+      const rawSysLogo = getSystemLogoUrl() || '';
+      const directSysLogo = rawSysLogo ? (convertDriveLinkToDirectImageUrl(rawSysLogo) || rawSysLogo) : '';
+      template.systemLogoUrl = String(directSysLogo);
+    } catch(sysLogoErr) {
+      template.systemLogoUrl = '';
+    }
 
     return template.evaluate()
       .setTitle(appTitle)

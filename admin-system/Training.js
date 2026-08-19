@@ -131,6 +131,19 @@ function autoUpdateTrainingLifecycleStages() {
         isUpdated = true;
       }
 
+      // Auto-heal status if ApprovalStatus is Approved but Status/Stage was left as Returned / Pending Revision
+      const appStatusClean = String(t.ApprovalStatus || '').trim().toLowerCase();
+      if (appStatusClean === 'approved' || appStatusClean === 'auto-approved' || appStatusClean === 'fully approved') {
+        if (t.Status === 'Pending Revision' || t.Status === 'Returned' || t.Status === 'Draft') {
+          t.Status = 'Upcoming';
+          isUpdated = true;
+        }
+        if (t.Stage === 'Form Returned') {
+          t.Stage = (partCount > 0) ? 'Participants Imported' : 'Created';
+          isUpdated = true;
+        }
+      }
+
       const startDateStr = t.StartDate;
       const endDateStr   = t.EndDate || t.StartDate;
 
@@ -423,7 +436,21 @@ function updateTraining(data) {
     if (data.CourseFee !== undefined && data.CourseFee !== null && data.CourseFee !== '') {
       rowObj['CourseFee'] = String(data.CourseFee);
     }
-    if (data.ApprovalStatus !== undefined) rowObj['ApprovalStatus'] = data.ApprovalStatus;
+    if (data.ApprovalStatus !== undefined) {
+      rowObj['ApprovalStatus'] = data.ApprovalStatus;
+      const appLower = String(data.ApprovalStatus).trim().toLowerCase();
+      if (appLower === 'approved' || appLower === 'auto-approved' || appLower === 'fully approved') {
+        if (!data.Status || data.Status === 'Pending Revision' || data.Status === 'Returned' || data.Status === 'Draft') {
+          rowObj['Status'] = 'Upcoming';
+        }
+        if (!data.Stage || data.Stage === 'Form Returned') {
+          rowObj['Stage'] = (Number(rowObj['Participants'] || 0) > 0) ? 'Participants Imported' : 'Created';
+        }
+        if (rowObj['HODStatus'] === 'Returned' || rowObj['HODStatus'] === 'Pending') rowObj['HODStatus'] = 'Approved';
+        if (rowObj['CsuiteStatus'] === 'Returned' || rowObj['CsuiteStatus'] === 'Pending') rowObj['CsuiteStatus'] = 'Approved';
+        if (rowObj['HOHRStatus'] === 'Returned' || rowObj['HOHRStatus'] === 'Pending') rowObj['HOHRStatus'] = 'Approved';
+      }
+    }
 
     rowObj['UpdatedDate'] = now();
 

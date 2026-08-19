@@ -22,11 +22,18 @@ function doGet(e) {
   // Determine user email strictly from authenticated Google Workspace session
   let activeEmail = resolveActiveSessionEmail();
 
+  let systemLogoUrl = '';
+  try {
+    const rawSysLogo = getSystemLogoUrl() || '';
+    systemLogoUrl = rawSysLogo ? (convertDriveLinkToDirectImageUrl(rawSysLogo) || rawSysLogo) : '';
+  } catch(sysLogoErr) {}
+
   // Validate approver authorization
   const auth = validateHODAccess(activeEmail);
   if (!auth.valid) {
     try {
       const errTemplate = HtmlService.createTemplateFromFile('Error');
+      errTemplate.systemLogoUrl = String(systemLogoUrl);
       errTemplate.params = { 
         title: 'Access Denied — Unauthorized Account',
         message: auth.message || (activeEmail ? `Access Denied: The email address (${activeEmail}) is not registered as an authorized approver.` : 'No authenticated Google account detected. Please log in with your authorized company email.')
@@ -42,6 +49,7 @@ function doGet(e) {
     template.params = (e && e.parameter) ? e.parameter : {};
     template.page = pageParam;
     template.activeEmail = activeEmail || '';
+    template.systemLogoUrl = String(systemLogoUrl);
 
     return template.evaluate()
       .setTitle(appTitle)
@@ -539,13 +547,17 @@ function submitHODDecision(data) {
 
     if (nextApprovalStatus === 'Approved') {
       updateCol('Status', 'Upcoming');
-      updateCol('Stage', 'Created');
+      updateCol('Stage', Number(currentT.Participants || 0) > 0 ? 'Participants Imported' : 'Created');
     } else if (validDecision === 'Rejected') {
       updateCol('Status', 'Cancelled');
       updateCol('Stage', 'Programme Closed');
     } else if (validDecision === 'Returned') {
       updateCol('Status', 'Pending Revision');
       updateCol('Stage', 'Form Returned');
+    } else {
+      // Intermediate approval tier (Pending C-Suite / Pending HOHR) - clear any previous returned status
+      updateCol('Status', 'Draft');
+      updateCol('Stage', 'Created');
     }
 
     updateCol('UpdatedDate', timestamp);

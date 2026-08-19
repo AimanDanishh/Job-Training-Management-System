@@ -174,6 +174,7 @@ function initDefaultScriptProperties(overwriteExisting) {
     'REPORT_TEMPLATE_ID':      '',
     'TRAINING_REQUISITION_TEMPLATE_ID': '',
     'COMPANY_LOGO_URL':        '',
+    'SYSTEM_LOGO_URL':         '',
     'PUBLIC_PORTAL_URL':       '',
     'HOD_PORTAL_URL':          ''
   };
@@ -249,6 +250,7 @@ function getSystemConfigurationDiagnostics() {
     'SHEET_HR_EMAIL',
     'SHEET_TRAININGS',
     'COMPANY_LOGO_URL',
+    'SYSTEM_LOGO_URL',
     'PUBLIC_PORTAL_URL',
     'HOD_PORTAL_URL'
   ];
@@ -387,6 +389,18 @@ function setCompanyLogoUrl(url) {
   setConfigProperty('COMPANY_LOGO_URL', url);
   Logger.log('COMPANY_LOGO_URL updated in Project Settings: ' + url);
   return 'COMPANY_LOGO_URL set to: ' + url;
+}
+
+function getSystemLogoUrl() {
+  const url = getConfigProperty('SYSTEM_LOGO_URL', '');
+  if (url && String(url).trim() !== '') return String(url).trim();
+  return '';
+}
+
+function setSystemLogoUrl(url) {
+  setConfigProperty('SYSTEM_LOGO_URL', url);
+  Logger.log('SYSTEM_LOGO_URL updated in Project Settings: ' + url);
+  return 'SYSTEM_LOGO_URL set to: ' + url;
 }
 
 function isSameEmployeeId(id1, id2) {

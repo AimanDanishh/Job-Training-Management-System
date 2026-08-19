@@ -473,14 +473,19 @@ function getActiveHODProfile(providedEmail, requesterIdOrName) {
     };
   }
 
-  const allowedDomain = getConfigProperty('ALLOWED_DOMAIN', '');
-  if (allowedDomain && userEmail && userEmail.includes('@')) {
-    const domain = userEmail.split('@')[1] || '';
-    if (domain.toLowerCase() !== allowedDomain.toLowerCase()) {
+  const allowedDomainStr = getConfigProperty('ALLOWED_DOMAIN', '').toLowerCase().trim();
+  const allowedDomains = allowedDomainStr
+    ? allowedDomainStr.split(',').map(d => d.trim().replace(/^@/, '')).filter(Boolean)
+    : [];
+
+  if (allowedDomains.length > 0 && userEmail && userEmail.includes('@')) {
+    const domain = (userEmail.split('@')[1] || '').toLowerCase().trim();
+    if (!allowedDomains.includes(domain)) {
+      const domainLabels = allowedDomains.map(d => '@' + d).join(' or ');
       return {
         valid: false,
         email: userEmail,
-        message: `Access denied. Only company email accounts (@${allowedDomain}) can access the HOD Portal.`
+        message: `Access denied. Only company email accounts (${domainLabels}) can access the HOD Portal.`
       };
     }
   }
@@ -583,10 +588,10 @@ function isSameApprover(approverA, approverB) {
 function getCurrentActiveApprovalStage(requisition) {
   if (!requisition) return 'NONE';
 
-  const appStatus = String(requisition.ApprovalStatus || requisition.Status || '').trim().toLowerCase();
+  const appStatus = String(requisition.ApprovalStatus || '').trim().toLowerCase();
 
-  // If request is overall complete, rejected, returned, cancelled, or closed -> NONE
-  if (appStatus === 'approved' || appStatus.includes('reject') || appStatus.includes('return') || appStatus.includes('cancel') || appStatus.includes('closed') || appStatus.includes('completed')) {
+  // If request is overall complete, approved, rejected, returned, cancelled, or closed -> NONE
+  if (appStatus === 'approved' || appStatus === 'auto-approved' || appStatus === 'fully approved' || appStatus.includes('reject') || appStatus === 'returned' || appStatus.includes('cancel') || appStatus.includes('closed') || appStatus.includes('completed')) {
     return 'NONE';
   }
 
@@ -595,7 +600,7 @@ function getCurrentActiveApprovalStage(requisition) {
   const hrSt = String(requisition.HOHRStatus || '').trim().toLowerCase();
 
   // STAGE 1: HOD Stage
-  const isHodCompleted = hodSt === 'approved' || hodSt === 'n/a' || appStatus.includes('c-suite') || appStatus.includes('csuite') || appStatus.includes('hohr') || appStatus === 'approved';
+  const isHodCompleted = hodSt === 'approved' || hodSt === 'n/a' || appStatus.includes('c-suite') || appStatus.includes('csuite') || appStatus.includes('hohr');
   
   if (!isHodCompleted) {
     if (hodSt === 'pending' || appStatus.includes('pending hod approval') || appStatus === 'pending' || appStatus === 'submitted' || appStatus === 'draft' || !hodSt) {
@@ -603,10 +608,13 @@ function getCurrentActiveApprovalStage(requisition) {
         return 'HOD';
       }
     }
+    if (appStatus.includes('pending hod approval') || appStatus === 'pending') {
+      return 'HOD';
+    }
   }
 
   // STAGE 2: CSuite Stage
-  const isCsCompleted = csSt === 'approved' || csSt === 'n/a' || appStatus.includes('hohr') || appStatus === 'approved';
+  const isCsCompleted = csSt === 'approved' || csSt === 'n/a' || appStatus.includes('hohr');
 
   if (isHodCompleted && !isCsCompleted) {
     if (csSt === 'pending' || appStatus.includes('pending c-suite approval') || appStatus.includes('pending csuite approval')) {
@@ -614,14 +622,13 @@ function getCurrentActiveApprovalStage(requisition) {
         return 'CSuite';
       }
     }
-    // Fallback: If HOD is completed and status is Pending C-Suite
     if (appStatus.includes('c-suite') || appStatus.includes('csuite')) {
       return 'CSuite';
     }
   }
 
   // STAGE 3: HOHR Stage
-  const isHrCompleted = hrSt === 'approved' || hrSt === 'n/a' || appStatus === 'approved';
+  const isHrCompleted = hrSt === 'approved' || hrSt === 'n/a';
 
   if (isHodCompleted && isCsCompleted && !isHrCompleted) {
     if (hrSt === 'pending' || appStatus.includes('pending hohr approval') || appStatus.includes('pending hr approval')) {
@@ -629,7 +636,6 @@ function getCurrentActiveApprovalStage(requisition) {
         return 'HOHR';
       }
     }
-    // Fallback: If HOD and C-Suite are completed and status is Pending HOHR
     if (appStatus.includes('hohr') || appStatus.includes('hr')) {
       return 'HOHR';
     }

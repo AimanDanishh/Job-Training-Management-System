@@ -14,6 +14,27 @@ function getConfigProperty(key, defaultValue) {
   return defaultValue;
 }
 
+function getSystemLogoUrl() {
+  const url = getConfigProperty('SYSTEM_LOGO_URL', '');
+  if (url && String(url).trim() !== '') return String(url).trim();
+  return '';
+}
+
+function convertDriveLinkToDirectImageUrl(url) {
+  if (!url || typeof url !== 'string') return '';
+  const clean = url.trim();
+  if (clean.startsWith('data:image/')) return clean;
+
+  const idMatch = clean.match(/\/d\/([a-zA-Z0-9_-]+)/) || 
+                  clean.match(/id=([a-zA-Z0-9_-]+)/) ||
+                  (clean.length > 20 && !clean.includes('/') ? [null, clean] : null);
+
+  if (idMatch && idMatch[1]) {
+    return 'https://lh3.googleusercontent.com/d/' + idMatch[1];
+  }
+  return clean;
+}
+
 /**
  * Returns configured Employee Portal URL from Script Properties
  */

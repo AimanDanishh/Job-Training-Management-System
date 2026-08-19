@@ -34,6 +34,13 @@ function doGet(e) {
     } catch(logoErr) {
       template.companyLogoUrl = '';
     }
+    try {
+      const rawSysLogo = getSystemLogoUrl() || '';
+      const directSysLogo = rawSysLogo ? (convertDriveLinkToDirectImageUrl(rawSysLogo) || rawSysLogo) : '';
+      template.systemLogoUrl = String(directSysLogo);
+    } catch(sysLogoErr) {
+      template.systemLogoUrl = '';
+    }
 
     return template.evaluate()
       .setTitle(appTitle)
@@ -65,12 +72,16 @@ function verifyGoogleUser() {
     Logger.log('Could not fetch active user email: ' + e.message);
   }
 
-  const allowedDomain = getConfigProperty('ALLOWED_DOMAIN', '').toLowerCase().trim();
+  const allowedDomainStr = getConfigProperty('ALLOWED_DOMAIN', '').toLowerCase().trim();
+  const allowedDomains = allowedDomainStr
+    ? allowedDomainStr.split(',').map(d => d.trim().replace(/^@/, '')).filter(Boolean)
+    : [];
+
   const adminEmailsStr = getConfigProperty('ADMIN_EMAILS', '').toLowerCase().trim();
-  const adminEmails = adminEmailsStr ? adminEmailsStr.split(',').map(e => e.trim()).filter(Boolean) : [];
+  const adminEmails = adminEmailsStr ? adminEmailsStr.split(',').map(e => e.trim().toLowerCase()).filter(Boolean) : [];
 
   const hrRecords = getHrEmailRecords();
-  const hrEmails = hrRecords.map(r => r.email).filter(Boolean);
+  const hrEmails = hrRecords.map(r => (r.email || '').toLowerCase().trim()).filter(Boolean);
 
   if (!email) {
     return {
@@ -84,12 +95,13 @@ function verifyGoogleUser() {
   const domain = userEmail.split('@')[1] || '';
 
   // 1. Check Company Domain requirement (if ALLOWED_DOMAIN is configured)
-  if (allowedDomain && domain !== allowedDomain) {
+  if (allowedDomains.length > 0 && !allowedDomains.includes(domain)) {
+    const domainLabels = allowedDomains.map(d => '@' + d).join(' or ');
     return {
       success: false,
       authenticated: false,
       email: userEmail,
-      message: `Access Denied: Only @${allowedDomain} company accounts are allowed to sign in. (Detected: ${userEmail})`
+      message: `Access Denied: Only ${domainLabels} company accounts are allowed to sign in. (Detected: ${userEmail})`
     };
   }
 
@@ -153,6 +165,7 @@ function getSettingsData() {
     allowedDomain: getConfigProperty('ALLOWED_DOMAIN', ''),
     adminEmails: getConfigProperty('ADMIN_EMAILS', ''),
     companyLogoUrl: getConfigProperty('COMPANY_LOGO_URL', ''),
+    systemLogoUrl: getConfigProperty('SYSTEM_LOGO_URL', ''),
     appTitle: getConfigProperty('APP_TITLE', '')
   });
 }
@@ -195,6 +208,9 @@ function saveSettings(data) {
     }
     if (data.companyLogoUrl !== undefined) {
       setConfigProperty('COMPANY_LOGO_URL', String(data.companyLogoUrl).trim());
+    }
+    if (data.systemLogoUrl !== undefined) {
+      setConfigProperty('SYSTEM_LOGO_URL', String(data.systemLogoUrl).trim());
     }
     if (data.appTitle !== undefined) {
       setConfigProperty('APP_TITLE', String(data.appTitle).trim());

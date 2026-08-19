@@ -7,6 +7,7 @@
   <?!= include('style'); ?>
 </head>
 <body class="theme-dark">
+  <div id="__trainhub_config__" style="display:none" data-config="<?!= encodeURIComponent(JSON.stringify({ systemLogoUrl: (typeof systemLogoUrl !== 'undefined' && systemLogoUrl) ? systemLogoUrl : '' })) ?>"></div>
 
   <!-- Top-Right Fixed Theme Toggle Button -->
   <button type="button" class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle Light / Dark Mode">
@@ -19,37 +20,49 @@
     <!-- ==========================================
          SCREEN 1 & 3: EMPLOYEE ID & VERIFICATION
          ========================================== -->
-    <div id="employeeIdScreen" style="max-width:520px;margin:40px auto 0 auto;">
-      <div class="portal-header">
-        <div class="brand-badge"><span>🏢</span> Apollo HR Portal</div>
-        <h1 class="brand-title">TRAINING REQUEST PORTAL</h1>
-        <p class="brand-subtitle">Job Training Management System</p>
-      </div>
-
-      <!-- State 1: Employee ID Input Form -->
-      <div id="idEntryBox" class="neo-card">
-        <div style="text-align:center;margin-bottom:24px;">
-          <div style="width:56px;height:56px;border-radius:50%;background:var(--bg-card);box-shadow:var(--shadow-raised);display:inline-flex;align-items:center;justify-content:center;font-size:24px;color:var(--primary);margin-bottom:12px;">
-            🪪
+    <div id="employeeIdScreen" style="max-width:440px;margin:24px auto 0 auto;width:100%;">
+      
+      <!-- State 1: Single Unified Soft-Elevated Container -->
+      <div id="idEntryBox" class="neo-card login-card-unified">
+        
+        <!-- 1. Large System Logo -->
+        <div class="login-system-logo-wrap">
+          <img id="systemLogoImg" alt="Apollo System Logo" style="display:none;width:100%;height:100%;object-fit:contain;border-radius:50%;" referrerpolicy="no-referrer">
+          <div id="systemLogoFallback" style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+              <circle cx="50" cy="50" r="48" fill="#E91C2D" />
+              <circle cx="50" cy="50" r="36" fill="none" stroke="#FFFFFF" stroke-width="3.5" opacity="0.35" />
+              <circle cx="50" cy="50" r="23" fill="#FFFFFF" opacity="0.95" />
+              <circle cx="50" cy="50" r="11" fill="#E91C2D" />
+            </svg>
           </div>
-          <h2 style="font-size:18px;font-weight:700;color:var(--text-primary);">Employee Verification</h2>
-          <p style="font-size:13px;color:var(--text-secondary);margin-top:4px;">Enter your Employee ID to access the training portal</p>
         </div>
 
+        <!-- 2. Subtle Section Identifier -->
+        <div class="login-section-title">TRAINING REQUEST</div>
+
+        <!-- 3. Primary Functional Heading -->
+        <h1 class="login-main-heading">Employee Verification</h1>
+
+        <!-- 4. Supporting Subtext -->
+        <p class="login-sub-heading">Enter your employee ID to continue</p>
+
+        <!-- 5. Verification Form -->
         <form onsubmit="event.preventDefault(); submitEmployeeIdLookup();">
-          <div class="form-group">
-            <label class="form-label" for="employeeIdInput">Employee ID / No. *</label>
-            <input type="text" id="employeeIdInput" class="form-control" placeholder="e.g. 00000" autocomplete="off" autofocus required style="text-align:center;font-size:16px;letter-spacing:1px;font-weight:700;">
+          <div class="form-group login-form-group">
+            <label class="form-label login-input-label" for="employeeIdInput">Employee ID / No.</label>
+            <input type="text" id="employeeIdInput" class="form-control login-input-field" placeholder="e.g. 00000" autocomplete="off" autofocus required>
           </div>
 
-          <button type="submit" id="btnContinueLookup" class="btn btn-primary btn-block" style="padding:14px;">
+          <button type="submit" id="btnContinueLookup" class="btn login-btn-continue">
             <span>Continue</span>
-            <span>➔</span>
+            <span style="font-size:17px;line-height:1">→</span>
           </button>
         </form>
 
-        <div style="text-align:center;margin-top:20px;font-size:11.5px;color:var(--text-muted);display:flex;align-items:center;justify-content:center;gap:6px;">
-          <span>🔒</span> Secure Internal Employee Verification
+        <!-- 6. Subtle Security Indicator -->
+        <div class="login-security-msg">
+          <span>🔒</span> Secure internal access
         </div>
       </div>
 
@@ -288,7 +301,7 @@
           <div style="margin-bottom:28px;">
             <div class="step-header">
               <span class="step-num">3</span>
-              <span>Participant List & Total Pax</span>
+              <span>Participant List & Total Pax *</span>
             </div>
 
             <div class="grid-2" style="margin-bottom:16px;">
@@ -298,13 +311,13 @@
               </div>
               <div style="display:flex;align-items:flex-end;">
                 <button type="button" class="btn btn-neo btn-block" style="padding:11px;" onclick="openParticipantPicker()">
-                  <span>👥 Select / Bulk Add Participants</span>
+                  <span>👥 Select / Bulk Add Participants *</span>
                 </button>
               </div>
             </div>
 
             <div class="neo-inset" style="min-height:60px;">
-              <div id="emptyPaxMsg" style="color:var(--text-muted);font-size:13px;text-align:center;padding:8px;">No participants selected yet. Click button above to select.</div>
+              <div id="emptyPaxMsg" style="color:var(--text-muted);font-size:13px;text-align:center;padding:8px;"><span style="color:var(--danger);font-weight:600;">* Required:</span> No participants selected yet. Click button above to select.</div>
               <div id="paxChipContainer" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
             </div>
           </div>

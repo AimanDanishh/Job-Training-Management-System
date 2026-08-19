@@ -25,6 +25,12 @@ function getCompanyLogoUrl() {
   return DEFAULT_APOLLO_LOGO_URL;
 }
 
+function getSystemLogoUrl() {
+  const url = getConfigProperty('SYSTEM_LOGO_URL', '');
+  if (url && String(url).trim() !== '') return String(url).trim();
+  return '';
+}
+
 function convertDriveLinkToDirectImageUrl(input) {
   if (!input) return '';
   const str = String(input).trim();
