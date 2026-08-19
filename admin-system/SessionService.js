@@ -146,6 +146,8 @@ function createSession(data) {
       Logger.log('Auto update stage error: ' + e.message);
     }
 
+    invalidateTrainingCaches(data.TrainingID);
+
     return ok(newSession);
   } catch (e) {
     Logger.log('createSession error: ' + e.message);
@@ -248,6 +250,11 @@ function updateSessionQRStatus(sessionId, status) {
     if (row === -1) return err('Session not found.');
 
     sheet.getRange(row, 9).setValue(status); // Column 9 = QRStatus
+
+    if (found.training && found.training.ID) {
+      invalidateTrainingCaches(found.training.ID);
+    }
+
     return ok({ message: `Session status updated to: ${status}` });
   } catch (e) {
     return err('Failed to update session status: ' + e.message);

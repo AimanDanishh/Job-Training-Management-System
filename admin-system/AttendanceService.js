@@ -91,6 +91,8 @@ function submitAttendance(arg1, arg2, arg3, arg4) {
       updateTrainingStage(session.TrainingID, 'Attendance In Progress');
     } catch (e) {}
 
+    invalidateTrainingCaches(session.TrainingID);
+
     return ok({
       message: `Attendance successfully submitted for ${finalEmpName} (${cleanEmpNo})!`,
       attendanceId: attId,
@@ -198,6 +200,8 @@ function updateAttendanceRecord(id, status, remarks) {
         if (remarksCol) attSheet.getRange(row, remarksCol).setValue(remarks || '');
         if (editedByCol) attSheet.getRange(row, editedByCol).setValue('Admin');
         if (editedAtCol) attSheet.getRange(row, editedAtCol).setValue(now());
+
+        invalidateTrainingCaches(t.ID);
 
         return ok({ message: 'Attendance record updated successfully.' });
       }

@@ -127,11 +127,21 @@
   });
 
   async function loadEmployees() {
+    const cached = ApolloCache.get('employees');
+    if (cached && Array.isArray(cached) && cached.length > 0) {
+      allEmployees = cached;
+      renderTable(allEmployees);
+    }
     try {
       allEmployees = await callServer('getEmployees');
+      if (Array.isArray(allEmployees)) {
+        ApolloCache.set('employees', allEmployees, 30 * 60 * 1000);
+      }
       renderTable(allEmployees);
     } catch(e) {
-      showToast('Failed to load employees: ' + e.message, 'error');
+      if (!cached) {
+        showToast('Failed to load employees: ' + e.message, 'error');
+      }
     }
   }
 
@@ -214,6 +224,7 @@
     setBtnLoading(btn, true, 'Saving...');
     try {
       await callServer(id ? 'updateEmployee' : 'addEmployee', data);
+      ApolloCache.remove('employees');
       showToast(id ? 'Employee updated.' : 'Employee added.', 'success');
       closeModal('modal-add');
       clearForm();
@@ -229,6 +240,7 @@
     if (!confirm('Delete this employee? This action cannot be undone.')) return;
     try {
       await callServer('deleteEmployee', id);
+      ApolloCache.remove('employees');
       showToast('Employee deleted.', 'success');
       loadEmployees();
     } catch(e) { showToast(e.message, 'error'); }

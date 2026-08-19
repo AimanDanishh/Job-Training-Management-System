@@ -15,7 +15,13 @@ const LIFECYCLE_STAGES = [
 // --- Read -----------------------------------------------------------------------
 function getTrainings() {
   try {
+    const cached = getCachedData(CACHE_NAMESPACES.TRAININGS_SUMMARIES);
+    if (cached) return ok(cached);
+
     const rows = autoUpdateTrainingLifecycleStages();
+    if (Array.isArray(rows)) {
+      setCachedData(CACHE_NAMESPACES.TRAININGS_SUMMARIES, rows, 600); // 10 minutes TTL
+    }
     return ok(rows);
   } catch (e) {
     Logger.log('getTrainings error: ' + e.message + '\n' + (e.stack || ''));
@@ -90,7 +96,7 @@ function autoUpdateTrainingLifecycleStages() {
 
       let partCount = Number(t.Participants || 0);
 
-      // Auto-resolve participant count if 0, NaN, or empty
+      // Auto-resolve participant count if 0, NaN, or empty from central row data
       if (isNaN(partCount) || partCount === 0) {
         // Tier 1: Check ParticipantList JSON string
         if (t.ParticipantList) {
@@ -107,15 +113,6 @@ function autoUpdateTrainingLifecycleStages() {
           if (!isNaN(aliasPax) && aliasPax > 0) {
             partCount = aliasPax;
           }
-        }
-        // Tier 3: Check training participants sheet in Drive or database
-        if (partCount === 0 && (t.ID || t.Code)) {
-          try {
-            const pList = getTrainingParticipantsList(t.ID || t.Code);
-            if (Array.isArray(pList) && pList.length > 0) {
-              partCount = pList.length;
-            }
-          } catch(e) {}
         }
 
         if (partCount > 0) {
@@ -365,6 +362,8 @@ function addTraining(data) {
 
     try { syncTrainingById(id, 'Admin Programme Creation', 'CREATE'); } catch(syncErr) { Logger.log('syncTrainingById error in addTraining: ' + syncErr.message); }
 
+    invalidateTrainingCaches(id);
+
     return ok({
       id: id,
       code: code,
@@ -451,6 +450,8 @@ function updateTraining(data) {
 
     try { syncTrainingById(data.ID, 'Admin Programme Update', 'UPDATE'); } catch(syncErr) { Logger.log('syncTrainingById error in updateTraining: ' + syncErr.message); }
 
+    invalidateTrainingCaches(data.ID);
+
     return ok({ message: 'Training updated successfully.' });
   } catch (e) {
     return err('Failed to update training: ' + e.message);
@@ -500,6 +501,8 @@ function acknowledgeHRRequisition(trainingId, hrData) {
       date: timeStamp
     });
 
+    invalidateTrainingCaches(trainingId);
+
     return ok({ message: `Requisition form acknowledged by HR Department (${empName}).` });
   } catch (e) {
     return err('Failed to record HR acknowledgment: ' + e.message);
@@ -524,6 +527,9 @@ function updateTrainingStage(trainingId, newStage) {
     if (stageCol > 0) sheet.getRange(row, stageCol).setValue(newStage);
     if (updatedDateCol > 0) sheet.getRange(row, updatedDateCol).setValue(now());
     try { syncTrainingById(trainingId, 'Stage Change (' + newStage + ')', 'STATUS_CHANGE'); } catch(sErr) {}
+
+    invalidateTrainingCaches(trainingId);
+
     return ok({ message: 'Stage updated to: ' + newStage });
   } catch (e) {
     return err(e.message);
@@ -572,6 +578,8 @@ function deleteTraining(id) {
     } catch(syncErr) {
       Logger.log('Master report sync on delete warning: ' + syncErr.message);
     }
+
+    invalidateTrainingCaches(id);
 
     return ok({ message: 'Training, database records, and reports were successfully updated.' });
   } catch (e) {
@@ -1353,5 +1361,196 @@ function getTrainingActionNotifications() {
   } catch (e) {
     Logger.log('getTrainingActionNotifications error: ' + e.message);
     return err('Failed to calculate training notifications: ' + e.message);
+  }
+}
+
+/**
+ * Composite High-Performance Endpoint: Fetches all initial data required for the Dashboard
+ * in a SINGLE server execution with ONE spreadsheet read, leveraging server-side CacheService.
+ */
+function getDashboardBootstrapData() {
+  try {
+    const cached = getCachedData(CACHE_NAMESPACES.DASHBOARD_BOOTSTRAP);
+    if (cached) return ok(cached);
+
+    const startTime = Date.now();
+
+    // 1. Settings / Validation status
+    const dbId = getSpreadsheetId();
+    const settingsData = {
+      databaseId: dbId,
+      validation: {
+        database: { connected: !!dbId }
+      }
+    };
+
+    // 2. Read central Trainings sheet ONCE
+    const tRows = autoUpdateTrainingLifecycleStages();
+    const trainingsList = Array.isArray(tRows) ? tRows : [];
+
+    // 3. Compute KPI summary metrics
+    const summary = {
+      total: trainingsList.length,
+      upcoming: 0,
+      ongoing: 0,
+      completed: 0,
+      pendingEval: 0,
+      pendingPost: 0
+    };
+
+    // 4. Compute Multi-Tier Approval status counts
+    const approval = {
+      pendingHod: 0,
+      pendingCsuite: 0,
+      pendingHohr: 0,
+      approved: 0,
+      rejected: 0,
+      returned: 0,
+      total: trainingsList.length
+    };
+
+    trainingsList.forEach(t => {
+      const status = String(t.Status || '').trim();
+      const stage = String(t.Stage || '').trim();
+      const appStatus = String(t.ApprovalStatus || '').trim();
+      const appStatusLower = appStatus.toLowerCase();
+
+      if (status === 'Upcoming' || status === 'Draft') summary.upcoming++;
+      else if (status === 'In Progress') summary.ongoing++;
+      else if (status === 'Completed' || status === 'Archived') summary.completed++;
+
+      if (['Attendance In Progress', 'Training Completed', 'Waiting for Evaluation'].includes(stage)) {
+        summary.pendingEval++;
+      }
+      if (['Evaluation Completed', 'Waiting for 3-Month Review'].includes(stage) || t.isThreeMonthsReached) {
+        summary.pendingPost++;
+      }
+
+      if (appStatus === 'Pending HOD Approval') approval.pendingHod++;
+      else if (appStatus === 'Pending C-Suite Approval') approval.pendingCsuite++;
+      else if (appStatus === 'Pending HOHR Approval') approval.pendingHohr++;
+      else if (appStatus === 'Rejected' || appStatusLower.includes('reject')) approval.rejected++;
+      else if (appStatusLower.includes('return')) approval.returned++;
+      else if (appStatusLower === 'approved' || appStatusLower === 'auto-approved' || appStatusLower === 'fully approved' || (!appStatus && status.toLowerCase().includes('approved'))) {
+        approval.approved++;
+      }
+    });
+
+    // 5. Training Action Notifications
+    const notiRes = parseServerRes(getTrainingActionNotifications());
+    const notifications = (notiRes.success && notiRes.data && Array.isArray(notiRes.data.notifications)) ? notiRes.data.notifications : [];
+
+    // 6. Active / Recent programmes subset for initial dashboard view (first 8)
+    const activeTrainings = trainingsList.filter(t => t.Status === 'In Progress' || t.Status === 'Upcoming' || t.Status === 'Draft').slice(0, 8);
+
+    const bootstrapData = {
+      settings: settingsData,
+      summary: summary,
+      approval: approval,
+      trainings: trainingsList,
+      activeTrainings: activeTrainings,
+      notifications: notifications,
+      serverTime: new Date().toISOString()
+    };
+
+    // Cache with 5 minutes TTL
+    setCachedData(CACHE_NAMESPACES.DASHBOARD_BOOTSTRAP, bootstrapData, 300);
+
+    Logger.log(`[PERF] getDashboardBootstrapData generated in ${Date.now() - startTime}ms`);
+    return ok(bootstrapData);
+  } catch (e) {
+    Logger.log('getDashboardBootstrapData error: ' + e.message);
+    return err('Failed to load dashboard bootstrap data: ' + e.message);
+  }
+}
+
+/**
+ * Composite High-Performance Endpoint: Fetches full details for a single training programme
+ * in a SINGLE server execution with ONE spreadsheet open.
+ */
+function getTrainingFullDetails(trainingId) {
+  try {
+    if (!trainingId) return err('Training ID is required.');
+    
+    // Check cache
+    const cacheKey = CACHE_NAMESPACES.TRAINING_DETAIL_PREFIX + String(trainingId);
+    const cached = getCachedData(cacheKey);
+    if (cached) return ok(cached);
+
+    const startTime = Date.now();
+
+    // 1. Get training record from central Trainings sheet
+    const tRes = parseServerRes(getTrainingById(trainingId));
+    if (!tRes.success || !tRes.data) return err(tRes.message || 'Training not found.');
+    const training = tRes.data;
+
+    // 2. Open per-training spreadsheet ONCE
+    let participants = [];
+    let sessions = [];
+    let attendance = [];
+    let evals = [];
+    let postEvals = [];
+
+    const ss = getTrainingDataSpreadsheet(trainingId);
+    if (ss) {
+      // Participants tab
+      const partSheet = ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants');
+      if (partSheet && partSheet.getLastRow() > 1) {
+        participants = sheetToJson(partSheet);
+      } else if (training.ParticipantList) {
+        try {
+          participants = typeof training.ParticipantList === 'string' ? JSON.parse(training.ParticipantList) : training.ParticipantList;
+        } catch(e) {}
+      }
+
+      // Sessions tab
+      const sessSheet = ss.getSheetByName('Sessions') || ss.getSheetByName('TrainingSessions');
+      if (sessSheet && sessSheet.getLastRow() > 1) {
+        sessions = sheetToJson(sessSheet);
+      }
+
+      // Attendance tab
+      const attSheet = ss.getSheetByName('Attendance') || ss.getSheetByName('AttendanceRecords');
+      if (attSheet && attSheet.getLastRow() > 1) {
+        attendance = sheetToJson(attSheet);
+      }
+
+      // Evaluation tab
+      const evalSheet = ss.getSheetByName('Evaluation') || ss.getSheetByName('TrainingEval');
+      if (evalSheet && evalSheet.getLastRow() > 1) {
+        evals = sheetToJson(evalSheet);
+      }
+
+      // Post Evaluation tab
+      const postSheet = ss.getSheetByName('Post Evaluation') || ss.getSheetByName('PostEvaluation') || ss.getSheetByName('PostEval');
+      if (postSheet && postSheet.getLastRow() > 1) {
+        postEvals = sheetToJson(postSheet);
+      }
+    }
+
+    // 3. Evaluation QR code / links
+    let evalQrs = null;
+    try {
+      evalQrs = parseServerRes(getEvaluationQRCodes(trainingId)).data || null;
+    } catch(e) {}
+
+    const fullResult = {
+      training: training,
+      participants: participants || [],
+      sessions: sessions || [],
+      attendance: attendance || [],
+      evalQrs: evalQrs,
+      evals: evals || [],
+      postEvals: postEvals || []
+    };
+
+    // Cache with 5 minutes TTL
+    setCachedData(cacheKey, fullResult, 300);
+
+    Logger.log(`[PERF] getTrainingFullDetails(${trainingId}) generated in ${Date.now() - startTime}ms`);
+    return ok(fullResult);
+  } catch(e) {
+    Logger.log('getTrainingFullDetails error: ' + e.message);
+    return err('Failed to get training full details: ' + e.message);
   }
 }

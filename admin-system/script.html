@@ -29,6 +29,58 @@ function readTrainHubConfig() {
 })();
 
 // ===============================================================================
+// ApolloCache - Client-side Session Storage Cache Manager
+// ===============================================================================
+const ApolloCache = {
+  get: function(key) {
+    if (!key) return null;
+    try {
+      if (typeof window === 'undefined' || !window.sessionStorage) return null;
+      const raw = sessionStorage.getItem('apollo:' + key);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || !parsed.timestamp || !parsed.ttl) return null;
+      if (Date.now() - parsed.timestamp > parsed.ttl) {
+        sessionStorage.removeItem('apollo:' + key);
+        return null;
+      }
+      return parsed.data;
+    } catch(e) {
+      return null;
+    }
+  },
+  set: function(key, data, ttlMs) {
+    if (!key || data === undefined) return;
+    try {
+      if (typeof window === 'undefined' || !window.sessionStorage) return;
+      const payload = {
+        data: data,
+        timestamp: Date.now(),
+        ttl: Math.max(Number(ttlMs) || (5 * 60 * 1000), 1000)
+      };
+      sessionStorage.setItem('apollo:' + key, JSON.stringify(payload));
+    } catch(e) {}
+  },
+  remove: function(key) {
+    if (!key) return;
+    try {
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        sessionStorage.removeItem('apollo:' + key);
+      }
+    } catch(e) {}
+  },
+  clear: function() {
+    try {
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        Object.keys(sessionStorage).forEach(k => {
+          if (k.startsWith('apollo:')) sessionStorage.removeItem(k);
+        });
+      }
+    } catch(e) {}
+  }
+};
+
+// ===============================================================================
 // Shared Utilities & Global Overlays
 // ===============================================================================
 

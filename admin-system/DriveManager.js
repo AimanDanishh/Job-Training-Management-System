@@ -12,21 +12,27 @@ const SUBFOLDER_NAMES = [];
  * stored in ROOT_FOLDER_ID/Training/<training code + name>; never in My Drive
  * or directly in the system root.
  */
+let _cachedSystemRootFolder = null;
 function getOrCreateSystemRootFolder() {
+  if (_cachedSystemRootFolder) return _cachedSystemRootFolder;
   const rootFolderId = getConfigProperty('ROOT_FOLDER_ID', '');
   if (!rootFolderId) throw new Error('ROOT_FOLDER_ID is required.');
-  return DriveApp.getFolderById(rootFolderId);
+  _cachedSystemRootFolder = DriveApp.getFolderById(rootFolderId);
+  return _cachedSystemRootFolder;
 }
 
 function getOrCreateRootFolder() {
   return getOrCreateTrainingRootFolder();
 }
 
+let _cachedTrainingRootFolder = null;
 function getOrCreateTrainingRootFolder() {
+  if (_cachedTrainingRootFolder) return _cachedTrainingRootFolder;
   const configuredFolderId = getConfigProperty('TRAINING_FOLDER', '') || getConfigProperty('TRAINING_FOLDER_ID', '');
   if (configuredFolderId) {
     try {
-      return DriveApp.getFolderById(configuredFolderId);
+      _cachedTrainingRootFolder = DriveApp.getFolderById(configuredFolderId);
+      if (_cachedTrainingRootFolder) return _cachedTrainingRootFolder;
     } catch (e) {
       Logger.log('Could not open configured TRAINING_FOLDER (' + configuredFolderId + '): ' + e.message);
     }
@@ -34,15 +40,27 @@ function getOrCreateTrainingRootFolder() {
 
   const systemRoot = getOrCreateSystemRootFolder();
   let iter = systemRoot.getFoldersByName('Training Folder');
-  if (iter.hasNext()) return iter.next();
-  return systemRoot.createFolder('Training Folder');
+  let folder;
+  if (iter.hasNext()) {
+    folder = iter.next();
+  } else {
+    folder = systemRoot.createFolder('Training Folder');
+  }
+  if (folder) {
+    try { setConfigProperty('TRAINING_FOLDER', folder.getId()); } catch(e) {}
+    _cachedTrainingRootFolder = folder;
+  }
+  return folder;
 }
 
+let _cachedReportsFolder = null;
 function getOrCreateReportsFolder() {
+  if (_cachedReportsFolder) return _cachedReportsFolder;
   const configuredReportsId = getConfigProperty('REPORTS_FOLDER_ID', '');
   if (configuredReportsId) {
     try {
-      return DriveApp.getFolderById(configuredReportsId);
+      _cachedReportsFolder = DriveApp.getFolderById(configuredReportsId);
+      if (_cachedReportsFolder) return _cachedReportsFolder;
     } catch (e) {
       Logger.log('Could not open REPORTS_FOLDER_ID (' + configuredReportsId + '): ' + e.message);
     }
@@ -50,14 +68,33 @@ function getOrCreateReportsFolder() {
 
   const systemRoot = getOrCreateSystemRootFolder();
   let repFolderIter = systemRoot.getFoldersByName('Reports');
-  if (repFolderIter.hasNext()) return repFolderIter.next();
+  if (repFolderIter.hasNext()) {
+    const repFolder = repFolderIter.next();
+    try { setConfigProperty('REPORTS_FOLDER_ID', repFolder.getId()); } catch(e) {}
+    _cachedReportsFolder = repFolder;
+    return repFolder;
+  }
   throw new Error("Required folder 'Reports' was not found under ROOT_FOLDER_ID.");
 }
 
+let _cachedNamelistFolder = null;
 function getOrCreateNamelistFolder() {
+  if (_cachedNamelistFolder) return _cachedNamelistFolder;
+  const configuredNamelistId = getConfigProperty('NAMELIST_FOLDER_ID', '');
+  if (configuredNamelistId) {
+    try {
+      _cachedNamelistFolder = DriveApp.getFolderById(configuredNamelistId);
+      if (_cachedNamelistFolder) return _cachedNamelistFolder;
+    } catch (e) {}
+  }
   const systemRoot = getOrCreateSystemRootFolder();
   let nameFolderIter = systemRoot.getFoldersByName('Namelist');
-  if (nameFolderIter.hasNext()) return nameFolderIter.next();
+  if (nameFolderIter.hasNext()) {
+    const nameFolder = nameFolderIter.next();
+    try { setConfigProperty('NAMELIST_FOLDER_ID', nameFolder.getId()); } catch(e) {}
+    _cachedNamelistFolder = nameFolder;
+    return nameFolder;
+  }
   throw new Error("Required folder 'Namelist' was not found under ROOT_FOLDER_ID.");
 }
 

@@ -364,87 +364,70 @@
       loadDashboard();
     });
 
-    async function loadDashboard() {
-      // 1. Load Core Dashboard KPIs and Data
-      try {
-        const [settingsRes, data, trainings] = await Promise.all([
-          callServer('getSettingsData').catch(() => null),
-          callServer('getDashboardReport').catch(() => ({ summary: {}, approval: {} })),
-          callServer('getTrainings').catch(() => [])
-        ]);
+    function renderDashboardState(data) {
+      if (!data) return;
+      const settingsRes = data.settings || {};
+      const s = data.summary || {};
+      const app = data.approval || {};
+      const tList = Array.isArray(data.trainings) ? data.trainings : [];
 
-        if (settingsRes && settingsRes.validation) {
-          const dbValid = settingsRes.validation.database && settingsRes.validation.database.connected;
-          const dbBanner = document.getElementById('db-config-banner');
-          if (dbBanner) {
-            if (!dbValid || !settingsRes.databaseId) {
-              dbBanner.style.display = 'block';
-            } else {
-              dbBanner.style.display = 'none';
-            }
+      if (settingsRes && settingsRes.validation) {
+        const dbValid = settingsRes.validation.database && settingsRes.validation.database.connected;
+        const dbBanner = document.getElementById('db-config-banner');
+        if (dbBanner) {
+          if (!dbValid || !settingsRes.databaseId) {
+            dbBanner.style.display = 'block';
+          } else {
+            dbBanner.style.display = 'none';
           }
         }
-
-        const s = data ? (data.summary || {}) : {};
-        const app = data ? (data.approval || {}) : {};
-        const tList = Array.isArray(trainings) ? trainings : [];
-
-        document.getElementById('kpi-total').textContent     = s.total      || tList.length || 0;
-        document.getElementById('kpi-upcoming').textContent  = s.upcoming   || 0;
-        document.getElementById('kpi-ongoing').textContent   = s.ongoing    || 0;
-        document.getElementById('kpi-completed').textContent = s.completed  || 0;
-        document.getElementById('kpi-eval').textContent      = s.pendingEval|| 0;
-        document.getElementById('kpi-post').textContent      = s.pendingPost|| 0;
-
-        // Approval status pipeline counts
-        document.getElementById('app-hod-count').textContent      = app.pendingHod || 0;
-        document.getElementById('app-csuite-count').textContent   = app.pendingCsuite || 0;
-        document.getElementById('app-hohr-count').textContent     = app.pendingHohr || 0;
-        document.getElementById('app-approved-count').textContent = app.approved || 0;
-
-        // Active/upcoming programmes list
-        const active = tList.filter(t => t.Status === 'In Progress' || t.Status === 'Upcoming' || t.Status === 'Draft').slice(0, 6);
-        renderActiveProgrammes(active);
-
-        // Render recent activities
-        renderActivityFeed(tList);
-
-      } catch(e) {
-        console.error('Error loading dashboard:', e);
-        showToast('Failed to load dashboard: ' + e.message, 'error');
       }
 
-      // 2. Load Smart Training Actions & Reminders independently
-      loadTrainingActionNotifications();
+      document.getElementById('kpi-total').textContent     = s.total      || tList.length || 0;
+      document.getElementById('kpi-upcoming').textContent  = s.upcoming   || 0;
+      document.getElementById('kpi-ongoing').textContent   = s.ongoing    || 0;
+      document.getElementById('kpi-completed').textContent = s.completed  || 0;
+      document.getElementById('kpi-eval').textContent      = s.pendingEval|| 0;
+      document.getElementById('kpi-post').textContent      = s.pendingPost|| 0;
+
+      // Approval status pipeline counts
+      document.getElementById('app-hod-count').textContent      = app.pendingHod || 0;
+      document.getElementById('app-csuite-count').textContent   = app.pendingCsuite || 0;
+      document.getElementById('app-hohr-count').textContent     = app.pendingHohr || 0;
+      document.getElementById('app-approved-count').textContent = app.approved || 0;
+
+      // Active/upcoming programmes list
+      const active = data.activeTrainings || tList.filter(t => t.Status === 'In Progress' || t.Status === 'Upcoming' || t.Status === 'Draft').slice(0, 6);
+      renderActiveProgrammes(active);
+
+      // Render recent activities
+      renderActivityFeed(tList);
+
+      // Render notifications
+      if (Array.isArray(data.notifications)) {
+        allActionNotifications = data.notifications;
+        renderTrainingActionNotifications(allActionNotifications, currentActionFilter);
+      }
     }
 
-    async function loadTrainingActionNotifications() {
+    async function loadDashboard() {
+      // 1. Instant Cache Render: Check ApolloCache for immediate UI painting
+      const cached = ApolloCache.get('dashboard_bootstrap');
+      if (cached) {
+        renderDashboardState(cached);
+      }
+
+      // 2. Authoritative Single Request: Fetch bootstrap composite data
       try {
-        const notiRes = await callServer('getTrainingActionNotifications');
-        allActionNotifications = (notiRes && Array.isArray(notiRes.notifications)) ? notiRes.notifications : [];
-        renderTrainingActionNotifications(allActionNotifications, currentActionFilter);
-      } catch(err) {
-        console.error('Training Action Notifications error:', err);
-        const listEl = document.getElementById('dash-action-notifications-list');
-        if (listEl) {
-          listEl.innerHTML = '';
-          const errCard = document.createElement('div');
-          errCard.style.cssText = 'padding:16px; text-align:center; background:#FEF2F2; border:1px solid #FECACA; border-radius:10px';
-          const errTitle = document.createElement('div');
-          errTitle.style.cssText = 'font-size:13px; font-weight:700; color:#991B1B';
-          errTitle.textContent = 'Unable to load training reminders';
-          const errMsg = document.createElement('div');
-          errMsg.style.cssText = 'font-size:11.5px; color:#7F1D1D; margin:4px 0 8px';
-          errMsg.textContent = err.message || 'Server request failed';
-          const retryBtn = document.createElement('button');
-          retryBtn.className = 'btn-th btn-xs';
-          retryBtn.style.cssText = 'background:#DC2626; color:#fff; border:none';
-          retryBtn.textContent = 'Retry';
-          retryBtn.addEventListener('click', () => loadTrainingActionNotifications());
-          errCard.appendChild(errTitle);
-          errCard.appendChild(errMsg);
-          errCard.appendChild(retryBtn);
-          listEl.appendChild(errCard);
+        const bootstrap = await callServer('getDashboardBootstrapData');
+        if (bootstrap) {
+          ApolloCache.set('dashboard_bootstrap', bootstrap, 5 * 60 * 1000); // 5 mins TTL
+          renderDashboardState(bootstrap);
+        }
+      } catch(e) {
+        console.error('Error loading dashboard bootstrap:', e);
+        if (!cached) {
+          showToast('Failed to load dashboard: ' + e.message, 'error');
         }
       }
     }

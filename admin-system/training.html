@@ -394,8 +394,16 @@
   async function loadTrainings() {
     const grid = document.getElementById('training-grid');
     const countEl = document.getElementById('t-count');
-    if (countEl) countEl.textContent = 'Loading programmes...';
-    if (grid) grid.innerHTML = '<div class="col-12 text-center py-5" style="color:#94A3B8"><div class="spinner mb-2"></div><br>Loading programmes...</div>';
+    
+    // Instant cache painting if available
+    const cached = ApolloCache.get('trainings_list');
+    if (cached && Array.isArray(cached) && cached.length > 0) {
+      allTrainings = cached;
+      filterTrainings();
+    } else {
+      if (countEl) countEl.textContent = 'Loading programmes...';
+      if (grid) grid.innerHTML = '<div class="col-12 text-center py-5" style="color:#94A3B8"><div class="spinner mb-2"></div><br>Loading programmes...</div>';
+    }
     
     try {
       console.log('[loadTrainings] Fetching training programmes from TrainHub database...');
@@ -416,6 +424,7 @@
       }
 
       allTrainings = trainings;
+      ApolloCache.set('trainings_list', trainings, 5 * 60 * 1000);
       console.log(`[loadTrainings] Successfully loaded ${allTrainings.length} training programmes.`);
       filterTrainings();
     } catch(e) {
@@ -814,25 +823,49 @@
     document.getElementById('training-list-section').style.display = 'none';
     const detailSection = document.getElementById('training-detail-section');
     const content = document.getElementById('detail-full-content');
-    content.innerHTML = '<div class="text-center py-5" style="color:#94A3B8"><div class="spinner mb-2"></div><br>Loading programme details from Training Data sheet...</div>';
     detailSection.style.display = 'block';
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
+    // 1. Instant Cache Render if available
+    const cacheKey = 'training_detail_' + id;
+    const cached = ApolloCache.get(cacheKey);
+    if (cached && cached.training) {
+      renderFullDetail(
+        cached.training,
+        cached.participants || [],
+        cached.sessions || [],
+        cached.attendance || [],
+        cached.evalQrs || null,
+        cached.evals || [],
+        cached.postEvals || []
+      );
+    } else {
+      content.innerHTML = '<div class="text-center py-5" style="color:#94A3B8"><div class="spinner mb-2"></div><br>Loading programme details from Training Data sheet...</div>';
+    }
+
+    // 2. Authoritative Single Composite Request (1 sheet open on server)
     try {
-      const [t, participants, sessions, attendance, evalQrs, evals, postEvals] = await Promise.all([
-        callServer('getTrainingById', id),
-        callServer('getTrainingParticipants', id).catch(() => []),
-        callServer('getSessions', id).catch(() => []),
-        callServer('getAttendance', id).catch(() => []),
-        callServer('getEvaluationQRCodes', id).catch(() => null),
-        callServer('getTrainingEvaluations', id).catch(() => []),
-        callServer('getPostEvaluations', id).catch(() => [])
-      ]);
-      renderFullDetail(t, participants || [], sessions || [], attendance || [], evalQrs, evals || [], postEvals || []);
-      loadTrainingSyncStatusUI(id);
+      const fullRes = await callServer('getTrainingFullDetails', id);
+      if (fullRes && fullRes.training) {
+        ApolloCache.set(cacheKey, fullRes, 5 * 60 * 1000); // 5 mins TTL
+        renderFullDetail(
+          fullRes.training,
+          fullRes.participants || [],
+          fullRes.sessions || [],
+          fullRes.attendance || [],
+          fullRes.evalQrs || null,
+          fullRes.evals || [],
+          fullRes.postEvals || []
+        );
+        loadTrainingSyncStatusUI(id);
+      } else {
+        throw new Error('Could not load details for programme ' + id);
+      }
     } catch(e) {
-      showToast(e.message, 'error');
-      closeFullDetail();
+      if (!cached) {
+        showToast(e.message, 'error');
+        closeFullDetail();
+      }
     }
   }
 

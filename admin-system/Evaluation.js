@@ -66,6 +66,8 @@ function saveTrainingEvaluation(data) {
     // Auto-advance lifecycle stage when evaluation is submitted
     tryAdvanceToEvaluationCompleted(data.TrainingID);
 
+    invalidateTrainingCaches(data.TrainingID);
+
     return ok({ message: 'Training evaluation submitted. Average score: ' + avg });
   } catch (e) {
     return err('Failed to save evaluation: ' + e.message);
@@ -99,7 +101,7 @@ function getPostEvaluations(trainingId) {
     });
     return ok(allPosts);
   } catch (e) {
-    return err(e.message);
+    return err('Failed to load post-evaluations: ' + e.message);
   }
 }
 
@@ -154,6 +156,8 @@ function savePostEvaluation(data) {
     } catch (e) {
       Logger.log('Post-eval stage update error: ' + e.message);
     }
+
+    invalidateTrainingCaches(data.TrainingID);
 
     return ok({ message: 'Post-training evaluation submitted successfully.' });
   } catch (e) {

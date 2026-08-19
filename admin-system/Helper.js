@@ -26,6 +26,123 @@ function setConfigProperty(key, value) {
   PropertiesService.getScriptProperties().setProperty(key, value);
 }
 
+// ===============================================================================
+// Centralized High-Performance Cache Layer (CacheService)
+// ===============================================================================
+
+const CACHE_NAMESPACES = {
+  SETTINGS: 'apollo:config:settings',
+  EMPLOYEES_ALL: 'apollo:employees:all',
+  EMPLOYEES_CC: 'apollo:employees:costcentres',
+  TRAININGS_SUMMARIES: 'apollo:trainings:summaries',
+  DASHBOARD_REPORT: 'apollo:dashboard:report',
+  DASHBOARD_BOOTSTRAP: 'apollo:dashboard:bootstrap',
+  TRAINING_DETAIL_PREFIX: 'apollo:training:detail:'
+};
+
+/**
+ * Retrieves cached data by key from CacheService.
+ * Returns parsed object, or null on cache miss / error.
+ */
+function getCachedData(key) {
+  if (!key) return null;
+  try {
+    const cache = CacheService.getScriptCache();
+    if (!cache) return null;
+    const raw = cache.get(String(key));
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (e) {
+    Logger.log('[CACHE] getCachedData error for key ' + key + ': ' + e.message);
+    return null;
+  }
+}
+
+/**
+ * Stores data in CacheService with a specified TTL in seconds (max 21600s / 6 hours).
+ */
+function setCachedData(key, data, ttlSeconds) {
+  if (!key || data === undefined || data === null) return;
+  try {
+    const cache = CacheService.getScriptCache();
+    if (!cache) return;
+    const cleanTtl = Math.min(Math.max(Number(ttlSeconds || 300), 10), 21600);
+    const jsonStr = JSON.stringify(data);
+    // CacheService value limit is 100KB (102,400 chars). Guard against oversized payloads.
+    if (jsonStr.length < 100000) {
+      cache.put(String(key), jsonStr, cleanTtl);
+    }
+  } catch (e) {
+    Logger.log('[CACHE] setCachedData error for key ' + key + ': ' + e.message);
+  }
+}
+
+/**
+ * Removes a specific cached key.
+ */
+function removeCachedData(key) {
+  if (!key) return;
+  try {
+    const cache = CacheService.getScriptCache();
+    if (cache) cache.remove(String(key));
+  } catch (e) {
+    Logger.log('[CACHE] removeCachedData error for key ' + key + ': ' + e.message);
+  }
+}
+
+/**
+ * Removes multiple cached keys by prefix or list.
+ */
+function removeCachedDataByPrefix(keysArray) {
+  if (!Array.isArray(keysArray) || keysArray.length === 0) return;
+  try {
+    const cache = CacheService.getScriptCache();
+    if (cache) cache.removeAll(keysArray.map(k => String(k)));
+  } catch (e) {
+    Logger.log('[CACHE] removeCachedDataByPrefix error: ' + e.message);
+  }
+}
+
+/**
+ * Helper to get cached data or execute fetchFn, store result in cache, and return it.
+ */
+function getCachedOrFetch(key, fetchFn, ttlSeconds) {
+  const cached = getCachedData(key);
+  if (cached !== null && cached !== undefined) {
+    return cached;
+  }
+  const fresh = fetchFn();
+  if (fresh !== undefined && fresh !== null) {
+    setCachedData(key, fresh, ttlSeconds);
+  }
+  return fresh;
+}
+
+/**
+ * Invalidates all caches associated with training modifications.
+ */
+function invalidateTrainingCaches(trainingId) {
+  const keysToRemove = [
+    CACHE_NAMESPACES.TRAININGS_SUMMARIES,
+    CACHE_NAMESPACES.DASHBOARD_REPORT,
+    CACHE_NAMESPACES.DASHBOARD_BOOTSTRAP
+  ];
+  if (trainingId) {
+    keysToRemove.push(CACHE_NAMESPACES.TRAINING_DETAIL_PREFIX + String(trainingId));
+  }
+  removeCachedDataByPrefix(keysToRemove);
+}
+
+/**
+ * Invalidates all caches associated with employee modifications.
+ */
+function invalidateEmployeeCaches() {
+  removeCachedDataByPrefix([
+    CACHE_NAMESPACES.EMPLOYEES_ALL,
+    CACHE_NAMESPACES.EMPLOYEES_CC
+  ]);
+}
+
 /**
  * Safely populates default Script Properties without overwriting existing configured properties.
  * If overwriteExisting is true, non-empty default values will update existing keys, but empty defaults are never saved.
