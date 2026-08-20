@@ -1518,7 +1518,7 @@ function getTrainingFullDetails(trainingId) {
     let evals = [];
     let postEvals = [];
 
-    const ss = getTrainingDataSpreadsheet(trainingId);
+    const ss = getTrainingDataSpreadsheet(training);
     if (ss) {
       // Participants tab
       const partSheet = ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants');
@@ -1531,7 +1531,7 @@ function getTrainingFullDetails(trainingId) {
       }
 
       // Sessions tab
-      const sessSheet = ss.getSheetByName('Sessions') || ss.getSheetByName('TrainingSessions');
+      const sessSheet = ss.getSheetByName('TrainingSessions') || ss.getSheetByName('Sessions') || ss.getSheetByName('Training Sessions') || ss.getSheetByName('Session');
       if (sessSheet && sessSheet.getLastRow() > 1) {
         sessions = sheetToJson(sessSheet);
       }
@@ -1555,6 +1555,46 @@ function getTrainingFullDetails(trainingId) {
       }
     }
 
+    // Reconcile and synchronize sessions with central TrainingSessions tab
+    const centralSessionsMap = new Map();
+    try {
+      const mainSs = getSpreadsheet();
+      if (mainSs) {
+        const centralSessSheet = mainSs.getSheetByName('TrainingSessions') || mainSs.getSheetByName('Sessions') || mainSs.getSheetByName('Training Sessions');
+        if (centralSessSheet && centralSessSheet.getLastRow() > 1) {
+          const allC = sheetToJson(centralSessSheet);
+          const cleanTId = String(trainingId).trim().toLowerCase();
+          allC.forEach(s => {
+            const sTId = String(s.TrainingID || '').trim().toLowerCase();
+            if (sTId === cleanTId || (training.Code && sTId === String(training.Code).trim().toLowerCase()) || (training.ID && sTId === String(training.ID).trim().toLowerCase())) {
+              const sId = String(s.SessionID || s.ID || '').trim().toLowerCase();
+              if (sId) centralSessionsMap.set(sId, s);
+            }
+          });
+        }
+      }
+    } catch(eC) {
+      Logger.log('Central sessions load error: ' + eC.message);
+    }
+
+    if (sessions && sessions.length > 0) {
+      // Merge latest central data into sessions list
+      sessions = sessions.map(s => {
+        const sId = String(s.SessionID || s.ID || '').trim().toLowerCase();
+        if (centralSessionsMap.has(sId)) {
+          return Object.assign({}, s, centralSessionsMap.get(sId));
+        }
+        return s;
+      });
+      // Append any sessions present in central tab but missing from per-training sheet
+      centralSessionsMap.forEach((cSess, sId) => {
+        const exists = sessions.some(s => String(s.SessionID || s.ID || '').trim().toLowerCase() === sId);
+        if (!exists) sessions.push(cSess);
+      });
+    } else {
+      sessions = Array.from(centralSessionsMap.values());
+    }
+
     // 3. Evaluation QR code / links
     let evalQrs = null;
     try {
@@ -1571,8 +1611,8 @@ function getTrainingFullDetails(trainingId) {
       postEvals: postEvals || []
     };
 
-    // Cache with 5 minutes TTL
-    setCachedData(cacheKey, fullResult, 300);
+    // Cache with short TTL
+    setCachedData(cacheKey, fullResult, 60);
 
     Logger.log(`[PERF] getTrainingFullDetails(${trainingId}) generated in ${Date.now() - startTime}ms`);
     return ok(fullResult);

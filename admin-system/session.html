@@ -22,6 +22,15 @@
       border-color: #2563EB;
       box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);
     }
+    .session-card.inactive-card {
+      background: #FAFAFA;
+      border: 1px dashed #CBD5E1;
+      opacity: 0.85;
+    }
+    .session-card.inactive-card:hover {
+      border-color: #EF4444;
+      opacity: 1;
+    }
     .qr-container {
       background: #F8FAFC;
       border: 1px solid #CBD5E1;
@@ -87,17 +96,17 @@
               <option value="">All Training Programmes</option>
             </select>
           </div>
-          <div class="col-md-3">
+          <div class="col-md-4">
             <label for="filter-status" class="label-th">Filter by QR Status</label>
             <select id="filter-status" class="input-th" onchange="loadSessions()" aria-label="Filter by QR Status">
-              <option value="">All Statuses</option>
-              <option value="Active">Active</option>
+              <option value="Active" selected>Active Sessions Only</option>
+              <option value="">All Statuses (Active, Expired, Inactive)</option>
               <option value="Expired">Expired</option>
-              <option value="Inactive">Inactive</option>
+              <option value="Inactive">Inactive (Deleted / Disabled)</option>
             </select>
           </div>
-          <div class="col-md-4 text-end">
-            <button class="btn-th btn-secondary" onclick="loadSessions()">
+          <div class="col-md-3 text-end">
+            <button class="btn-th btn-secondary w-100" onclick="loadSessions()">
               <span class="icon sm">refresh</span>Refresh Sessions
             </button>
           </div>
@@ -121,18 +130,29 @@
     <div class="modal-header">
       <div>
         <h3 class="modal-title" id="session-modal-title">New Training Session</h3>
-        <p class="modal-sub">Create a session with auto-generated QR code</p>
+        <p class="modal-sub" id="session-modal-sub">Create a session with auto-generated QR code</p>
       </div>
       <button class="modal-close" onclick="closeModal('modal-session')"><span class="icon sm">close</span></button>
     </div>
+    
+    <input type="hidden" id="s-session-id" value="">
+    
+    <div id="s-session-id-preview" style="display:none;margin-top:10px;padding:8px 12px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;font-size:12.5px;color:#1E40AF;font-weight:700;align-items:center;gap:6px">
+      <span class="icon sm" style="font-size:16px;color:#2563EB">qr_code_2</span>
+      <span>Session ID: <span id="s-session-id-display" style="font-family:monospace"></span></span>
+    </div>
+
     <div class="row g-3 mt-1">
       <div class="col-12">
         <label for="s-training-id" class="label-th">Training Programme <span class="required">*</span></label>
         <select id="s-training-id" class="input-th" aria-label="Training Programme"></select>
+        <div id="s-training-id-note" style="display:none;font-size:11px;color:#64748B;margin-top:4px">
+          Training programme cannot be changed once a session is created.
+        </div>
       </div>
       <div class="col-12">
         <label for="s-name" class="label-th">Session Name <span class="required">*</span></label>
-        <input id="s-name" class="input-th" placeholder="e.g. Day 1, Morning, Day 2 Afternoon">
+        <input id="s-name" class="input-th" placeholder="e.g. Day 1 Morning, Day 2 Afternoon">
       </div>
       <div class="col-md-6">
         <label for="s-date" class="label-th">Session Date <span class="required">*</span></label>
@@ -147,12 +167,11 @@
         <input id="s-end-time" class="input-th" type="time">
       </div>
       <div class="col-12">
-        <label for="s-status" class="label-th">QR Status</label>
-        <select id="s-status" class="input-th">
-          <option value="" disabled selected>Select Status</option>
-          <option value="Active">Active (Ready for check-in)</option>
-          <option value="Expired">Expired (Check-in closed)</option>
-          <option value="Inactive">Inactive</option>
+        <label for="s-status" class="label-th">QR Status <span class="required">*</span></label>
+        <select id="s-status" class="input-th" aria-label="QR Status">
+          <option value="Active">Active (Participants can record attendance)</option>
+          <option value="Inactive">Inactive (Disabled / Attendance rejected)</option>
+          <option value="Expired">Expired (Session time ended)</option>
         </select>
       </div>
     </div>
@@ -160,6 +179,39 @@
       <button class="btn-th btn-secondary" onclick="closeModal('modal-session')">Cancel</button>
       <button class="btn-th btn-primary" id="btn-save-session" onclick="saveSession()">
         <span class="icon sm">save</span>Save Session
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Session Confirmation Modal -->
+<div id="modal-delete-session" class="modal-overlay" style="display:none">
+  <div class="modal-box" style="max-width:480px">
+    <div class="modal-header">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:38px;height:38px;border-radius:50%;background:#FEE2E2;display:flex;align-items:center;justify-content:center;color:#DC2626">
+          <span class="icon sm" style="font-size:20px">delete_forever</span>
+        </div>
+        <div>
+          <h3 class="modal-title" style="color:#991B1B">Delete QR Session</h3>
+          <p class="modal-sub">Confirm session deactivation</p>
+        </div>
+      </div>
+      <button class="modal-close" onclick="closeModal('modal-delete-session')"><span class="icon sm">close</span></button>
+    </div>
+    <div style="padding:16px 0 8px">
+      <p style="font-size:13.5px;color:#334155;line-height:1.5;margin:0 0 12px">
+        Delete this QR session (<strong id="del-session-id-display" style="font-family:monospace"></strong>)? Participants will no longer be able to use this QR code to record attendance.
+      </p>
+      <div style="font-size:12px;color:#64748B;background:#F8FAFC;padding:10px 12px;border-radius:8px;border:1px solid #E2E8F0;line-height:1.5">
+        <span class="icon sm" style="color:#059669">shield</span> <strong>Historical records preserved:</strong> Existing attendance records already submitted through this session remain intact.
+      </div>
+    </div>
+    <input type="hidden" id="del-session-id-val" value="">
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:16px;border-top:1px solid #F1F5F9">
+      <button class="btn-th btn-secondary" onclick="closeModal('modal-delete-session')">Cancel</button>
+      <button class="btn-th btn-danger" id="btn-confirm-delete-session" onclick="executeDeleteSession()" style="background:#DC2626;color:#fff;border:none;display:inline-flex;align-items:center;gap:4px">
+        <span class="icon sm">delete</span>Delete Session
       </button>
     </div>
   </div>
@@ -224,6 +276,61 @@
     selModal.innerHTML  = '<option value="">- Select Training -</option>' + opts;
   }
 
+  function toInputDateStr(val) {
+    if (!val) return '';
+    const str = String(val).replace(/GMT.*$/, '').replace(/\(.*\)$/, '').trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+
+    const ymdMatch = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+    if (ymdMatch) {
+      const year = ymdMatch[1];
+      const month = ymdMatch[2].padStart(2, '0');
+      const day = ymdMatch[3].padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    const dmyMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+    if (dmyMatch) {
+      const day = dmyMatch[1].padStart(2, '0');
+      const month = dmyMatch[2].padStart(2, '0');
+      const year = dmyMatch[3];
+      return `${year}-${month}-${day}`;
+    }
+
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) {
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+    return '';
+  }
+
+  function toInputTimeStr(val) {
+    if (!val) return '';
+    const str = String(val).replace(/GMT.*$/, '').replace(/\(.*\)$/, '').trim();
+    const match = str.match(/^(\d{1,2}):(\d{2})/);
+    if (match && !str.includes('1899') && !str.includes('Singapore') && !str.includes('Standard')) {
+      return `${match[1].padStart(2, '0')}:${match[2]}`;
+    }
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) {
+      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    }
+    const simpleMatch = str.match(/(\d{2}):(\d{2})/);
+    if (simpleMatch) return `${simpleMatch[1]}:${simpleMatch[2]}`;
+    return '';
+  }
+
+  function findParentTraining(trainingIdOrCode) {
+    if (!trainingIdOrCode || !allTrainings || !allTrainings.length) return null;
+    const clean = String(trainingIdOrCode).trim().toLowerCase();
+    return allTrainings.find(t => 
+      String(t.ID || '').trim().toLowerCase() === clean ||
+      String(t.Code || '').trim().toLowerCase() === clean ||
+      String(t.TrainingID || '').trim().toLowerCase() === clean ||
+      (t.Name && String(t.Name).trim().toLowerCase() === clean)
+    ) || null;
+  }
+
   async function loadSessions() {
     const grid = document.getElementById('sessions-grid');
     grid.innerHTML = '<div class="text-center p-5" style="color:#94A3B8">Loading sessions...</div>';
@@ -235,6 +342,22 @@
       allSessionsList = await callServer('getSessions', selectedTrainingId || '') || [];
 
       let filtered = allSessionsList;
+
+      // Filter by Training Programme on client side as well for comprehensive matching
+      if (selectedTrainingId) {
+        const selT = findParentTraining(selectedTrainingId);
+        const selAliases = new Set([String(selectedTrainingId).trim().toLowerCase()]);
+        if (selT) {
+          if (selT.ID) selAliases.add(String(selT.ID).trim().toLowerCase());
+          if (selT.Code) selAliases.add(String(selT.Code).trim().toLowerCase());
+          if (selT.TrainingID) selAliases.add(String(selT.TrainingID).trim().toLowerCase());
+        }
+        filtered = filtered.filter(s => {
+          const sTId = String(s.TrainingID || '').trim().toLowerCase();
+          return selAliases.has(sTId);
+        });
+      }
+
       if (selectedStatus) {
         filtered = filtered.filter(s => String(s.QRStatus || 'Active').toLowerCase() === selectedStatus.toLowerCase());
       }
@@ -243,7 +366,7 @@
 
       let warningBannerHtml = '';
       if (selectedTrainingId) {
-        const selT = allTrainings.find(t => String(t.ID) === String(selectedTrainingId));
+        const selT = findParentTraining(selectedTrainingId);
         if (selT && !isTrainingApproved(selT)) {
           const appStr = selT.ApprovalStatus || 'Pending Approval';
           warningBannerHtml = `
@@ -264,7 +387,7 @@
             <div class="empty-state card-th text-center p-5">
               <span class="icon" style="font-size:48px;color:#94A3B8">qr_code</span>
               <p style="color:#64748B;font-weight:600;margin-top:12px">No sessions found</p>
-              <p style="color:#94A3B8;font-size:12px">Create a new session or generate missing QR codes above.</p>
+              <p style="color:#94A3B8;font-size:12px">Create a new session or switch status filter above.</p>
               <button class="btn-th btn-primary btn-sm mt-3" onclick="openCreateSessionModal()">
                 <span class="icon sm">add</span>Create New Session
               </button>
@@ -280,17 +403,56 @@
   }
 
   function renderSessionCard(s) {
-    const parentT = allTrainings.find(t => String(t.ID) === String(s.TrainingID)) || {};
-    const trainingTitle = s.TrainingTitle || parentT.Name || 'Training Programme';
+    const parentT = findParentTraining(s.TrainingID) || {};
+    const trainingTitle = s.TrainingTitle || parentT.Name || parentT.TrainingTitle || 'Training Programme';
 
     const attUrl = s.AttendanceURL || generateClientAttendanceURL(s.SessionID);
     const qrUrl  = ensureQRLogoUrl(s.QRCodeURL, attUrl);
     const status = s.QRStatus || 'Active';
+    const isInactive = String(status).toLowerCase() === 'inactive';
+
+    if (isInactive) {
+      return `
+        <div class="col-md-6 col-lg-4">
+          <div class="session-card inactive-card">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+              <div style="flex:1">
+                <span style="font-size:11px;font-weight:700;color:#94A3B8;text-transform:uppercase">${s.SessionID}</span>
+                <h3 style="font-size:15px;font-weight:700;color:#64748B;margin:2px 0 4px;text-decoration:line-through">${s.SessionName}</h3>
+                <p style="font-size:12px;color:#94A3B8;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${trainingTitle}">
+                  ${trainingTitle}
+                </p>
+              </div>
+              <div>${statusBadge(status)}</div>
+            </div>
+
+            <div style="font-size:11.5px;color:#94A3B8;margin-top:10px;padding:8px 10px;background:#F1F5F9;border-radius:6px;display:flex;gap:12px">
+              <div><span class="icon sm" style="color:#94A3B8">calendar_today</span> ${formatMinimalistDate(s.SessionDate)}</div>
+              <div><span class="icon sm" style="color:#94A3B8">schedule</span> ${formatSessionTimeRange(s.StartTime, s.EndTime)}</div>
+            </div>
+
+            <div style="margin:16px 0;padding:12px;background:#FEE2E2;border:1px dashed #F87171;border-radius:8px;text-align:center">
+              <span class="icon sm" style="color:#DC2626;font-size:20px">block</span>
+              <div style="font-size:12px;font-weight:700;color:#991B1B;margin-top:4px">QR Attendance Disabled</div>
+              <div style="font-size:11px;color:#7F1D1D;margin-top:2px">Scans for this session are rejected.</div>
+            </div>
+
+            <div style="margin-top:auto;display:flex;gap:6px">
+              <button class="btn-th btn-secondary btn-sm" style="flex:1" onclick="navTo('attendance', {session:'${s.SessionID}'})">
+                <span class="icon sm">visibility</span>View Logs
+              </button>
+              <button class="btn-th btn-primary btn-sm" style="flex:1" onclick="openEditSessionModal('${s.SessionID}')" title="Reactivate or Edit">
+                <span class="icon sm">edit</span>Edit / Reactivate
+              </button>
+            </div>
+          </div>
+        </div>`;
+    }
 
     return `
       <div class="col-md-6 col-lg-4">
         <div class="session-card">
-          <div style="display:flex;justify-space-between;align-items:flex-start;gap:8px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
             <div style="flex:1">
               <span style="font-size:11px;font-weight:700;color:#2563EB;text-transform:uppercase">${s.SessionID}</span>
               <h3 style="font-size:16px;font-weight:700;color:#1E293B;margin:2px 0 4px">${s.SessionName}</h3>
@@ -312,6 +474,7 @@
           </div>
 
           <div style="margin-top:auto;display:flex;flex-direction:column;gap:6px">
+            <!-- Row 1: Copy Link & Download QR -->
             <div style="display:flex;gap:6px">
               <button class="btn-th btn-secondary btn-sm" style="flex:1" onclick="copyAttendanceLink('${attUrl}')">
                 <span class="icon sm">content_copy</span>Copy Link
@@ -320,15 +483,24 @@
                 <span class="icon sm">download</span>Download QR
               </button>
             </div>
+
+            <!-- Row 2: View Attendance & Data Sheet Link -->
             <div style="display:flex;gap:6px">
               <button class="btn-th btn-secondary btn-sm" style="flex:1" onclick="navTo('attendance', {session:'${s.SessionID}'})">
                 <span class="icon sm">visibility</span>View Attendance
               </button>
-              <button class="btn-th btn-secondary btn-sm" style="width:auto" onclick="toggleSessionStatus('${s.SessionID}', '${status}')" title="Toggle Active / Expired">
-                <span class="icon sm">${status==='Active'?'block':'check_circle'}</span>
+              ${parentT.trainingDataSheetUrl || parentT.ParticipantsSheetID ? `<a class="btn-th btn-sm" style="background:#059669;color:#fff;border:none;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:4px;flex:1" href="${parentT.trainingDataSheetUrl || ('https://docs.google.com/spreadsheets/d/' + parentT.ParticipantsSheetID + '/edit')}" target="_blank" title="Open Training Data Sheet"><span class="icon sm">table_chart</span>Data Sheet</a>` : ''}
+            </div>
+
+            <!-- Row 3: Edit and Delete Management Controls -->
+            <div style="display:flex;gap:6px;border-top:1px solid #F1F5F9;padding-top:6px;margin-top:2px">
+              <button class="btn-th btn-secondary btn-sm" style="flex:1;display:inline-flex;align-items:center;justify-content:center;gap:4px" onclick="openEditSessionModal('${s.SessionID}')" title="Edit Session Details">
+                <span class="icon sm" style="color:#2563EB">edit</span>Edit
+              </button>
+              <button class="btn-th btn-sm" style="flex:1;display:inline-flex;align-items:center;justify-content:center;gap:4px;background:#FFF1F2;color:#E11D48;border:1px solid #FECDD3" onclick="confirmDeleteSession('${s.SessionID}')" title="Delete / Deactivate QR Session">
+                <span class="icon sm" style="color:#E11D48">delete</span>Delete
               </button>
             </div>
-            ${parentT.trainingDataSheetUrl || parentT.ParticipantsSheetID ? `<a class="btn-th btn-sm" style="background:#059669;color:#fff;border:none;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:4px;width:100%" href="${parentT.trainingDataSheetUrl || ('https://docs.google.com/spreadsheets/d/' + parentT.ParticipantsSheetID + '/edit')}" target="_blank" title="Open Training Data Sheet"><span class="icon sm">table_chart</span>Open Training Data Sheet</a>` : ''}
           </div>
         </div>
       </div>`;
@@ -347,17 +519,6 @@
     });
   }
 
-  async function toggleSessionStatus(sessionId, currentStatus) {
-    const newStatus = currentStatus === 'Active' ? 'Expired' : 'Active';
-    try {
-      await callServer('updateSessionQRStatus', sessionId, newStatus);
-      showToast(`Session ${sessionId} marked as ${newStatus}`, 'info');
-      await loadSessions();
-    } catch(e) {
-      showToast('Failed to update status: ' + e.message, 'error');
-    }
-  }
-
   async function runGenerateMissingQRCodes() {
     try {
       const res = await callServer('generateMissingQRCodes');
@@ -369,6 +530,13 @@
   }
 
   function openCreateSessionModal() {
+    document.getElementById('session-modal-title').textContent = 'New Training Session';
+    document.getElementById('session-modal-sub').textContent = 'Create a session with auto-generated QR code';
+    document.getElementById('s-session-id').value = '';
+    document.getElementById('s-session-id-preview').style.display = 'none';
+    document.getElementById('s-training-id').disabled = false;
+    document.getElementById('s-training-id-note').style.display = 'none';
+
     const preTrainingId = document.getElementById('filter-training').value;
     if (preTrainingId) {
       const selT = allTrainings.find(t => String(t.ID) === String(preTrainingId));
@@ -383,43 +551,116 @@
     }
     document.getElementById('s-date').value = '';
     document.getElementById('s-name').value = '';
-    document.getElementById('s-start-time').value = '';
-    document.getElementById('s-end-time').value = '';
-    document.getElementById('s-status').value = '';
+    document.getElementById('s-start-time').value = '09:00';
+    document.getElementById('s-end-time').value = '17:00';
+    document.getElementById('s-status').value = 'Active';
+    document.getElementById('btn-save-session').innerHTML = '<span class="icon sm">save</span>Save Session';
+    openModal('modal-session');
+  }
+
+  function openEditSessionModal(sessionId) {
+    const s = allSessionsList.find(item => String(item.SessionID) === String(sessionId));
+    if (!s) {
+      showToast(`Session ${sessionId} not found.`, 'error');
+      return;
+    }
+
+    const parentT = findParentTraining(s.TrainingID) || {};
+    const trainingIdToSelect = (parentT && parentT.ID) ? parentT.ID : (s.TrainingID || '');
+
+    document.getElementById('session-modal-title').textContent = 'Edit Training Session';
+    document.getElementById('session-modal-sub').textContent = 'Modify session name, date, time, and QR status';
+    document.getElementById('s-session-id').value = s.SessionID;
+    document.getElementById('s-session-id-display').textContent = s.SessionID;
+    document.getElementById('s-session-id-preview').style.display = 'flex';
+
+    document.getElementById('s-training-id').value = trainingIdToSelect;
+    document.getElementById('s-training-id').disabled = true;
+    document.getElementById('s-training-id-note').style.display = 'block';
+
+    document.getElementById('s-name').value = s.SessionName || '';
+    document.getElementById('s-date').value = toInputDateStr(s.SessionDate);
+    document.getElementById('s-start-time').value = toInputTimeStr(s.StartTime) || '09:00';
+    document.getElementById('s-end-time').value = toInputTimeStr(s.EndTime) || '17:00';
+    document.getElementById('s-status').value = s.QRStatus || 'Active';
+
+    document.getElementById('btn-save-session').innerHTML = '<span class="icon sm">save</span>Save Changes';
     openModal('modal-session');
   }
 
   async function saveSession() {
     const btn = document.getElementById('btn-save-session');
-    const data = {
-      TrainingID:  document.getElementById('s-training-id').value,
-      SessionName: document.getElementById('s-name').value,
-      SessionDate: document.getElementById('s-date').value,
-      StartTime:   document.getElementById('s-start-time').value,
-      EndTime:     document.getElementById('s-end-time').value,
-      QRStatus:    document.getElementById('s-status').value
-    };
+    const sessionId = document.getElementById('s-session-id').value.trim();
+    const isEditing = Boolean(sessionId);
 
-    if (!data.TrainingID) { showToast('Please select a Training Programme.', 'error'); return; }
-    if (!data.SessionName) { showToast('Please enter a Session Name.', 'error'); return; }
+    const trainingId = document.getElementById('s-training-id').value;
+    const sessionName = document.getElementById('s-name').value.trim();
+    const sessionDate = document.getElementById('s-date').value;
+    const startTime   = document.getElementById('s-start-time').value;
+    const endTime     = document.getElementById('s-end-time').value;
+    const qrStatus    = document.getElementById('s-status').value || 'Active';
 
-    const selT = allTrainings.find(t => String(t.ID) === String(data.TrainingID));
-    if (selT && !isTrainingApproved(selT)) {
-      const appStr = selT.ApprovalStatus || 'Pending Approval';
-      showToast(`Cannot create session: Training programme approval status is '${appStr}'. Approval from ${getApprovalRoleText(appStr)} is required first.`, 'error');
-      return;
+    if (!trainingId && !isEditing) { showToast('Please select a Training Programme.', 'error'); return; }
+    if (!sessionName) { showToast('Please enter a Session Name.', 'error'); return; }
+    if (!sessionDate) { showToast('Please select a Session Date.', 'error'); return; }
+
+    if (!isEditing) {
+      const selT = allTrainings.find(t => String(t.ID) === String(trainingId));
+      if (selT && !isTrainingApproved(selT)) {
+        const appStr = selT.ApprovalStatus || 'Pending Approval';
+        showToast(`Cannot create session: Training programme approval status is '${appStr}'. Approval from ${getApprovalRoleText(appStr)} is required first.`, 'error');
+        return;
+      }
     }
 
-    setBtnLoading(btn, true, 'Saving...');
+    const data = {
+      TrainingID:  trainingId,
+      SessionName: sessionName,
+      SessionDate: sessionDate,
+      StartTime:   startTime || '09:00',
+      EndTime:     endTime || '17:00',
+      QRStatus:    qrStatus
+    };
+
+    setBtnLoading(btn, true, isEditing ? 'Saving Changes...' : 'Creating Session...');
     try {
-      await callServer('createSession', data);
-      showToast('Session created successfully!', 'success');
+      if (isEditing) {
+        await callServer('updateSession', sessionId, data);
+        showToast(`Session ${sessionId} updated successfully!`, 'success');
+      } else {
+        await callServer('createSession', data);
+        showToast('Session created successfully!', 'success');
+      }
       closeModal('modal-session');
       await loadSessions();
     } catch(e) {
       showToast(e.message, 'error');
     } finally {
-      setBtnLoading(btn, false);
+      setBtnLoading(btn, false, isEditing ? '<span class="icon sm">save</span>Save Changes' : '<span class="icon sm">save</span>Save Session');
+    }
+  }
+
+  function confirmDeleteSession(sessionId) {
+    document.getElementById('del-session-id-val').value = sessionId;
+    document.getElementById('del-session-id-display').textContent = sessionId;
+    openModal('modal-delete-session');
+  }
+
+  async function executeDeleteSession() {
+    const sessionId = document.getElementById('del-session-id-val').value.trim();
+    if (!sessionId) return;
+
+    const btn = document.getElementById('btn-confirm-delete-session');
+    setBtnLoading(btn, true, 'Deleting...');
+    try {
+      await callServer('deleteSession', sessionId);
+      showToast(`QR session ${sessionId} deleted (marked Inactive).`, 'success');
+      closeModal('modal-delete-session');
+      await loadSessions();
+    } catch(e) {
+      showToast('Failed to delete session: ' + e.message, 'error');
+    } finally {
+      setBtnLoading(btn, false, '<span class="icon sm">delete</span>Delete Session');
     }
   }
 

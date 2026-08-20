@@ -116,8 +116,17 @@
 
   function toInputDateStr(val) {
     if (!val) return '';
-    const str = String(val).trim();
+    const str = String(val).replace(/GMT.*$/, '').replace(/\(.*\)$/, '').trim();
     if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+
+    const ymdMatch = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+    if (ymdMatch) {
+      const year = ymdMatch[1];
+      const month = ymdMatch[2].padStart(2, '0');
+      const day = ymdMatch[3].padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
     const dmyMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
     if (dmyMatch) {
       const day = dmyMatch[1].padStart(2, '0');
@@ -125,9 +134,13 @@
       const year = dmyMatch[3];
       return `${year}-${month}-${day}`;
     }
+
     const d = new Date(str);
     if (!isNaN(d.getTime())) {
-      return d.toISOString().split('T')[0];
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
     }
     return '';
   }

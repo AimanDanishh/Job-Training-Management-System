@@ -853,9 +853,29 @@ function ensureTrainingSessionsSheetColumns(sheet) {
  * @param {string} trainingId - Training ID (e.g. TRN-1001) or Training Code (e.g. LM-2026-0001)
  * @returns {Spreadsheet|null} Google Spreadsheet object for the training, or null
  */
-function getTrainingDataSpreadsheet(trainingId) {
-  if (!trainingId) return null;
-  const cleanId = String(trainingId).trim();
+function getTrainingDataSpreadsheet(trainingInput) {
+  if (!trainingInput) return null;
+  
+  let cleanId = '';
+  let directT = null;
+  
+  if (typeof trainingInput === 'object' && trainingInput !== null) {
+    directT = trainingInput;
+    cleanId = String(trainingInput.ID || trainingInput.Code || trainingInput.TrainingID || '').trim();
+  } else {
+    cleanId = String(trainingInput).trim();
+  }
+
+  // If direct object has ParticipantsSheetID, try opening immediately
+  if (directT && (directT.ParticipantsSheetID || directT.singleSheetId || directT.TrainingDataSheetID)) {
+    const directSheetId = String(directT.ParticipantsSheetID || directT.singleSheetId || directT.TrainingDataSheetID).trim();
+    if (directSheetId) {
+      try {
+        const ss = SpreadsheetApp.openById(directSheetId);
+        if (ss) return ss;
+      } catch(e) {}
+    }
+  }
 
   const tSheet = getSheet(SHEET_NAMES.trainings);
   if (!tSheet) return null;
@@ -866,7 +886,7 @@ function getTrainingDataSpreadsheet(trainingId) {
     String(r.Code || '').trim() === cleanId ||
     String(r.TrainingID || '').trim() === cleanId ||
     (r.Name && String(r.Name).trim().toLowerCase() === cleanId.toLowerCase())
-  );
+  ) || directT;
   if (!t) return null;
 
   // 1. Direct Resolution: Open by stored ParticipantsSheetID first if available

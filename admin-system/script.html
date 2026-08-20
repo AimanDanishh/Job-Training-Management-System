@@ -754,7 +754,8 @@ function statusBadge(status) {
     'Pending Approval': 'badge-yellow',  'Approved':          'badge-green',
     'Rejected':         'badge-red',     'Postponed':         'badge-yellow',
     'Rescheduled':      'badge-yellow',  'Cancelled':         'badge-red',
-    'Not Submitted':    'badge-gray',    'Inactive':          'badge-gray',
+    'Not Submitted':    'badge-gray',    'Inactive':          'badge-red',
+    'Expired':          'badge-yellow',
   };
   const cls = map[status] || 'badge-gray';
   return `<span class="badge-th ${cls}">${status}</span>`;
@@ -819,6 +820,58 @@ function formatMinimalistDate(dateVal) {
     return `${day}/${month}/${year}`;
   }
   return str.split('T')[0] || '-';
+}
+
+function toInputDateStr(val) {
+  if (!val) return '';
+  const str = String(val).replace(/GMT.*$/, '').replace(/\(.*\)$/, '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+
+  const ymdMatch = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+  if (ymdMatch) {
+    const year = ymdMatch[1];
+    const month = ymdMatch[2].padStart(2, '0');
+    const day = ymdMatch[3].padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  const dmyMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  if (dmyMatch) {
+    const day = dmyMatch[1].padStart(2, '0');
+    const month = dmyMatch[2].padStart(2, '0');
+    const year = dmyMatch[3];
+    return `${year}-${month}-${day}`;
+  }
+
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+  return '';
+}
+
+function toDisplayDateStr(val) {
+  if (!val) return '';
+  const str = String(val).replace(/GMT.*$/, '').replace(/\(.*\)$/, '').trim();
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) return str;
+  const ymdMatch = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+  if (ymdMatch) {
+    const year = ymdMatch[1];
+    const month = ymdMatch[2].padStart(2, '0');
+    const day = ymdMatch[3].padStart(2, '0');
+    return `${day}/${month}/${year}`;
+  }
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) {
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
+  }
+  return str;
 }
 
 function formatDisplayTime(val, defaultTime = '09:00 AM') {
@@ -1066,6 +1119,8 @@ window.statusBadge = statusBadge;
 window.approvalStatusBadge = approvalStatusBadge;
 window.isTrainingApproved = isTrainingApproved;
 window.getApprovalRoleText = getApprovalRoleText;
+window.toInputDateStr = toInputDateStr;
+window.toDisplayDateStr = toDisplayDateStr;
 window.formatMinimalistDate = formatMinimalistDate;
 window.formatDisplayTime = formatDisplayTime;
 window.formatSessionTimeRange = formatSessionTimeRange;

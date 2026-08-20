@@ -236,6 +236,8 @@
       toastNoVerifiedEmp: 'No verified employee selected.',
       toastMissingSession: 'Missing session parameter. Please scan a valid session QR code.',
       toastSessionClosed: 'This session is currently closed for attendance.',
+      toastSessionInactive: 'This QR attendance session is no longer active. Attendance cannot be recorded.',
+      toastSessionExpired: 'Attendance registration for this session is closed (Expired).',
       successMsgTpl: 'Your attendance for {training} has been recorded successfully.'
     },
     bm: {
@@ -276,6 +278,8 @@
       toastNoVerifiedEmp: 'Tiada pekerja yang disahkan dipilih.',
       toastMissingSession: 'Parameter sesi tiada. Sila imbas kod QR sesi yang sah.',
       toastSessionClosed: 'Pendaftaran kehadiran untuk sesi ini telah ditutup.',
+      toastSessionInactive: 'Sesi kehadiran QR ini tidak lagi aktif. Kehadiran tidak dapat direkodkan.',
+      toastSessionExpired: 'Pendaftaran kehadiran untuk sesi ini telah ditutup (Tamat Tempoh).',
       successMsgTpl: 'Kehadiran anda untuk {training} telah berjaya direkodkan.'
     }
   };
@@ -359,8 +363,13 @@
       document.getElementById('meta-row').style.display = 'flex';
       document.getElementById('view-loading').style.display = 'none';
 
-      if (session.QRStatus === 'Expired' || session.QRStatus === 'Inactive') {
-        showErrorState(t('toastSessionClosed'));
+      const statusLower = String(session.QRStatus || '').trim().toLowerCase();
+      if (statusLower === 'inactive' || statusLower === 'deleted') {
+        showErrorState(t('toastSessionInactive'));
+        return;
+      }
+      if (statusLower === 'expired') {
+        showErrorState(t('toastSessionExpired'));
         return;
       }
 

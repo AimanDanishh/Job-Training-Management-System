@@ -285,13 +285,14 @@ function validatePublicAttendance(sessionId, employeeId) {
       }
     }
 
-    if (qrStatus === 'Expired') {
+    const statusLower = qrStatus.toLowerCase();
+    if (statusLower === 'inactive' || statusLower === 'deleted') {
+      return { valid: false, message: 'This QR attendance session is no longer active. Attendance cannot be recorded.' };
+    }
+    if (statusLower === 'expired') {
       return { valid: false, message: 'Attendance registration for this session is closed (Expired).' };
     }
-    if (qrStatus === 'Inactive') {
-      return { valid: false, message: 'This training session is currently inactive.' };
-    }
-    if (qrStatus === 'Scheduled' || qrStatus === 'Draft') {
+    if (statusLower === 'scheduled' || statusLower === 'draft') {
       return { valid: false, message: 'Attendance check-in has not opened yet for this session.' };
     }
 

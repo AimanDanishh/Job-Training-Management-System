@@ -38,12 +38,12 @@ function validateAttendance(sessionId, employeeNo) {
     const session = sessionResObj.data;
 
     // 2. Check QR / Session Status
-    const status = String(session.QRStatus || 'Active').trim();
-    if (status === 'Expired') {
-      return { valid: false, message: 'This training session has expired. Attendance registration is closed.', session: session };
+    const status = String(session.QRStatus || 'Active').trim().toLowerCase();
+    if (status === 'inactive' || status === 'deleted') {
+      return { valid: false, message: 'This QR attendance session is no longer active. Attendance cannot be recorded.', session: session };
     }
-    if (status === 'Inactive') {
-      return { valid: false, message: 'This training session is currently inactive.', session: session };
+    if (status === 'expired') {
+      return { valid: false, message: 'Attendance registration for this session is closed (Expired).', session: session };
     }
     // 2b. Check Parent Training Approval Status
     if (session.TrainingID) {
