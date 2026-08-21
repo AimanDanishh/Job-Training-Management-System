@@ -621,8 +621,8 @@ function submitHODDecision(data) {
     }
 
 
-    // Send email notifications via Gmail Drafts (development mode)
-    let draftLog = [];
+    // Send email notifications (Direct Sent)
+    let emailLog = [];
     try {
       const trainings = sheetToJson(tSheet);
       const currentT = trainings.find(t =>
@@ -714,7 +714,7 @@ function submitHODDecision(data) {
           introText: `Your Training Requisition Request for "${trainingName}" (${cleanId}) has been ${validDecision.toLowerCase()} by ${hodName}.${remarks ? ' Remarks: ' + remarks : ''}`
         });
 
-        sendOrDraftEmail(requesterEmail, reqSubject, reqBody, 'requester', draftLog, reqHtml);
+        sendOrDraftEmail(requesterEmail, reqSubject, reqBody, 'requester', emailLog, reqHtml);
       }
 
       // IF APPROVED: Email the next approver (or Requester + Arina if final complete approval)
@@ -755,7 +755,7 @@ function submitHODDecision(data) {
             introText: `A Training Requisition Request for "${trainingName}" (${cleanId}) submitted by ${requesterName} (${requesterId}) has been APPROVED by Head of Department (${hodName}) and is currently awaiting your review and approval.`
           });
 
-          sendOrDraftEmail(csuiteEmail, csSubject, csBody, `C-Suite [${csuiteName}]`, draftLog, csHtml);
+          sendOrDraftEmail(csuiteEmail, csSubject, csBody, `C-Suite [${csuiteName}]`, emailLog, csHtml);
         }
 
         // Step 2: C-Suite Approved -> Pending HOHR Approval (Only notify Head of HR)
@@ -794,7 +794,7 @@ function submitHODDecision(data) {
             introText: `A Training Requisition Request for "${trainingName}" (${cleanId}) submitted by ${requesterName} (${requesterId}) has received C-Suite approval and is currently awaiting your final Head of HR approval.`
           });
 
-          sendOrDraftEmail(hohrEmail, hrSubject, hrBody, `HOHR [${hohrName}]`, draftLog, hrHtml);
+          sendOrDraftEmail(hohrEmail, hrSubject, hrBody, `HOHR [${hohrName}]`, emailLog, hrHtml);
         }
 
         // Step 3: HOHR Approved -> Fully Approved (Complete Approval: Notify Requester + Arina)
@@ -829,7 +829,7 @@ function submitHODDecision(data) {
             introText: `Great news! Your Training Requisition Request for "${trainingName}" (${cleanId}) has received ALL required managerial approvals (HOD, C-Suite, and Head of HR).`
           });
 
-          sendOrDraftEmail(requesterEmail, reqSubject, reqBody, 'requester', draftLog, reqHtml);
+          sendOrDraftEmail(requesterEmail, reqSubject, reqBody, 'requester', emailLog, reqHtml);
 
           // Notification to Arina (HR Admin)
           const arinaSubject = `Training Requisition — ${trainingName} | ${cleanId}`;
@@ -861,12 +861,12 @@ function submitHODDecision(data) {
             introText: `The Training Requisition for "${trainingName}" (${cleanId}) submitted by ${requesterName} (${requesterId}) has received all required approvals (HOD, C-Suite, HOHR) and is ready for session setup.`
           });
 
-          sendOrDraftEmail('arina.ismail@apollofood.com.my', arinaSubject, arinaBody, 'Arina (HR Admin)', draftLog, arinaHtml);
+          sendOrDraftEmail('arina.ismail@apollofood.com.my', arinaSubject, arinaBody, 'Arina (HR Admin)', emailLog, arinaHtml);
         }
       }
     } catch (mailErr) {
       Logger.log('Notification mail error: ' + mailErr.message);
-      draftLog.push(`General mail engine error: ${mailErr.message}`);
+      emailLog.push(`General mail engine error: ${mailErr.message}`);
     }
 
     try {
@@ -875,14 +875,15 @@ function submitHODDecision(data) {
       Logger.log('syncTrainingById error in submitHODDecision: ' + syncErr.message);
     }
 
-    const logSummary = (draftLog && draftLog.length > 0) ? ` (${draftLog.join('; ')})` : '';
+    const logSummary = (emailLog && emailLog.length > 0) ? ` (${emailLog.join('; ')})` : '';
 
     return ok({
       trainingId: cleanId,
       decision: nextApprovalStatus,
       approvedBy: hodName,
       timestamp: timestamp,
-      draftLog: draftLog,
+      emailLog: emailLog,
+      draftLog: emailLog, // Backward compatibility alias
       message: `Training requisition request marked as ${nextApprovalStatus.toUpperCase()}.${logSummary}`
     });
   } catch (e) {
@@ -891,29 +892,77 @@ function submitHODDecision(data) {
 }
 
 /**
- * Helper function to create a Gmail Draft strictly (Drafts Only)
+ * Helper function to send email directly via MailApp with GmailApp fallback
+ * Only logs success if sending succeeds; retains error if both fail.
  */
-function sendOrDraftEmail(recipient, subject, body, logPrefix, draftLog, htmlBody) {
-  if (!recipient) return;
+function sendOrDraftEmail(recipient, subject, body, logPrefix, emailLog, htmlBody) {
+  if (!recipient) {
+    if (emailLog) emailLog.push(`No recipient email provided for ${logPrefix}`);
+    return { success: false, error: 'No recipient email' };
+  }
+
+  const options = {};
+  if (htmlBody) options.htmlBody = htmlBody;
+
+  let sendSuccess = false;
+  let primaryErr = null;
+  let fallbackErr = null;
+
   try {
-    const options = {};
-    if (htmlBody) options.htmlBody = htmlBody;
-    GmailApp.createDraft(recipient, subject, body, options);
-    if (draftLog) draftLog.push(`Draft created for ${logPrefix} (${recipient})`);
+    MailApp.sendEmail({
+      to: recipient,
+      subject: subject,
+      body: body,
+      htmlBody: htmlBody || undefined
+    });
+    sendSuccess = true;
+    if (emailLog) emailLog.push(`Email sent to ${logPrefix} (${recipient})`);
+    return { success: true };
   } catch (dErr) {
-    Logger.log('GmailApp createDraft error: ' + dErr.message);
-    if (draftLog) draftLog.push(`Draft error for ${logPrefix} (${recipient}): ${dErr.message}`);
+    primaryErr = dErr;
+    Logger.log(`MailApp.sendEmail failed for ${logPrefix} (${recipient}): ${dErr.message}. Attempting GmailApp fallback...`);
+    try {
+      GmailApp.sendEmail(recipient, subject, body, options);
+      sendSuccess = true;
+      if (emailLog) emailLog.push(`Email sent to ${logPrefix} (${recipient}) via Gmail fallback`);
+      return { success: true };
+    } catch (gErr) {
+      fallbackErr = gErr;
+      Logger.log(`GmailApp.sendEmail fallback also failed for ${logPrefix} (${recipient}): ${gErr.message}`);
+    }
+  }
+
+  if (!sendSuccess) {
+    const errSummary = `${primaryErr ? primaryErr.message : 'Unknown error'}${fallbackErr ? ' | Fallback: ' + fallbackErr.message : ''}`;
+    if (emailLog) emailLog.push(`Email send failed for ${logPrefix} (${recipient}): ${errSummary}`);
+    return { success: false, error: errSummary };
   }
 }
 
 /**
- * Run this function ONCE in Apps Script Editor to grant Gmail Draft permissions
+ * Run this function ONCE in Apps Script Editor to grant and verify Email Sending permissions
  */
-function authorizeGmailDrafts() {
+function authorizeEmailSending() {
   const user = Session.getActiveUser().getEmail() || Session.getEffectiveUser().getEmail() || 'admin@apollofood.com.my';
-  const draft = GmailApp.createDraft(user, '[TrainHub Draft Test]', 'Gmail Draft permission verified successfully.');
-  Logger.log('Gmail Draft authorized successfully. Draft ID: ' + draft.getId());
-  return 'Gmail Draft permissions authorized successfully! Draft ID: ' + draft.getId();
+  try {
+    MailApp.sendEmail({
+      to: user,
+      subject: '[TrainHub Email Test]',
+      body: 'Email sending permissions verified successfully via MailApp.'
+    });
+    Logger.log('Email sending authorized successfully via MailApp.');
+    return 'Email sending permissions authorized successfully via MailApp!';
+  } catch (e) {
+    Logger.log('MailApp authorization test failed, testing GmailApp: ' + e.message);
+    GmailApp.sendEmail(user, '[TrainHub Email Test]', 'Email sending permissions verified successfully via GmailApp.');
+    Logger.log('Email sending authorized successfully via GmailApp.');
+    return 'Email sending permissions authorized successfully via GmailApp!';
+  }
+}
+
+/** Backward compatibility alias for authorization */
+function authorizeGmailDrafts() {
+  return authorizeEmailSending();
 }
 
 

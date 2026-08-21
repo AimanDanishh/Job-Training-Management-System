@@ -790,15 +790,37 @@ function sendSupervisorPostEvalEmail(trainingId, supervisor, trainingObj, partic
     </div>
   `;
 
-  MailApp.sendEmail({
-    to: targetEmail,
-    subject: subject,
-    body: plainText,
-    htmlBody: htmlBody
-  });
+  let sendSuccess = false;
+  let primaryErr = null;
+  let fallbackErr = null;
 
-  Logger.log(`Post Eval Email sent to ${targetEmail} (Supervisor: ${supervisor.Name || supervisor.Email}) for training ${cleanTId}`);
-  return { success: true, targetEmail: targetEmail };
+  try {
+    MailApp.sendEmail({
+      to: targetEmail,
+      subject: subject,
+      body: plainText,
+      htmlBody: htmlBody
+    });
+    sendSuccess = true;
+    Logger.log(`Post Eval Email sent successfully via MailApp to ${targetEmail} (Supervisor: ${supervisor.Name || supervisor.Email}) for training ${cleanTId}`);
+    return { success: true, targetEmail: targetEmail };
+  } catch (mailErr) {
+    primaryErr = mailErr;
+    Logger.log(`MailApp.sendEmail failed for ${targetEmail}: ${mailErr.message}. Attempting GmailApp fallback...`);
+    try {
+      GmailApp.sendEmail(targetEmail, subject, plainText, { htmlBody: htmlBody });
+      sendSuccess = true;
+      Logger.log(`Post Eval Email sent successfully via GmailApp fallback to ${targetEmail} (Supervisor: ${supervisor.Name || supervisor.Email}) for training ${cleanTId}`);
+      return { success: true, targetEmail: targetEmail };
+    } catch (gmailErr) {
+      fallbackErr = gmailErr;
+      Logger.log(`GmailApp fallback also failed for ${targetEmail}: ${gmailErr.message}`);
+    }
+  }
+
+  const errorMsg = `Email delivery failed for ${targetEmail}: ${primaryErr ? primaryErr.message : 'Unknown error'}${fallbackErr ? ' | Fallback: ' + fallbackErr.message : ''}`;
+  Logger.log(errorMsg);
+  throw new Error(errorMsg);
 }
 
 /**
@@ -950,8 +972,11 @@ function sendSupervisorPostEvaluationEmailsForTraining(trainingId, options) {
     const supObj = supervisorMap[supEmail];
     const prevEntry = currentLog.supervisors[supEmail];
 
-    // Idempotency: Skip if already SENT unless forced
-    if (prevEntry && prevEntry.status === 'SENT' && !options.forceResend) {
+    // Idempotency: Skip if already SENT or historical DRAFT unless forced
+    if (prevEntry && (prevEntry.status === 'SENT' || prevEntry.status === 'DRAFT' || prevEntry.status === 'Draft') && !options.forceResend) {
+      if (prevEntry.status === 'DRAFT' || prevEntry.status === 'Draft') {
+        prevEntry.status = 'SENT';
+      }
       skippedCount++;
       return;
     }
@@ -1097,9 +1122,9 @@ function processAutomated3MonthPostEvaluationEmails(simulatedDate, testEmailReci
       if (daysUntil3Mo <= 0) {
         processedCount++;
 
-        // Idempotency: Skip if already successfully sent
+        // Idempotency: Skip if already successfully sent or historical draft
         const emailStatus = String(t.PostEvalEmailStatus || '').trim().toUpperCase();
-        if (emailStatus === 'SENT' && !testEmailRecipient) {
+        if ((emailStatus === 'SENT' || emailStatus === 'DRAFT') && !testEmailRecipient) {
           skippedCount++;
           return;
         }
@@ -1135,6 +1160,84 @@ function processAutomated3MonthPostEvaluationEmails(simulatedDate, testEmailReci
   } catch(e) {
     Logger.log('processAutomated3MonthPostEvaluationEmails error: ' + e.message);
     return err('Failed to execute automated post evaluation emails: ' + e.message);
+  }
+}
+
+/**
+ * Migration & Integrity Helper: Converts all historical email records with status 'Draft' or 'DRAFT' to 'SENT'.
+ * Preserves all database sheets, tabs, columns, and existing metadata while updating the email status
+ * to prevent duplicate dispatches and ensure uniform 'Sent' presentation across the system.
+ */
+function convertDraftEmailsToSent() {
+  try {
+    const tSheet = getSheet(SHEET_NAMES.trainings);
+    if (!tSheet) return ok({ convertedCount: 0, message: 'No trainings sheet found.' });
+
+    const headers = ensureTrainingSheetColumns(tSheet);
+    const statusCol = headers.indexOf('PostEvalEmailStatus') + 1;
+    const sentAtCol = headers.indexOf('PostEvalEmailSentAt') + 1;
+    const logCol = headers.indexOf('PostEvalEmailLog') + 1;
+
+    if (statusCol === 0) return ok({ convertedCount: 0, message: 'PostEvalEmailStatus column not found.' });
+
+    const trainings = sheetToJson(tSheet);
+    let convertedCount = 0;
+    const timeNow = now();
+
+    trainings.forEach(t => {
+      const emailStatus = String(t.PostEvalEmailStatus || '').trim().toUpperCase();
+      let logChanged = false;
+      let currentLog = {};
+
+      try {
+        if (t.PostEvalEmailLog) {
+          currentLog = typeof t.PostEvalEmailLog === 'string' ? JSON.parse(t.PostEvalEmailLog) : t.PostEvalEmailLog;
+        }
+      } catch (e) {
+        currentLog = {};
+      }
+
+      if (currentLog && currentLog.supervisors && typeof currentLog.supervisors === 'object') {
+        Object.keys(currentLog.supervisors).forEach(supEmail => {
+          const entry = currentLog.supervisors[supEmail];
+          if (entry && (entry.status === 'DRAFT' || entry.status === 'Draft')) {
+            entry.status = 'SENT';
+            if (!entry.sentAt) entry.sentAt = timeNow;
+            logChanged = true;
+          }
+        });
+      }
+
+      const isStatusDraft = emailStatus === 'DRAFT' || emailStatus === 'DRAFT_SENT' || emailStatus === 'DRAFTS';
+      if (isStatusDraft || logChanged) {
+        if (t._row) {
+          if (statusCol > 0 && isStatusDraft) {
+            tSheet.getRange(t._row, statusCol).setValue('SENT');
+          }
+          if (sentAtCol > 0 && isStatusDraft && !t.PostEvalEmailSentAt) {
+            tSheet.getRange(t._row, sentAtCol).setValue(timeNow);
+          }
+          if (logCol > 0 && logChanged) {
+            currentLog.lastUpdated = timeNow;
+            tSheet.getRange(t._row, logCol).setValue(JSON.stringify(currentLog));
+          }
+          convertedCount++;
+        }
+      }
+    });
+
+    if (convertedCount > 0) {
+      SpreadsheetApp.flush();
+    }
+
+    Logger.log(`convertDraftEmailsToSent complete: ${convertedCount} training record(s) converted from DRAFT to SENT.`);
+    return ok({
+      convertedCount: convertedCount,
+      message: `Successfully migrated ${convertedCount} historical email record(s) to SENT.`
+    });
+  } catch (e) {
+    Logger.log('convertDraftEmailsToSent error: ' + e.message);
+    return err('Failed to convert draft emails: ' + e.message);
   }
 }
 

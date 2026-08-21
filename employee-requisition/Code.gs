@@ -694,8 +694,9 @@ function submitEmployeeRequisition(data) {
       }
     }
 
-    // Create Gmail Draft for HOD / Approver
-    let draftStatus = 'Not created';
+    // Send Email Notification to HOD / Approver
+    let emailStatus = 'Not sent';
+    let emailSendState = 'NOT_SENT';
     try {
       const hodPortalUrl = getConfigProperty('HOD_PORTAL_URL', '');
       const reviewUrl = hodPortalUrl ? `${hodPortalUrl}?page=review&id=${id}` : getAppUrl();
@@ -743,24 +744,49 @@ function submitEmployeeRequisition(data) {
       });
 
       if (recipientEmail) {
+        let sendSuccess = false;
+        let primaryErr = null;
+        let fallbackErr = null;
+
         try {
-          const draft = GmailApp.createDraft(recipientEmail, subject, body, { htmlBody: htmlBody });
-          if (draft && draft.getId()) {
-            draftStatus = `Draft created successfully (ID: ${draft.getId()}) for ${recipientEmail}`;
-            Logger.log(draftStatus);
-          } else {
-            draftStatus = `Draft creation returned no ID for ${recipientEmail}`;
+          MailApp.sendEmail({
+            to: recipientEmail,
+            subject: subject,
+            body: body,
+            htmlBody: htmlBody
+          });
+          sendSuccess = true;
+          emailStatus = `Email sent successfully to ${recipientEmail}`;
+          emailSendState = 'SENT';
+          Logger.log(emailStatus);
+        } catch (mailErr) {
+          primaryErr = mailErr;
+          Logger.log(`MailApp.sendEmail failed for ${recipientEmail}: ${mailErr.message}. Attempting GmailApp fallback...`);
+          try {
+            GmailApp.sendEmail(recipientEmail, subject, body, { htmlBody: htmlBody });
+            sendSuccess = true;
+            emailStatus = `Email sent successfully to ${recipientEmail} (via Gmail fallback)`;
+            emailSendState = 'SENT';
+            Logger.log(emailStatus);
+          } catch (gmailErr) {
+            fallbackErr = gmailErr;
+            Logger.log(`GmailApp.sendEmail fallback also failed for ${recipientEmail}: ${gmailErr.message}`);
           }
-        } catch(draftErr) {
-          draftStatus = `Draft creation error: ${draftErr.message}`;
-          Logger.log(draftStatus);
+        }
+
+        if (!sendSuccess) {
+          emailStatus = `Email delivery failed for ${recipientEmail}: ${primaryErr ? primaryErr.message : 'Unknown error'}${fallbackErr ? ' | Fallback: ' + fallbackErr.message : ''}`;
+          emailSendState = 'FAILED';
+          Logger.log(emailStatus);
         }
       } else {
-        draftStatus = 'No recipient HOD email available to create draft.';
+        emailStatus = 'No recipient HOD email available to send notification.';
+        emailSendState = 'SKIPPED_NO_RECIPIENT';
       }
     } catch (mailErr) {
-      draftStatus = `Notification error: ${mailErr.message}`;
-      Logger.log(draftStatus);
+      emailStatus = `Notification error: ${mailErr.message}`;
+      emailSendState = 'FAILED';
+      Logger.log(emailStatus);
     }
 
     try {
@@ -770,12 +796,14 @@ function submitEmployeeRequisition(data) {
     }
 
     return ok({
-      message: `Training Requisition Form (AP-HRD-F01-01) ${isEditing ? 'resubmitted' : 'submitted'}! Status: ${currentApprovalStatus}. HOD: ${hodName || 'Assigned HOD'}. ${draftStatus}`,
+      message: `Training Requisition Form (AP-HRD-F01-01) ${isEditing ? 'resubmitted' : 'submitted'}! Status: ${currentApprovalStatus}. HOD: ${hodName || 'Assigned HOD'}. ${emailStatus}`,
       trainingId: id,
       trainingCode: code,
       approvalStatus: currentApprovalStatus,
       assignedHod: hodName,
-      draftStatus: draftStatus,
+      emailStatus: emailStatus,
+      emailSendState: emailSendState,
+      draftStatus: emailStatus, // Backward compatibility alias
       isEditing: isEditing
     });
   } catch (e) {
@@ -785,9 +813,25 @@ function submitEmployeeRequisition(data) {
 }
 
 /**
- * Run this test function in the Apps Script online editor to authorize Gmail Draft permissions!
+ * Run this test function in the Apps Script online editor to authorize and verify Email Sending permissions!
  */
+function testEmailSendPermission() {
+  const recipient = Session.getActiveUser().getEmail() || 'test@example.com';
+  try {
+    MailApp.sendEmail({
+      to: recipient,
+      subject: '[TrainHub TEST EMAIL]',
+      body: 'This is a test email to verify MailApp sending permissions.'
+    });
+    Logger.log('Test email sent successfully via MailApp to ' + recipient);
+  } catch (e) {
+    Logger.log('MailApp test failed, attempting GmailApp: ' + e.message);
+    GmailApp.sendEmail(recipient, '[TrainHub TEST EMAIL]', 'This is a test email to verify GmailApp sending permissions.');
+    Logger.log('Test email sent successfully via GmailApp to ' + recipient);
+  }
+}
+
+/** Backward compatibility alias for test authorization */
 function testCreateDraftPermission() {
-  const draft = GmailApp.createDraft(Session.getActiveUser().getEmail() || 'test@example.com', '[TrainHub TEST DRAFT]', 'This is a test draft to verify Gmail draft permissions.');
-  Logger.log('Test draft created successfully! ID: ' + draft.getId());
+  return testEmailSendPermission();
 }

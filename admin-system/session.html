@@ -384,12 +384,12 @@
       if (!filtered.length) {
         grid.innerHTML = warningBannerHtml + `
           <div class="col-12">
-            <div class="empty-state card-th text-center p-5">
-              <span class="icon" style="font-size:48px;color:#94A3B8">qr_code</span>
-              <p style="color:#64748B;font-weight:600;margin-top:12px">No sessions found</p>
-              <p style="color:#94A3B8;font-size:12px">Create a new session or switch status filter above.</p>
-              <button class="btn-th btn-primary btn-sm mt-3" onclick="openCreateSessionModal()">
-                <span class="icon sm">add</span>Create New Session
+            <div class="empty-state card-th text-center" style="padding:48px 24px;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+              <span class="icon empty-icon" style="font-size:44px;color:#94A3B8;margin-bottom:8px">qr_code</span>
+              <p style="color:#475569;font-weight:600;font-size:15px;margin:0 0 4px 0">No sessions found</p>
+              <p style="color:#94A3B8;font-size:12.5px;margin:0 0 16px 0">Create a new session or switch status filter above.</p>
+              <button class="btn-th btn-primary btn-sm" style="display:inline-flex;align-items:center;gap:6px;padding:7px 16px;font-size:12.5px;font-weight:600;border-radius:7px;box-shadow:0 1px 3px rgba(233,28,45,0.2)" onclick="openCreateSessionModal()">
+                <span class="icon sm" style="font-size:15px;margin:0">add</span>Create New Session
               </button>
             </div>
           </div>`;

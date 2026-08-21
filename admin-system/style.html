@@ -749,7 +749,9 @@
     margin-bottom: 12px;
   }
   .empty-state { text-align: center; padding: 48px 20px; }
-  .empty-state .icon { font-size: 42px; color: var(--apollo-gray-300); margin-bottom: 12px; }
+  .empty-state > .icon, .empty-state .empty-icon { font-size: 42px; color: var(--apollo-gray-300); margin-bottom: 12px; }
+  .empty-state .btn-th .icon, .btn-th .icon { margin-bottom: 0 !important; }
+  .empty-state .btn-th .icon.sm, .btn-th .icon.sm { font-size: 15px !important; }
   .divider { border: none; border-top: 1px solid var(--apollo-gray-100); margin: 16px 0; }
 
   /* -- Responsive Behavior ------------------------------------------ */

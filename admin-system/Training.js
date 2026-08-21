@@ -1315,7 +1315,7 @@ function getTrainingActionNotifications() {
             actionLabel: 'Retry Email',
             errorDetails: t.PostEvalEmailError || ''
           });
-        } else if (emailStatus === 'SENT') {
+        } else if (emailStatus === 'SENT' || emailStatus === 'DRAFT') {
           // Informational: Post Evaluation Email Sent
           notifications.push({
             id: `${trainingId}_POST_EVAL_EMAIL_SENT`,
