@@ -256,8 +256,9 @@ function send3MonthPostEvalNotifications() {
 
     trainings.forEach(t => {
       if (t.isThreeMonthsReached && ['Training Completed', 'Evaluation Completed', 'Waiting for 3-Month Review'].includes(t.Stage)) {
-        const hodEmail = getConfigProperty('ADMIN_EMAILS', '');
-        const postEvalUrl = hodPortalUrl ? `${hodPortalUrl}?page=posteval&id=${t.ID}` : getAppUrl();
+        const publicPortalUrl = getPublicPortalUrl() || getAppUrl();
+        const postEvalUrl = `${publicPortalUrl}?page=post&id=${t.ID}`;
+        const postDashboardUrl = `${publicPortalUrl}?page=post`;
 
         if (hodEmail) {
           const subject = `[TrainHub] 3-Month Post-Training Evaluation Due - ${t.Name}`;
@@ -265,9 +266,10 @@ function send3MonthPostEvalNotifications() {
             `The 3-month milestone after course completion has elapsed for training programme:\n` +
             `Training Name: ${t.Name} (${t.Code || t.ID})\n` +
             `Completed Date: ${t.EndDate || t.StartDate}\n\n` +
-            `Please click the link below to answer the post evaluation form for participants under your Cost Centre:\n` +
-            `${postEvalUrl}\n\n` +
-            `Thank you,\nTrainHub Training Management System`;
+            `Please click the links below to conduct the post-training evaluations for your assigned staff:\n\n` +
+            `• Evaluate This Training: ${postEvalUrl}\n` +
+            `• 3-Month Post Evaluation Dashboard: ${postDashboardUrl}\n\n` +
+            `Thank you,\nApollo Job Training Management System`;
 
           MailApp.sendEmail(hodEmail, subject, body);
           sentCount++;

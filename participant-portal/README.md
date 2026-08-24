@@ -1,15 +1,19 @@
 # Public Participant Portal — Google Apps Script Setup Guide
 
-This Google Apps Script project serves as the **Public Participant Portal** for the Job Training Management System. It allows participants to check in via QR code, submit training evaluations, and allows supervisors to submit 3-month post-training evaluations without requiring Google sign-in.
+This Google Apps Script project serves as the **Public Participant Portal** for the Job Training Management System. It allows participants to check in via QR code, submit training evaluations, and allows supervisors/HODs to view the **3-Month Post-Evaluation Dashboard** and conduct subordinate reviews without requiring Google sign-in.
 
 ---
 
 ## 📌 Features
 
 - **Attendance QR Check-In**: Participants scan session QR codes and enter their Employee ID.
-- **Training Evaluation**: 7-statement Likert rating scale + open feedback text areas.
-- **6-Month Post Evaluation**: Supervisor competency assessment before/after training.
-- **Server-Side Validation**: Validates employee existence, enrollment, active session status, and prevents duplicate submissions.
+- **Training Evaluation (Level 1)**: 7-statement Likert rating scale + open feedback text areas.
+- **3-Month Post Evaluation Dashboard (Level 3)**:
+  - Multi-training dashboard overview with Employee ID / Email login.
+  - Per-course 3-month milestone countdown locks (`NOT_STARTED`, `COUNTDOWN_ACTIVE`, `UNLOCKED`).
+  - Real-time subordinate progress counters (Pending vs Completed).
+  - Competency scale (1–5) before & after training, performance improvement pills, daily work applicability, recommendations, and impact assessment comments.
+- **Server-Side Validation**: Validates employee existence, enrollment, active session status, supervisor assignments, and prevents duplicate submissions.
 - **Shared Spreadsheet Database**: Reads and writes to the main Admin Google Spreadsheet without schema changes.
 
 ---
@@ -33,6 +37,7 @@ The Public Portal connects to your existing Google Spreadsheet database via **Sc
 | Property Key | Example Value | Description |
 | :--- | :--- | :--- |
 | `SPREADSHEET_ID` | `1a2b3c4d5e6f7g8h9i0j...` | **Required.** The ID of your existing Master Google Spreadsheet (from its URL). |
+| `EMPLOYEE_SPREADSHEET_ID` | `1x2y3z...` | Optional fallback. Employee Master Directory ID. |
 | `APP_TITLE` | `TrainHub — Participant Portal` | Optional. Display title for browser tabs. |
 
 > 💡 **Where to find `SPREADSHEET_ID`?**  
@@ -84,14 +89,24 @@ The Public Portal routes requests based on URL query parameters:
 https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec?page=attendance&session=SES0001
 ```
 
-### 2. Training Evaluation Page
+### 2. Training Evaluation Page (Level 1)
 ```
 https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec?page=evaluation&id=TRN-1001
 ```
 
-### 3. 6-Month Post Evaluation Page (Supervisor Link)
+### 3. 3-Month Post Evaluation Dashboard (General Login)
 ```
-https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec?page=post&id=TRN-1001&emp=EMP-1001
+https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec?page=post
+```
+
+### 4. 3-Month Post Evaluation Dashboard (Auto-Authenticated Supervisor Link)
+```
+https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec?page=post&emp=00123
+```
+
+### 5. Specific Training Post-Review Form
+```
+https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec?page=post&id=TRN-1001&emp=00123
 ```
 
 ---
@@ -103,5 +118,6 @@ All data submitted from HTML pages is validated on the Apps Script backend ([`Va
 1. **Training Existence**: Rejects requests if `TrainingID` / `SessionID` does not exist.
 2. **Employee Registration**: Rejects check-in if Employee ID is missing from `Employees`.
 3. **Participant Enrollment**: Rejects submission if Employee ID is not registered in `TrainingParticipants`.
-4. **Duplicate Protection**: Blocks multiple attendance or evaluation submissions from the same employee.
-5. **Session Expiry**: Blocks check-in if the session status is set to `Expired` or `Inactive`.
+4. **Supervisor Authorization**: Enforces strict supervisor matching against `SupervisorID`, `SupervisorEmail`, or `SupervisorName` in participant records. Prevents self-evaluation by participants.
+5. **Duplicate Protection**: Blocks multiple attendance or evaluation submissions from the same employee.
+6. **Session Expiry**: Blocks check-in if the session status is set to `Expired` or `Inactive`.

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <?!= include('style') ?>
-  <title>3-Month Post Evaluation — TrainHub Evaluator Portal</title>
+  <title>Post-Training Competency Review — TrainHub Evaluator Portal</title>
 </head>
 <body>
 
@@ -14,14 +14,16 @@
   <span id="themeToggleLabel">Dark</span>
 </button>
 
-<div class="portal-container">
-  <div class="portal-card">
+<div class="portal-container" id="mainContainer">
+  
+  <!-- Main Portal Card -->
+  <div class="portal-card" id="mainCard">
     
-    <!-- Header -->
+    <!-- Brand Header -->
     <div class="brand-header">
-      <div style="width:95px;height:95px;border-radius:50%;background:#FFFFFF;display:inline-flex;align-items:center;justify-content:center;margin:0 auto 14px auto;padding:5px;box-sizing:border-box;overflow:hidden;border:1px solid rgba(226,232,240,0.9);box-shadow:6px 6px 16px #d1d9e6,-6px -6px 16px #ffffff,0 8px 20px rgba(233,28,45,0.16);">
+      <div style="width:72px;height:72px;border-radius:50%;background:#FFFFFF;display:inline-flex;align-items:center;justify-content:center;margin:0 auto 12px auto;padding:4px;box-sizing:border-box;overflow:hidden;border:1px solid rgba(226,232,240,0.9);box-shadow:6px 6px 16px rgba(0,0,0,0.25),-6px -6px 16px rgba(255,255,255,0.05);">
         <? if (typeof systemLogoUrl !== 'undefined' && systemLogoUrl) { ?>
-          <img src="<?= systemLogoUrl ?>" alt="Apollo System Logo" style="width:100%;height:100%;object-fit:contain;border-radius:50%;" referrerpolicy="no-referrer" onerror="this.style.display='none';document.getElementById('posteval-logo-fallback').style.display='flex';">
+          <img src="<?= systemLogoUrl ?>" alt="System Logo" style="width:100%;height:100%;object-fit:contain;border-radius:50%;" referrerpolicy="no-referrer" onerror="this.style.display='none';document.getElementById('posteval-logo-fallback').style.display='flex';">
           <div id="posteval-logo-fallback" style="display:none;align-items:center;justify-content:center;width:100%;height:100%;">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
               <circle cx="50" cy="50" r="48" fill="#E91C2D" />
@@ -42,82 +44,35 @@
       <div>
         <span class="badge-pillar">POST-TRAINING EVALUATION</span>
       </div>
-      <h1 class="portal-title">3-Month Competency Assessment</h1>
-      <p class="portal-subtitle">Supervisor / Manager / HOD / PIC Review Portal</p>
+      <h1 class="portal-title" id="pageMainHeading">3-Month Competency Assessment</h1>
+      <p class="portal-subtitle" id="pageMainSubheading">Supervisor / Manager / HOD Post-Training Review Portal</p>
     </div>
 
     <!-- Loading Spinner View -->
-    <div id="view-loading" style="text-align:center; padding: 24px 0;">
+    <div id="view-loading" style="text-align:center; padding: 32px 0;">
       <div class="spinner"></div>
-      <p style="color:var(--text-secondary); font-size:13.5px; font-weight:600;">Preparing evaluator portal...</p>
+      <p style="color:var(--text-secondary); font-size:13.5px; font-weight:600;" id="txt-loading-msg">Connecting to training management database...</p>
     </div>
 
-    <!-- Step 1: Evaluator ID Screen (Main Landing Page) -->
-    <div id="view-step-evaluator-id" style="display:none;">
+    <!-- ═══════════════════════════════════════════════════════════════
+         STEP 1: EVALUATOR LOGIN / VERIFICATION VIEW
+         ═══════════════════════════════════════════════════════════════ -->
+    <div id="view-login" style="display:none;">
       
-      <!-- Training Programme Overview Card -->
-      <div id="main-training-box" class="info-details-box" style="display:none; margin-bottom: 20px;">
-        <div class="info-row">
-          <span class="info-label">Training Programme</span>
-          <span class="info-value" id="txt-main-training-title" style="font-weight:700;">—</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Completion Date</span>
-          <span class="info-value" id="txt-main-training-completion">—</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">3-Month Unlock Date</span>
-          <span class="info-value" id="txt-main-training-unlock" style="font-weight:700; color:var(--primary);">—</span>
-        </div>
-      </div>
-
-      <!-- Training Not Completed Notice Card (Phase: NOT_STARTED) -->
-      <div id="main-not-started-card" style="display:none; background: linear-gradient(135deg, rgba(59,130,246,0.08), rgba(99,102,241,0.08)); border: 1.5px solid #3B82F6; border-radius: var(--radius-md); padding: 18px; margin-bottom: 20px; text-align: center;">
-        <div style="font-size: 26px; margin-bottom: 6px;">📅</div>
-        <h4 style="font-size: 15px; font-weight: 800; color: #2563EB; margin-bottom: 6px;">Training Not Completed Yet</h4>
-        <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 12px;">
-          The 3-month post-training evaluation countdown will start automatically <strong>after</strong> the course completion date (<span id="txt-not-started-completion-date" style="font-weight:700; color:var(--text-primary);">—</span>).
-        </p>
-        <div style="font-size: 12px; font-weight: 700; color: #1D4ED8; background: var(--bg-card); padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border-color); display: inline-block;">
-          ⏳ Countdown will begin upon training completion
-        </div>
-      </div>
-
-      <!-- Live 3-Month Countdown Lock Card (Phase: COUNTDOWN_ACTIVE) -->
-      <div id="main-countdown-lock" style="display:none; background: linear-gradient(135deg, rgba(239,68,68,0.08), rgba(245,158,11,0.08)); border: 1.5px solid #F59E0B; border-radius: var(--radius-md); padding: 18px; margin-bottom: 20px; text-align: center;">
-        <div style="font-size: 26px; margin-bottom: 6px;">🔒</div>
-        <h4 style="font-size: 15px; font-weight: 800; color: #D97706; margin-bottom: 6px;">3-Month Post-Training Review Period In Progress</h4>
-        <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 12px;">
-          To accurately measure on-the-job skill transfer and retention, post-training evaluation unlocks <strong>after 3 months</strong> of training completion (<span id="txt-main-unlock-target-date" style="font-weight:700; color:var(--text-primary);">—</span>).
-        </p>
-        <div style="font-family: monospace; font-size: 18px; font-weight: 800; color: #B45309; background: var(--bg-card); padding: 10px 16px; border-radius: 8px; border: 1px solid var(--border-color); display: inline-block;" id="txt-main-countdown-timer">
-          00m : 00d : 00h : 00m : 00s
-        </div>
-        <div style="font-size: 11.5px; color: #DC2626; font-weight: 700; margin-top: 10px;">
-          ⏳ Evaluator login will automatically unlock once the 3-month milestone is reached.
-        </div>
-      </div>
-
-      <!-- Unlocked Active Banner (Phase: UNLOCKED) -->
-      <div id="main-unlocked-banner" style="display:none; background: rgba(16,185,129,0.08); border: 1.5px solid #10B981; border-radius: var(--radius-md); padding: 14px 16px; margin-bottom: 20px; text-align: center;">
-        <div style="display:inline-flex; align-items:center; gap:8px; font-size:14px; font-weight:800; color:#059669;">
-          <span>🔓</span> 3-Month Evaluation Window Unlocked
-        </div>
-        <p style="font-size:12px; color:var(--text-secondary); margin-top:4px;">
-          Training completed on <span id="txt-main-completion-date" style="font-weight:700;">—</span>. Authorized Supervisors and PICs can now log in and conduct evaluations.
-        </p>
-      </div>
-
       <div style="text-align:center; margin-bottom: 20px;">
-        <h2 style="font-size: 16px; font-weight: 700; color: var(--text-primary);">Evaluator Verification</h2>
-        <p style="font-size: 12.5px; color: var(--text-secondary); margin-top: 4px;">Enter your Supervisor / PIC Employee ID or Work Email to access assigned post-evaluations.</p>
+        <h2 style="font-size: 16px; font-weight: 800; color: var(--text-primary);">Evaluator Authentication</h2>
+        <p style="font-size: 12.5px; color: var(--text-secondary); margin-top: 4px;">
+          Enter your Supervisor Employee ID or Work Email to access your assigned training evaluations.
+        </p>
       </div>
 
       <form onsubmit="handleVerifyEvaluator(event)">
-        <div class="form-group">
-          <label for="inp-evaluator-empid" class="form-label">Supervisor / PIC Employee ID or Email <span class="req">*</span></label>
-          <input type="text" id="inp-evaluator-empid" class="form-control" placeholder="e.g. 00000 or supervisor@company.com" required autocomplete="off" aria-label="Supervisor / PIC Employee ID or Email">
-          <p style="font-size:11.5px; color:var(--text-secondary); margin-top:6px;">ℹ️ <strong>Note:</strong> Participants cannot evaluate themselves. Only assigned Supervisors, Managers, HODs, or Persons in Charge (PIC) are authorized to conduct 3-Month post-training evaluations.</p>
+        <div class="form-group mb-3">
+          <label for="inp-evaluator-empid" class="form-label">Supervisor Employee ID or Email <span class="req">*</span></label>
+          <input type="text" id="inp-evaluator-empid" class="form-control" placeholder="e.g. 00000 or username@apollofood.com" required autocomplete="off" aria-label="Supervisor Employee ID or Email">
+          <p style="font-size:11.5px; color:var(--text-secondary); margin-top:6px;">
+            ℹ️ <strong>Access Policy:</strong> Participants cannot evaluate themselves. Only assigned person can submit 3-Month post-evaluations.
+          </p>
         </div>
 
         <button type="submit" id="btn-verify-evaluator" class="btn-submit">
@@ -126,68 +81,152 @@
       </form>
     </div>
 
-    <!-- Step 2: Evaluator Dashboard View -->
+    <!-- ═══════════════════════════════════════════════════════════════
+         STEP 2: MULTI-TRAINING DASHBOARD OVERVIEW VIEW
+         ═══════════════════════════════════════════════════════════════ -->
     <div id="view-dashboard" style="display:none;">
       
-      <!-- Verified Evaluator Banner Card -->
-      <div class="info-details-box" style="margin-bottom: 20px;">
-        <div class="info-row">
-          <span class="info-label">Verified Evaluator</span>
-          <span class="info-value" id="txt-evaluator-name">—</span>
+      <!-- Verified Evaluator Profile Card -->
+      <div class="evaluator-profile-card">
+        <div>
+          <div style="font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:var(--primary);">
+            👤 Verified Evaluator Profile
+          </div>
+          <div style="font-size:20px; font-weight:800; color:var(--text-primary); margin-top:2px;" id="txt-dash-eval-name">
+            —
+          </div>
+          <div class="evaluator-meta-chips">
+            <span class="meta-chip">🆔 <span id="txt-dash-eval-id">—</span></span>
+            <span class="meta-chip">🏢 <span id="txt-dash-eval-dept">—</span></span>
+            <span class="meta-chip">✉️ <span id="txt-dash-eval-email">—</span></span>
+          </div>
         </div>
-        <div class="info-row">
-          <span class="info-label">Employee ID</span>
-          <span class="info-value" id="txt-evaluator-empid">—</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Department / Cost Centre</span>
-          <span class="info-value" id="txt-evaluator-dept">—</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Email Address</span>
-          <span class="info-value" id="txt-evaluator-email" style="color:var(--primary);">Auto-Retrieved ✓</span>
-        </div>
-        <div class="info-row" id="row-post-training-info" style="display:none;">
-          <span class="info-label">Training Programme</span>
-          <span class="info-value" id="txt-post-training-name">—</span>
-        </div>
-        <div class="info-row" id="row-post-training-date" style="display:none;">
-          <span class="info-label">Training Date</span>
-          <span class="info-value" id="txt-post-training-date">—</span>
+        <div>
+          <button class="btn-neo" onclick="switchEvaluator()" style="font-size:12px; padding:6px 12px;">
+            <span>🔄</span> Switch User
+          </button>
         </div>
       </div>
 
-      <!-- Training & Participant Selector -->
-      <div class="form-group mb-3">
-        <label for="sel-participant" class="form-label">Select Participant to Evaluate <span class="req">*</span></label>
-        <select id="sel-participant" class="form-control" onchange="handleParticipantSelectionChange()" aria-label="Select Participant to Evaluate">
-          <option value="">-- Select Pending Participant --</option>
-        </select>
-        <p style="font-size:12px; color:var(--text-secondary); margin-top:6px;" id="txt-pending-stats">
-          Loading assigned pending evaluations...
+      <!-- Stats Grid -->
+      <div class="stats-grid">
+        <div class="stat-card stat-total">
+          <div class="stat-card-header">
+            <span>Assigned Trainings</span>
+            <span>📚</span>
+          </div>
+          <div class="stat-card-value" id="stat-total-trainings">0</div>
+          <div class="stat-card-sub">Supervised courses</div>
+        </div>
+
+        <div class="stat-card stat-pending">
+          <div class="stat-card-header">
+            <span>Pending Reviews</span>
+            <span>⏳</span>
+          </div>
+          <div class="stat-card-value" id="stat-pending-reviews">0</div>
+          <div class="stat-card-sub">Subordinates requiring review</div>
+        </div>
+
+        <div class="stat-card stat-completed">
+          <div class="stat-card-header">
+            <span>Completed</span>
+            <span>✅</span>
+          </div>
+          <div class="stat-card-value" id="stat-completed-reviews">0</div>
+          <div class="stat-card-sub">Successfully submitted</div>
+        </div>
+      </div>
+
+      <!-- Section Title & Quick Filter -->
+      <div class="section-title-bar">
+        <div class="section-title-text">
+          <span>📋</span> Supervised Training Programmes
+        </div>
+        <div style="font-size:12px; color:var(--text-secondary);" id="txt-trainings-count">
+          Showing 0 training programme(s)
+        </div>
+      </div>
+
+      <!-- Training Programmes Cards Container -->
+      <div class="trainings-list-grid" id="trainingsListContainer">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <!-- Empty State Card if no trainings -->
+      <div id="noTrainingsCard" class="info-details-box" style="display:none; text-align:center; padding:32px 16px;">
+        <div style="font-size:36px; margin-bottom:8px;">📌</div>
+        <h4 style="font-size:16px; font-weight:800; color:var(--text-primary);">No Assigned Trainings Found</h4>
+        <p style="font-size:13px; color:var(--text-secondary); margin-top:4px;">
+          You currently have no subordinates pending 3-month post evaluation.
         </p>
       </div>
 
-      <!-- Form Container -->
-      <div id="form-container" style="display:none; margin-top:24px; border-top:1px solid var(--border-color); padding-top:20px;">
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         STEP 3: SUBORDINATE EVALUATION VIEW (FOR SELECTED TRAINING)
+         ═══════════════════════════════════════════════════════════════ -->
+    <div id="view-evaluation" style="display:none;">
+      
+      <!-- Back Navigation Breadcrumb -->
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <button class="btn-neo" onclick="returnToDashboard()" style="font-size:12.5px; padding:7px 14px;">
+          <span>←</span> Back to Trainings Dashboard
+        </button>
+        <span class="badge-pillar" id="badge-active-eval-state">EVALUATION IN PROGRESS</span>
+      </div>
+
+      <!-- Selected Training Overview Card -->
+      <div class="info-details-box" style="margin-bottom:20px;">
+        <div class="info-row">
+          <span class="info-label">Training Programme</span>
+          <span class="info-value" id="txt-eval-training-name" style="font-weight:800; color:var(--text-primary);">—</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Completion Date</span>
+          <span class="info-value" id="txt-eval-completion-date">—</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Evaluation Status</span>
+          <span class="info-value" id="txt-eval-window-status" style="font-weight:700;">—</span>
+        </div>
+      </div>
+
+      <!-- Subordinate Selector -->
+      <div class="form-group mb-3">
+        <label for="sel-subordinate" class="form-label">Select Subordinate to Evaluate <span class="req">*</span></label>
+        <select id="sel-subordinate" class="form-control" onchange="handleSubordinateSelectionChange()" aria-label="Select Subordinate to Evaluate">
+          <option value="">-- Select Pending Subordinate --</option>
+        </select>
+        <p style="font-size:12px; color:var(--text-secondary); margin-top:6px;" id="txt-subordinate-stats">
+          Loading assigned subordinates...
+        </p>
+      </div>
+
+      <!-- Evaluation Form Container -->
+      <div id="form-container" style="display:none; margin-top:20px; border-top:1px solid var(--border-color); padding-top:20px;">
         
-        <div style="background:var(--bg-input); border:1px solid var(--border-color); box-shadow:var(--shadow-inset); border-radius:var(--radius-md); padding:14px 16px; margin-bottom:20px;">
+        <div style="background:var(--bg-input); border:1px solid var(--border-color); box-shadow:var(--shadow-inset); border-radius:var(--radius-md); padding:12px 16px; margin-bottom:20px;">
           <h3 style="font-size:14px; font-weight:800; color:var(--primary);">
-            📝 Performance Review for <span id="selected-participant-name" style="color:var(--text-primary);">--</span>
+            📝 Performance Review for: <span id="selected-subordinate-name" style="color:var(--text-primary);">--</span>
           </h3>
+          <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;" id="selected-subordinate-meta">
+            Employee ID: -- • Department: --
+          </div>
         </div>
 
         <form onsubmit="handlePostEvalSubmit(event)">
           
           <!-- Competency Before -->
           <div class="form-group mb-4">
-            <label class="form-label">1. Competency Level BEFORE Training (Scale 1-5) <span class="req">* Required</span></label>
+            <label class="form-label">1. Competency Level BEFORE Training (Scale 1-5) <span class="req">*</span></label>
             <div class="radio-pill-group" id="group-comp-before"></div>
           </div>
 
           <!-- Competency After -->
           <div class="form-group mb-4">
-            <label class="form-label">2. Competency Level AFTER Training (Scale 1-5) <span class="req">* Required</span></label>
+            <label class="form-label">2. Competency Level AFTER Training (Scale 1-5) <span class="req">*</span></label>
             <div class="radio-pill-group" id="group-comp-after"></div>
           </div>
 
@@ -195,30 +234,47 @@
           <div class="form-group mb-4">
             <label class="form-label">3. Has the employee shown performance improvement after training?</label>
             <div class="radio-pill-group" id="opts-improvement">
-              <div class="radio-pill-item" onclick="selectRadioOption('improvement', 'High')">High (Clear productivity gains)</div>
-              <div class="radio-pill-item" onclick="selectRadioOption('improvement', 'Moderate')">Moderate (Noticeable improvement)</div>
-              <div class="radio-pill-item" onclick="selectRadioOption('improvement', 'Slight')">Slight (Minimal change)</div>
-              <div class="radio-pill-item" onclick="selectRadioOption('improvement', 'None')">None</div>
+              <div class="radio-pill-item active" onclick="selectRadioOption('improvement', 'High')">
+                <strong>High</strong> (Clear productivity gains and independent output)
+              </div>
+              <div class="radio-pill-item" onclick="selectRadioOption('improvement', 'Moderate')">
+                <strong>Moderate</strong> (Noticeable progress in daily tasks)
+              </div>
+              <div class="radio-pill-item" onclick="selectRadioOption('improvement', 'Slight')">
+                <strong>Slight</strong> (Minimal changes observed)
+              </div>
+              <div class="radio-pill-item" onclick="selectRadioOption('improvement', 'None')">
+                <strong>None</strong> (No observable change in performance)
+              </div>
             </div>
           </div>
 
+          <!-- Application to Daily Work -->
           <div class="form-group mb-4">
             <label class="form-label">4. Can the employee apply what was learned to daily work?</label>
             <div class="radio-pill-group" id="opts-canApply">
-              <div class="radio-pill-item" onclick="selectRadioOption('canApply', 'Yes')">Yes - Fully Applicable</div>
-              <div class="radio-pill-item" onclick="selectRadioOption('canApply', 'Partially')">Partially Applicable</div>
-              <div class="radio-pill-item" onclick="selectRadioOption('canApply', 'No')">No - Not Applicable</div>
+              <div class="radio-pill-item active" onclick="selectRadioOption('canApply', 'Yes')">
+                <strong>Yes</strong> (Fully applicable to daily duties)
+              </div>
+              <div class="radio-pill-item" onclick="selectRadioOption('canApply', 'Partially')">
+                <strong>Partially</strong> (Some techniques applied)
+              </div>
+              <div class="radio-pill-item" onclick="selectRadioOption('canApply', 'No')">
+                <strong>No</strong> (Skills not applicable to current role)
+              </div>
             </div>
           </div>
 
+          <!-- Further Training Recommendation -->
           <div class="form-group mb-4">
             <label for="inp-further-training" class="form-label">5. Further Training / Coaching Recommendation</label>
-            <input type="text" id="inp-further-training" class="form-control" placeholder="e.g. Advanced Certification, On-the-job coaching..." value="No further training required at this stage" aria-label="Further Training / Coaching Recommendation">
+            <input type="text" id="inp-further-training" class="form-control" placeholder="e.g. Advanced Level Certification, On-the-job coaching..." value="No further training required at this stage" aria-label="Further Training / Coaching Recommendation">
           </div>
 
+          <!-- Supervisor Feedback / Comments -->
           <div class="form-group mb-4">
-            <label for="inp-post-comments" class="form-label">6. Supervisor / PIC Comments & Recommendation</label>
-            <textarea id="inp-post-comments" class="form-control" rows="3" placeholder="Describe the participant's application of skills..." aria-label="Supervisor / PIC Comments & Recommendation"></textarea>
+            <label for="inp-post-comments" class="form-label">6. Supervisor / HOD Comments & Impact Assessment</label>
+            <textarea id="inp-post-comments" class="form-control" rows="3" placeholder="Describe the participant's on-the-job skill transfer, productivity improvements, or areas needing support..." aria-label="Supervisor / HOD Comments & Impact Assessment"></textarea>
           </div>
 
           <button type="submit" id="btn-submit-post" class="btn-submit">
@@ -228,36 +284,52 @@
         </form>
       </div>
 
-      <!-- All Completed View -->
-      <div id="view-all-completed" style="display:none; text-align:center; padding:32px 16px;">
+      <!-- All Completed View for Current Training -->
+      <div id="view-training-all-completed" style="display:none; text-align:center; padding:32px 16px;">
         <div style="font-size:48px; margin-bottom:12px;">🎉</div>
-        <h3 style="font-size:20px; font-weight:800; color:var(--success); margin-bottom:8px;">All Assigned Post-Evaluations Completed!</h3>
-        <p style="font-size:13.5px; color:var(--text-secondary);">Thank you. All 3-month post-training evaluation reviews for your department have been recorded in the central database.</p>
+        <h3 style="font-size:18px; font-weight:800; color:var(--success); margin-bottom:8px;">All Subordinates in This Training Evaluated!</h3>
+        <p style="font-size:13.5px; color:var(--text-secondary); margin-bottom:20px;">
+          Thank you! All 3-month post-training competency assessments for this training programme have been submitted.
+        </p>
+        <button class="btn-neo btn-neo-primary" onclick="returnToDashboard()">
+          ← Return to Trainings Dashboard
+        </button>
       </div>
 
     </div>
 
-    <!-- Success View -->
-    <div id="view-success" style="display:none; text-align:center; padding: 20px 0;">
+    <!-- ═══════════════════════════════════════════════════════════════
+         STEP 4: SUBMISSION SUCCESS SCREEN
+         ═══════════════════════════════════════════════════════════════ -->
+    <div id="view-success" style="display:none; text-align:center; padding: 24px 0;">
       <div style="width: 64px; height: 64px; background: var(--success-bg); border: 2px solid var(--success); border-radius: 50%; color: var(--success); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 32px; font-weight: 800;">
         ✓
       </div>
-      <h3 style="font-size: 20px; font-weight: 800; color: var(--success); margin-bottom: 6px;">Post Evaluation Saved!</h3>
-      <p style="font-size: 14px; color: var(--text-primary); margin-bottom: 20px;" id="txt-success-post-msg">The 3-month post-training evaluation has been recorded.</p>
+      <h3 style="font-size: 20px; font-weight: 800; color: var(--success); margin-bottom: 6px;">Evaluation Recorded!</h3>
+      <p style="font-size: 14px; color: var(--text-primary); margin-bottom: 20px;" id="txt-success-post-msg">
+        The 3-month post-training evaluation has been recorded successfully in the master database.
+      </p>
       
-      <button type="button" class="btn-submit btn-secondary" style="max-width:220px; margin:0 auto;" onclick="reloadDashboard()">
-        Return to Pending List
-      </button>
+      <div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
+        <button type="button" class="btn-neo btn-neo-primary" onclick="continueEvaluatingCurrentTraining()">
+          Evaluate Next Subordinate →
+        </button>
+        <button type="button" class="btn-neo" onclick="returnToDashboard()">
+          Return to Dashboard
+        </button>
+      </div>
     </div>
 
-    <!-- Error View -->
-    <div id="view-error" style="display:none; text-align:center; padding: 20px 0;">
+    <!-- ═══════════════════════════════════════════════════════════════
+         STEP 5: ERROR SCREEN
+         ═══════════════════════════════════════════════════════════════ -->
+    <div id="view-error" style="display:none; text-align:center; padding: 24px 0;">
       <div style="width: 64px; height: 64px; background: var(--danger-bg); border: 2px solid var(--danger); border-radius: 50%; color: var(--danger); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 30px; font-weight: 800;">
         ✕
       </div>
-      <h3 style="font-size: 19px; font-weight: 800; color: var(--danger); margin-bottom: 6px;">Evaluator Access Error</h3>
+      <h3 style="font-size: 19px; font-weight: 800; color: var(--danger); margin-bottom: 6px;">Evaluator Access Notice</h3>
       <p style="font-size: 13.5px; color: var(--text-secondary); margin-bottom: 20px;" id="txt-error-msg">Validation error.</p>
-      <button class="btn-submit btn-secondary" style="max-width:180px; margin:0 auto;" onclick="resetToStepEvaluatorId()">Try Again</button>
+      <button class="btn-neo" onclick="resetToLogin()">Try Again</button>
     </div>
 
   </div>
@@ -270,138 +342,36 @@
   const COMPETENCY_LEVELS = [
     { v:1, label:'1 - Novice',             desc:'Basic awareness; requires constant supervision' },
     { v:2, label:'2 - Advanced Beginner',   desc:'Developing skill; requires occasional guidance' },
-    { v:3, label:'3 - Competent',          desc:'Fully proficient; can work independently' },
-    { v:4, label:'4 - Proficient',         desc:'High proficiency; can guide others' },
-    { v:5, label:'5 - Expert',             desc:'Mastery level; recognized authority' },
+    { v:3, label:'3 - Competent',          desc:'Fully proficient; works independently' },
+    { v:4, label:'4 - Proficient',         desc:'High proficiency; capable of mentoring others' },
+    { v:5, label:'5 - Expert',             desc:'Mastery level; recognized departmental authority' },
   ];
 
   let selectedCompBefore = 0;
   let selectedCompAfter = 0;
   let selectedRadioValues = { improvement: 'High', canApply: 'Yes' };
-  let activeTrainingId = '';
-  let activeTrainingObj = null;
-  let activeEvaluator = null;
-  let pendingParticipants = [];
-  let mainCountdownInterval = null;
+  
+  let verifiedEvaluator = null;
+  let allTrainingsData = [];
+  let currentSelectedTraining = null;
+  let targetTrainingIdParam = '';
 
   document.addEventListener('DOMContentLoaded', async () => {
-    activeTrainingId = getQueryParam('id') || getQueryParam('training') || getQueryParam('trainingId') || getQueryParam('trn') || <?!= JSON.stringify((typeof params !== 'undefined' && params && (params.id || params.training || params.trainingId || params.trn)) ? (params.id || params.training || params.trainingId || params.trn) : '') ?>;
-    const preEvalEmp = getQueryParam('evaluator') || getQueryParam('emp') || <?!= JSON.stringify((typeof params !== 'undefined' && params && (params.evaluator || params.emp)) ? (params.evaluator || params.emp) : '') ?>;
-
+    initTheme();
     renderCompetencySelectors();
+
+    targetTrainingIdParam = getQueryParam('id') || getQueryParam('training') || getQueryParam('trainingId') || getQueryParam('trn') || <?!= JSON.stringify((typeof params !== 'undefined' && params && (params.id || params.training || params.trainingId || params.trn)) ? (params.id || params.training || params.trainingId || params.trn) : '') ?>;
+    const preEvalEmp = getQueryParam('evaluator') || getQueryParam('emp') || getQueryParam('eval') || <?!= JSON.stringify((typeof params !== 'undefined' && params && (params.evaluator || params.emp || params.eval)) ? (params.evaluator || params.emp || params.eval) : '') ?>;
 
     if (preEvalEmp) {
       document.getElementById('inp-evaluator-empid').value = preEvalEmp;
+      // Auto-trigger verification if employee parameter is provided
+      handleVerifyEvaluator({ preventDefault: () => {} });
+    } else {
+      document.getElementById('view-loading').style.display = 'none';
+      document.getElementById('view-login').style.display = 'block';
     }
-
-    // Load 3-Month Lock Status & Training Details for the Main Landing Page
-    try {
-      const statusRes = await callServer('getPostEvalTrainingStatus', activeTrainingId);
-      if (statusRes && statusRes.training) {
-        activeTrainingObj = statusRes.training;
-        activeTrainingId = statusRes.training.ID;
-        setupMainCountdownLock(statusRes.lockInfo, statusRes.training);
-      }
-    } catch(err) {
-      console.warn('Status load notice: ', err.message);
-    }
-
-    document.getElementById('view-loading').style.display = 'none';
-    document.getElementById('view-step-evaluator-id').style.display = 'block';
   });
-
-  function setupMainCountdownLock(lockInfo, training) {
-    const notStartedCard = document.getElementById('main-not-started-card');
-    const lockCard = document.getElementById('main-countdown-lock');
-    const unlockedBanner = document.getElementById('main-unlocked-banner');
-    const submitBtn = document.getElementById('btn-verify-evaluator');
-    const inputField = document.getElementById('inp-evaluator-empid');
-
-    if (mainCountdownInterval) clearInterval(mainCountdownInterval);
-
-    if (training) {
-      document.getElementById('main-training-box').style.display = 'block';
-      document.getElementById('txt-main-training-title').textContent = `[${training.Code || training.ID}] ${training.Name}`;
-      document.getElementById('txt-main-training-completion').textContent = (lockInfo && lockInfo.completionDateFormatted) ? lockInfo.completionDateFormatted : (training.EndDate || training.StartDate || '—');
-      document.getElementById('txt-main-training-unlock').textContent = (lockInfo && lockInfo.unlockTargetDateFormatted) ? lockInfo.unlockTargetDateFormatted : '—';
-    }
-
-    const phase = lockInfo ? lockInfo.phase : 'UNLOCKED';
-
-    if (phase === 'NOT_STARTED') {
-      // Training has NOT completed yet: Countdown has NOT started yet
-      if (notStartedCard) notStartedCard.style.display = 'block';
-      if (lockCard) lockCard.style.display = 'none';
-      if (unlockedBanner) unlockedBanner.style.display = 'none';
-      if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '🔒 Locked (Course Not Completed Yet)';
-      }
-      if (inputField) inputField.disabled = true;
-      const compDate = lockInfo ? lockInfo.completionDateFormatted : '—';
-      document.getElementById('txt-not-started-completion-date').textContent = compDate;
-      return;
-    }
-
-    if (phase === 'UNLOCKED') {
-      // 3 Months elapsed: Unlocked
-      if (notStartedCard) notStartedCard.style.display = 'none';
-      if (lockCard) lockCard.style.display = 'none';
-      if (unlockedBanner) unlockedBanner.style.display = 'block';
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = 'Verify & Access Dashboard →';
-      }
-      if (inputField) inputField.disabled = false;
-      document.getElementById('txt-main-completion-date').textContent = lockInfo ? lockInfo.completionDateFormatted : '—';
-      return;
-    }
-
-    // Phase: 'COUNTDOWN_ACTIVE' (Training completed, counting down 3 months)
-    if (notStartedCard) notStartedCard.style.display = 'none';
-    if (lockCard) lockCard.style.display = 'block';
-    if (unlockedBanner) unlockedBanner.style.display = 'none';
-    if (submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = `🔒 Locked Until ${lockInfo.unlockTargetDateFormatted}`;
-    }
-    if (inputField) inputField.disabled = true;
-    document.getElementById('txt-main-unlock-target-date').textContent = lockInfo.unlockTargetDateFormatted || '—';
-
-    const targetTime = new Date(lockInfo.unlockTargetIso).getTime();
-
-    function updateTimer() {
-      const now = new Date().getTime();
-      const diff = targetTime - now;
-
-      if (diff <= 0) {
-        clearInterval(mainCountdownInterval);
-        if (notStartedCard) notStartedCard.style.display = 'none';
-        if (lockCard) lockCard.style.display = 'none';
-        if (unlockedBanner) unlockedBanner.style.display = 'block';
-        if (submitBtn) {
-          submitBtn.disabled = false;
-          submitBtn.innerHTML = 'Verify & Access Dashboard →';
-        }
-        if (inputField) inputField.disabled = false;
-        showToast('3-Month Milestone Reached! Post Evaluation Unlocked.', 'success');
-        return;
-      }
-
-      const months = Math.floor(diff / (1000 * 60 * 60 * 24 * 30.4375));
-      const days = Math.floor((diff % (1000 * 60 * 60 * 24 * 30.4375)) / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-
-      const timerStr = `${String(months).padStart(2, '0')}m : ${String(days).padStart(2, '0')}d : ${String(hours).padStart(2, '0')}h : ${String(minutes).padStart(2, '0')}m : ${String(seconds).padStart(2, '0')}s`;
-      const timerElem = document.getElementById('txt-main-countdown-timer');
-      if (timerElem) timerElem.textContent = timerStr;
-    }
-
-    updateTimer();
-    mainCountdownInterval = setInterval(updateTimer, 1000);
-  }
 
   function renderCompetencySelectors() {
     const beforeEl = document.getElementById('group-comp-before');
@@ -421,13 +391,15 @@
   function setCompBefore(val) {
     selectedCompBefore = val;
     document.querySelectorAll('[id^="cb-pill-"]').forEach(el => el.classList.remove('active'));
-    document.getElementById(`cb-pill-${val}`).classList.add('active');
+    const target = document.getElementById(`cb-pill-${val}`);
+    if (target) target.classList.add('active');
   }
 
   function setCompAfter(val) {
     selectedCompAfter = val;
     document.querySelectorAll('[id^="ca-pill-"]').forEach(el => el.classList.remove('active'));
-    document.getElementById(`ca-pill-${val}`).classList.add('active');
+    const target = document.getElementById(`ca-pill-${val}`);
+    if (target) target.classList.add('active');
   }
 
   function selectRadioOption(groupName, value) {
@@ -439,7 +411,7 @@
   }
 
   async function handleVerifyEvaluator(e) {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     const evaluatorId = document.getElementById('inp-evaluator-empid').value.trim();
 
     if (!evaluatorId) {
@@ -448,50 +420,48 @@
     }
 
     const btn = document.getElementById('btn-verify-evaluator');
-    setBtnLoading(btn, true, 'Verifying & Loading Pending List...');
+    setBtnLoading(btn, true, 'Verifying Evaluator...');
+    document.getElementById('view-login').style.display = 'none';
+    document.getElementById('view-loading').style.display = 'block';
+    document.getElementById('txt-loading-msg').textContent = `Verifying identity & fetching supervised trainings...`;
 
     try {
-      const res = await callServer('verifyEvaluatorByEmployeeId', evaluatorId, activeTrainingId);
+      const res = await callServer('verifyEvaluatorByEmployeeId', evaluatorId, targetTrainingIdParam);
 
-      document.getElementById('view-step-evaluator-id').style.display = 'none';
+      verifiedEvaluator = res.evaluator;
+      allTrainingsData = res.trainings || [];
 
-      activeEvaluator = res.evaluator;
-      document.getElementById('txt-evaluator-name').textContent = res.evaluator.Name || evaluatorId;
-      document.getElementById('txt-evaluator-empid').textContent = res.evaluator.EmployeeID || evaluatorId;
-      document.getElementById('txt-evaluator-dept').textContent = res.evaluator.Department || '—';
-      document.getElementById('txt-evaluator-email').textContent = res.evaluator.Email ? `${res.evaluator.Email} ✓` : 'Verified ✓';
+      // Render profile
+      document.getElementById('txt-dash-eval-name').textContent = verifiedEvaluator.Name || evaluatorId;
+      document.getElementById('txt-dash-eval-id').textContent = verifiedEvaluator.EmployeeID || evaluatorId;
+      document.getElementById('txt-dash-eval-dept').textContent = verifiedEvaluator.Department || '—';
+      document.getElementById('txt-dash-eval-email').textContent = verifiedEvaluator.Email || 'Verified ✓';
 
-      if (res.training) {
-        document.getElementById('row-post-training-info').style.display = 'flex';
-        document.getElementById('row-post-training-date').style.display = 'flex';
-        document.getElementById('txt-post-training-name').textContent = `[${res.training.Code || res.training.ID}] ${res.training.Name}`;
-        const sD = formatMinimalistDate(res.training.StartDate);
-        const eD = formatMinimalistDate(res.training.EndDate);
-        document.getElementById('txt-post-training-date').textContent = sD ? (eD && eD !== sD ? `${sD} - ${eD}` : sD) : '—';
-      }
+      // Render Overall Metrics
+      const stats = res.overallStats || { totalTrainings: allTrainingsData.length, totalPending: 0, totalCompleted: 0 };
+      document.getElementById('stat-total-trainings').textContent = stats.totalTrainings || allTrainingsData.length;
+      document.getElementById('stat-pending-reviews').textContent = stats.totalPending || 0;
+      document.getElementById('stat-completed-reviews').textContent = stats.totalCompleted || 0;
 
-      pendingParticipants = res.pendingParticipants || [];
-      const sel = document.getElementById('sel-participant');
-      sel.innerHTML = '<option value="">-- Select Pending Participant --</option>';
+      // Expand to wide dashboard container
+      document.getElementById('mainContainer').classList.add('dashboard-mode');
+      document.getElementById('pageMainHeading').textContent = 'Post-Training Evaluation Dashboard';
+      document.getElementById('pageMainSubheading').textContent = 'Centralized 3-Month Competency Reviews for Supervised Staff';
 
-      if (pendingParticipants.length === 0) {
-        document.getElementById('txt-pending-stats').textContent = `0 Pending. All ${res.completedCount || 0} participants evaluated.`;
-        document.getElementById('view-all-completed').style.display = 'block';
-        document.getElementById('form-container').style.display = 'none';
-      } else {
-        document.getElementById('view-all-completed').style.display = 'none';
-        document.getElementById('txt-pending-stats').textContent = `${pendingParticipants.length} Employees Pending Review (${res.completedCount || 0} Evaluated).`;
+      renderTrainingsList(allTrainingsData);
 
-        pendingParticipants.forEach(p => {
-          const opt = document.createElement('option');
-          opt.value = p.EmployeeID;
-          opt.textContent = `${p.Name} (${p.EmployeeID}) - ${p.Position}`;
-          sel.appendChild(opt);
-        });
+      document.getElementById('view-loading').style.display = 'none';
 
-        // Auto select first if available
-        sel.selectedIndex = 1;
-        handleParticipantSelectionChange();
+      // If user came with a specific training ID, jump directly into that training
+      if (targetTrainingIdParam && allTrainingsData.length > 0) {
+        const directTraining = allTrainingsData.find(t => 
+          String(t.ID).toLowerCase() === targetTrainingIdParam.toLowerCase() || 
+          String(t.Code).toLowerCase() === targetTrainingIdParam.toLowerCase()
+        );
+        if (directTraining) {
+          openTrainingEvaluation(directTraining.ID);
+          return;
+        }
       }
 
       document.getElementById('view-dashboard').style.display = 'block';
@@ -503,28 +473,162 @@
     }
   }
 
-  function handleParticipantSelectionChange() {
-    const sel = document.getElementById('sel-participant');
+  function renderTrainingsList(trainings) {
+    const container = document.getElementById('trainingsListContainer');
+    const emptyBox = document.getElementById('noTrainingsCard');
+    const countLabel = document.getElementById('txt-trainings-count');
+
+    if (!trainings || trainings.length === 0) {
+      container.style.display = 'none';
+      emptyBox.style.display = 'block';
+      countLabel.textContent = '0 training programmes found';
+      return;
+    }
+
+    emptyBox.style.display = 'none';
+    container.style.display = 'grid';
+    countLabel.textContent = `Showing ${trainings.length} supervised training programme(s)`;
+
+    container.innerHTML = trainings.map(t => {
+      const lock = t.lockInfo || { phase: 'UNLOCKED', isUnlocked: true };
+      let badgeHtml = '';
+      let actionBtnHtml = '';
+
+      if (lock.phase === 'NOT_STARTED') {
+        badgeHtml = `<span class="badge-status badge-not-started">📅 Course In Progress</span>`;
+        actionBtnHtml = `<button class="btn-neo" disabled title="Training completed on ${lock.completionDateFormatted}">🔒 Locked (Course Not Completed Yet)</button>`;
+      } else if (lock.phase === 'COUNTDOWN_ACTIVE' || !lock.isUnlocked) {
+        badgeHtml = `<span class="badge-status badge-countdown">🔒 Locked Until ${lock.unlockTargetDateFormatted || '3 Months'}</span>`;
+        actionBtnHtml = `<button class="btn-neo" disabled title="Evaluation window unlocks exactly 3 months after course completion">🔒 Locked (Unlocks ${lock.unlockTargetDateFormatted})</button>`;
+      } else {
+        // UNLOCKED
+        badgeHtml = `<span class="badge-status badge-unlocked">🔓 3-Month Window Unlocked</span>`;
+        if (t.pendingCount > 0) {
+          actionBtnHtml = `<button class="btn-neo btn-neo-primary" onclick="openTrainingEvaluation('${t.ID}')">📝 Evaluate Subordinates (${t.pendingCount} Pending) →</button>`;
+        } else {
+          actionBtnHtml = `<button class="btn-neo" onclick="openTrainingEvaluation('${t.ID}')">✅ All Evaluated (${t.completedCount} Completed)</button>`;
+        }
+      }
+
+      return `
+        <div class="training-neo-card">
+          <div class="training-neo-header">
+            <div>
+              <span class="training-code-pill">${escapeHtml(t.Code || t.ID)}</span>
+              <h3 class="training-title">${escapeHtml(t.Name)}</h3>
+            </div>
+            <div>
+              ${badgeHtml}
+            </div>
+          </div>
+
+          <div class="training-meta-row">
+            <span>📅 Completion: <strong>${escapeHtml(lock.completionDateFormatted || t.EndDate || '—')}</strong></span>
+            <span>📂 Category: <strong>${escapeHtml(t.Category || 'General')}</strong></span>
+            <span>👨‍🏫 Trainer: <strong>${escapeHtml(t.Trainer || '—')}</strong></span>
+          </div>
+
+          <div class="training-progress-row">
+            <div>
+              <span style="color:var(--text-secondary); margin-right:8px;">Subordinates:</span>
+              <strong style="color:var(--warning);">${t.pendingCount} Pending</strong> • 
+              <strong style="color:var(--success);">${t.completedCount} Completed</strong> 
+              <span style="color:var(--text-muted);">(${t.totalParticipants} Total)</span>
+            </div>
+            <div>
+              ${actionBtnHtml}
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function openTrainingEvaluation(trainingId) {
+    const training = allTrainingsData.find(t => String(t.ID) === String(trainingId) || String(t.Code) === String(trainingId));
+    if (!training) {
+      showToast('Training programme not found.', 'error');
+      return;
+    }
+
+    currentSelectedTraining = training;
+
+    document.getElementById('view-dashboard').style.display = 'none';
+    document.getElementById('view-success').style.display = 'none';
+    document.getElementById('view-evaluation').style.display = 'block';
+
+    // Populate Training Details
+    document.getElementById('txt-eval-training-name').textContent = `[${training.Code || training.ID}] ${training.Name}`;
+    const lock = training.lockInfo || {};
+    document.getElementById('txt-eval-completion-date').textContent = lock.completionDateFormatted || training.EndDate || '—';
+    document.getElementById('txt-eval-window-status').textContent = lock.isUnlocked ? '🔓 3-Month Window Open' : `🔒 Locked Until ${lock.unlockTargetDateFormatted}`;
+
+    renderSubordinatesDropdown(training);
+  }
+
+  function renderSubordinatesDropdown(training) {
+    const sel = document.getElementById('sel-subordinate');
+    const formContainer = document.getElementById('form-container');
+    const allDoneBox = document.getElementById('view-training-all-completed');
+    const statsInfo = document.getElementById('txt-subordinate-stats');
+
+    sel.innerHTML = '<option value="">-- Select Pending Subordinate --</option>';
+
+    const pendingList = training.pendingParticipants || [];
+    const completedList = training.completedParticipants || [];
+
+    if (pendingList.length === 0) {
+      statsInfo.textContent = `All ${completedList.length} subordinates in this training have been evaluated.`;
+      formContainer.style.display = 'none';
+      allDoneBox.style.display = 'block';
+    } else {
+      allDoneBox.style.display = 'none';
+      statsInfo.textContent = `${pendingList.length} Subordinate(s) Pending Review • ${completedList.length} Completed.`;
+
+      pendingList.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.EmployeeID;
+        opt.textContent = `⏳ ${p.Name} (${p.EmployeeID}) — ${p.Department || p.Position}`;
+        sel.appendChild(opt);
+      });
+
+      // Auto select first pending subordinate
+      sel.selectedIndex = 1;
+      handleSubordinateSelectionChange();
+    }
+  }
+
+  function handleSubordinateSelectionChange() {
+    const sel = document.getElementById('sel-subordinate');
     const val = sel.value;
     const formContainer = document.getElementById('form-container');
 
-    if (!val) {
+    if (!val || !currentSelectedTraining) {
       formContainer.style.display = 'none';
       return;
     }
 
-    const emp = pendingParticipants.find(p => String(p.EmployeeID) === String(val));
+    const emp = (currentSelectedTraining.pendingParticipants || []).find(p => String(p.EmployeeID) === String(val));
     if (emp) {
-      document.getElementById('selected-participant-name').textContent = `${emp.Name} (${emp.EmployeeID})`;
+      document.getElementById('selected-subordinate-name').textContent = `${emp.Name}`;
+      document.getElementById('selected-subordinate-meta').textContent = `Employee ID: ${emp.EmployeeID} • Department: ${emp.Department || '—'} • Position: ${emp.Position || 'Staff'}`;
       formContainer.style.display = 'block';
+
+      // Reset form ratings
+      setCompBefore(3);
+      setCompAfter(4);
+      selectRadioOption('improvement', 'High');
+      selectRadioOption('canApply', 'Yes');
+      document.getElementById('inp-further-training').value = 'No further training required at this stage';
+      document.getElementById('inp-post-comments').value = '';
     }
   }
 
   async function handlePostEvalSubmit(e) {
-    e.preventDefault();
-    const partEmpId = document.getElementById('sel-participant').value;
+    if (e && e.preventDefault) e.preventDefault();
+    const partEmpId = document.getElementById('sel-subordinate').value;
     if (!partEmpId) {
-      showToast('Please select a participant to evaluate.', 'error');
+      showToast('Please select a subordinate to evaluate.', 'error');
       return;
     }
 
@@ -534,14 +638,14 @@
     }
 
     const btn = document.getElementById('btn-submit-post');
-    setBtnLoading(btn, true, 'Submitting 3-Month Post Review...');
+    setBtnLoading(btn, true, 'Submitting 3-Month Evaluation...');
 
     try {
       const payload = {
-        TrainingID: activeTrainingId,
+        TrainingID: currentSelectedTraining.ID,
         EmployeeID: partEmpId,
-        EvaluatorID: activeEvaluator.EmployeeID,
-        EvaluatorName: activeEvaluator.Name,
+        EvaluatorID: verifiedEvaluator.EmployeeID,
+        EvaluatorName: verifiedEvaluator.Name,
         CompetencyBefore: selectedCompBefore,
         CompetencyAfter: selectedCompAfter,
         Improvement: selectedRadioValues['improvement'] || 'High',
@@ -552,7 +656,22 @@
 
       const res = await callServer('savePostEvaluation', payload);
 
-      document.getElementById('view-dashboard').style.display = 'none';
+      // Locally update data structures
+      const empIdx = currentSelectedTraining.pendingParticipants.findIndex(p => String(p.EmployeeID) === String(partEmpId));
+      if (empIdx >= 0) {
+        const [evaluatedEmp] = currentSelectedTraining.pendingParticipants.splice(empIdx, 1);
+        currentSelectedTraining.completedParticipants.push(evaluatedEmp);
+        currentSelectedTraining.pendingCount = currentSelectedTraining.pendingParticipants.length;
+        currentSelectedTraining.completedCount = currentSelectedTraining.completedParticipants.length;
+      }
+
+      // Update overall stats
+      const totalPending = allTrainingsData.reduce((acc, t) => acc + (t.pendingCount || 0), 0);
+      const totalCompleted = allTrainingsData.reduce((acc, t) => acc + (t.completedCount || 0), 0);
+      document.getElementById('stat-pending-reviews').textContent = totalPending;
+      document.getElementById('stat-completed-reviews').textContent = totalCompleted;
+
+      document.getElementById('view-evaluation').style.display = 'none';
       document.getElementById('view-success').style.display = 'block';
       document.getElementById('txt-success-post-msg').textContent = `3-Month Post-Training Review for ${partEmpId} submitted successfully.`;
 
@@ -563,30 +682,57 @@
     }
   }
 
-  function reloadDashboard() {
+  function continueEvaluatingCurrentTraining() {
     document.getElementById('view-success').style.display = 'none';
-    if (activeEvaluator) {
-      handleVerifyEvaluator({ preventDefault: () => {} });
+    if (currentSelectedTraining) {
+      openTrainingEvaluation(currentSelectedTraining.ID);
     } else {
-      resetToStepEvaluatorId();
+      returnToDashboard();
     }
   }
 
-  function resetToStepEvaluatorId() {
-    document.getElementById('view-loading').style.display = 'none';
-    document.getElementById('view-dashboard').style.display = 'none';
+  function returnToDashboard() {
+    document.getElementById('view-evaluation').style.display = 'none';
     document.getElementById('view-success').style.display = 'none';
     document.getElementById('view-error').style.display = 'none';
-    document.getElementById('view-step-evaluator-id').style.display = 'block';
+    renderTrainingsList(allTrainingsData);
+    document.getElementById('view-dashboard').style.display = 'block';
+  }
+
+  function switchEvaluator() {
+    document.getElementById('mainContainer').classList.remove('dashboard-mode');
+    document.getElementById('pageMainHeading').textContent = '3-Month Competency Assessment';
+    document.getElementById('pageMainSubheading').textContent = 'Supervisor / Manager / HOD / PIC Review Portal';
+    document.getElementById('view-dashboard').style.display = 'none';
+    document.getElementById('view-evaluation').style.display = 'none';
+    document.getElementById('view-success').style.display = 'none';
+    document.getElementById('view-error').style.display = 'none';
+    document.getElementById('inp-evaluator-empid').value = '';
+    document.getElementById('view-login').style.display = 'block';
+  }
+
+  function resetToLogin() {
+    switchEvaluator();
   }
 
   function showErrorState(msg) {
     document.getElementById('view-loading').style.display = 'none';
-    document.getElementById('view-step-evaluator-id').style.display = 'none';
+    document.getElementById('view-login').style.display = 'none';
     document.getElementById('view-dashboard').style.display = 'none';
+    document.getElementById('view-evaluation').style.display = 'none';
     document.getElementById('view-success').style.display = 'none';
     document.getElementById('view-error').style.display = 'block';
     document.getElementById('txt-error-msg').textContent = msg;
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   }
 </script>
 

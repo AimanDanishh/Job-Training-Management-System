@@ -50,6 +50,8 @@ function doGet(e) {
     template.page = pageParam;
     template.activeEmail = activeEmail || '';
     template.systemLogoUrl = String(systemLogoUrl);
+    template.employeePortalUrl = String(getEmployeePortalUrl() || '');
+    template.participantPortalUrl = String(getParticipantPortalUrl() || '');
 
     return template.evaluate()
       .setTitle(appTitle)
@@ -242,7 +244,8 @@ function getApproverDashboardData() {
       pendingRequests: pendingRequests,
       historyRequests: historyRequests,
       allSupervisedRequests: allSupervisedRequests,
-      employeePortalUrl: empPortalUrl
+      employeePortalUrl: empPortalUrl,
+      participantPortalUrl: getParticipantPortalUrl() || ''
     });
   } catch (e) {
     Logger.log('getApproverDashboardData error: ' + e.message);

@@ -699,6 +699,7 @@ function sendSupervisorPostEvalEmail(trainingId, supervisor, trainingObj, partic
 
   const publicUrl = getPublicPortalUrl() || getAppUrl();
   const reviewUrl = `${publicUrl}?page=post&id=${encodeURIComponent(cleanTId)}&eval=${encodeURIComponent(supervisor.ID || supervisor.Email)}`;
+  const dashboardUrl = `${publicUrl}?page=post&emp=${encodeURIComponent(supervisor.ID || supervisor.Email)}`;
 
   const isTestMode = Boolean(testRecipientEmail);
   const targetEmail = isTestMode ? String(testRecipientEmail).trim() : supervisor.Email;
@@ -746,8 +747,9 @@ function sendSupervisorPostEvalEmail(trainingId, supervisor, trainingObj, partic
     `Course Completed: ${compDateFormatted}\n\n` +
     `You have been assigned as the Supervisor / Person In Charge to evaluate the performance and competency improvement of the assigned participant(s).\n` +
     participantListText +
-    `Please click the link below to access the 3-Month Competency Review Portal:\n` +
-    `${reviewUrl}\n\n` +
+    `Please use the links below to access the evaluation or your full supervisor dashboard:\n\n` +
+    `1. Evaluate This Training Directly:\n${reviewUrl}\n\n` +
+    `2. Open 3-Month Post Evaluation Dashboard (All Supervised Courses):\n${dashboardUrl}\n\n` +
     `Thank you,\nApollo Job Training Management System`;
 
   const htmlBody = `
@@ -772,16 +774,20 @@ function sendSupervisorPostEvalEmail(trainingId, supervisor, trainingObj, partic
 
         ${participantListHtml}
 
-        <div style="text-align: center; margin: 24px 0;">
-          <a href="${reviewUrl}" target="_blank" style="background: #2563EB; color: #FFFFFF; text-decoration: none; padding: 12px 28px; border-radius: 6px; font-size: 14px; font-weight: 700; display: inline-block;">
-            Open 3-Month Competency Review Portal &rarr;
+        <div style="text-align: center; margin: 28px 0 18px; display: flex; flex-direction: column; gap: 10px; align-items: center;">
+          <a href="${reviewUrl}" target="_blank" style="background: #2563EB; color: #FFFFFF; text-decoration: none; padding: 13px 26px; border-radius: 6px; font-size: 14px; font-weight: 700; display: inline-block; box-shadow: 0 2px 5px rgba(37,99,235,0.25); min-width: 260px; text-align: center; margin-bottom: 8px;">
+            📝 Evaluate This Training (${tCode}) &rarr;
+          </a>
+          <a href="${dashboardUrl}" target="_blank" style="background: #0F172A; color: #FFFFFF; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-size: 13.5px; font-weight: 700; display: inline-block; box-shadow: 0 2px 5px rgba(15,23,42,0.2); min-width: 260px; text-align: center;">
+            📊 3-Month Post Evaluation Dashboard &rarr;
           </a>
         </div>
 
-        <p style="font-size: 11.5px; color: #94A3B8; margin-bottom: 0;">
-          If the button above does not work, copy and paste this link into your browser:<br/>
-          <a href="${reviewUrl}" style="color: #2563EB; word-break: break-all;">${reviewUrl}</a>
-        </p>
+        <div style="background: #F1F5F9; border-radius: 6px; padding: 12px 14px; margin: 20px 0 10px; font-size: 11.5px; color: #64748B;">
+          <strong>Direct Links:</strong><br/>
+          • <strong>Training Form:</strong> <a href="${reviewUrl}" style="color: #2563EB; word-break: break-all;">${reviewUrl}</a><br/>
+          • <strong>Supervisor Dashboard:</strong> <a href="${dashboardUrl}" style="color: #2563EB; word-break: break-all;">${dashboardUrl}</a>
+        </div>
         <hr style="border: none; border-top: 1px solid #E2E8F0; margin: 20px 0 14px;" />
         <div style="font-size: 11px; color: #94A3B8; text-align: center;">
           This is an automated system email from the Apollo Job Training Management System. Please do not reply directly.

@@ -115,10 +115,25 @@ function isSameEmployeeId(id1, id2) {
   const s1 = String(id1).trim().toLowerCase();
   const s2 = String(id2).trim().toLowerCase();
   if (s1 === s2) return true;
+  if (!s1 || !s2) return false;
+
+  // 1. Strip leading zeros
   const z1 = s1.replace(/^0+/, '');
   const z2 = s2.replace(/^0+/, '');
   if (z1 !== '' && z1 === z2) return true;
   if (s1.replace(/0/g, '') === '' && s2.replace(/0/g, '') === '') return true;
+
+  // 2. Strip common prefixes (emp-, emp, staff-, staff, e-, e, no-, no)
+  const cleanPrefix = (str) => str.replace(/^(emp|staff|no|e)[\-_:\s]*/i, '').replace(/^0+/, '');
+  const p1 = cleanPrefix(s1);
+  const p2 = cleanPrefix(s2);
+  if (p1 !== '' && p1 === p2) return true;
+
+  // 3. Compare purely extracted digits if both contain numbers
+  const d1 = s1.replace(/\D/g, '').replace(/^0+/, '');
+  const d2 = s2.replace(/\D/g, '').replace(/^0+/, '');
+  if (d1 !== '' && d2 !== '' && d1 === d2) return true;
+
   return false;
 }
 
@@ -156,46 +171,44 @@ function getEmployeeSpreadsheet() {
 }
 
 function getSheet(name) {
-  const cleanNameLower = String(name || '').toLowerCase().trim();
-  const isEmployeeSpreadsheetSheet = (
-    cleanNameLower === 'employees' ||
-    cleanNameLower === 'for it' ||
-    cleanNameLower === 'hr email' ||
-    cleanNameLower === 'hod email' ||
-    cleanNameLower === 'csuite email' ||
-    cleanNameLower === 'c-suite email' ||
-    cleanNameLower === 'hohr email' ||
-    cleanNameLower === 'cost centre' ||
-    cleanNameLower === 'costcentre'
-  );
+  const isEmpSheet = ['employees', 'cost centre', 'costcentre', 'hod email', 'hodemail', 'csuite email', 'csuiteemail', 'c-suite email', 'hohr email', 'hohremail', 'for it', 'forit', 'for_it', 'staff', 'staff list'].includes(String(name).toLowerCase().trim());
+  const primarySs = isEmpSheet ? getEmployeeSpreadsheet() : getSpreadsheet();
+  const secondarySs = isEmpSheet ? getSpreadsheet() : getEmployeeSpreadsheet();
 
-  const ss = isEmployeeSpreadsheetSheet ? getEmployeeSpreadsheet() : getSpreadsheet();
-  if (!ss) return null;
-  
-  let sheet = ss.getSheetByName(name);
-  if (!sheet) {
-    const allSheets = ss.getSheets();
-    const targetClean = String(name).toLowerCase().replace(/[^a-z0-9]/g, '');
-    sheet = allSheets.find(s => {
-      const sClean = s.getName().toLowerCase().replace(/[^a-z0-9]/g, '');
-      return sClean === targetClean ||
-             sClean === targetClean + 's' ||
-             sClean + 's' === targetClean;
-    });
+  const findInSs = (ssObj) => {
+    if (!ssObj) return null;
+    let sheet = ssObj.getSheetByName(name);
+    if (!sheet) {
+      const allSheets = ssObj.getSheets();
+      const targetClean = String(name).toLowerCase().replace(/[^a-z0-9]/g, '');
+      sheet = allSheets.find(s => {
+        const sClean = s.getName().toLowerCase().replace(/[^a-z0-9]/g, '');
+        return sClean === targetClean ||
+               sClean === targetClean + 's' ||
+               sClean + 's' === targetClean;
+      });
 
-    if (!sheet && isEmployeeSpreadsheetSheet && allSheets.length > 0) {
-      sheet = allSheets.find(s => s.getName().toLowerCase().includes('for it') || s.getName().toLowerCase().includes('emp') || s.getName().toLowerCase().includes('staff')) || allSheets[0];
+      if (!sheet && isEmpSheet && allSheets.length > 0) {
+        sheet = allSheets.find(s => {
+          const n = s.getName().toLowerCase();
+          return n.includes('for it') || n.includes('emp') || n.includes('staff') || n.includes('master');
+        });
+      }
     }
-  }
+    return sheet;
+  };
 
-  if (sheet) {
+  let found = findInSs(primarySs);
+  if (!found) found = findInSs(secondarySs);
+
+  if (found) {
     const cleanName = String(name).toLowerCase().replace(/[^a-z0-9]/g, '');
     if (cleanName === 'attendance') {
-      ensureAttendanceSheetColumns(sheet);
+      ensureAttendanceSheetColumns(found);
     }
   }
 
-  return sheet;
+  return found;
 }
 
 /**

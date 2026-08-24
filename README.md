@@ -15,12 +15,12 @@ The **Job Training Management System (TrainHub)** is an enterprise-grade, server
 
 ### Core Automated Capabilities:
 - 📝 **Digital Training Requisition (`AP-HRD-F01-01`)**: 15-field employee requisition portal with dynamic Cost Centre selection, employee directory lookup, brochure file attachments, and automated requisition sheet generation.
-- ⚡ **Multi-Tier Approval & Auto-Bypass Engine**: Dynamically routes requests through HOD review, C-Suite approval, Head of HR (HOHR) sign-off, and final HR acknowledgment with intelligent multi-role auto-bypass logic.
+- ⚡ **Multi-Tier Approval & Auto-Bypass Engine**: Dynamically routes requests through HOD review, C-Suite approval, Head of HR (HOHR) sign-off, and final HR acknowledgment with intelligent multi-role auto-bypass logic. **Automatically displays pending approval requests immediately upon login.**
 - 📁 **Automated Drive Workspace Generator**: Automatically provisions isolated Google Drive training folders, copies and pre-fills official `AP-HRD-F01-01` form templates, and generates individual training data spreadsheets.
 - 📱 **Public QR Attendance Check-In**: Non-Google login QR check-in portal for participants with session expiry enforcement and duplicate check-in prevention.
 - ⭐ **Two-Stage Training Evaluation**:
   - **Level 1 (Reaction)**: 7-criteria Likert feedback form submitted immediately upon training completion.
-  - **Level 3 (Behavior / 3-Month Post-Evaluation)**: Automated 90-day countdown timer notifying supervisors to evaluate workplace competency improvements.
+  - **Level 3 (Behavior / 3-Month Post-Evaluation Dashboard)**: Centralized multi-training supervisor portal with Employee ID login, countdown timer locks, real-time subordinate progress counters, and dual email action buttons.
 - 📊 **Enterprise Analytics & Excel Export Engine**: Live dashboards and automated Google Sheet / Microsoft Excel (`.xlsx`) generation for Annual Training Plans (ATP), Training Hours by Cost Centre, Cost Breakdown Reports, and Employee Training Records.
 
 ---
@@ -37,7 +37,7 @@ Job Training Management System (TrainHub)
 │   ├── Training Programme & Session Manager (Lifecycle Stage Automations)
 │   ├── Session Attendance Monitor & Manual Attendance Adjustments
 │   ├── Branded QR Code Generator (Attendance, Level 1 & Level 3 Evaluations)
-│   ├── 3-Month Post-Evaluation Countdown & Supervisor Assignment Engine
+│   ├── 3-Month Post-Evaluation Automated Email Alerts with Dual Action Buttons
 │   ├── Unified Report Generator (Hours, Cost, Title, Employee, ATP)
 │   └── Direct-to-Drive Excel (.xlsx) Export Engine
 │
@@ -51,15 +51,19 @@ Job Training Management System (TrainHub)
 │
 ├── 3. HOD & Managerial Review Portal [hod-portal]
 │   ├── Server-Side Identity Resolution (Restricted to Authorized Approvers)
+│   ├── Auto-Display of Pending Requests Immediately Upon Login
 │   ├── Multi-Tier Approval Review Interface (HOD ➔ C-Suite ➔ HOHR)
 │   ├── Decision Actions: Approve / Reject / Return / Reschedule (with Remarks)
 │   ├── Automated Digital Approval Stamping on Google Sheet Templates
+│   ├── "📊 Post Evaluation" Navigation Tab Linked Directly to Participant Portal
 │   └── Cost-Centre-Filtered 3-Month Post-Evaluation Review Console
 │
 ├── 4. Public Participant Portal [participant-portal]
 │   ├── Public Mobile-Optimized QR Attendance Check-In (No Google Login Required)
 │   ├── Level 1 Participant Training Evaluation Form (7-Point Likert + Feedback)
-│   ├── Level 3 Direct Supervisor Post-Training Review Form
+│   ├── Centralized 3-Month Post-Evaluation Dashboard (Multi-Training Supervised View)
+│   ├── Per-Course 3-Month Countdown Locks (NOT_STARTED, COUNTDOWN_ACTIVE, UNLOCKED)
+│   ├── Real-Time Subordinate Progress Counters (Pending vs Completed)
 │   └── Server-Side Enrollment, Expiry, and Duplicate Submission Validations
 │
 └── 5. Shared Infrastructure & Storage [Google Drive & Google Sheets]
@@ -275,10 +279,14 @@ TrainHub includes a server-side report generator capable of live UI rendering an
 
 ### 6.2 Level 1 & Level 3 Post-Evaluations
 - **Level 1 (Reaction)**: Evaluates Course Content, Instructor Effectiveness, Facility/Platform Quality, Time Allocation, and Learning Objectives (Scale 1–5 + Qualitative text areas).
-- **Level 3 (3-Month Behavior Evaluation)**:
-  - 90 days after training completion, supervisors access `hod-portal?page=posteval` or receive direct links.
-  - Supervisors evaluate competency levels before vs. after training, job applicability, and further training requirements.
-  - Features a live countdown timer showing remaining months, days, and hours until the evaluation window unlocks.
+- **Level 3 (3-Month Behavior / Post-Evaluation Dashboard)**:
+  - **Centralized Dashboard (`participant-portal?page=post`)**: Supervisors and HODs log in using their Employee ID or Work Email to view all supervised training programmes.
+  - **Milestone Countdown Locks**: Each course displays a dynamic 3-month countdown lock status (`📅 Course In Progress`, `🔒 Locked Until DD/MM/YYYY`, or `🔓 3-Month Window Unlocked`).
+  - **Real-Time Subordinate Progress**: Shows pending vs. completed subordinate counts per course with breadcrumb navigation.
+  - **Direct Email Actions**: Automated 3-month review notification emails include dual action buttons:
+    1. `📝 Evaluate This Training (<CODE>) →` (deep links directly to the specific course form)
+    2. `📊 3-Month Post Evaluation Dashboard →` (opens the supervisor's personalized dashboard)
+  - **HOD Portal Integration**: The Approval Portal includes a dedicated `📊 Post Evaluation` tab in the navigation bar that seamlessly links to the dashboard.
 
 ---
 
@@ -391,6 +399,7 @@ TrainHub includes a server-side report generator capable of live UI rendering an
    | `SPREADSHEET_ID` | Master Database ID | `1a2b3c...` |
    | `EMPLOYEE_SPREADSHEET_ID` | Employee Master Database ID | `1x2y3z...` |
    | `EMPLOYEE_PORTAL_URL` | Web App URL of `employee-requisition` | `https://script.google.com/macros/s/.../exec` |
+   | `PARTICIPANT_PORTAL_URL` | Web App URL of `participant-portal` | `https://script.google.com/macros/s/.../exec` |
    | `ALLOWED_DOMAIN` | Company domain | `apollofood.com.my` |
 
 3. **Deploy Web App**:
@@ -412,6 +421,7 @@ TrainHub includes a server-side report generator capable of live UI rendering an
    | Key | Description | Value |
    | :--- | :--- | :--- |
    | `SPREADSHEET_ID` | Master Database ID | `1a2b3c...` |
+   | `EMPLOYEE_SPREADSHEET_ID` | Employee Master Database ID (Optional fallback) | `1x2y3z...` |
    | `APP_TITLE` | Display Title | `TrainHub — Participant Portal` |
 
 3. **Deploy Web App**:
@@ -434,7 +444,9 @@ After obtaining all four Web App URLs, complete the circular link routing across
              ▼                                                           │
 ┌─────────────────────────┐       EMPLOYEE_PORTAL_URL       ┌────────────┴────────────┐
 │       hod-portal        │◄────────────────────────────────┤  employee-requisition   │
-└─────────────────────────┘                                 └─────────────────────────┘
+└────────────┬────────────┘                                 └─────────────────────────┘
+             │                    PARTICIPANT_PORTAL_URL                 ▲
+             └───────────────────────────────────────────────────────────┘
 ```
 
 1. **In `admin-system`**:
@@ -444,6 +456,7 @@ After obtaining all four Web App URLs, complete the circular link routing across
    - Set `HOD_PORTAL_URL` = Web App URL of `hod-portal`.
 3. **In `hod-portal`**:
    - Set `EMPLOYEE_PORTAL_URL` = Web App URL of `employee-requisition`.
+   - Set `PARTICIPANT_PORTAL_URL` = Web App URL of `participant-portal`.
 
 > 💡 **Legacy Workspace Migration**: If migrating from previous test folders, run `migrateTrainingWorkspacesToConfiguredRoot` from `admin-system` to safely relocate all existing training workspaces into `ROOT_FOLDER_ID/Training Folder/`.
 
@@ -455,9 +468,11 @@ After obtaining all four Web App URLs, complete the circular link routing across
 | :--- | :--- | :--- |
 | **Attendance QR Check-In** | `/exec?page=attendance&session=SES0001` | Public / Mobile Browser (No login required) |
 | **Level 1 Training Evaluation** | `/exec?page=evaluation&id=TRN-1001` | Participants upon course completion |
-| **Level 3 Supervisor Post-Review**| `/exec?page=post&id=TRN-1001&emp=00123` | Direct supervisor review link |
-| **HOD Requisition Review** | `/exec?page=review&id=TRN-1001` | Authenticated HOD / C-Suite / HOHR |
-| **HOD 3-Month Evaluation Hub** | `/exec?page=posteval` | Authenticated HOD (Filtered by Cost Centre) |
+| **Level 3 Post-Evaluation Dashboard** | `/exec?page=post` | Supervisors / HODs (Prompts for ID / Email) |
+| **Personalized Post-Eval Dashboard** | `/exec?page=post&emp=00123` | Auto-authenticated Supervisor Dashboard |
+| **Single-Course Post-Review Form** | `/exec?page=post&id=TRN-1001&emp=00123` | Direct supervisor review form for specific course |
+| **HOD Requisition Review & Dashboard** | `/exec?page=review` *(or `/exec?page=review&id=TRN-1001`)* | Authenticated HOD / C-Suite / HOHR (**Auto-displays Pending Requests immediately**) |
+| **HOD 3-Month Evaluation Console** | `/exec?page=posteval` | Authenticated HOD (Filtered by Cost Centre) |
 | **Employee "My Requests"** | `/exec?page=my_requests` | Authenticated Employee |
 
 ---

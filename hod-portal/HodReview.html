@@ -63,7 +63,7 @@
 
       <!-- 4 Dashboard Summary Stat Cards -->
       <div class="stats-grid">
-        <div class="stat-card stat-pending" onclick="switchNavTab('pending')" style="cursor:pointer;" title="Click to view Pending Requests">
+        <div class="stat-card stat-pending" onclick="showPendingRequests()" style="cursor:pointer;" title="Click to view Pending Requests">
           <div class="stat-card-label">
             <span>MY APPROVALS</span>
             <span>⏳</span>
@@ -103,11 +103,14 @@
       <!-- Navigation & Real-Time Search Bar -->
       <div class="nav-bar-container">
         <div class="nav-tabs">
-          <button class="nav-tab-btn active" id="tabPendingBtn" onclick="switchNavTab('pending')">
+          <button class="nav-tab-btn active" id="tabPendingBtn" onclick="showPendingRequests()">
             <span>📌</span> Pending Requests (<span id="navPendingBadge">0</span>)
           </button>
           <button class="nav-tab-btn" id="tabHistoryBtn" onclick="switchNavTab('history')">
             <span>📜</span> Request History
+          </button>
+          <button class="nav-tab-btn" id="tabPostEvalBtn" onclick="openPostEvaluationDashboard()" title="Open 3-Month Post Evaluation Dashboard">
+            <span>📊</span> Post Evaluation
           </button>
           <button class="nav-tab-btn" onclick="openEmployeePortal()">
             <span>📝</span> New Request
@@ -340,7 +343,8 @@
     let pendingRequestsList = [];
     let historyRequestsList = [];
     let allSupervisedList = [];
-    let employeePortalUrl = '';
+    let employeePortalUrl = '<?= typeof employeePortalUrl !== "undefined" ? employeePortalUrl : "" ?>';
+    let participantPortalUrl = '<?= typeof participantPortalUrl !== "undefined" ? participantPortalUrl : "" ?>';
 
     try {
       window.INITIAL_DASHBOARD_DATA = <?!= getInitialDashboardDataJson(activeEmail) ?>;
@@ -384,8 +388,6 @@
       }
     }
 
-
-
     function openEmployeePortal() {
       if (employeePortalUrl && employeePortalUrl.trim()) {
         window.open(employeePortalUrl.trim(), '_top');
@@ -394,8 +396,20 @@
       }
     }
 
+    function openPostEvaluationDashboard() {
+      const approverIdentifier = currentApprover ? (currentApprover.ID || currentApprover.Email || '') : '';
+      if (participantPortalUrl && participantPortalUrl.trim()) {
+        const cleanUrl = participantPortalUrl.trim();
+        const joinChar = cleanUrl.includes('?') ? '&' : '?';
+        const targetUrl = `${cleanUrl}${joinChar}page=post${approverIdentifier ? '&emp=' + encodeURIComponent(approverIdentifier) : ''}`;
+        window.open(targetUrl, '_top');
+      } else {
+        window.location.href = `?page=posteval${approverIdentifier ? '&emp=' + encodeURIComponent(approverIdentifier) : ''}`;
+      }
+    }
+
     function openPostEvalPage() {
-      window.location.href = '?page=posteval';
+      openPostEvaluationDashboard();
     }
 
     function initApprovalPortal() {
@@ -407,20 +421,43 @@
 
       if (!loadedFromInitial) {
         showLoading('Loading Approval Portal...');
+        google.script.run
+          .withSuccessHandler(resStr => {
+            hideLoading();
+            processDashboardData(resStr);
+          })
+          .withFailureHandler(err => {
+            hideLoading();
+            showAccessDeniedScreen('Unable to connect to backend server: ' + err.message);
+          })
+          .getApproverDashboardData();
+      }
+    }
+
+    /**
+     * Loads and displays the Pending Requests view.
+     * Reused both automatically on login/bootstrap and when the user clicks the "Pending Requests" button or "MY APPROVALS" card.
+     *
+     * @param {boolean} forceRefresh - If true, re-fetches latest data from server
+     */
+    function showPendingRequests(forceRefresh = false) {
+      if (forceRefresh) {
+        showLoading('Refreshing pending requests...');
+        google.script.run
+          .withSuccessHandler(resStr => {
+            hideLoading();
+            processDashboardData(resStr);
+            switchNavTab('pending');
+          })
+          .withFailureHandler(err => {
+            hideLoading();
+            showAlert('Failed to refresh data: ' + err.message, true);
+          })
+          .getApproverDashboardData();
+        return;
       }
 
-      google.script.run
-        .withSuccessHandler(resStr => {
-          hideLoading();
-          processDashboardData(resStr);
-        })
-        .withFailureHandler(err => {
-          hideLoading();
-          if (!loadedFromInitial) {
-            showAccessDeniedScreen('Unable to connect to backend server: ' + err.message);
-          }
-        })
-        .getApproverDashboardData();
+      switchNavTab('pending');
     }
 
     function processDashboardData(resInput) {
@@ -442,21 +479,10 @@
       dashboardMetrics = data.metrics || { pending: 0, approved: 0, rejected: 0, total: 0 };
       allSupervisedList = data.allSupervisedRequests || [];
       historyRequestsList = data.historyRequests || [];
+      pendingRequestsList = Array.isArray(data.pendingRequests) ? data.pendingRequests : [];
 
-      const isPendingStatus = (r) => {
-        const st = String(r.ApprovalStatus || r.Status || '').toLowerCase();
-        return !st.includes('approved') && !st.includes('reject') && !st.includes('return') && !st.includes('cancel') && !st.includes('closed');
-      };
-
-      if (Array.isArray(data.pendingRequests) && data.pendingRequests.length > 0) {
-        pendingRequestsList = data.pendingRequests.filter(isPendingStatus);
-      } else if (allSupervisedList.length > 0) {
-        pendingRequestsList = allSupervisedList.filter(isPendingStatus);
-      } else {
-        pendingRequestsList = [];
-      }
-
-      employeePortalUrl = data.employeePortalUrl || '';
+      employeePortalUrl = data.employeePortalUrl || employeePortalUrl || '';
+      participantPortalUrl = data.participantPortalUrl || participantPortalUrl || '';
 
       renderApproverIdentity(currentApprover);
       renderDashboardMetrics(dashboardMetrics);
@@ -466,7 +492,9 @@
       }
 
       document.getElementById('mainDashboardContent').style.display = 'block';
-      switchNavTab('pending');
+
+      // Automatically display Pending Requests view immediately upon login / session restore
+      showPendingRequests();
 
       // Auto-open specific request if 'id' parameter is in URL
       const urlParams = new URLSearchParams(window.location.search);
@@ -497,8 +525,6 @@
         document.getElementById('displayApproverEmail').style.display = 'none';
       }
     }
-
-
 
     function renderDashboardMetrics(m) {
       document.getElementById('statPendingCount').innerText = m.pending || 0;
@@ -567,15 +593,7 @@
       const subtitle = document.getElementById('requestCountSubtitle');
 
       if (activeTab === 'pending') {
-        let sourceList = pendingRequestsList;
-        if ((!sourceList || sourceList.length === 0) && Array.isArray(allSupervisedList) && allSupervisedList.length > 0) {
-          sourceList = allSupervisedList.filter(r => {
-            const st = String(r.ApprovalStatus || r.Status || '').toLowerCase();
-            return !st.includes('approved') && !st.includes('reject') && !st.includes('return') && !st.includes('cancel') && !st.includes('closed');
-          });
-        }
-
-        const filteredPending = filterRequests(sourceList || []);
+        const filteredPending = filterRequests(pendingRequestsList || []);
         subtitle.innerText = `Showing ${filteredPending.length} pending request(s)`;
 
         if (filteredPending.length === 0) {

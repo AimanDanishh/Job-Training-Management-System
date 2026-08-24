@@ -43,6 +43,14 @@ function getEmployeePortalUrl() {
   return url;
 }
 
+/**
+ * Returns configured Participant Portal URL from Script Properties
+ */
+function getParticipantPortalUrl() {
+  let url = getConfigProperty('PARTICIPANT_PORTAL_URL', '') || getConfigProperty('PUBLIC_PORTAL_URL', '');
+  return url;
+}
+
 
 
 function getSpreadsheetId() {

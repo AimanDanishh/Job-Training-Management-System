@@ -487,5 +487,303 @@
   .toast-success { background: #059669; border: 1px solid #34D399; }
   .toast-error   { background: #DC2626; border: 1px solid #F87171; }
   .toast-info    { background: #2563EB; border: 1px solid #60A5FA; }
+
+  /* ─────────────────────────────────────────────────────────────
+     Neomorphism Dashboard & Multi-Training View Enhancements
+     ───────────────────────────────────────────────────────────── */
+  .portal-container.dashboard-mode {
+    max-width: 980px;
+    transition: max-width 0.3s ease;
+  }
+
+  .evaluator-profile-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-raised);
+    padding: 20px 24px;
+    margin-bottom: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .evaluator-meta-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 6px;
+  }
+
+  .meta-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: var(--radius-full);
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--bg-input);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-inset);
+  }
+
+  /* Stats Grid */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .stat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-raised);
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.25s ease;
+  }
+
+  .stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+  }
+
+  .stat-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+
+  .stat-card-value {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--text-primary);
+    line-height: 1.1;
+  }
+
+  .stat-card-sub {
+    font-size: 11.5px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+  }
+
+  .stat-pending .stat-card-value { color: var(--warning); }
+  .stat-completed .stat-card-value { color: var(--success); }
+  .stat-total .stat-card-value { color: var(--primary); }
+
+  /* Section Title Bar */
+  .section-title-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  .section-title-text {
+    font-size: 17px;
+    font-weight: 800;
+    color: var(--text-primary);
+  }
+
+  /* Training Cards Grid */
+  .trainings-list-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 18px;
+    margin-bottom: 24px;
+  }
+
+  .training-neo-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-raised);
+    padding: 22px 24px;
+    transition: all 0.25s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .training-neo-card:hover {
+    box-shadow: var(--shadow-hover);
+    border-color: rgba(96, 165, 250, 0.4);
+  }
+
+  .training-neo-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .training-code-pill {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 800;
+    background: var(--primary-light);
+    color: var(--primary);
+    border: 1px solid rgba(96, 165, 250, 0.3);
+    margin-bottom: 4px;
+  }
+
+  .training-title {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--text-primary);
+    line-height: 1.3;
+  }
+
+  .training-meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    font-size: 12.5px;
+    color: var(--text-secondary);
+  }
+
+  /* Status Badges */
+  .badge-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: var(--radius-full);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .badge-unlocked {
+    background: var(--success-bg);
+    color: var(--success);
+    border: 1px solid var(--success);
+  }
+
+  .badge-countdown {
+    background: var(--warning-bg);
+    color: var(--warning);
+    border: 1px solid var(--warning);
+  }
+
+  .badge-not-started {
+    background: rgba(59, 130, 246, 0.12);
+    color: #3B82F6;
+    border: 1px solid #3B82F6;
+  }
+
+  /* Progress & Participant Chips */
+  .training-progress-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-inset);
+    font-size: 12.5px;
+  }
+
+  /* Neomorphic Action Buttons */
+  .btn-neo {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 18px;
+    border-radius: var(--radius-md);
+    font-size: 13.5px;
+    font-weight: 700;
+    cursor: pointer;
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    box-shadow: var(--shadow-raised-sm);
+    transition: all 0.2s ease;
+    text-decoration: none;
+  }
+
+  .btn-neo:hover:not(:disabled) {
+    box-shadow: var(--shadow-hover);
+    transform: translateY(-2px);
+    border-color: var(--primary);
+    color: var(--primary);
+  }
+
+  .btn-neo:active:not(:disabled) {
+    box-shadow: var(--shadow-inset);
+    transform: translateY(0);
+  }
+
+  .btn-neo-primary {
+    background: var(--btn-primary-bg);
+    color: var(--btn-primary-text);
+    border: none;
+    box-shadow: var(--shadow-raised-sm);
+  }
+
+  .btn-neo-primary:hover:not(:disabled) {
+    box-shadow: var(--shadow-hover);
+    color: var(--btn-primary-text);
+    transform: translateY(-2px);
+    filter: brightness(1.08);
+  }
+
+  .btn-neo:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  .subordinate-selector-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+
+  .subordinate-pill {
+    padding: 12px 14px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+    background: var(--bg-input);
+    box-shadow: var(--shadow-inset);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .subordinate-pill:hover {
+    border-color: var(--primary);
+  }
+
+  .subordinate-pill.active {
+    border-color: var(--primary);
+    background: var(--primary-light);
+    box-shadow: 0 0 12px rgba(96, 165, 250, 0.25);
+  }
+
+  .subordinate-pill.completed {
+    opacity: 0.75;
+    border-color: rgba(52, 211, 153, 0.4);
+  }
 </style>
 

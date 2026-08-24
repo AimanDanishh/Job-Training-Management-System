@@ -550,3 +550,24 @@ Training Type: add "On-Job Training"
    * HR email
    * Cost Centre
 
+
+
+~~Language BM/ENG for attendance form only~~
+
+~~GoldenScoop access~~
+
+
+
+Attendance Dashboard - remove the export to sheet button on top right corner
+
+Reports Page - remove the export filtered results button
+
+Add edit button for QR session, to edit session name, time and QR active or inactive, so if the participant scan the QR when the admin set the QR session to inactive, the participant cannot mark their attendance, also add a delete button to the QR session to delete the QR session (also mark as inactive if the participant scan)
+
+
+Add hyperlink to email
+
+
+
+HOD, Participant
+
