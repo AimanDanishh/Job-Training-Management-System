@@ -121,14 +121,29 @@ function getCachedOrFetch(key, fetchFn, ttlSeconds) {
 /**
  * Invalidates all caches associated with training modifications.
  */
-function invalidateTrainingCaches(trainingId) {
+function invalidateTrainingCaches(trainingInput) {
   const keysToRemove = [
     CACHE_NAMESPACES.TRAININGS_SUMMARIES,
     CACHE_NAMESPACES.DASHBOARD_REPORT,
     CACHE_NAMESPACES.DASHBOARD_BOOTSTRAP
   ];
-  if (trainingId) {
-    keysToRemove.push(CACHE_NAMESPACES.TRAINING_DETAIL_PREFIX + String(trainingId));
+  if (trainingInput) {
+    let tId = '';
+    let tCode = '';
+    if (typeof trainingInput === 'object' && trainingInput !== null) {
+      tId = String(trainingInput.ID || trainingInput.TrainingID || '').trim();
+      tCode = String(trainingInput.Code || '').trim();
+    } else {
+      tId = String(trainingInput).trim();
+    }
+    if (tId) {
+      keysToRemove.push(CACHE_NAMESPACES.TRAINING_DETAIL_PREFIX + tId);
+      keysToRemove.push('apollo:training:ss:' + tId.toLowerCase());
+    }
+    if (tCode) {
+      keysToRemove.push(CACHE_NAMESPACES.TRAINING_DETAIL_PREFIX + tCode);
+      keysToRemove.push('apollo:training:ss:' + tCode.toLowerCase());
+    }
   }
   removeCachedDataByPrefix(keysToRemove);
 }
@@ -379,6 +394,50 @@ function getEmployeeSpreadsheetId() {
 
 const DEFAULT_APOLLO_LOGO_URL = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjIyIiBmaWxsPSIjRTkxQzJEIi8+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iMjgiIGZpbGw9IiNGRkY4Q0YiIHN0cm9rZT0iI0ZFQzMwRCIgc3Ryb2tlLXdpZHRoPSIyIi8+PHRleHQgeD0iNTAiIHk9IjYxIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI5MDAiIGZvbnQtc2l6ZT0iMzIiIGZpbGw9IiNFOTFDMkQiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkE8L3RleHQ+PC9zdmc+';
 
+const LOGO_CACHE_KEYS = {
+  COMPANY_LOGO: 'apollo:admin:company_logo',
+  SYSTEM_LOGO: 'apollo:admin:system_logo'
+};
+
+function getCachedCompanyLogoDirectUrl() {
+  try {
+    const cached = getCachedData(LOGO_CACHE_KEYS.COMPANY_LOGO);
+    if (cached) return cached;
+  } catch(e) {}
+
+  const rawLogo = getCompanyLogoUrl() || '';
+  const directLogo = convertDriveLinkToDirectImageUrl(rawLogo) || rawLogo;
+  if (directLogo) {
+    try {
+      setCachedData(LOGO_CACHE_KEYS.COMPANY_LOGO, directLogo, 21600); // 6 hours TTL
+    } catch(e) {}
+  }
+  return directLogo;
+}
+
+function getCachedSystemLogoDirectUrl() {
+  try {
+    const cached = getCachedData(LOGO_CACHE_KEYS.SYSTEM_LOGO);
+    if (cached) return cached;
+  } catch(e) {}
+
+  const rawSysLogo = getSystemLogoUrl() || '';
+  const directSysLogo = rawSysLogo ? (convertDriveLinkToDirectImageUrl(rawSysLogo) || rawSysLogo) : '';
+  if (directSysLogo) {
+    try {
+      setCachedData(LOGO_CACHE_KEYS.SYSTEM_LOGO, directSysLogo, 21600); // 6 hours TTL
+    } catch(e) {}
+  }
+  return directSysLogo;
+}
+
+function invalidateLogoCaches() {
+  try {
+    removeCachedData(LOGO_CACHE_KEYS.COMPANY_LOGO);
+    removeCachedData(LOGO_CACHE_KEYS.SYSTEM_LOGO);
+  } catch(e) {}
+}
+
 function getCompanyLogoUrl() {
   const url = getConfigProperty('COMPANY_LOGO_URL', '');
   if (url && String(url).trim() !== '') return String(url).trim();
@@ -387,6 +446,7 @@ function getCompanyLogoUrl() {
 
 function setCompanyLogoUrl(url) {
   setConfigProperty('COMPANY_LOGO_URL', url);
+  invalidateLogoCaches();
   Logger.log('COMPANY_LOGO_URL updated in Project Settings: ' + url);
   return 'COMPANY_LOGO_URL set to: ' + url;
 }
@@ -399,6 +459,7 @@ function getSystemLogoUrl() {
 
 function setSystemLogoUrl(url) {
   setConfigProperty('SYSTEM_LOGO_URL', url);
+  invalidateLogoCaches();
   Logger.log('SYSTEM_LOGO_URL updated in Project Settings: ' + url);
   return 'SYSTEM_LOGO_URL set to: ' + url;
 }
@@ -866,13 +927,27 @@ function getTrainingDataSpreadsheet(trainingInput) {
     cleanId = String(trainingInput).trim();
   }
 
-  // If direct object has ParticipantsSheetID, try opening immediately
+  const cacheKey = 'apollo:training:ss:' + cleanId.toLowerCase();
+
+  // 0. Fast Cache Check: Check CacheService for resolved Spreadsheet ID
+  try {
+    const cachedSsId = getCachedData(cacheKey);
+    if (cachedSsId && String(cachedSsId).trim()) {
+      const cachedSS = SpreadsheetApp.openById(String(cachedSsId).trim());
+      if (cachedSS) return cachedSS;
+    }
+  } catch(e) {}
+
+  // 1. Direct object resolution
   if (directT && (directT.ParticipantsSheetID || directT.singleSheetId || directT.TrainingDataSheetID)) {
     const directSheetId = String(directT.ParticipantsSheetID || directT.singleSheetId || directT.TrainingDataSheetID).trim();
     if (directSheetId) {
       try {
         const ss = SpreadsheetApp.openById(directSheetId);
-        if (ss) return ss;
+        if (ss) {
+          try { setCachedData(cacheKey, directSheetId, 21600); } catch(cErr) {}
+          return ss;
+        }
       } catch(e) {}
     }
   }
@@ -889,18 +964,25 @@ function getTrainingDataSpreadsheet(trainingInput) {
   ) || directT;
   if (!t) return null;
 
-  // 1. Direct Resolution: Open by stored ParticipantsSheetID first if available
+  // 2. Direct Resolution: Open by stored ParticipantsSheetID first if available
   const storedSheetId = String(t.ParticipantsSheetID || t.singleSheetId || t.TrainingDataSheetID || '').trim();
   if (storedSheetId) {
     try {
       const ss = SpreadsheetApp.openById(storedSheetId);
-      if (ss) return ss;
+      if (ss) {
+        try {
+          setCachedData(cacheKey, storedSheetId, 21600);
+          if (t.ID) setCachedData('apollo:training:ss:' + String(t.ID).toLowerCase(), storedSheetId, 21600);
+          if (t.Code) setCachedData('apollo:training:ss:' + String(t.Code).toLowerCase(), storedSheetId, 21600);
+        } catch(cErr) {}
+        return ss;
+      }
     } catch(e) {
       Logger.log('Could not open spreadsheet directly via stored ParticipantsSheetID (' + storedSheetId + '): ' + e.message);
     }
   }
 
-  // 2. Drive Workspace Resolution: Search via FolderID or Root Folder
+  // 3. Drive Workspace Resolution: Search via FolderID or Root Folder
   try {
     let targetFolder = null;
 
@@ -930,12 +1012,18 @@ function getTrainingDataSpreadsheet(trainingInput) {
         const file = fileIter.next();
         const ss = SpreadsheetApp.openById(file.getId());
         if (ss) {
+          const foundId = file.getId();
+          try {
+            setCachedData(cacheKey, foundId, 21600);
+            if (t.ID) setCachedData('apollo:training:ss:' + String(t.ID).toLowerCase(), foundId, 21600);
+            if (t.Code) setCachedData('apollo:training:ss:' + String(t.Code).toLowerCase(), foundId, 21600);
+          } catch(cErr) {}
           // Auto-persist resolved ParticipantsSheetID to row if missing
           try {
             if (t._row) {
               const headers = ensureTrainingSheetColumns(tSheet);
               const colIdx = headers.indexOf('ParticipantsSheetID') + 1;
-              if (colIdx > 0) tSheet.getRange(t._row, colIdx).setValue(file.getId());
+              if (colIdx > 0) tSheet.getRange(t._row, colIdx).setValue(foundId);
             }
           } catch(persistErr) {}
           return ss;
@@ -943,7 +1031,7 @@ function getTrainingDataSpreadsheet(trainingInput) {
       }
     }
   } catch (e) {
-    Logger.log('Error opening per-training sheet for ' + cleanId + ': ' + e.message);
+    Logger.log('Error resolving training spreadsheet via Drive: ' + e.message);
   }
 
   return null;

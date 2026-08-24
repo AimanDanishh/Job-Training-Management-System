@@ -61,7 +61,7 @@
   </style>
 </head>
 <body>
-<div id="__trainhub_config__" style="display:none" data-config="<?!= encodeURIComponent(JSON.stringify({ page: currentPage || '', publicPortalUrl: (typeof publicPortalUrl !== 'undefined' && publicPortalUrl) ? publicPortalUrl : '', companyLogoUrl: (typeof companyLogoUrl !== 'undefined' && companyLogoUrl) ? companyLogoUrl : '' })) ?>"></div>
+<div id="__trainhub_config__" style="display:none" data-config="<?!= encodeURIComponent(JSON.stringify({ page: currentPage || '', appUrl: (typeof appUrl !== 'undefined' && appUrl) ? appUrl : '', publicPortalUrl: (typeof publicPortalUrl !== 'undefined' && publicPortalUrl) ? publicPortalUrl : '', companyLogoUrl: (typeof companyLogoUrl !== 'undefined' && companyLogoUrl) ? companyLogoUrl : '', currentUser: (typeof currentUserJson !== 'undefined' && currentUserJson) ? JSON.parse(currentUserJson) : {} })) ?>"></div>
 <div class="app-shell">
   <!-- Sidebar -->
   <?!= include('sidebar') ?>
@@ -118,7 +118,9 @@
 
       <!-- Sessions Grid -->
       <div id="sessions-grid" class="row g-3">
-        <div class="text-center p-5" style="color:#94A3B8">Loading sessions...</div>
+        <div class="col-12 col-md-6 col-lg-4 mb-3"><div class="skeleton-card" style="margin:0;padding:18px"><div class="skeleton-shimmer skeleton-title" style="width:55%;height:20px;margin-bottom:12px"></div><div class="skeleton-shimmer skeleton-text" style="width:75%;height:14px;margin-bottom:12px"></div><div class="skeleton-shimmer" style="width:140px;height:140px;border-radius:10px;margin:0 auto 14px"></div></div></div>
+        <div class="col-12 col-md-6 col-lg-4 mb-3"><div class="skeleton-card" style="margin:0;padding:18px"><div class="skeleton-shimmer skeleton-title" style="width:55%;height:20px;margin-bottom:12px"></div><div class="skeleton-shimmer skeleton-text" style="width:75%;height:14px;margin-bottom:12px"></div><div class="skeleton-shimmer" style="width:140px;height:140px;border-radius:10px;margin:0 auto 14px"></div></div></div>
+        <div class="col-12 col-md-6 col-lg-4 mb-3"><div class="skeleton-card" style="margin:0;padding:18px"><div class="skeleton-shimmer skeleton-title" style="width:55%;height:20px;margin-bottom:12px"></div><div class="skeleton-shimmer skeleton-text" style="width:75%;height:14px;margin-bottom:12px"></div><div class="skeleton-shimmer" style="width:140px;height:140px;border-radius:10px;margin:0 auto 14px"></div></div></div>
       </div>
     </main>
   </div>
@@ -333,7 +335,7 @@
 
   async function loadSessions() {
     const grid = document.getElementById('sessions-grid');
-    grid.innerHTML = '<div class="text-center p-5" style="color:#94A3B8">Loading sessions...</div>';
+    grid.innerHTML = ApolloShimmer.sessionCard() + ApolloShimmer.sessionCard() + ApolloShimmer.sessionCard();
 
     try {
       const selectedTrainingId = document.getElementById('filter-training').value;

@@ -174,7 +174,7 @@
   </style>
 </head>
 <body>
-<div id="__trainhub_config__" style="display:none" data-config="<?!= encodeURIComponent(JSON.stringify({ page: currentPage || '', publicPortalUrl: (typeof publicPortalUrl !== 'undefined' && publicPortalUrl) ? publicPortalUrl : '', systemLogoUrl: (typeof systemLogoUrl !== 'undefined' && systemLogoUrl) ? systemLogoUrl : '' })) ?>"></div>
+<div id="__trainhub_config__" style="display:none" data-config="<?!= encodeURIComponent(JSON.stringify({ page: currentPage || '', appUrl: (typeof appUrl !== 'undefined' && appUrl) ? appUrl : '', publicPortalUrl: (typeof publicPortalUrl !== 'undefined' && publicPortalUrl) ? publicPortalUrl : '', systemLogoUrl: (typeof systemLogoUrl !== 'undefined' && systemLogoUrl) ? systemLogoUrl : '', companyLogoUrl: (typeof companyLogoUrl !== 'undefined' && companyLogoUrl) ? companyLogoUrl : '', currentUser: (typeof currentUserJson !== 'undefined' && currentUserJson) ? JSON.parse(currentUserJson) : {} })) ?>"></div>
 
   <div class="login-wrapper">
     <!-- Brand Header with Logo as Primary Subject -->
@@ -297,6 +297,11 @@
     });
 
     function checkCurrentUser(autoRedirect = false) {
+      if (window.__CURRENT_USER__ && window.__CURRENT_USER__.email) {
+        handleAuthResponse(window.__CURRENT_USER__, autoRedirect);
+        return;
+      }
+
       google.script.run
         .withSuccessHandler(res => handleAuthResponse(res, autoRedirect))
         .withFailureHandler(err => {

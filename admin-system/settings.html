@@ -8,7 +8,7 @@
   <?!= include('script') ?>
 </head>
 <body>
-<div id="__trainhub_config__" style="display:none" data-config="<?!= encodeURIComponent(JSON.stringify({ page: currentPage || '', publicPortalUrl: (typeof publicPortalUrl !== 'undefined' && publicPortalUrl) ? publicPortalUrl : '', companyLogoUrl: (typeof companyLogoUrl !== 'undefined' && companyLogoUrl) ? companyLogoUrl : '' })) ?>"></div>
+<div id="__trainhub_config__" style="display:none" data-config="<?!= encodeURIComponent(JSON.stringify({ page: currentPage || '', appUrl: (typeof appUrl !== 'undefined' && appUrl) ? appUrl : '', publicPortalUrl: (typeof publicPortalUrl !== 'undefined' && publicPortalUrl) ? publicPortalUrl : '', companyLogoUrl: (typeof companyLogoUrl !== 'undefined' && companyLogoUrl) ? companyLogoUrl : '', currentUser: (typeof currentUserJson !== 'undefined' && currentUserJson) ? JSON.parse(currentUserJson) : {} })) ?>"></div>
 <div class="app-shell">
   <!-- Sidebar -->
   <?!= include('sidebar') ?>
@@ -112,7 +112,9 @@
                     </tr>
                   </thead>
                   <tbody id="tbl-sheets-body">
-                    <tr><td colspan="3" style="text-align:center; padding:16px; color:#64748B"><span class="spinner"></span> Checking sheets...</td></tr>
+                    <tr><td><div class="skeleton-shimmer skeleton-text" style="width:60%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-text" style="width:75%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-pill" style="width:70px;height:20px;margin:0"></div></td></tr>
+                    <tr><td><div class="skeleton-shimmer skeleton-text" style="width:60%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-text" style="width:75%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-pill" style="width:70px;height:20px;margin:0"></div></td></tr>
+                    <tr><td><div class="skeleton-shimmer skeleton-text" style="width:60%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-text" style="width:75%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-pill" style="width:70px;height:20px;margin:0"></div></td></tr>
                   </tbody>
                 </table>
               </div>
@@ -301,12 +303,9 @@
 
   async function loadSettingsData() {
     try {
-      showLoadingOverlay('Fetching system configuration...');
       const res = await callServer('getSettingsData');
-      hideLoadingOverlay();
       renderSettings(res);
     } catch (e) {
-      hideLoadingOverlay();
       showToast('Failed to load settings: ' + e.message, 'error');
     }
   }

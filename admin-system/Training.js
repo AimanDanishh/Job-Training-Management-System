@@ -31,28 +31,16 @@ function getTrainings() {
 
 function getTrainingById(id) {
   try {
-    const rows = autoUpdateTrainingLifecycleStages();
-    const t = rows.find(r => r.ID === id);
+    if (!id) return err('Training ID is required.');
+    const sheet = getSheet(SHEET_NAMES.trainings);
+    if (!sheet) return err(`Sheet "${SHEET_NAMES.trainings}" not found.`);
+    const rows = sheetToJson(sheet);
+    const cleanId = String(id).trim().toLowerCase();
+    const t = rows.find(r => 
+      String(r.ID || '').trim().toLowerCase() === cleanId ||
+      String(r.Code || '').trim().toLowerCase() === cleanId
+    );
     if (!t) return err('Training not found.');
-
-    // Auto-sign HR Department acknowledgment in Training Requisition Form using opening admin's info
-    try {
-      let activeEmail = '';
-      try {
-        activeEmail = Session.getActiveUser().getEmail();
-      } catch (e) {}
-      
-      const hrProfile = getHrProfileByEmail(activeEmail);
-      acknowledgeHRRequisition(id, {
-        employeeNo: hrProfile.employeeNo,
-        name: hrProfile.name,
-        position: hrProfile.position,
-        status: 'Acknowledged'
-      });
-    } catch(hrErr) {
-      Logger.log('Auto HR sign error in getTrainingById: ' + hrErr.message);
-    }
-
     return ok(t);
   } catch (e) {
     return err(e.message);
@@ -69,6 +57,13 @@ function autoUpdateTrainingLifecycleStages() {
       throw new Error(`Training database sheet "${SHEET_NAMES.trainings}" could not be found in the configured TrainHub Spreadsheet.`);
     }
     const headers = ensureTrainingSheetColumns(sheet);
+    const lastRow = sheet.getLastRow();
+    const lastCol = sheet.getLastColumn();
+    if (lastRow < 2 || lastCol < 1) {
+      return [];
+    }
+
+    const rawValues = sheet.getRange(1, 1, lastRow, lastCol).getValues();
     const rows = sheetToJson(sheet);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -77,19 +72,21 @@ function autoUpdateTrainingLifecycleStages() {
     const courseFeeCol = headers.indexOf('CourseFee') + 1;
     const statusCol = headers.indexOf('Status') + 1;
     const stageCol = headers.indexOf('Stage') + 1;
+    const partCol = headers.indexOf('Participants') + 1;
 
     let sheetModified = false;
 
     rows.forEach(t => {
       let isUpdated = false;
+      const rowIdx = (t._row && t._row >= 2) ? (t._row - 1) : -1;
 
       // Database Auto-Repair: Fix any CourseFee values corrupted by previous date timestamp overwrites
       const rawFee = String(t.CourseFee || '').trim();
       if (rawFee && (rawFee.includes(':') || rawFee.includes('2026') || rawFee.includes('Aug') || rawFee.includes('/'))) {
         const defaultFee = '0.00';
         t.CourseFee = defaultFee;
-        if (t._row && courseFeeCol > 0) {
-          sheet.getRange(t._row, courseFeeCol).setValue(defaultFee);
+        if (rowIdx >= 1 && courseFeeCol > 0 && rowIdx < rawValues.length) {
+          rawValues[rowIdx][courseFeeCol - 1] = defaultFee;
           sheetModified = true;
         }
       }
@@ -117,9 +114,8 @@ function autoUpdateTrainingLifecycleStages() {
 
         if (partCount > 0) {
           t.Participants = partCount;
-          const partCol = headers.indexOf('Participants') + 1;
-          if (t._row && partCol > 0) {
-            sheet.getRange(t._row, partCol).setValue(partCount);
+          if (rowIdx >= 1 && partCol > 0 && rowIdx < rawValues.length) {
+            rawValues[rowIdx][partCol - 1] = partCount;
             sheetModified = true;
           }
         }
@@ -210,9 +206,11 @@ function autoUpdateTrainingLifecycleStages() {
 
         if (isUpdated) {
           t._isLifecycleUpdated = true;
-          if (statusCol > 0) sheet.getRange(t._row, statusCol).setValue(t.Status);
-          if (stageCol > 0) sheet.getRange(t._row, stageCol).setValue(t.Stage);
-          if (updatedDateCol > 0) sheet.getRange(t._row, updatedDateCol).setValue(now());
+          if (rowIdx >= 1 && rowIdx < rawValues.length) {
+            if (statusCol > 0) rawValues[rowIdx][statusCol - 1] = t.Status;
+            if (stageCol > 0) rawValues[rowIdx][stageCol - 1] = t.Stage;
+            if (updatedDateCol > 0) rawValues[rowIdx][updatedDateCol - 1] = now();
+          }
           sheetModified = true;
         }
       } else {
@@ -222,7 +220,9 @@ function autoUpdateTrainingLifecycleStages() {
       }
     });
 
-    if (sheetModified) {
+    // Single Batch Write: Flush all updated rows back in one atomic call
+    if (sheetModified && rawValues.length > 1) {
+      sheet.getRange(2, 1, rawValues.length - 1, lastCol).setValues(rawValues.slice(1));
       try { SpreadsheetApp.flush(); } catch(fErr) {}
       rows.forEach(t => {
         if (t._isLifecycleUpdated && t.ID) {
@@ -772,7 +772,7 @@ function addTrainingParticipants(trainingId, participants) {
     const existingRows = sheetToJson(sheet);
     const existingEmpIds = new Set(existingRows.map(r => String(r.EmployeeID || r.ID || '').trim().toLowerCase()));
 
-    let addedCount = 0;
+    const rowsToInsert = [];
     const addedAt = now();
 
     resolution.participants.forEach(dbEmp => {
@@ -783,19 +783,27 @@ function addTrainingParticipants(trainingId, participants) {
         const empDept = dbEmp.Department;
         const empPos  = dbEmp.Position;
 
-        sheet.appendRow([
+        rowsToInsert.push([
           generateId('TP'),
           trainingId,
           empId,
           empName,
           empDept,
           empPos,
-          addedAt
+          addedAt,
+          '', // SupervisorID
+          '', // SupervisorEmail
+          ''  // SupervisorName
         ]);
         existingEmpIds.add(empIdLower);
-        addedCount++;
       }
     });
+
+    const addedCount = rowsToInsert.length;
+    if (addedCount > 0) {
+      const startRow = sheet.getLastRow() + 1;
+      sheet.getRange(startRow, 1, addedCount, rowsToInsert[0].length).setValues(rowsToInsert);
+    }
 
     const totalCount = existingEmpIds.size;
     updateTrainingParticipantCount(trainingId, totalCount);
@@ -815,6 +823,7 @@ function addTrainingParticipants(trainingId, participants) {
       Logger.log('Auto update stage error in addTrainingParticipants: ' + sErr.message);
     }
 
+    invalidateTrainingCaches(trainingId);
     return ok({ message: `Added ${addedCount} participants successfully.`, count: totalCount });
   } catch (e) {
     return err('Failed to add participants: ' + e.message);
@@ -849,6 +858,7 @@ function removeTrainingParticipant(trainingId, employeeId) {
 
     try { syncTrainingRequisitionParticipants(trainingId); } catch(e) {}
 
+    invalidateTrainingCaches(trainingId);
     return ok({ message: 'Participant removed successfully.', count: totalCount });
   } catch (e) {
     return err('Failed to remove participant: ' + e.message);
@@ -885,12 +895,14 @@ function updateTrainingParticipantCount(trainingId, count) {
  * supervisor assignments, and 3-month post-evaluations.
  * Purely read-only calculation without mutating or adding any database sheets.
  */
-function getTrainingActionNotifications() {
+function getTrainingActionNotifications(trainingsList) {
   try {
-    const tSheet = getSheet(SHEET_NAMES.trainings);
-    if (!tSheet) return ok({ count: 0, notifications: [] });
-
-    const tRows = sheetToJson(tSheet);
+    let tRows = trainingsList;
+    if (!tRows || !Array.isArray(tRows)) {
+      const tSheet = getSheet(SHEET_NAMES.trainings);
+      if (!tSheet) return ok({ count: 0, notifications: [] });
+      tRows = sheetToJson(tSheet);
+    }
     if (!tRows || tRows.length === 0) return ok({ count: 0, notifications: [] });
 
     const now = new Date();
@@ -1465,8 +1477,8 @@ function getDashboardBootstrapData() {
       }
     });
 
-    // 5. Training Action Notifications
-    const notiRes = parseServerRes(getTrainingActionNotifications());
+    // 5. Training Action Notifications (Reuses in-memory dataset to eliminate duplicate sheet reads)
+    const notiRes = parseServerRes(getTrainingActionNotifications(trainingsList));
     const notifications = (notiRes.success && notiRes.data && Array.isArray(notiRes.data.notifications)) ? notiRes.data.notifications : [];
 
     // 6. Active / Recent programmes subset for initial dashboard view (first 8)
@@ -1557,43 +1569,28 @@ function getTrainingFullDetails(trainingId) {
       }
     }
 
-    // Reconcile and synchronize sessions with central TrainingSessions tab
-    const centralSessionsMap = new Map();
-    try {
-      const mainSs = getSpreadsheet();
-      if (mainSs) {
-        const centralSessSheet = mainSs.getSheetByName('TrainingSessions') || mainSs.getSheetByName('Sessions') || mainSs.getSheetByName('Training Sessions');
-        if (centralSessSheet && centralSessSheet.getLastRow() > 1) {
-          const allC = sheetToJson(centralSessSheet);
-          const cleanTId = String(trainingId).trim().toLowerCase();
-          allC.forEach(s => {
-            const sTId = String(s.TrainingID || '').trim().toLowerCase();
-            if (sTId === cleanTId || (training.Code && sTId === String(training.Code).trim().toLowerCase()) || (training.ID && sTId === String(training.ID).trim().toLowerCase())) {
-              const sId = String(s.SessionID || s.ID || '').trim().toLowerCase();
-              if (sId) centralSessionsMap.set(sId, s);
-            }
-          });
+    // Reconcile and synchronize sessions with central TrainingSessions tab only if needed
+    if (!sessions || sessions.length === 0) {
+      const centralSessionsMap = new Map();
+      try {
+        const mainSs = getSpreadsheet();
+        if (mainSs) {
+          const centralSessSheet = mainSs.getSheetByName('TrainingSessions') || mainSs.getSheetByName('Sessions') || mainSs.getSheetByName('Training Sessions');
+          if (centralSessSheet && centralSessSheet.getLastRow() > 1) {
+            const allC = sheetToJson(centralSessSheet);
+            const cleanTId = String(trainingId).trim().toLowerCase();
+            allC.forEach(s => {
+              const sTId = String(s.TrainingID || '').trim().toLowerCase();
+              if (sTId === cleanTId || (training.Code && sTId === String(training.Code).trim().toLowerCase()) || (training.ID && sTId === String(training.ID).trim().toLowerCase())) {
+                const sId = String(s.SessionID || s.ID || '').trim().toLowerCase();
+                if (sId) centralSessionsMap.set(sId, s);
+              }
+            });
+          }
         }
+      } catch(eC) {
+        Logger.log('Central sessions load error: ' + eC.message);
       }
-    } catch(eC) {
-      Logger.log('Central sessions load error: ' + eC.message);
-    }
-
-    if (sessions && sessions.length > 0) {
-      // Merge latest central data into sessions list
-      sessions = sessions.map(s => {
-        const sId = String(s.SessionID || s.ID || '').trim().toLowerCase();
-        if (centralSessionsMap.has(sId)) {
-          return Object.assign({}, s, centralSessionsMap.get(sId));
-        }
-        return s;
-      });
-      // Append any sessions present in central tab but missing from per-training sheet
-      centralSessionsMap.forEach((cSess, sId) => {
-        const exists = sessions.some(s => String(s.SessionID || s.ID || '').trim().toLowerCase() === sId);
-        if (!exists) sessions.push(cSess);
-      });
-    } else {
       sessions = Array.from(centralSessionsMap.values());
     }
 
@@ -1613,8 +1610,8 @@ function getTrainingFullDetails(trainingId) {
       postEvals: postEvals || []
     };
 
-    // Cache with short TTL
-    setCachedData(cacheKey, fullResult, 60);
+    // Cache with 5-minute TTL
+    setCachedData(cacheKey, fullResult, 300);
 
     Logger.log(`[PERF] getTrainingFullDetails(${trainingId}) generated in ${Date.now() - startTime}ms`);
     return ok(fullResult);

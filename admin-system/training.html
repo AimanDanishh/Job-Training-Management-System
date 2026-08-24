@@ -8,7 +8,7 @@
   <?!= include('script') ?>
 </head>
 <body>
-<div id="__trainhub_config__" style="display:none" data-config="<?!= encodeURIComponent(JSON.stringify({ page: currentPage || '', publicPortalUrl: (typeof publicPortalUrl !== 'undefined' && publicPortalUrl) ? publicPortalUrl : '', companyLogoUrl: (typeof companyLogoUrl !== 'undefined' && companyLogoUrl) ? companyLogoUrl : '' })) ?>"></div>
+<div id="__trainhub_config__" style="display:none" data-config="<?!= encodeURIComponent(JSON.stringify({ page: currentPage || '', appUrl: (typeof appUrl !== 'undefined' && appUrl) ? appUrl : '', publicPortalUrl: (typeof publicPortalUrl !== 'undefined' && publicPortalUrl) ? publicPortalUrl : '', companyLogoUrl: (typeof companyLogoUrl !== 'undefined' && companyLogoUrl) ? companyLogoUrl : '', currentUser: (typeof currentUserJson !== 'undefined' && currentUserJson) ? JSON.parse(currentUserJson) : {} })) ?>"></div>
 <div class="app-shell">
   <!-- Sidebar -->
   <?!= include('sidebar') ?>
@@ -60,7 +60,11 @@
         <div id="t-count" style="font-size:12px;color:#94A3B8;margin-bottom:12px"></div>
 
         <!-- Cards grid -->
-        <div id="training-grid" class="row g-3"></div>
+        <div id="training-grid" class="row g-3">
+          <div class="col-12 col-md-6 col-lg-4 mb-3"><div class="skeleton-card" style="margin:0;padding:18px"><div class="skeleton-shimmer skeleton-pill" style="width:70px;height:22px;margin-bottom:12px"></div><div class="skeleton-shimmer skeleton-title" style="width:85%;height:22px"></div><div class="skeleton-shimmer skeleton-text" style="width:60%;height:14px"></div></div></div>
+          <div class="col-12 col-md-6 col-lg-4 mb-3"><div class="skeleton-card" style="margin:0;padding:18px"><div class="skeleton-shimmer skeleton-pill" style="width:70px;height:22px;margin-bottom:12px"></div><div class="skeleton-shimmer skeleton-title" style="width:85%;height:22px"></div><div class="skeleton-shimmer skeleton-text" style="width:60%;height:14px"></div></div></div>
+          <div class="col-12 col-md-6 col-lg-4 mb-3"><div class="skeleton-card" style="margin:0;padding:18px"><div class="skeleton-shimmer skeleton-pill" style="width:70px;height:22px;margin-bottom:12px"></div><div class="skeleton-shimmer skeleton-title" style="width:85%;height:22px"></div><div class="skeleton-shimmer skeleton-text" style="width:60%;height:14px"></div></div></div>
+        </div>
       </div>
 
       <!-- Full-Screen Detail View Section -->
@@ -253,8 +257,10 @@
     
     <!-- Tab 1: Enrolled List -->
     <div id="pm-tab-enrolled">
-      <div id="pm-enrolled-list" style="max-height:280px;overflow-y:auto;border:1px solid #E2E8F0;border-radius:8px;background:#fff">
-        <div class="p-3 text-center" style="color:#94A3B8">Loading participants...</div>
+      <div id="pm-enrolled-list" style="max-height:280px;overflow-y:auto;border:1px solid #E2E8F0;border-radius:8px;background:#fff;padding:12px">
+        <div class="skeleton-shimmer skeleton-text" style="width:100%;height:32px;border-radius:6px;margin-bottom:8px"></div>
+        <div class="skeleton-shimmer skeleton-text" style="width:100%;height:32px;border-radius:6px;margin-bottom:8px"></div>
+        <div class="skeleton-shimmer skeleton-text" style="width:100%;height:32px;border-radius:6px"></div>
       </div>
     </div>
 
@@ -282,8 +288,10 @@
         </label>
         <span id="pm-selected-count" style="color:#2563EB">0 selected</span>
       </div>
-      <div id="pm-picker-list" style="max-height:220px;overflow-y:auto;border:1px solid #CBD5E1;border-top:none;border-radius:0 0 6px 6px;background:#fff">
-        <div class="p-3 text-center" style="color:#94A3B8">Loading employees...</div>
+      <div id="pm-picker-list" style="max-height:220px;overflow-y:auto;border:1px solid #CBD5E1;border-top:none;border-radius:0 0 6px 6px;background:#fff;padding:10px">
+        <div class="skeleton-shimmer skeleton-text" style="width:100%;height:28px;border-radius:6px;margin-bottom:6px"></div>
+        <div class="skeleton-shimmer skeleton-text" style="width:100%;height:28px;border-radius:6px;margin-bottom:6px"></div>
+        <div class="skeleton-shimmer skeleton-text" style="width:100%;height:28px;border-radius:6px"></div>
       </div>
       <div style="display:flex;justify-content:flex-end;margin-top:12px">
         <button class="btn-th btn-primary btn-sm" onclick="saveSelectedParticipants()"><span class="icon sm">group_add</span>Add Selected to Training</button>
@@ -442,8 +450,8 @@
       allTrainings = cached;
       filterTrainings();
     } else {
-      if (countEl) countEl.textContent = 'Loading programmes...';
-      if (grid) grid.innerHTML = '<div class="col-12 text-center py-5" style="color:#94A3B8"><div class="spinner mb-2"></div><br>Loading programmes...</div>';
+      if (countEl) countEl.textContent = 'Syncing programmes...';
+      if (grid) grid.innerHTML = ApolloShimmer.trainingCard() + ApolloShimmer.trainingCard() + ApolloShimmer.trainingCard() + ApolloShimmer.trainingCard() + ApolloShimmer.trainingCard() + ApolloShimmer.trainingCard();
     }
     
     try {
@@ -653,7 +661,7 @@
 
           <!-- Actions -->
           <div style="display:flex;gap:6px;border-top:1px solid #F1F5F9;padding-top:12px;flex-wrap:wrap">
-            <button class="btn-th btn-primary btn-sm" style="flex:1;justify-content:center" onclick="openDetail('${t.ID}')"><span class="icon sm">open_in_new</span>Open</button>
+            <button class="btn-th btn-primary btn-sm" style="flex:1;justify-content:center" onmouseenter="prefetchTrainingDetail('${t.ID}')" ontouchstart="prefetchTrainingDetail('${t.ID}')" onclick="openDetail('${t.ID}')"><span class="icon sm">open_in_new</span>Open</button>
             <button class="btn-th btn-secondary btn-sm" onclick="openParticipantManager('${t.ID}')" title="Manage Participants"><span class="icon sm">group_add</span></button>
             ${getTrainingDataSheetButton(t)}
             ${getTrainingRequisitionButton(t)}
@@ -873,11 +881,124 @@
     }
   }
 
+  const prefetchingIds = new Set();
+  function prefetchTrainingDetail(id) {
+    if (!id || prefetchingIds.has(id)) return;
+    const cacheKey = 'training_detail_' + id;
+    if (ApolloCache.get(cacheKey)) return;
+    prefetchingIds.add(id);
+    callServer('getTrainingFullDetails', id).then(res => {
+      if (res && res.training) {
+        ApolloCache.set(cacheKey, res, 5 * 60 * 1000);
+      }
+    }).catch(() => {}).finally(() => {
+      prefetchingIds.delete(id);
+    });
+  }
+
+  function renderDetailShimmerSkeleton(t) {
+    const topActions = document.getElementById('detail-top-actions');
+    const content = document.getElementById('detail-full-content');
+    
+    if (t) {
+      const isApproved = isTrainingApproved(t);
+      const appStatusStr = t.ApprovalStatus || 'Approved';
+      const dataSheetUrl = t.trainingDataSheetUrl || (t.ParticipantsSheetID ? ('https://docs.google.com/spreadsheets/d/' + t.ParticipantsSheetID + '/edit') : '');
+      const reqUrl = t.requisitionFormUrl || (t.RequisitionFormFileID ? ('https://docs.google.com/spreadsheets/d/' + t.RequisitionFormFileID + '/edit') : '');
+      const folderUrl = t.folderUrl || (t.FolderID ? ('https://drive.google.com/drive/folders/' + t.FolderID) : '');
+      
+      topActions.innerHTML = `
+        <button class="btn-th btn-primary" ${!isApproved ? 'disabled style="opacity:0.65;cursor:not-allowed"' : ''} onclick="${isApproved ? `openCreateSessionForTraining('${t.ID}')` : `showToast('Cannot add session: Training approval status is ${appStatusStr}.', 'error')`}"><span class="icon sm">${isApproved ? 'add' : 'lock'}</span>Add Session</button>
+        <button class="btn-th btn-primary" style="background:#059669;border-color:#059669" onclick="navTo('attendance', {id:'${t.ID}'})"><span class="icon sm">fact_check</span>View Attendance</button>
+        <button class="btn-th btn-secondary" onclick="navTo('evaluation', {id:'${t.ID}'})"><span class="icon sm">rate_review</span>View Evaluations</button>
+        ${dataSheetUrl ? `<a class="btn-th" style="background:#059669;color:#fff;border:none;text-decoration:none;display:inline-flex;align-items:center;gap:4px" href="${dataSheetUrl}" target="_blank"><span class="icon sm">table_chart</span>Training Data Sheet</a>` : ''}
+        ${reqUrl ? `<a class="btn-th btn-secondary" href="${reqUrl}" target="_blank" style="text-decoration:none;display:inline-flex;align-items:center;gap:4px"><span class="icon sm">description</span>Requisition Form</a>` : ''}
+        ${folderUrl ? `<a class="btn-th btn-secondary" href="${folderUrl}" target="_blank" style="text-decoration:none;display:inline-flex;align-items:center;gap:4px"><span class="icon sm">folder</span>Drive Workspace</a>` : ''}
+        <button class="btn-th btn-secondary" onclick="editTraining('${t.ID}')"><span class="icon sm">edit</span>Edit</button>
+      `;
+
+      const cc = CAT_COLORS[t.Category] || '#2563EB';
+      content.innerHTML = `
+        <!-- Immediate Optimistic Programme Overview Header Card -->
+        <div class="skeleton-card" style="border-left:5px solid ${cc};margin-bottom:20px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px;flex-wrap:wrap">
+            <div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+                <span style="font-size:12px;font-weight:700;background:${cc}15;color:${cc};padding:3px 8px;border-radius:6px;border:1px solid ${cc}30">${t.Category || 'General'}</span>
+                <span style="font-family:monospace;font-size:12px;font-weight:700;color:#64748B;background:#F1F5F9;padding:3px 8px;border-radius:6px">${t.Code || t.ID}</span>
+                <span class="badge-th badge-blue" style="font-size:11.5px">${t.Status || 'Active'}</span>
+                ${approvalStatusBadge(t.ApprovalStatus || 'Approved')}
+              </div>
+              <h2 style="font-size:20px;font-weight:800;color:#1E293B;margin:0 0 6px">${t.Name || 'Training Programme'}</h2>
+              <div style="display:flex;gap:16px;font-size:12.5px;color:#64748B;flex-wrap:wrap">
+                <span><span class="icon sm" style="vertical-align:-2px;color:#2563EB">person</span> ${t.Trainer || '-'}</span>
+                <span><span class="icon sm" style="vertical-align:-2px;color:#2563EB">place</span> ${t.Venue || '-'}</span>
+                <span><span class="icon sm" style="vertical-align:-2px;color:#2563EB">calendar_today</span> ${t.StartDate ? formatDisplayDateRange(t.StartDate, t.EndDate) : '-'}</span>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;background:#EFF6FF;padding:6px 12px;border-radius:20px;font-size:12px;color:#1E40AF;font-weight:600">
+              <span class="spinner" style="width:14px;height:14px;border-width:2px"></span>
+              <span>Syncing live spreadsheet data...</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Shimmer KPI Summary Cards -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:14px;margin-bottom:24px">
+          <div class="skeleton-card" style="padding:16px;margin:0">
+            <div class="skeleton-shimmer skeleton-text" style="width:50%;height:12px;margin-bottom:8px"></div>
+            <div class="skeleton-shimmer skeleton-title" style="width:70%;height:28px"></div>
+          </div>
+          <div class="skeleton-card" style="padding:16px;margin:0">
+            <div class="skeleton-shimmer skeleton-text" style="width:40%;height:12px;margin-bottom:8px"></div>
+            <div class="skeleton-shimmer skeleton-title" style="width:60%;height:28px"></div>
+          </div>
+          <div class="skeleton-card" style="padding:16px;margin:0">
+            <div class="skeleton-shimmer skeleton-text" style="width:60%;height:12px;margin-bottom:8px"></div>
+            <div class="skeleton-shimmer skeleton-title" style="width:80%;height:28px"></div>
+          </div>
+          <div class="skeleton-card" style="padding:16px;margin:0">
+            <div class="skeleton-shimmer skeleton-text" style="width:45%;height:12px;margin-bottom:8px"></div>
+            <div class="skeleton-shimmer skeleton-title" style="width:65%;height:28px"></div>
+          </div>
+        </div>
+
+        <!-- Shimmer Data Table Placeholder -->
+        <div class="skeleton-card" style="padding:20px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <div class="skeleton-shimmer skeleton-title" style="width:200px;height:20px;margin:0"></div>
+            <div class="skeleton-shimmer skeleton-pill" style="width:100px;height:30px"></div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div class="skeleton-shimmer skeleton-text" style="width:100%;height:38px;border-radius:8px"></div>
+            <div class="skeleton-shimmer skeleton-text" style="width:100%;height:38px;border-radius:8px"></div>
+            <div class="skeleton-shimmer skeleton-text" style="width:100%;height:38px;border-radius:8px"></div>
+            <div class="skeleton-shimmer skeleton-text" style="width:100%;height:38px;border-radius:8px"></div>
+          </div>
+        </div>
+      `;
+    } else {
+      topActions.innerHTML = '<div class="skeleton-shimmer skeleton-pill" style="width:120px;height:34px"></div>';
+      content.innerHTML = `
+        <div class="skeleton-card" style="margin-bottom:20px">
+          <div class="skeleton-shimmer skeleton-title" style="width:60%;height:28px;margin-bottom:12px"></div>
+          <div class="skeleton-shimmer skeleton-text" style="width:40%;height:14px"></div>
+        </div>
+        <div class="skeleton-card" style="padding:20px">
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div class="skeleton-shimmer skeleton-text" style="width:100%;height:40px"></div>
+            <div class="skeleton-shimmer skeleton-text" style="width:100%;height:40px"></div>
+            <div class="skeleton-shimmer skeleton-text" style="width:100%;height:40px"></div>
+          </div>
+        </div>
+      `;
+    }
+  }
+
   async function openDetail(id, forceFresh = false) {
     currentPmTrainingId = id;
     document.getElementById('training-list-section').style.display = 'none';
     const detailSection = document.getElementById('training-detail-section');
-    const content = document.getElementById('detail-full-content');
     detailSection.style.display = 'block';
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
@@ -898,7 +1019,9 @@
         cached.postEvals || []
       );
     } else {
-      content.innerHTML = '<div class="text-center py-5" style="color:#94A3B8"><div class="spinner mb-2"></div><br>Loading programme details from Training Data sheet...</div>';
+      // 0ms Instant Optimistic Shell + Shimmer Skeleton
+      const basicT = (Array.isArray(allTrainings) ? allTrainings.find(x => String(x.ID) === String(id) || String(x.Code) === String(id)) : null);
+      renderDetailShimmerSkeleton(basicT);
     }
 
     // 2. Authoritative Single Composite Request (1 sheet open on server)

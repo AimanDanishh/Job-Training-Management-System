@@ -19,7 +19,7 @@
   </style>
 </head>
 <body>
-<div id="__trainhub_config__" style="display:none" data-config="<?!= encodeURIComponent(JSON.stringify({ page: currentPage || '', publicPortalUrl: (typeof publicPortalUrl !== 'undefined' && publicPortalUrl) ? publicPortalUrl : '', companyLogoUrl: (typeof companyLogoUrl !== 'undefined' && companyLogoUrl) ? companyLogoUrl : '' })) ?>"></div>
+<div id="__trainhub_config__" style="display:none" data-config="<?!= encodeURIComponent(JSON.stringify({ page: currentPage || '', appUrl: (typeof appUrl !== 'undefined' && appUrl) ? appUrl : '', publicPortalUrl: (typeof publicPortalUrl !== 'undefined' && publicPortalUrl) ? publicPortalUrl : '', companyLogoUrl: (typeof companyLogoUrl !== 'undefined' && companyLogoUrl) ? companyLogoUrl : '', currentUser: (typeof currentUserJson !== 'undefined' && currentUserJson) ? JSON.parse(currentUserJson) : {} })) ?>"></div>
 <div class="app-shell">
   <!-- Sidebar -->
   <?!= include('sidebar') ?>
@@ -692,6 +692,16 @@
     document.getElementById('eval-subtabs').style.display = 'flex';
     document.getElementById('eval-tid').value  = id;
     document.getElementById('post-tid').value  = id;
+
+    // Shimmer skeleton loading state
+    document.getElementById('eval-summary').style.display = 'flex';
+    document.getElementById('e-completed').innerHTML = '<div class="skeleton-shimmer skeleton-text" style="width:30px;height:24px;margin:0 auto"></div>';
+    document.getElementById('e-avg').innerHTML = '<div class="skeleton-shimmer skeleton-text" style="width:60px;height:24px;margin:0 auto"></div>';
+    document.getElementById('e-response-rate').innerHTML = '<div class="skeleton-shimmer skeleton-text" style="width:40px;height:24px;margin:0 auto"></div>';
+    const pb2w = document.getElementById('post-eval-2week-tbody');
+    if (pb2w) pb2w.innerHTML = ApolloShimmer.tableRows(6, 4);
+    const etb = document.getElementById('eval-tbody');
+    if (etb) etb.innerHTML = ApolloShimmer.tableRows(8, 4);
 
     try {
       const [sum, evals, posts, attendedRes, qrData, tObj] = await Promise.all([

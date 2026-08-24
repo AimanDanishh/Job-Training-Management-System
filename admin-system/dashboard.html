@@ -8,7 +8,7 @@
   <?!= include('script') ?>
 </head>
 <body>
-<div id="__trainhub_config__" style="display:none" data-config="<?!= encodeURIComponent(JSON.stringify({ page: currentPage || '', publicPortalUrl: (typeof publicPortalUrl !== 'undefined' && publicPortalUrl) ? publicPortalUrl : '', companyLogoUrl: (typeof companyLogoUrl !== 'undefined' && companyLogoUrl) ? companyLogoUrl : '' })) ?>"></div>
+<div id="__trainhub_config__" style="display:none" data-config="<?!= encodeURIComponent(JSON.stringify({ page: currentPage || '', appUrl: (typeof appUrl !== 'undefined' && appUrl) ? appUrl : '', publicPortalUrl: (typeof publicPortalUrl !== 'undefined' && publicPortalUrl) ? publicPortalUrl : '', companyLogoUrl: (typeof companyLogoUrl !== 'undefined' && companyLogoUrl) ? companyLogoUrl : '', currentUser: (typeof currentUserJson !== 'undefined' && currentUserJson) ? JSON.parse(currentUserJson) : {} })) ?>"></div>
 <div class="app-shell">
   <!-- Sidebar -->
   <?!= include('sidebar') ?>
@@ -176,8 +176,21 @@
         </div>
 
         <div id="dash-action-notifications-list" style="display:flex; flex-direction:column; gap:10px">
-          <div style="padding:20px 16px; text-align:center; background:#F8FAFC; border:1px dashed #CBD5E1; border-radius:10px">
-            <div style="font-size:13px; font-weight:600; color:#64748B">Checking training actions...</div>
+          <div class="skeleton-card" style="padding:14px 18px;margin:0">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <div class="skeleton-shimmer skeleton-pill" style="width:100px;height:20px"></div>
+              <div class="skeleton-shimmer skeleton-text" style="width:60px;height:12px;margin:0"></div>
+            </div>
+            <div class="skeleton-shimmer skeleton-title" style="width:75%;height:18px;margin-bottom:6px"></div>
+            <div class="skeleton-shimmer skeleton-text" style="width:90%;height:13px;margin-bottom:0"></div>
+          </div>
+          <div class="skeleton-card" style="padding:14px 18px;margin:0">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <div class="skeleton-shimmer skeleton-pill" style="width:90px;height:20px"></div>
+              <div class="skeleton-shimmer skeleton-text" style="width:60px;height:12px;margin:0"></div>
+            </div>
+            <div class="skeleton-shimmer skeleton-title" style="width:65%;height:18px;margin-bottom:6px"></div>
+            <div class="skeleton-shimmer skeleton-text" style="width:80%;height:13px;margin-bottom:0"></div>
           </div>
         </div>
       </div>
@@ -218,21 +231,29 @@
         </div>
       </div>
 
-      <!-- Quick Actions Bar -->
-      <div class="card-th mb-4">
-        <div class="section-label" style="margin-bottom:12px">Quick Actions & Shortcuts</div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <!-- Quick Actions Grid -->
+      <div class="card-th mb-4" style="border-left:4px solid #D97706; background:#FFFDF7">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px">
+          <div style="display:flex; align-items:center; gap:8px">
+            <span class="icon" style="color:#D97706">bolt</span>
+            <span style="font-size:14px; font-weight:700; color:#92400E">Operations & Quick Actions</span>
+          </div>
+          <button class="btn-th btn-sm" style="background:#D97706; color:#fff; border:none" onclick="navTo('evaluation')">
+            <span class="icon sm">rate_review</span> Open Evaluation Center
+          </button>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:10px">
           <button class="btn-th" style="background:#EFF6FF;color:#2563EB;border:1px solid #BFDBFE" onclick="navTo('training')">
-            <span class="icon sm">add_circle</span> New Programme
+            <span class="icon sm">school</span> View All Trainings
           </button>
           <button class="btn-th" style="background:#F0FDF4;color:#16A34A;border:1px solid #BBF7D0" onclick="navTo('attendance')">
-            <span class="icon sm">fact_check</span> Attendance Logs
+            <span class="icon sm">fact_check</span> Attendance Portal
           </button>
           <button class="btn-th" style="background:#FFFBEB;color:#D97706;border:1px solid #FDE68A" onclick="navTo('evaluation')">
-            <span class="icon sm">rate_review</span> Evaluation Forms
+            <span class="icon sm">rate_review</span> Evaluation Portal
           </button>
           <button class="btn-th" style="background:#F5F3FF;color:#7C3AED;border:1px solid #DDD6FE" onclick="navTo('report')">
-            <span class="icon sm">bar_chart</span> Requisition & Reports
+            <span class="icon sm">bar_chart</span> Generate Reports
           </button>
         </div>
       </div>
@@ -246,8 +267,10 @@
               <span style="font-size:14px;font-weight:700;color:#1E293B">Active & Upcoming Programmes</span>
               <button class="btn-th btn-secondary btn-sm" onclick="navTo('training')">View All</button>
             </div>
-            <div id="active-programmes">
-              <div class="empty-state"><span class="icon">school</span><p style="color:#94A3B8">Loading programmes...</p></div>
+            <div id="active-programmes" style="padding:16px">
+              <div class="skeleton-shimmer skeleton-text" style="width:100%;height:38px;border-radius:8px;margin-bottom:10px"></div>
+              <div class="skeleton-shimmer skeleton-text" style="width:100%;height:38px;border-radius:8px;margin-bottom:10px"></div>
+              <div class="skeleton-shimmer skeleton-text" style="width:100%;height:38px;border-radius:8px"></div>
             </div>
           </div>
         </div>
@@ -259,8 +282,10 @@
               <span style="font-size:14px;font-weight:700;color:#1E293B">Recent System Activities</span>
               <span style="font-size:11px;color:#22C55E;font-weight:600">* Live Updates</span>
             </div>
-            <div id="activity-feed" style="padding:4px 0">
-              <div class="p-4 text-center" style="color:#94A3B8"><div class="spinner mb-2"></div><br>Loading recent activities...</div>
+            <div id="activity-feed" style="padding:16px">
+              <div class="skeleton-shimmer skeleton-text" style="width:90%;height:18px;margin-bottom:10px"></div>
+              <div class="skeleton-shimmer skeleton-text" style="width:75%;height:18px;margin-bottom:10px"></div>
+              <div class="skeleton-shimmer skeleton-text" style="width:85%;height:18px"></div>
             </div>
           </div>
         </div>

@@ -77,22 +77,30 @@ function generateMissingQRCodes(forceRegenerate = false) {
       const attUrlIdx = findIndex(['AttendanceURL', 'Attendance URL', 'Attendance_URL', 'AttURL']);
       const qrUrlIdx = findIndex(['QRCodeURL', 'QR Code URL', 'QR_Code_URL', 'QRCode', 'QRURL']);
       if (sessionIdx === -1 || attUrlIdx === -1 || qrUrlIdx === -1) return;
+      let sheetUpdated = false;
       for (let i = 1; i < data.length; i++) {
         const sessionId = String(data[i][sessionIdx]).trim();
         if (!sessionId) continue;
         let attUrl = data[i][attUrlIdx];
         let qrUrl = data[i][qrUrlIdx];
-        let updated = false;
+        let rowUpdated = false;
         if (!attUrl || String(attUrl).trim() === '') {
           attUrl = generateAttendanceURL(sessionId);
-          sheet.getRange(i + 1, attUrlIdx + 1).setValue(attUrl);
-          updated = true;
+          data[i][attUrlIdx] = attUrl;
+          rowUpdated = true;
         }
         if (forceRegenerate || !qrUrl || String(qrUrl).trim() === '') {
-          sheet.getRange(i + 1, qrUrlIdx + 1).setValue(generateQRCode(attUrl || generateAttendanceURL(sessionId)));
-          updated = true;
+          qrUrl = generateQRCode(attUrl || generateAttendanceURL(sessionId));
+          data[i][qrUrlIdx] = qrUrl;
+          rowUpdated = true;
         }
-        if (updated) updatedCount++;
+        if (rowUpdated) {
+          updatedCount++;
+          sheetUpdated = true;
+        }
+      }
+      if (sheetUpdated && data.length > 1) {
+        sheet.getRange(2, 1, data.length - 1, headers.length).setValues(data.slice(1));
       }
     });
 

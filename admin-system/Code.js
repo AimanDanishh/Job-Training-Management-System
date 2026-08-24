@@ -16,8 +16,28 @@ function doGet(e) {
     'report', 'session', 'settings', 'employee'
   ];
 
-  const safePage = allowedPages.includes(page) ? page : 'index';
+  let safePage = allowedPages.includes(page) ? page : 'index';
   const appTitle = getConfigProperty('APP_TITLE', 'TrainHub - Training Management System');
+
+  // Authoritative server-side identity and access verification
+  let currentUser = { success: false, authenticated: false, message: 'Not authenticated.' };
+  try {
+    currentUser = verifyGoogleUser();
+  } catch(uErr) {
+    currentUser = { success: false, authenticated: false, message: uErr.message };
+  }
+
+  // Server-Side Route Guard:
+  // 1. 'index' is always public (login / access-denied screen).
+  // 2. 'attendance' is publicly accessible only when 'session' parameter is provided (participant QR check-in flow).
+  // 3. All other administrative pages require authenticated === true.
+  const isParticipantAttendance = (safePage === 'attendance' && e && e.parameter && e.parameter.session);
+  const isAuthorized = currentUser && currentUser.authenticated === true;
+
+  if (safePage !== 'index' && !isParticipantAttendance && !isAuthorized) {
+    Logger.log(`[AUTH GUARD] Unauthorized access blocked for page: "${safePage}" by user: "${currentUser.email || 'anonymous'}". Redirecting to index.`);
+    safePage = 'index';
+  }
 
   try {
     const template = HtmlService.createTemplateFromFile(safePage);
@@ -27,17 +47,24 @@ function doGet(e) {
     template.queryParams = (e && e.parameter) ? JSON.stringify(e.parameter) : '{}';
     const rawPublicUrl = getPublicPortalUrl() || '';
     template.publicPortalUrl = String(rawPublicUrl);
+    let appUrl = '';
     try {
-      const rawLogo = getCompanyLogoUrl() || '';
-      const directLogo = convertDriveLinkToDirectImageUrl(rawLogo) || '';
-      template.companyLogoUrl = String(directLogo);
+      appUrl = ScriptApp.getService().getUrl();
+    } catch(urlErr) {
+      appUrl = rawPublicUrl;
+    }
+    template.appUrl = String(appUrl || '');
+    // Inject server-side authenticated user profile to avoid redundant startup network calls
+    template.currentUserJson = JSON.stringify(currentUser || {});
+
+    // High-performance cached logo resolution
+    try {
+      template.companyLogoUrl = String(getCachedCompanyLogoDirectUrl() || '');
     } catch(logoErr) {
       template.companyLogoUrl = '';
     }
     try {
-      const rawSysLogo = getSystemLogoUrl() || '';
-      const directSysLogo = rawSysLogo ? (convertDriveLinkToDirectImageUrl(rawSysLogo) || rawSysLogo) : '';
-      template.systemLogoUrl = String(directSysLogo);
+      template.systemLogoUrl = String(getCachedSystemLogoDirectUrl() || '');
     } catch(sysLogoErr) {
       template.systemLogoUrl = '';
     }
@@ -216,9 +243,10 @@ function saveSettings(data) {
       setConfigProperty('APP_TITLE', String(data.appTitle).trim());
     }
 
-    // Invalidate cached spreadsheet objects so new IDs take effect immediately
+    // Invalidate cached spreadsheet objects and logo caches so new settings take effect immediately
     if (typeof _cachedSpreadsheet !== 'undefined') _cachedSpreadsheet = null;
     if (typeof _cachedEmployeeSpreadsheet !== 'undefined') _cachedEmployeeSpreadsheet = null;
+    if (typeof invalidateLogoCaches === 'function') invalidateLogoCaches();
 
     Logger.log('System settings successfully saved to Script Properties.');
     return getSettingsData();

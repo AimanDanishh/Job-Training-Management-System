@@ -241,7 +241,7 @@
   </style>
 </head>
 <body>
-<div id="__trainhub_config__" style="display:none" data-config="<?!= encodeURIComponent(JSON.stringify({ page: currentPage || '', publicPortalUrl: (typeof publicPortalUrl !== 'undefined' && publicPortalUrl) ? publicPortalUrl : '', companyLogoUrl: (typeof companyLogoUrl !== 'undefined' && companyLogoUrl) ? companyLogoUrl : '' })) ?>"></div>
+<div id="__trainhub_config__" style="display:none" data-config="<?!= encodeURIComponent(JSON.stringify({ page: currentPage || '', appUrl: (typeof appUrl !== 'undefined' && appUrl) ? appUrl : '', publicPortalUrl: (typeof publicPortalUrl !== 'undefined' && publicPortalUrl) ? publicPortalUrl : '', companyLogoUrl: (typeof companyLogoUrl !== 'undefined' && companyLogoUrl) ? companyLogoUrl : '', currentUser: (typeof currentUserJson !== 'undefined' && currentUserJson) ? JSON.parse(currentUserJson) : {} })) ?>"></div>
 <div class="app-shell">
   <!-- Sidebar -->
   <?!= include('sidebar') ?>
@@ -468,12 +468,9 @@
                 </tr>
               </thead>
               <tbody id="mgmt-table-tbody">
-                <tr>
-                  <td colspan="10" class="text-center p-4" style="color:#94A3B8">
-                    <div class="spinner" style="margin:0 auto 8px; width:24px; height:24px; border-color:rgba(37,99,235,0.2); border-top-color:#2563EB"></div>
-                    Loading training records...
-                  </td>
-                </tr>
+                <tr><td><div class="skeleton-shimmer skeleton-text" style="width:50%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-text" style="width:75%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-text" style="width:65%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-text" style="width:60%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-text" style="width:70%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-text" style="width:50%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-text" style="width:60%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-pill" style="width:60px;height:20px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-pill" style="width:70px;height:20px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-pill" style="width:60px;height:24px;margin:0"></div></td></tr>
+                <tr><td><div class="skeleton-shimmer skeleton-text" style="width:50%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-text" style="width:75%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-text" style="width:65%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-text" style="width:60%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-text" style="width:70%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-text" style="width:50%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-text" style="width:60%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-pill" style="width:60px;height:20px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-pill" style="width:70px;height:20px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-pill" style="width:60px;height:24px;margin:0"></div></td></tr>
+                <tr><td><div class="skeleton-shimmer skeleton-text" style="width:50%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-text" style="width:75%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-text" style="width:65%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-text" style="width:60%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-text" style="width:70%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-text" style="width:50%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-text" style="width:60%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-pill" style="width:60px;height:20px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-pill" style="width:70px;height:20px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-pill" style="width:60px;height:24px;margin:0"></div></td></tr>
               </tbody>
             </table>
           </div>
@@ -689,9 +686,8 @@
               </tr>
             </thead>
             <tbody id="sync-history-tbody">
-              <tr>
-                <td colspan="8" class="text-center p-4" style="color:#94A3B8">Loading sync history...</td>
-              </tr>
+              <tr><td><div class="skeleton-shimmer skeleton-text" style="width:40%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-text" style="width:75%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-text" style="width:60%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-text" style="width:70%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-pill" style="width:60px;height:20px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-pill" style="width:70px;height:20px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-text" style="width:50%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-pill" style="width:50px;height:24px;margin:0"></div></td></tr>
+              <tr><td><div class="skeleton-shimmer skeleton-text" style="width:40%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-text" style="width:75%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-text" style="width:60%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-text" style="width:70%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-pill" style="width:60px;height:20px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-pill" style="width:70px;height:20px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-text" style="width:50%;height:16px;margin:0"></div></td><td><div class="skeleton-shimmer skeleton-pill" style="width:50px;height:24px;margin:0"></div></td></tr>
             </tbody>
           </table>
         </div>

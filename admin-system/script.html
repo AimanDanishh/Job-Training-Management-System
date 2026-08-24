@@ -16,13 +16,48 @@ function readTrainHubConfig() {
         cfg = JSON.parse(decodeURIComponent(raw));
         window.__TRAINHUB_CONFIG__ = cfg;
         if (cfg.page) window.__TRAINHUB_PAGE__ = cfg.page;
-        if (cfg.publicPortalUrl) window.__PUBLIC_PORTAL_URL__ = cfg.publicPortalUrl;
+        if (cfg.appUrl) {
+          window.__APP_URL__ = cfg.appUrl;
+          _cachedBaseUrl = cfg.appUrl;
+        }
+        if (cfg.publicPortalUrl) {
+          window.__PUBLIC_PORTAL_URL__ = cfg.publicPortalUrl;
+          if (!_cachedBaseUrl) _cachedBaseUrl = cfg.publicPortalUrl;
+        }
         if (cfg.companyLogoUrl) window.__COMPANY_LOGO_URL__ = cfg.companyLogoUrl;
         if (cfg.systemLogoUrl) window.__SYSTEM_LOGO_URL__ = cfg.systemLogoUrl;
+        if (cfg.currentUser) window.__CURRENT_USER__ = cfg.currentUser;
       }
     } catch(e) {}
   }
+  enforceAuthGuard();
   return cfg;
+}
+
+function enforceAuthGuard() {
+  try {
+    const cfg = window.__TRAINHUB_CONFIG__ || {};
+    const page = cfg.page || window.__TRAINHUB_PAGE__ || 'dashboard';
+    const hasSession = cfg.sessionParam || (typeof window !== 'undefined' && window.location && window.location.search && window.location.search.includes('session='));
+    
+    // Public pages: 'index' (login) and 'attendance' with participant check-in session parameter
+    if (page === 'index' || (page === 'attendance' && hasSession)) {
+      return;
+    }
+
+    const user = window.__CURRENT_USER__;
+    if (!user || user.authenticated !== true) {
+      console.warn('[ApolloAuthGuard] Unauthorized client route access blocked for page: ' + page);
+      const base = window.__APP_URL__ || window.__PUBLIC_PORTAL_URL__ || '';
+      const cleanBase = base ? base.split('?')[0] : '';
+      const targetUrl = (cleanBase || window.location.href.split('?')[0]) + '?page=index';
+      try {
+        window.open(targetUrl, '_top');
+      } catch(e) {
+        window.location.href = targetUrl;
+      }
+    }
+  } catch(guardErr) {}
 }
 
 (function() {
@@ -80,6 +115,87 @@ const ApolloCache = {
     } catch(e) {}
   }
 };
+window.ApolloCache = ApolloCache;
+
+// ===============================================================================
+// ApolloShimmer - Global Shimmer Skeleton Component Generator
+// ===============================================================================
+const ApolloShimmer = {
+  statCard: () => `
+    <div class="skeleton-card" style="padding:16px;margin:0">
+      <div class="skeleton-shimmer skeleton-text" style="width:45%;height:12px;margin-bottom:10px"></div>
+      <div class="skeleton-shimmer skeleton-title" style="width:65%;height:28px;margin-bottom:0"></div>
+    </div>
+  `,
+
+  trainingCard: () => `
+    <div class="col-12 col-md-6 col-lg-4 mb-3">
+      <div class="skeleton-card" style="margin:0;padding:18px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div class="skeleton-shimmer skeleton-pill" style="width:70px;height:22px"></div>
+          <div class="skeleton-shimmer skeleton-pill" style="width:50px;height:22px"></div>
+        </div>
+        <div class="skeleton-shimmer skeleton-title" style="width:85%;height:22px;margin-bottom:10px"></div>
+        <div class="skeleton-shimmer skeleton-text" style="width:60%;height:14px;margin-bottom:8px"></div>
+        <div class="skeleton-shimmer skeleton-text" style="width:50%;height:14px;margin-bottom:14px"></div>
+        <div style="border-top:1px solid #F1F5F9;padding-top:12px;display:flex;gap:8px">
+          <div class="skeleton-shimmer skeleton-pill" style="flex:1;height:32px"></div>
+          <div class="skeleton-shimmer skeleton-pill" style="width:36px;height:32px"></div>
+        </div>
+      </div>
+    </div>
+  `,
+
+  sessionCard: () => `
+    <div class="col-12 col-md-6 col-lg-4 mb-3">
+      <div class="skeleton-card" style="margin:0;padding:18px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div class="skeleton-shimmer skeleton-title" style="width:55%;height:20px;margin:0"></div>
+          <div class="skeleton-shimmer skeleton-pill" style="width:60px;height:22px"></div>
+        </div>
+        <div class="skeleton-shimmer skeleton-text" style="width:75%;height:14px;margin-bottom:8px"></div>
+        <div class="skeleton-shimmer skeleton-text" style="width:60%;height:14px;margin-bottom:14px"></div>
+        <div style="display:flex;justify-content:center;margin-bottom:14px">
+          <div class="skeleton-shimmer" style="width:140px;height:140px;border-radius:10px"></div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <div class="skeleton-shimmer skeleton-pill" style="flex:1;height:32px"></div>
+        </div>
+      </div>
+    </div>
+  `,
+
+  tableRows: (cols = 5, rows = 5) => {
+    let html = '';
+    for (let r = 0; r < rows; r++) {
+      html += '<tr>';
+      for (let c = 0; c < cols; c++) {
+        const width = c === 0 ? '40%' : (c === 1 ? '75%' : (c === cols - 1 ? '50%' : '65%'));
+        html += `<td><div class="skeleton-shimmer skeleton-text" style="width:${width};height:16px;margin:0"></div></td>`;
+      }
+      html += '</tr>';
+    }
+    return html;
+  },
+
+  notificationList: (count = 3) => {
+    let html = '';
+    for (let i = 0; i < count; i++) {
+      html += `
+        <div class="skeleton-card" style="padding:14px 18px;margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div class="skeleton-shimmer skeleton-pill" style="width:90px;height:20px"></div>
+            <div class="skeleton-shimmer skeleton-text" style="width:60px;height:12px;margin:0"></div>
+          </div>
+          <div class="skeleton-shimmer skeleton-title" style="width:75%;height:18px;margin-bottom:6px"></div>
+          <div class="skeleton-shimmer skeleton-text" style="width:90%;height:13px;margin-bottom:0"></div>
+        </div>
+      `;
+    }
+    return html;
+  }
+};
+window.ApolloShimmer = ApolloShimmer;
 
 // ===============================================================================
 // Shared Utilities & Global Overlays
@@ -120,24 +236,13 @@ function hideLoadingOverlay() {
 // --- google.script.run wrapper (returns a Promise) ---------------------------
 function callServer(fnName, ...args) {
   return new Promise((resolve, reject) => {
-    let loaderTimer = setTimeout(() => {
-      showLoadingOverlay('Communicating with server...');
-    }, 400);
-
-    const cleanup = () => {
-      clearTimeout(loaderTimer);
-      hideLoadingOverlay();
-    };
-
     if (typeof google === 'undefined' || !google.script || !google.script.run) {
-      cleanup();
       reject(new Error('Google Apps Script runtime environment not detected. Please run this web application from your deployed Apps Script URL.'));
       return;
     }
 
     const runner = google.script.run
       .withSuccessHandler(raw => {
-        cleanup();
         try {
           const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
           if (res && res.success === false) reject(new Error(res.message || 'Server error'));
@@ -145,19 +250,16 @@ function callServer(fnName, ...args) {
         } catch(e) { reject(e); }
       })
       .withFailureHandler(e => {
-        cleanup();
         reject(new Error(e.message || String(e)));
       });
 
     try {
       if (typeof runner[fnName] !== 'function') {
-        cleanup();
         reject(new Error(`Server function '${fnName}' does not exist on google.script.run.`));
         return;
       }
       runner[fnName](...args);
     } catch(e) {
-      cleanup();
       reject(e);
     }
   });
@@ -218,13 +320,70 @@ function getQueryParam(name) {
   return null;
 }
 
+// --- Topbar Navigation Progress Controller (YouTube / NProgress style) -------
+let _navProgressTimer = null;
+function startNavProgress(targetPage) {
+  let bar = document.getElementById('apollo-nav-progress');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'apollo-nav-progress';
+    document.body.appendChild(bar);
+  }
+  
+  // Highlight clicked sidebar item immediately
+  try {
+    const navItems = document.querySelectorAll('.nav-item');
+    navItems.forEach(item => {
+      if (item.getAttribute('data-page') === targetPage) {
+        item.classList.add('nav-navigating');
+      } else {
+        item.classList.remove('nav-navigating');
+      }
+    });
+  } catch(e) {}
+
+  bar.style.width = '0%';
+  bar.classList.add('active');
+  
+  if (_navProgressTimer) clearInterval(_navProgressTimer);
+  
+  let progress = 18;
+  bar.style.width = progress + '%';
+  
+  _navProgressTimer = setInterval(() => {
+    if (progress < 65) {
+      progress += 14;
+    } else if (progress < 88) {
+      progress += 3.5;
+    } else {
+      progress += 0.4;
+    }
+    if (bar) bar.style.width = Math.min(progress, 96) + '%';
+  }, 100);
+}
+
+function stopNavProgress() {
+  if (_navProgressTimer) clearInterval(_navProgressTimer);
+  const bar = document.getElementById('apollo-nav-progress');
+  if (bar) {
+    bar.style.width = '100%';
+    setTimeout(() => {
+      bar.classList.remove('active');
+      bar.style.width = '0%';
+    }, 250);
+  }
+}
+
 // --- Navigate to page --------------------------------------------------------
-let _cachedBaseUrl = null;
 function navTo(page, params) {
   // Clean up timers when navigating
   if (window.CountdownTimerManager) {
     window.CountdownTimerManager.stop();
   }
+
+  // 1. Instant Visual Feedback (<10ms)
+  startNavProgress(page);
+
   const navigate = (base) => {
     if (!base) return;
     const cleanBase = String(base || '').split('?')[0];
@@ -237,6 +396,7 @@ function navTo(page, params) {
       window.location.href = url;
     }
   };
+
   if (_cachedBaseUrl) {
     navigate(_cachedBaseUrl);
     return;
@@ -822,6 +982,15 @@ function formatMinimalistDate(dateVal) {
   return str.split('T')[0] || '-';
 }
 
+function formatDisplayDateRange(startDateVal, endDateVal) {
+  if (!startDateVal) return '-';
+  const startStr = formatMinimalistDate(startDateVal);
+  if (!endDateVal) return startStr;
+  const endStr = formatMinimalistDate(endDateVal);
+  if (!endStr || startStr === endStr) return startStr;
+  return `${startStr} - ${endStr}`;
+}
+
 function toInputDateStr(val) {
   if (!val) return '';
   const str = String(val).replace(/GMT.*$/, '').replace(/\(.*\)$/, '').trim();
@@ -1030,29 +1199,42 @@ function initSidebarState() {
 }
 
 // --- Real User Profile Loader ------------------------------------------------
-function loadRealUserProfile() {
-  callServer('getCurrentUser').then(user => {
-    if (user && user.email) {
-      const nameEl = document.getElementById('sidebar-user-name');
-      const emailEl = document.getElementById('sidebar-user-email');
-      const avatarEl = document.getElementById('sidebar-user-avatar');
+function applyUserProfile(user) {
+  if (user && (user.email || user.name)) {
+    const nameEl = document.getElementById('sidebar-user-name');
+    const emailEl = document.getElementById('sidebar-user-email');
+    const avatarEl = document.getElementById('sidebar-user-avatar');
 
-      const emailStr = user.email;
-      let nameStr = user.name;
-      if (!nameStr) {
-        const localPart = emailStr.split('@')[0] || 'User';
-        nameStr = localPart.replace(/[\._\-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-      }
-
-      if (nameEl) nameEl.textContent = nameStr;
-      if (emailEl) emailEl.textContent = emailStr;
-
-      if (avatarEl) {
-        const initials = nameStr.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase() || 'AD';
-        avatarEl.textContent = initials;
-        avatarEl.title = `${nameStr} (${emailStr})`;
-      }
+    const emailStr = user.email || '';
+    let nameStr = user.name;
+    if (!nameStr && emailStr) {
+      const localPart = emailStr.split('@')[0] || 'User';
+      nameStr = localPart.replace(/[\._\-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
     }
+
+    if (nameEl) nameEl.textContent = nameStr || 'Administrator';
+    if (emailEl) emailEl.textContent = emailStr;
+
+    if (avatarEl) {
+      const initials = (nameStr || 'AD').split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase() || 'AD';
+      avatarEl.textContent = initials;
+      avatarEl.title = `${nameStr || 'Administrator'} (${emailStr})`;
+    }
+  }
+}
+
+function loadRealUserProfile() {
+  const injected = (typeof window !== 'undefined' && window.__CURRENT_USER__ && typeof window.__CURRENT_USER__ === 'object' && window.__CURRENT_USER__.email)
+    ? window.__CURRENT_USER__
+    : null;
+
+  if (injected) {
+    applyUserProfile(injected);
+    return;
+  }
+
+  callServer('getCurrentUser').then(user => {
+    applyUserProfile(user);
   }).catch(() => {});
 }
 
@@ -1067,6 +1249,7 @@ window.onReady = onReady;
 
 // --- Sidebar Navigation & Active State ---------------------------------------
 onReady(() => {
+  stopNavProgress();
   initSidebarState();
   initSidebarLogo();
   loadRealUserProfile();
@@ -1122,6 +1305,7 @@ window.getApprovalRoleText = getApprovalRoleText;
 window.toInputDateStr = toInputDateStr;
 window.toDisplayDateStr = toDisplayDateStr;
 window.formatMinimalistDate = formatMinimalistDate;
+window.formatDisplayDateRange = formatDisplayDateRange;
 window.formatDisplayTime = formatDisplayTime;
 window.formatSessionTimeRange = formatSessionTimeRange;
 window.formatMinimalistDateTime = formatMinimalistDateTime;
