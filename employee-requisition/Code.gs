@@ -753,7 +753,8 @@ function submitEmployeeRequisition(data) {
             to: recipientEmail,
             subject: subject,
             body: body,
-            htmlBody: htmlBody
+            htmlBody: htmlBody,
+            name: 'Apollo Training Hub'
           });
           sendSuccess = true;
           emailStatus = `Email sent successfully to ${recipientEmail}`;
@@ -763,7 +764,10 @@ function submitEmployeeRequisition(data) {
           primaryErr = mailErr;
           Logger.log(`MailApp.sendEmail failed for ${recipientEmail}: ${mailErr.message}. Attempting GmailApp fallback...`);
           try {
-            GmailApp.sendEmail(recipientEmail, subject, body, { htmlBody: htmlBody });
+            GmailApp.sendEmail(recipientEmail, subject, body, {
+              htmlBody: htmlBody,
+              name: 'Apollo Training Hub'
+            });
             sendSuccess = true;
             emailStatus = `Email sent successfully to ${recipientEmail} (via Gmail fallback)`;
             emailSendState = 'SENT';
@@ -821,12 +825,15 @@ function testEmailSendPermission() {
     MailApp.sendEmail({
       to: recipient,
       subject: '[TrainHub TEST EMAIL]',
-      body: 'This is a test email to verify MailApp sending permissions.'
+      body: 'This is a test email to verify MailApp sending permissions.',
+      name: 'Apollo Training Hub'
     });
     Logger.log('Test email sent successfully via MailApp to ' + recipient);
   } catch (e) {
     Logger.log('MailApp test failed, attempting GmailApp: ' + e.message);
-    GmailApp.sendEmail(recipient, '[TrainHub TEST EMAIL]', 'This is a test email to verify GmailApp sending permissions.');
+    GmailApp.sendEmail(recipient, '[TrainHub TEST EMAIL]', 'This is a test email to verify GmailApp sending permissions.', {
+      name: 'Apollo Training Hub'
+    });
     Logger.log('Test email sent successfully via GmailApp to ' + recipient);
   }
 }

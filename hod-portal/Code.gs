@@ -904,7 +904,9 @@ function sendOrDraftEmail(recipient, subject, body, logPrefix, emailLog, htmlBod
     return { success: false, error: 'No recipient email' };
   }
 
-  const options = {};
+  const options = {
+    name: 'Apollo Training Hub'
+  };
   if (htmlBody) options.htmlBody = htmlBody;
 
   let sendSuccess = false;
@@ -916,7 +918,8 @@ function sendOrDraftEmail(recipient, subject, body, logPrefix, emailLog, htmlBod
       to: recipient,
       subject: subject,
       body: body,
-      htmlBody: htmlBody || undefined
+      htmlBody: htmlBody || undefined,
+      name: 'Apollo Training Hub'
     });
     sendSuccess = true;
     if (emailLog) emailLog.push(`Email sent to ${logPrefix} (${recipient})`);
@@ -951,13 +954,16 @@ function authorizeEmailSending() {
     MailApp.sendEmail({
       to: user,
       subject: '[TrainHub Email Test]',
-      body: 'Email sending permissions verified successfully via MailApp.'
+      body: 'Email sending permissions verified successfully via MailApp.',
+      name: 'Apollo Training Hub'
     });
     Logger.log('Email sending authorized successfully via MailApp.');
     return 'Email sending permissions authorized successfully via MailApp!';
   } catch (e) {
     Logger.log('MailApp authorization test failed, testing GmailApp: ' + e.message);
-    GmailApp.sendEmail(user, '[TrainHub Email Test]', 'Email sending permissions verified successfully via GmailApp.');
+    GmailApp.sendEmail(user, '[TrainHub Email Test]', 'Email sending permissions verified successfully via GmailApp.', {
+      name: 'Apollo Training Hub'
+    });
     Logger.log('Email sending authorized successfully via GmailApp.');
     return 'Email sending permissions authorized successfully via GmailApp!';
   }

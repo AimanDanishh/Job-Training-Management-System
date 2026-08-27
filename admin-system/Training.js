@@ -271,7 +271,9 @@ function send3MonthPostEvalNotifications() {
             `• 3-Month Post Evaluation Dashboard: ${postDashboardUrl}\n\n` +
             `Thank you,\nApollo Job Training Management System`;
 
-          MailApp.sendEmail(hodEmail, subject, body);
+          MailApp.sendEmail(hodEmail, subject, body, {
+            name: 'Apollo Training Hub'
+          });
           sentCount++;
         }
       }

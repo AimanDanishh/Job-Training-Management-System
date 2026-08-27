@@ -805,7 +805,8 @@ function sendSupervisorPostEvalEmail(trainingId, supervisor, trainingObj, partic
       to: targetEmail,
       subject: subject,
       body: plainText,
-      htmlBody: htmlBody
+      htmlBody: htmlBody,
+      name: 'Apollo Training Hub'
     });
     sendSuccess = true;
     Logger.log(`Post Eval Email sent successfully via MailApp to ${targetEmail} (Supervisor: ${supervisor.Name || supervisor.Email}) for training ${cleanTId}`);
@@ -814,7 +815,10 @@ function sendSupervisorPostEvalEmail(trainingId, supervisor, trainingObj, partic
     primaryErr = mailErr;
     Logger.log(`MailApp.sendEmail failed for ${targetEmail}: ${mailErr.message}. Attempting GmailApp fallback...`);
     try {
-      GmailApp.sendEmail(targetEmail, subject, plainText, { htmlBody: htmlBody });
+      GmailApp.sendEmail(targetEmail, subject, plainText, {
+        htmlBody: htmlBody,
+        name: 'Apollo Training Hub'
+      });
       sendSuccess = true;
       Logger.log(`Post Eval Email sent successfully via GmailApp fallback to ${targetEmail} (Supervisor: ${supervisor.Name || supervisor.Email}) for training ${cleanTId}`);
       return { success: true, targetEmail: targetEmail };
