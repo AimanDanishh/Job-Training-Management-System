@@ -54,7 +54,7 @@ function resolveRealHODProfile(userEmail, requesterIdOrName) {
             if (emailVal.includes(userEmailClean) || userEmailClean.includes(emailVal)) return true;
           }
           if (idVal && idVal === userEmailClean) return true;
-          if (nameVal && nameVal === userEmailClean) return true;
+          if (nameVal && (nameVal === userEmailClean || (userEmailClean === 'andrew low' && (nameVal === 'low voon tat' || nameVal === 'voon tat low')))) return true;
           return false;
         });
 
@@ -210,7 +210,7 @@ function resolveRealHODProfile(userEmail, requesterIdOrName) {
 
   return {
     ID: realHodId || 'N/A',
-    Name: realHodName || '',
+    Name: formatDisplayName(realHodName || ''),
     CostCentre: realCostCentre || 'N/A',
     Position: realPosition || '',
     RoleTitle: roleTitle,
@@ -218,9 +218,9 @@ function resolveRealHODProfile(userEmail, requesterIdOrName) {
     isCsuite: isCsuite,
     isHohr: isHohr,
     Email: userEmailClean || '',
-    CsuiteName: csuiteName,
+    CsuiteName: formatDisplayName(csuiteName),
     CsuiteEmail: csuiteEmail,
-    HohrName: hohrName,
+    HohrName: formatDisplayName(hohrName),
     HohrEmail: hohrEmail
   };
 
@@ -312,7 +312,7 @@ function resolveCSuiteProfileForRequester(requesterCostCentre, requesterIdOrName
 
         return {
           ID: getVal(matchedCs, idAliases) || 'CSUITE',
-          Name: getVal(matchedCs, nameAliases) || targetCsuiteName || 'C-Suite Executive',
+          Name: formatDisplayName(getVal(matchedCs, nameAliases) || targetCsuiteName || 'C-Suite Executive'),
           CostCentre: getVal(matchedCs, deptAliases) || requesterCostCentre,
           Position: getVal(matchedCs, ['Position Title', 'PositionTitle', 'Position']) || 'C-Suite Executive',
           Email: getVal(matchedCs, emailAliases) || targetCsuiteEmail
@@ -325,7 +325,7 @@ function resolveCSuiteProfileForRequester(requesterCostCentre, requesterIdOrName
 
   return {
     ID: 'CSUITE',
-    Name: targetCsuiteName || 'C-Suite Executive',
+    Name: formatDisplayName(targetCsuiteName || 'C-Suite Executive'),
     CostCentre: requesterCostCentre || '',
     Position: 'C-Suite Executive',
     Email: targetCsuiteEmail || ''
@@ -369,7 +369,7 @@ function getHOHREmailProfile() {
         const row = rows[0];
         return {
           ID: getVal(row, ['Employee No', 'EmployeeNo', 'EmployeeID', 'ID']),
-          Name: getVal(row, nameAliases) || 'Head of HR',
+          Name: formatDisplayName(getVal(row, nameAliases) || 'Head of HR'),
           CostCentre: getVal(row, ['Cost Centre', 'CostCentre', 'Department']),
           Position: getVal(row, ['Position Title', 'PositionTitle', 'Position']),
           Email: getVal(row, emailAliases)
@@ -430,14 +430,14 @@ function getAllRealHODProfiles() {
           if (name && !hods.some(x => x.Name.toLowerCase() === name.toLowerCase() && x.Email.toLowerCase() === email.toLowerCase())) {
             hods.push({
               ID: id || 'N/A',
-              Name: name,
+              Name: formatDisplayName(name),
               CostCentre: dept || 'Cost Centre',
               Position: pos || defaultPos,
               RoleTag: defaultRole,
               Email: email || '',
-              CsuiteName: getVal(h, ['CsuiteName', 'CSuiteName']),
+              CsuiteName: formatDisplayName(getVal(h, ['CsuiteName', 'CSuiteName'])),
               CsuiteEmail: getVal(h, ['CsuiteEmail', 'CSuiteEmail']),
-              HohrName: getVal(h, ['HohrName', 'HOHRName']),
+              HohrName: formatDisplayName(getVal(h, ['HohrName', 'HOHRName'])),
               HohrEmail: getVal(h, ['HohrEmail', 'HOHREmail'])
             });
           }
@@ -570,8 +570,16 @@ function isSameApprover(approverA, approverB) {
     return emailA === emailB;
   }
 
-  const nameA = String(approverA.Name || approverA.HOD || approverA.Csuite || approverA.HOHR || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-  const nameB = String(approverB.Name || approverB.HOD || approverB.Csuite || approverB.HOHR || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const normalizeApproverName = (nameStr) => {
+    let clean = String(nameStr || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (clean === 'andrewlow' || clean === 'lowvoontat' || clean === 'voontatlow') {
+      return 'andrewlow';
+    }
+    return clean;
+  };
+
+  const nameA = normalizeApproverName(approverA.Name || approverA.HOD || approverA.Csuite || approverA.HOHR || '');
+  const nameB = normalizeApproverName(approverB.Name || approverB.HOD || approverB.Csuite || approverB.HOHR || '');
 
   if (nameA && nameB && !isInvalid(nameA) && !isInvalid(nameB)) {
     return nameA === nameB || nameA.includes(nameB) || nameB.includes(nameA);
@@ -694,15 +702,15 @@ function getAssignedApproversForRequisition(t) {
   // Resolve rawHod to full profile
   let hodProfile = null;
   if (rawHod && !isStatusValue(rawHod)) {
-    hodProfile = resolveRealHODProfile(rawHod) || { Name: rawHod, ID: rawHod, Email: '' };
+    hodProfile = resolveRealHODProfile(rawHod) || { Name: formatDisplayName(rawHod), ID: rawHod, Email: '' };
   } else if (itRow && itRow.HOD) {
-    hodProfile = resolveRealHODProfile(itRow.HOD) || { Name: itRow.HOD, ID: itRow.HOD, Email: '' };
+    hodProfile = resolveRealHODProfile(itRow.HOD) || { Name: formatDisplayName(itRow.HOD), ID: itRow.HOD, Email: '' };
   }
 
   // Resolve rawCs to full profile
   let csProfile = null;
   if (rawCs && !isStatusValue(rawCs)) {
-    csProfile = resolveRealHODProfile(rawCs) || resolveCSuiteProfileForRequester(t.Department, reqId) || { Name: rawCs, ID: 'CSUITE', Email: '' };
+    csProfile = resolveRealHODProfile(rawCs) || resolveCSuiteProfileForRequester(t.Department, reqId) || { Name: formatDisplayName(rawCs), ID: 'CSUITE', Email: '' };
   } else {
     csProfile = resolveCSuiteProfileForRequester(t.Department, reqId);
   }
@@ -710,7 +718,7 @@ function getAssignedApproversForRequisition(t) {
   // Resolve rawHohr to full profile
   let hrProfile = null;
   if (rawHohr && !isStatusValue(rawHohr)) {
-    hrProfile = resolveRealHODProfile(rawHohr) || getHOHREmailProfile() || { Name: rawHohr, ID: 'HOHR', Email: '' };
+    hrProfile = resolveRealHODProfile(rawHohr) || getHOHREmailProfile() || { Name: formatDisplayName(rawHohr), ID: 'HOHR', Email: '' };
   } else {
     hrProfile = getHOHREmailProfile();
   }

@@ -513,7 +513,7 @@
     function renderApproverIdentity(appr) {
       if (!appr) return;
       document.getElementById('approverIdentityBanner').style.display = 'flex';
-      const nameStr = (appr.Name && appr.Name.trim() !== '') ? appr.Name.trim() : 'User';
+      const nameStr = (appr.Name && appr.Name.trim() !== '') ? formatDisplayName(appr.Name.trim()) : 'User';
       document.getElementById('displayApproverName').innerText = `Welcome, ${nameStr}!`;
       document.getElementById('displayApproverId').innerText = `ID: ${appr.ID || 'N/A'}`;
       document.getElementById('displayApproverDept').innerText = `Dept: ${appr.CostCentre || 'N/A'}`;
@@ -576,12 +576,14 @@
         const title = (r.Name || r.TrainingName || '').toLowerCase();
         const code = (r.Code || r.ID || '').toLowerCase();
         const user = (r.RequestedBy || r.RequestedByName || '').toLowerCase();
+        const userDisp = (typeof formatDisplayName === 'function' ? formatDisplayName(r.RequestedBy || r.RequestedByName || '') : '').toLowerCase();
         const empId = (r.EmployeeID || '').toLowerCase();
         const dept = (r.Department || '').toLowerCase();
 
         return title.includes(currentSearchTerm) ||
                code.includes(currentSearchTerm) ||
                user.includes(currentSearchTerm) ||
+               userDisp.includes(currentSearchTerm) ||
                empId.includes(currentSearchTerm) ||
                dept.includes(currentSearchTerm);
       });
@@ -657,7 +659,7 @@
           <div class="request-card-body">
             <div>
               <div class="data-item-label">Requested By</div>
-              <div class="data-item-val">${escapeHtml(r.RequestedBy)}</div>
+              <div class="data-item-val">${escapeHtml(formatDisplayName(r.RequestedBy))}</div>
             </div>
             <div>
               <div class="data-item-label">Employee ID</div>
@@ -735,14 +737,14 @@
       document.getElementById('modalStatusBadge').innerHTML = `<span class="badge ${getBadgeClassForStatus(status)}">${escapeHtml(status.toUpperCase())}</span>`;
 
       // Requester
-      document.getElementById('modalReqName').innerText = `${req.Name || t.RequestedByName || 'N/A'} (${req.ID || t.RequestedBy || 'N/A'})`;
+      document.getElementById('modalReqName').innerText = `${formatDisplayName(req.Name || t.RequestedByName || 'N/A')} (${req.ID || t.RequestedBy || 'N/A'})`;
       document.getElementById('modalReqDept').innerText = req.Department || t.Department || 'N/A';
       document.getElementById('modalReqEmail').innerText = req.Email || t.RequestedByEmail || 'N/A';
       document.getElementById('modalReqDate').innerText = formatDateStr(t.CreatedDate || t.RequestedDate) || 'N/A';
 
       // Specifications
       document.getElementById('modalCategory').innerText = t.Category || 'General';
-      const trainerStr = t.Trainer || 'TBD';
+      const trainerStr = formatDisplayName(t.Trainer || 'TBD');
       const providerStr = t.TrainingProvider || t.Provider || t.Vendor || '';
       document.getElementById('modalTrainer').innerText = providerStr ? `${trainerStr} (${providerStr})` : trainerStr;
       document.getElementById('modalSchedule').innerText = `${formatDateStr(t.StartDate) || 'N/A'} to ${formatDateStr(t.EndDate || t.StartDate) || 'N/A'}`;
@@ -772,7 +774,7 @@
           <tr>
             <td>${idx + 1}</td>
             <td><strong>${escapeHtml(p.EmployeeID || p.EmployeeNo || p['Employee No'] || p.ID || 'N/A')}</strong></td>
-            <td>${escapeHtml(p.EmployeeName || p.Name || p['Employee Name'] || 'N/A')}</td>
+            <td>${escapeHtml(formatDisplayName(p.EmployeeName || p.Name || p['Employee Name'] || 'N/A'))}</td>
             <td>${escapeHtml(p.Department || p.CostCentre || p['Cost Centre'] || 'N/A')}</td>
             <td>${escapeHtml(p.Position || p.JobTitle || p['Job Position'] || 'Participant')}</td>
           </tr>
@@ -800,8 +802,8 @@
         stampBox.style.display = 'block';
         document.getElementById('modalStampStatusTitle').innerText = `DIGITALLY STAMPED: ${String(status).toUpperCase()}`;
         document.getElementById('modalStampDetails').innerHTML = `
-          <strong>Approved By:</strong> ${escapeHtml(t.ApprovedBy)} | <strong>Cost Centre:</strong> ${escapeHtml(t.ApprovedCostCentre || 'N/A')}<br>
-          <strong>Timestamp:</strong> ${escapeHtml(t.ApprovedAt)} ${t.ApprovalRemarks ? '<br><strong>Remarks:</strong> ' + escapeHtml(t.ApprovalRemarks) : ''}
+          <strong>Approved By:</strong> ${escapeHtml(formatDisplayName(t.ApprovedBy))} | <strong>Cost Centre:</strong> ${escapeHtml(t.ApprovedCostCentre || 'N/A')}<br>
+          <strong>Timestamp:</strong> ${escapeHtml(t.ApprovedAt)} ${t.ApprovalRemarks ? '<br><strong>Remarks:</strong> ' + escapeHtml(formatDisplayName(t.ApprovalRemarks)) : ''}
         `;
       } else {
         stampBox.style.display = 'none';

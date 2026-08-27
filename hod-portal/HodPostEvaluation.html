@@ -294,7 +294,7 @@
         groupContainer.innerHTML = '';
       }
 
-      document.getElementById('badgeHodName').innerText = `${currentHOD.Name || currentHOD.Email} (${currentHOD.CostCentre || 'Supervisor'})`;
+      document.getElementById('badgeHodName').innerText = `${formatDisplayName(currentHOD.Name || currentHOD.Email)} (${currentHOD.CostCentre || 'Supervisor'})`;
       document.getElementById('evalTrainingTitle').innerText = t ? (t.Name || 'Training Programme') : 'No Training Selected';
       document.getElementById('evalTrainingCode').innerText = t ? `Training Code: ${t.Code || t.ID} | Venue: ${t.Venue || 'N/A'}` : '';
 
@@ -319,7 +319,7 @@
         pendingParticipants.forEach(p => {
           let opt = document.createElement('option');
           opt.value = p.EmployeeID || p.ID;
-          opt.innerText = `${p.EmployeeName || p.Name} (${p.EmployeeID || p.ID}) - ${p.Position || 'Staff'}`;
+          opt.innerText = `${formatDisplayName(p.EmployeeName || p.Name)} (${p.EmployeeID || p.ID}) - ${p.Position || 'Staff'}`;
           select.appendChild(opt);
         });
 
@@ -341,7 +341,7 @@
 
       const emp = pendingParticipants.find(p => String(p.EmployeeID || p.ID) === String(val));
       if (emp) {
-        document.getElementById('selectedEmpNameDisplay').innerText = `${emp.EmployeeName || emp.Name} (${emp.EmployeeID || emp.ID})`;
+        document.getElementById('selectedEmpNameDisplay').innerText = `${formatDisplayName(emp.EmployeeName || emp.Name)} (${emp.EmployeeID || emp.ID})`;
         formContainer.style.display = 'block';
       }
     }

@@ -155,11 +155,11 @@ function getApproverDashboardData() {
         Code: getTrainingCode(r),
         Name: String(r.Name || r.TrainingName || 'Training Request').trim(),
         Category: String(r.Category || 'General').trim(),
-        RequestedBy: String(r.RequestedByName || r.RequestedBy || 'Employee Requester').trim(),
+        RequestedBy: formatDisplayName(String(r.RequestedByName || r.RequestedBy || 'Employee Requester').trim()),
         EmployeeID: String(r.RequestedBy || r.EmployeeID || 'N/A').trim(),
         RequestedByEmail: String(r.RequestedByEmail || '').trim(),
         Department: String(r.Department || r.CostCentre || 'N/A').trim(),
-        Trainer: String(r.Trainer || 'TBD').trim(),
+        Trainer: formatDisplayName(String(r.Trainer || 'TBD').trim()),
         Venue: String(r.Venue || 'TBD').trim(),
         StartDate: String(r.StartDate || '').trim(),
         EndDate: String(r.EndDate || r.StartDate || '').trim(),
@@ -174,13 +174,13 @@ function getApproverDashboardData() {
         HODStatus: hodSt,
         CsuiteStatus: csSt,
         HOHRStatus: hrSt,
-        HOD: assignedApprovers.HOD ? assignedApprovers.HOD.Name : hodSt,
-        Csuite: assignedApprovers.CSuite ? assignedApprovers.CSuite.Name : csSt,
-        HOHR: assignedApprovers.HOHR ? assignedApprovers.HOHR.Name : hrSt,
+        HOD: formatDisplayName(assignedApprovers.HOD ? assignedApprovers.HOD.Name : hodSt),
+        Csuite: formatDisplayName(assignedApprovers.CSuite ? assignedApprovers.CSuite.Name : csSt),
+        HOHR: formatDisplayName(assignedApprovers.HOHR ? assignedApprovers.HOHR.Name : hrSt),
         ExpiryDate: String(r.ExpiryDate || r.CertExpiryDate || r.CertificateExpiryDate || '').trim(),
         CertExpiryDate: String(r.CertExpiryDate || r.ExpiryDate || r.CertificateExpiryDate || '').trim(),
-        ApprovalRemarks: String(r.ApprovalRemarks || '').trim(),
-        ApprovedBy: String(r.ApprovedBy || '').trim(),
+        ApprovalRemarks: formatDisplayName(String(r.ApprovalRemarks || '').trim()),
+        ApprovedBy: formatDisplayName(String(r.ApprovedBy || '').trim()),
         ApprovedAt: String(r.ApprovedAt || '').trim(),
         ApprovedCostCentre: String(r.ApprovedCostCentre || '').trim(),
         BrochureURL: String(r.BrochureURL || r.BrochureUrl || '').trim()
@@ -326,7 +326,7 @@ function getRequisitionDetails(trainingId) {
 
     let requester = {
       ID: training.RequestedBy || training.EmployeeID || 'N/A',
-      Name: training.RequestedByName || training.Trainer || 'Employee Requester',
+      Name: formatDisplayName(training.RequestedByName || training.Trainer || 'Employee Requester'),
       Department: training.Department || 'N/A',
       Email: training.RequestedByEmail || ''
     };
@@ -341,7 +341,7 @@ function getRequisitionDetails(trainingId) {
       });
       if (matched) {
         requester.ID = String(matched['Employee No'] || matched.EmployeeNo || matched.ID || requester.ID).trim();
-        requester.Name = String(matched.Name || matched.EmployeeName || matched['HOD'] || requester.Name).trim();
+        requester.Name = formatDisplayName(String(matched.Name || matched.EmployeeName || matched['HOD'] || requester.Name).trim());
         requester.Department = String(matched['Cost Centre'] || matched.Department || requester.Department).trim();
         requester.Email = String(matched.Email || requester.Email).trim();
       }
@@ -349,7 +349,27 @@ function getRequisitionDetails(trainingId) {
 
     // Cleanse legacy stamp data if training has old dummy text
     if (training.ApprovedBy && (training.ApprovedBy.includes('IT.INTERN') || training.ApprovedBy.includes('It Intern') || training.ApprovedBy.includes('EMP-HOD001') || training.ApprovedBy.includes('Head of Department'))) {
-      training.ApprovedBy = `${hodProfile.Name} (${hodProfile.ID})`;
+      training.ApprovedBy = `${formatDisplayName(hodProfile.Name)} (${hodProfile.ID})`;
+    } else if (training.ApprovedBy) {
+      training.ApprovedBy = formatDisplayName(training.ApprovedBy);
+    }
+    if (training.RequestedByName) {
+      training.RequestedByName = formatDisplayName(training.RequestedByName);
+    }
+    if (training.Trainer) {
+      training.Trainer = formatDisplayName(training.Trainer);
+    }
+    if (training.HOD) {
+      training.HOD = formatDisplayName(training.HOD);
+    }
+    if (training.Csuite) {
+      training.Csuite = formatDisplayName(training.Csuite);
+    }
+    if (training.HOHR) {
+      training.HOHR = formatDisplayName(training.HOHR);
+    }
+    if (training.ApprovalRemarks) {
+      training.ApprovalRemarks = formatDisplayName(training.ApprovalRemarks);
     }
     if (!training.ApprovedCostCentre || training.ApprovedCostCentre.includes('All Departments')) {
       training.ApprovedCostCentre = hodProfile.CostCentre;
@@ -411,7 +431,7 @@ function submitHODDecision(data) {
     }
 
     const hodProfile = auth.hod;
-    const hodName = hodProfile.Name || 'Approver';
+    const hodName = formatDisplayName(hodProfile.Name || 'Approver');
     const hodId = hodProfile.ID || 'N/A';
     const hodCostCentre = hodProfile.CostCentre || 'N/A';
 
@@ -480,11 +500,11 @@ function submitHODDecision(data) {
     const userIsHohr = Boolean(hodProfile.isHohr);
 
     const csProfile = assignedAll.CSuite;
-    const csuiteName = csProfile ? csProfile.Name : 'C-Suite Executive';
+    const csuiteName = csProfile ? formatDisplayName(csProfile.Name) : 'C-Suite Executive';
     const csuiteId = csProfile ? csProfile.ID : '';
 
     const hrProfile = assignedAll.HOHR;
-    const hohrName = hrProfile ? hrProfile.Name : 'Head of HR';
+    const hohrName = hrProfile ? formatDisplayName(hrProfile.Name) : 'Head of HR';
     const hohrId = hrProfile ? hrProfile.ID : '';
 
     let autoVerifiedRemarks = '';
@@ -543,7 +563,7 @@ function submitHODDecision(data) {
 
     const fullRemarks = (remarks || '') + autoVerifiedRemarks;
     updateCol('ApprovalStatus', nextApprovalStatus);
-    updateCol('ApprovedBy', `${hodProfile.Name} (${hodProfile.ID})`);
+    updateCol('ApprovedBy', `${formatDisplayName(hodProfile.Name)} (${hodProfile.ID})`);
     updateCol('ApprovedCostCentre', hodProfile.CostCentre);
     updateCol('ApprovedAt', timestamp);
     updateCol('ApprovalRemarks', fullRemarks.trim());
@@ -663,6 +683,8 @@ function submitHODDecision(data) {
           }
         }
       }
+
+      requesterName = formatDisplayName(requesterName);
 
       if (!requesterCostCentre) {
         requesterCostCentre = hodCostCentre || 'N/A';
@@ -1107,7 +1129,7 @@ function submitHODPostEval(data) {
     }
 
     const evalId = 'PEVAL-' + Math.floor(100000 + Math.random() * 900000);
-    const evaluatorName = auth.hod.Name;
+    const evaluatorName = formatDisplayName(auth.hod.Name);
     const evaluatorId = auth.hod.ID;
     const submittedAt = formatDateTime(new Date());
 

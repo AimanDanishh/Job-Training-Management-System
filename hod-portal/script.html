@@ -1,4 +1,11 @@
 <script>
+  function formatDisplayName(name) {
+    if (name === null || name === undefined) return '';
+    const trimmed = String(name).trim();
+    if (!trimmed) return '';
+    return trimmed.replace(/\b(Low\s+Voon\s+Tat|Voon\s+Tat\s+Low)\b/gi, 'Andrew Low');
+  }
+
   function showLoading(msg) {
     let overlay = document.getElementById('loadingOverlay');
     if (!overlay) {

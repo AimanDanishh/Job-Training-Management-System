@@ -14,6 +14,30 @@ function getConfigProperty(key, defaultValue) {
   return defaultValue;
 }
 
+/**
+ * Transforms display names specifically for the Approval Portal.
+ * Maps "Low Voon Tat" / "Voon Tat Low" -> "Andrew Low".
+ *
+ * @param {string} name - Raw name string
+ * @returns {string} Formatted display name
+ */
+function formatDisplayName(name) {
+  if (name === null || name === undefined) return '';
+  const trimmed = String(name).trim();
+  if (!trimmed) return '';
+  return trimmed.replace(/\b(Low\s+Voon\s+Tat|Voon\s+Tat\s+Low)\b/gi, 'Andrew Low');
+}
+
+/**
+ * Helper: Safely compare employee IDs across different formats (e.g. EMP-101 vs 101)
+ */
+function isSameEmployeeId(id1, id2) {
+  if (!id1 || !id2) return false;
+  const clean1 = String(id1).trim().toLowerCase().replace(/^emp-?/i, '');
+  const clean2 = String(id2).trim().toLowerCase().replace(/^emp-?/i, '');
+  return clean1 === clean2 || String(id1).trim().toLowerCase() === String(id2).trim().toLowerCase();
+}
+
 function getSystemLogoUrl() {
   const url = getConfigProperty('SYSTEM_LOGO_URL', '');
   if (url && String(url).trim() !== '') return String(url).trim();
@@ -508,7 +532,12 @@ function getParticipantsForRequisition(training, cleanId) {
     }
   } catch (e5) {}
 
-  return participants;
+  return (participants || []).map(p => ({
+    ...p,
+    Name: formatDisplayName(p.Name || p.EmployeeName || ''),
+    EmployeeName: formatDisplayName(p.EmployeeName || p.Name || ''),
+    SupervisorName: formatDisplayName(p.SupervisorName || '')
+  }));
 }
 
 function getOrCreateSingleTrainingSheet(folder, code) {
@@ -644,7 +673,7 @@ function updateTrainingRequisitionSignatures(trainingId, step, sigData, targetFo
     // Preserve original template header rows 39 and 40 (columns A to I) completely untouched
 
     const empNo    = sigData.employeeNo || sigData.EmployeeNo || sigData.EmployeeID || sigData.ID || '';
-    const empName  = sigData.name || sigData.EmployeeName || sigData.Name || '';
+    const empName  = formatDisplayName(sigData.name || sigData.EmployeeName || sigData.Name || '');
     const position = sigData.position || sigData.JobPosition || sigData.Position || sigData.JobTitle || '';
     const sigDate  = getFormattedCurrentDate(sigData.date || sigData.Date || sigData.Timestamp);
     const status   = sigData.status || sigData.RequestStatus || sigData.ApprovalStatus || '';
@@ -721,7 +750,7 @@ function updateTrainingRequisitionSignatures(trainingId, step, sigData, targetFo
           const reqNameCol = headers.indexOf('RequestedByName') + 1;
           const createdDateCol = headers.indexOf('CreatedDate') + 1;
           const reqId = reqIdCol > 0 ? trainingSheet.getRange(row, reqIdCol).getValue() : '';
-          const reqName = reqNameCol > 0 ? trainingSheet.getRange(row, reqNameCol).getValue() : '';
+          const reqName = formatDisplayName(reqNameCol > 0 ? trainingSheet.getRange(row, reqNameCol).getValue() : '');
           const reqDate = (createdDateCol > 0 ? trainingSheet.getRange(row, createdDateCol).getValue() : '') || sigDate;
           let reqPos = 'Requester';
           if (reqId && getSheet('Employees')) {
@@ -819,7 +848,7 @@ function formatDurationForEmail(durationVal, hoursVal) {
 function buildTrainingRequisitionEmailHtml(params) {
   const requestId = params.requestId || 'TRN-0000';
   const trainingTitle = params.trainingTitle || 'Training Request';
-  const requesterName = params.requesterName || 'Employee Requester';
+  const requesterName = formatDisplayName(params.requesterName || 'Employee Requester');
   const employeeId = params.employeeId || 'N/A';
   const department = params.department || 'N/A';
   const category = params.category || 'General';
@@ -830,9 +859,9 @@ function buildTrainingRequisitionEmailHtml(params) {
   const reviewUrl = params.reviewUrl || '';
   
   const badgeText = params.badgeText || 'ACTION REQUIRED';
-  const headlineText = params.headlineText || 'Training Requisition Requires Your Review';
-  const greetingText = params.greetingText || 'Dear Approver / Manager,';
-  const introText = params.introText || 'A new training requisition has been submitted and is currently awaiting your review and approval.';
+  const headlineText = formatDisplayName(params.headlineText || 'Training Requisition Requires Your Review');
+  const greetingText = formatDisplayName(params.greetingText || 'Dear Approver / Manager,');
+  const introText = formatDisplayName(params.introText || 'A new training requisition has been submitted and is currently awaiting your review and approval.');
 
   // Status background & border colors depending on status
   let statusBg = '#FFFBEB';
