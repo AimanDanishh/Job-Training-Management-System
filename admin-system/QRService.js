@@ -64,7 +64,7 @@ function generateMissingQRCodes(forceRegenerate = false) {
     let updatedCount = 0;
     trainings.forEach(training => {
       const ss = getTrainingDataSpreadsheet(training.ID || training.Code);
-      const sheet = ss ? ss.getSheetByName('TrainingSessions') : null;
+      const sheet = ss ? (ss.getSheetByName('Sessions') || ss.getSheetByName('TrainingSessions') || ss.getSheetByName('Training Sessions') || ss.getSheetByName('Session')) : null;
       if (!sheet || sheet.getLastRow() < 2) return;
       ensureTrainingSessionsSheetColumns(sheet);
       const data = sheet.getDataRange().getValues();

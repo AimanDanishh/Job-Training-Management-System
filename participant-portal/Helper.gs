@@ -117,22 +117,17 @@ function isSameEmployeeId(id1, id2) {
   if (s1 === s2) return true;
   if (!s1 || !s2) return false;
 
-  // 1. Strip leading zeros
+  // 1. Strip leading zeros: e.g. "00123" vs "123"
   const z1 = s1.replace(/^0+/, '');
   const z2 = s2.replace(/^0+/, '');
   if (z1 !== '' && z1 === z2) return true;
   if (s1.replace(/0/g, '') === '' && s2.replace(/0/g, '') === '') return true;
 
-  // 2. Strip common prefixes (emp-, emp, staff-, staff, e-, e, no-, no)
+  // 2. Strip common prefixes: e.g. "EMP-00123", "STAFF-00123" vs "00123"
   const cleanPrefix = (str) => str.replace(/^(emp|staff|no|e)[\-_:\s]*/i, '').replace(/^0+/, '');
   const p1 = cleanPrefix(s1);
   const p2 = cleanPrefix(s2);
   if (p1 !== '' && p1 === p2) return true;
-
-  // 3. Compare purely extracted digits if both contain numbers
-  const d1 = s1.replace(/\D/g, '').replace(/^0+/, '');
-  const d2 = s2.replace(/\D/g, '').replace(/^0+/, '');
-  if (d1 !== '' && d2 !== '' && d1 === d2) return true;
 
   return false;
 }
@@ -481,8 +476,10 @@ function generateId(prefix) {
 
 function normalizeHeader(header) {
   const h = String(header).trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-  if (['id', 'empid', 'employeeid', 'employeeno', 'staffid', 'badgenumber'].includes(h)) return 'ID';
-  if (['name', 'fullname', 'employeename', 'staffname'].includes(h)) return 'Name';
+  if (['empid', 'employeeid', 'employeeno', 'staffid', 'badgenumber', 'staffno', 'employeenumber', 'badgeno'].includes(h)) return 'EmployeeID';
+  if (h === 'id') return 'ID';
+  if (['employeename', 'staffname'].includes(h)) return 'EmployeeName';
+  if (['name', 'fullname'].includes(h)) return 'Name';
   if (['costcentre', 'costcenter'].includes(h)) return 'CostCentre';
   if (['department', 'dept', 'company', 'division'].includes(h)) return 'Department';
   if (['position', 'positiontitle', 'jobtitle', 'title', 'designation', 'role'].includes(h)) return 'Position';
@@ -521,8 +518,39 @@ function sheetToJson(sheet) {
         obj[customNormKey] = val;
       }
     });
-    if (!obj.ID && data[i][0] !== undefined) obj.ID = String(data[i][0]);
-    if (!obj.Name && data[i][1] !== undefined) obj.Name = String(data[i][1]);
+
+    // Employee ID alias cross-population
+    const detectedEmpId = obj.EmployeeID || obj['Employee ID'] || obj.EmployeeNo || obj['Employee No'] || obj['Employee Number'] || obj.EmpID || obj['Emp ID'] || obj.StaffID || obj['Staff ID'] || obj.StaffNo || obj.EmpNo || obj['Emp No'] || obj.BadgeNo || obj['Badge No'] || '';
+    if (detectedEmpId) {
+      if (!obj.EmployeeID) obj.EmployeeID = detectedEmpId;
+      if (!obj.EmployeeNo) obj.EmployeeNo = detectedEmpId;
+      if (!obj.EmpID) obj.EmpID = detectedEmpId;
+      if (!obj.ID && !headers.some(h => String(h).trim().toLowerCase() === 'id')) obj.ID = detectedEmpId;
+    } else if (obj.ID && !String(obj.ID).startsWith('PRT') && !String(obj.ID).startsWith('ATT') && !String(obj.ID).startsWith('EVL') && !String(obj.ID).startsWith('PEV') && !String(obj.ID).startsWith('SES') && !String(obj.ID).startsWith('TRN')) {
+      if (!obj.EmployeeID) obj.EmployeeID = obj.ID;
+      if (!obj.EmployeeNo) obj.EmployeeNo = obj.ID;
+      if (!obj.EmpID) obj.EmpID = obj.ID;
+    }
+
+    // Name alias cross-population
+    const detectedName = obj.EmployeeName || obj['Employee Name'] || obj.Name || obj['Staff Name'] || obj.FullName || obj['Full Name'] || '';
+    if (detectedName) {
+      if (!obj.Name) obj.Name = detectedName;
+      if (!obj.EmployeeName) obj.EmployeeName = detectedName;
+    }
+
+    // Cost Centre <-> Department cross-mapping
+    if (obj.CostCentre && !obj.Department) obj.Department = obj.CostCentre;
+    if (obj.Department && !obj.CostCentre) obj.CostCentre = obj.Department;
+    if (obj['Cost Centre'] && !obj.Department) obj.Department = obj['Cost Centre'];
+    if (obj['Cost Centre'] && !obj.CostCentre) obj.CostCentre = obj['Cost Centre'];
+
+    // Position <-> Job Title cross-mapping
+    if (obj.Position && !obj.JobTitle) obj.JobTitle = obj.Position;
+    if (obj.JobTitle && !obj.Position) obj.Position = obj.JobTitle;
+    if (obj.PositionTitle && !obj.Position) obj.Position = obj.PositionTitle;
+    if (obj['Position Title'] && !obj.Position) obj.Position = obj['Position Title'];
+    if (obj['Job Title'] && !obj.Position) obj.Position = obj['Job Title'];
 
     // Smart fallback for shifted columns
     if (obj.TrainingID && String(obj.TrainingID).trim().toUpperCase().startsWith('SES')) {

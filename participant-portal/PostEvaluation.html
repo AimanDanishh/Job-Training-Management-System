@@ -360,8 +360,8 @@
     initTheme();
     renderCompetencySelectors();
 
-    targetTrainingIdParam = getQueryParam('id') || getQueryParam('training') || getQueryParam('trainingId') || getQueryParam('trn') || <?!= JSON.stringify((typeof params !== 'undefined' && params && (params.id || params.training || params.trainingId || params.trn)) ? (params.id || params.training || params.trainingId || params.trn) : '') ?>;
-    const preEvalEmp = getQueryParam('evaluator') || getQueryParam('emp') || getQueryParam('eval') || <?!= JSON.stringify((typeof params !== 'undefined' && params && (params.evaluator || params.emp || params.eval)) ? (params.evaluator || params.emp || params.eval) : '') ?>;
+    targetTrainingIdParam = getQueryParam('id') || getQueryParam('training') || getQueryParam('trainingId') || getQueryParam('trn');
+    const preEvalEmp = getQueryParam('evaluator') || getQueryParam('emp') || getQueryParam('eval');
 
     if (preEvalEmp) {
       document.getElementById('inp-evaluator-empid').value = preEvalEmp;

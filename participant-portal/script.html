@@ -1,3 +1,7 @@
+<script id="server-params" type="application/json">
+<?!= JSON.stringify((typeof params !== 'undefined' && params) ? params : {}) ?>
+</script>
+
 <script>
   /**
    * Universal async wrapper for calling backend Google Apps Script functions.
@@ -30,11 +34,24 @@
   }
 
   /**
-   * Helper to retrieve URL Query Parameters
+   * Helper to retrieve URL Query Parameters (checks window.location and server-params)
    */
   function getQueryParam(param) {
-    const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get(param) || '';
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const val = urlParams.get(param);
+      if (val !== null && val !== '') return val;
+    } catch(e) {}
+    try {
+      const el = document.getElementById('server-params');
+      if (el && el.textContent) {
+        const data = JSON.parse(el.textContent.trim());
+        if (data && data[param] !== undefined && data[param] !== null && String(data[param]).trim() !== '') {
+          return String(data[param]).trim();
+        }
+      }
+    } catch(e) {}
+    return '';
   }
 
   /**

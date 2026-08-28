@@ -108,7 +108,7 @@ function validateAttendance(sessionId, employeeNo) {
     try {
       if (session.TrainingID) {
         const ss = getTrainingDataSpreadsheet(session.TrainingID);
-        const tpSheet = ss ? ss.getSheetByName('TrainingParticipants') : null;
+        const tpSheet = ss ? (ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants')) : null;
         if (tpSheet) {
           const tpRows = sheetToJson(tpSheet);
           const tpEmp = tpRows.find(e => isSameEmployeeId(e.EmployeeID || e.EmployeeNo || e.ID || '', cleanEmpNo));

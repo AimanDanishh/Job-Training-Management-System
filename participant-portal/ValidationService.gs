@@ -33,111 +33,138 @@ function getValidTraining(trainingId) {
   return { valid: true, training: training };
 }
 
-function getValidEmployee(employeeId, trainingId) {
+// ─── 2. Participant Validation (Attendance & Level 1 Evaluation) ─────────────
+/**
+ * Validate and look up a PARTICIPANT for training attendance and Level 1 evaluation.
+ * Strictly uses participant, attendance, and employee directory records.
+ * NEVER checks supervisor assignment columns or evaluator/HOD routing tables.
+ * 
+ * @param {string} employeeId - Employee ID or Badge Number
+ * @param {string} [trainingId] - Training ID (optional, to verify enrollment)
+ * @param {Spreadsheet} [optionalSpreadsheet] - Pre-opened spreadsheet object (e.g. from session lookup)
+ * @returns {Object} { valid: boolean, enrolled: boolean, employee?: Object, message?: string }
+ */
+function getValidParticipant(employeeId, trainingId, optionalSpreadsheet) {
   if (!employeeId || String(employeeId).trim() === '') {
-    return { valid: false, message: 'Employee identifier is required.' };
+    return { valid: false, message: 'Employee ID is required.' };
   }
   const cleanInput = String(employeeId).trim();
   const cleanInputLower = cleanInput.toLowerCase();
   const cleanTId   = trainingId ? String(trainingId).trim() : '';
 
-  const getRowEmpId = (r) => {
-    return r.ID || r.EmployeeID || r.EmployeeNo || r.EmpID || r.StaffID || r.StaffNo || r.EmpNo ||
-           r['Employee ID'] || r['Employee No'] || r['Staff ID'] || r['Staff No'] || r['Emp ID'] || r['Emp No'] ||
-           r['Employee_ID'] || r['Staff_ID'] || r['Badge No'] || r['BadgeNo'] || r['No'] || r['No.'] || r['Employee Number'] || '';
+  // Universal participant matching predicate across diverse sheet schemas
+  const matchesParticipant = (r) => {
+    if (!r) return false;
+    const possibleIds = [
+      r.EmployeeID, r['Employee ID'], r.Employee_ID,
+      r.EmployeeNo, r['Employee No'], r['Employee Number'],
+      r.EmpID, r['Emp ID'], r.EmpNo, r['Emp No'],
+      r.StaffID, r['Staff ID'], r.StaffNo, r['Staff No'],
+      r.BadgeNo, r['Badge No'], r.BadgeNumber,
+      r.No, r['No.'],
+      r.ID
+    ];
+
+    for (let i = 0; i < possibleIds.length; i++) {
+      const pid = possibleIds[i];
+      if (pid !== undefined && pid !== null && String(pid).trim() !== '' && isSameEmployeeId(pid, cleanInput)) {
+        return true;
+      }
+    }
+
+    const email = r.Email || r.EmailAddress || r['Email Address'] || r['Company Email'] || r['Work Email'];
+    if (email && String(email).trim().toLowerCase() === cleanInputLower) return true;
+
+    const name = r.EmployeeName || r['Employee Name'] || r.Name || r['Staff Name'] || r.FullName || r['Full Name'];
+    if (name && String(name).trim().toLowerCase() === cleanInputLower) return true;
+
+    return false;
   };
 
-  const getRowEmail = (r) => {
-    return r.Email || r.EmailAddress || r['Email Address'] || r['Company Email'] || r['Work Email'] || r['User Email'] || r['HOD Email'] || r['HR Email'] || '';
+  // Universal participant details normalizer (Standard schema: ID, Name, Department, Position, Email)
+  const extractParticipantDetails = (r) => {
+    const empId = r.EmployeeID || r['Employee ID'] || r.Employee_ID ||
+                  r.EmployeeNo || r['Employee No'] || r.EmpID || r['Emp ID'] ||
+                  r.StaffID || r['Staff ID'] || r.BadgeNo || r.ID || cleanInput;
+
+    const empName = r.EmployeeName || r['Employee Name'] || r.Name || r['Staff Name'] ||
+                    r.FullName || r['Full Name'] || cleanInput;
+
+    const empDept = r.Department || r.CostCentre || r['Cost Centre'] || r.Dept || r.Section || '';
+    const empPos  = r.Position || r.JobTitle || r.PositionTitle || r['Position Title'] || r['Job Title'] || r.Designation || 'Participant';
+    const empEmail = r.Email || r.EmailAddress || r['Email Address'] || r['Company Email'] || '';
+
+    return {
+      ID: String(empId).trim(),
+      Name: String(empName).trim(),
+      Department: String(empDept).trim(),
+      Position: String(empPos).trim(),
+      Email: String(empEmail).trim()
+    };
   };
 
-  const getRowName = (r) => {
-    return r.Name || r.EmployeeName || r['Employee Name'] || r['Staff Name'] || r['HOD Name'] || r['HR Name'] || r.FullName || r['Full Name'] || '';
-  };
-
-  const getRowDept = (r) => {
-    return r.Department || r.CostCentre || r['Cost Centre'] || r.Dept || r.Section || '';
-  };
-
-  const getRowPos = (r) => {
-    return r.Position || r.JobTitle || r.PositionTitle || r['Position Title'] || r['Job Title'] || r.Designation || '';
-  };
-
-  // 1. Primary Lookup: Per-Training Spreadsheet (Participants & Assigned Supervisors)
+  // 1. Primary Lookup: Per-Training Spreadsheet(s)
+  const candidateSheets = [];
+  if (optionalSpreadsheet) candidateSheets.push(optionalSpreadsheet);
   if (cleanTId) {
     try {
       const ss = getTrainingDataSpreadsheet(cleanTId);
-      const tpSheet = ss ? (ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants') || ss.getSheetByName('ParticipantList')) : null;
-      if (tpSheet) {
+      if (ss && !candidateSheets.includes(ss)) candidateSheets.push(ss);
+    } catch (e) {
+      Logger.log('Per-training spreadsheet lookup error: ' + e.message);
+    }
+  }
+
+  for (const ss of candidateSheets) {
+    if (!ss) continue;
+    try {
+      // 1a. Check Participants Tab (ONLY participant fields, ignoring supervisor columns)
+      const tpSheet = ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants') || ss.getSheetByName('ParticipantList');
+      if (tpSheet && tpSheet.getLastRow() > 1) {
         const tpRows = sheetToJson(tpSheet);
-        
-        // 1a. Check Participant columns
-        const tpEmp = tpRows.find(r => 
-          isSameEmployeeId(getRowEmpId(r), cleanInput) ||
-          (getRowEmail(r) && String(getRowEmail(r)).trim().toLowerCase() === cleanInputLower) ||
-          (getRowName(r) && String(getRowName(r)).toLowerCase().trim() === cleanInputLower)
-        );
+        const tpEmp = tpRows.find(matchesParticipant);
         if (tpEmp) {
           return {
             valid: true,
-            employee: {
-              ID: getRowEmpId(tpEmp) || cleanInput,
-              Name: getRowName(tpEmp) || cleanInput,
-              Department: getRowDept(tpEmp),
-              Position: getRowPos(tpEmp) || 'Participant',
-              Email: getRowEmail(tpEmp)
-            }
-          };
-        }
-
-        // 1b. Check Assigned Supervisor columns
-        const supEmp = tpRows.find(r => 
-          isSameEmployeeId(r.SupervisorID || '', cleanInput) ||
-          (r.SupervisorEmail && String(r.SupervisorEmail).trim().toLowerCase() === cleanInputLower) ||
-          (r.SupervisorName && String(r.SupervisorName).trim().toLowerCase() === cleanInputLower)
-        );
-        if (supEmp) {
-          return {
-            valid: true,
-            employee: {
-              ID: supEmp.SupervisorID || cleanInput,
-              Name: supEmp.SupervisorName || cleanInput,
-              Email: supEmp.SupervisorEmail || (cleanInput.includes('@') ? cleanInput : ''),
-              Department: getRowDept(supEmp) || 'Supervisor / PIC',
-              Position: 'Supervisor'
-            }
+            enrolled: true,
+            employee: extractParticipantDetails(tpEmp)
           };
         }
       }
-    } catch (e) {
-      Logger.log('Per-training lookup error: ' + e.message);
-    }
 
-    // Check ParticipantList JSON on training record
+      // 1b. Check Attendance Tab in this Training
+      const attSheet = ss.getSheetByName('Attendance');
+      if (attSheet && attSheet.getLastRow() > 1) {
+        const attRows = sheetToJson(attSheet);
+        const attEmp = attRows.find(matchesParticipant);
+        if (attEmp) {
+          return {
+            valid: true,
+            enrolled: true,
+            employee: extractParticipantDetails(attEmp)
+          };
+        }
+      }
+    } catch(ssErr) {
+      Logger.log('Error reading candidate spreadsheet: ' + ssErr.message);
+    }
+  }
+
+  // 1c. Check ParticipantList JSON on training record
+  if (cleanTId) {
     try {
       const tCheck = getValidTraining(cleanTId);
       if (tCheck.valid && tCheck.training) {
-        const rawJson = tCheck.training.ParticipantList || tCheck.training.participants;
+        const rawJson = tCheck.training.ParticipantList || tCheck.training.participants || tCheck.training.Participants;
         if (rawJson) {
           const list = Array.isArray(rawJson) ? rawJson : JSON.parse(rawJson);
           if (Array.isArray(list)) {
-            const m = list.find(p => 
-              isSameEmployeeId(getRowEmpId(p) || p.SupervisorID || '', cleanInput) ||
-              (p.SupervisorEmail && String(p.SupervisorEmail).trim().toLowerCase() === cleanInputLower) ||
-              (p.SupervisorName && String(p.SupervisorName).trim().toLowerCase() === cleanInputLower) ||
-              (getRowEmail(p) && String(getRowEmail(p)).trim().toLowerCase() === cleanInputLower) ||
-              (getRowName(p) && String(getRowName(p)).trim().toLowerCase() === cleanInputLower)
-            );
+            const m = list.find(matchesParticipant);
             if (m) {
               return {
                 valid: true,
-                employee: {
-                  ID: getRowEmpId(m) || m.SupervisorID || cleanInput,
-                  Name: getRowName(m) || m.SupervisorName || cleanInput,
-                  Department: getRowDept(m),
-                  Position: getRowPos(m) || '',
-                  Email: getRowEmail(m) || m.SupervisorEmail || ''
-                }
+                enrolled: true,
+                employee: extractParticipantDetails(m)
               };
             }
           }
@@ -146,101 +173,142 @@ function getValidEmployee(employeeId, trainingId) {
     } catch(jErr) {}
   }
 
-  // 2. Employee Master Directory lookup (Checking all possible employee sheets)
+  // 2. Check Central Database sheet 'Participants' / 'TrainingParticipants'
+  try {
+    const mainSs = getSpreadsheet();
+    if (mainSs) {
+      const dbPartSheet = mainSs.getSheetByName('Participants') || mainSs.getSheetByName('TrainingParticipants');
+      if (dbPartSheet && dbPartSheet.getLastRow() > 1) {
+        const dbParts = sheetToJson(dbPartSheet);
+        const m = dbParts.find(p => {
+          const pTid = String(p.TrainingID || p.TrainingCode || p.ID || '').trim().toLowerCase();
+          if (cleanTId && pTid && pTid !== cleanTId.toLowerCase()) return false;
+          return matchesParticipant(p);
+        });
+        if (m) {
+          return {
+            valid: true,
+            enrolled: true,
+            employee: extractParticipantDetails(m)
+          };
+        }
+      }
+    }
+  } catch(dbErr) {}
+
+  // 3. Employee Master Directory Lookup (To verify if employee is in the company roster)
   const masterSheetTabs = [
     SHEET_NAMES.employees,
-    'Employees',
     'For IT',
     'FOR IT',
+    'Employees',
+    'EMPLOYEES',
     'Staff',
     'Staff List',
     'Employee',
-    'Master Employees',
-    'Cost Centre',
-    'HOD email',
-    'HOD Email',
-    'HR email',
-    'HR Email',
-    'Csuite email',
-    'C-Suite email'
+    'Master Employees'
   ];
 
-  for (const tabName of masterSheetTabs) {
-    if (!tabName) continue;
-    try {
-      const empSheet = getSheet(tabName);
-      if (empSheet) {
-        const rows = sheetToJson(empSheet);
-        const emp = rows.find(r => 
-          isSameEmployeeId(getRowEmpId(r), cleanInput) ||
-          (getRowEmail(r) && String(getRowEmail(r)).trim().toLowerCase() === cleanInputLower) ||
-          (getRowName(r) && String(getRowName(r)).trim().toLowerCase() === cleanInputLower)
-        );
-        if (emp) {
-          return {
-            valid: true,
-            employee: {
-              ID: getRowEmpId(emp) || cleanInput,
-              Name: getRowName(emp) || cleanInput,
-              Department: getRowDept(emp) || 'Company Staff',
-              Position: getRowPos(emp) || 'Employee',
-              Email: getRowEmail(emp) || (cleanInput.includes('@') ? cleanInput : '')
-            }
-          };
+  let foundInDirectory = null;
+  const directorySpreadsheets = [];
+  try {
+    const empSs = getEmployeeSpreadsheet();
+    if (empSs) directorySpreadsheets.push(empSs);
+  } catch(e) {}
+  try {
+    const mainSs = getSpreadsheet();
+    if (mainSs && !directorySpreadsheets.includes(mainSs)) directorySpreadsheets.push(mainSs);
+  } catch(e) {}
+
+  for (const ssObj of directorySpreadsheets) {
+    if (!ssObj) continue;
+    for (const tabName of masterSheetTabs) {
+      if (!tabName) continue;
+      try {
+        const empSheet = ssObj.getSheetByName(tabName);
+        if (empSheet && empSheet.getLastRow() > 1) {
+          const rows = sheetToJson(empSheet);
+          const emp = rows.find(matchesParticipant);
+          if (emp) {
+            foundInDirectory = extractParticipantDetails(emp);
+            break;
+          }
         }
-      }
-    } catch(sheetErr) {
-      Logger.log(`Error checking sheet tab ${tabName}: ` + sheetErr.message);
+      } catch(sheetErr) {}
     }
+    if (foundInDirectory) break;
   }
 
-  // 3. Fallback: Search all per-training participant rosters for assigned supervisor / participant
+  if (foundInDirectory) {
+    if (cleanTId) {
+      let hasExplicitParticipants = false;
+      for (const ss of candidateSheets) {
+        if (!ss) continue;
+        const tpSheet = ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants') || ss.getSheetByName('ParticipantList');
+        if (tpSheet && tpSheet.getLastRow() > 1) {
+          hasExplicitParticipants = true;
+          break;
+        }
+      }
+
+      if (hasExplicitParticipants) {
+        return {
+          valid: false,
+          enrolled: false,
+          employee: foundInDirectory,
+          message: `Employee ID (${cleanInput}) - ${foundInDirectory.Name} is not enrolled in this training programme.`
+        };
+      }
+    }
+
+    return {
+      valid: true,
+      enrolled: true,
+      employee: foundInDirectory
+    };
+  }
+
+  // 4. Safety Fallback across all per-training spreadsheets if employee was enrolled in any training
   try {
     const tSheet = getSheet(SHEET_NAMES.trainings);
-    if (tSheet) {
+    if (tSheet && tSheet.getLastRow() > 1) {
       const allTrainings = sheetToJson(tSheet);
       for (const t of allTrainings) {
-        const tId = t.ID || t.TrainingID || t.Code;
-        if (!tId) continue;
-        const ss = getTrainingDataSpreadsheet(tId);
+        const ss = getTrainingDataSpreadsheet(t);
         if (!ss) continue;
-        const tpSheet = ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants');
-        if (!tpSheet) continue;
-        const tpRows = sheetToJson(tpSheet);
-        const foundRow = tpRows.find(r => 
-          isSameEmployeeId(r.SupervisorID || '', cleanInput) ||
-          isSameEmployeeId(getRowEmpId(r), cleanInput) ||
-          (r.SupervisorEmail && String(r.SupervisorEmail).trim().toLowerCase() === cleanInputLower) ||
-          (r.SupervisorName && String(r.SupervisorName).trim().toLowerCase() === cleanInputLower) ||
-          (getRowEmail(r) && String(getRowEmail(r)).trim().toLowerCase() === cleanInputLower) ||
-          (getRowName(r) && String(getRowName(r)).trim().toLowerCase() === cleanInputLower)
-        );
-        if (foundRow) {
-          const isSup = isSameEmployeeId(foundRow.SupervisorID || '', cleanInput) ||
-                        (foundRow.SupervisorEmail && String(foundRow.SupervisorEmail).trim().toLowerCase() === cleanInputLower) ||
-                        (foundRow.SupervisorName && String(foundRow.SupervisorName).trim().toLowerCase() === cleanInputLower);
-          return {
-            valid: true,
-            employee: {
-              ID: isSup ? (foundRow.SupervisorID || cleanInput) : (getRowEmpId(foundRow) || cleanInput),
-              Name: isSup ? (foundRow.SupervisorName || cleanInput) : (getRowName(foundRow) || cleanInput),
-              Department: getRowDept(foundRow) || (isSup ? 'Supervisor / Evaluator' : ''),
-              Position: isSup ? 'Supervisor' : (getRowPos(foundRow) || 'Participant'),
-              Email: isSup ? (foundRow.SupervisorEmail || '') : getRowEmail(foundRow)
+        const pSheet = ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants');
+        if (pSheet && pSheet.getLastRow() > 1) {
+          const pRows = sheetToJson(pSheet);
+          const matched = pRows.find(matchesParticipant);
+          if (matched) {
+            const empDetails = extractParticipantDetails(matched);
+            if (cleanTId) {
+              const currentTCode = String(t.ID || t.Code || '').trim().toLowerCase();
+              if (currentTCode === cleanTId.toLowerCase()) {
+                return {
+                  valid: true,
+                  enrolled: true,
+                  employee: empDetails
+                };
+              }
+            } else {
+              return {
+                valid: true,
+                enrolled: true,
+                employee: empDetails
+              };
             }
-          };
+          }
         }
       }
     }
-  } catch(tScanErr) {
-    Logger.log('Training scan fallback error: ' + tScanErr.message);
-  }
+  } catch(fbErr) {}
 
-  if (!getConfigProperty('SPREADSHEET_ID', '')) {
-    return { valid: false, message: 'Spreadsheet ID not configured. Please set SPREADSHEET_ID in Apps Script Project Settings.' };
-  }
-
-  return { valid: false, message: `Evaluator (${cleanInput}) is not registered in the employee directory.` };
+  return {
+    valid: false,
+    enrolled: false,
+    message: `Employee ID (${cleanInput}) is not registered in the employee directory.`
+  };
 }
 
 // ─── 3. Check Employee Enrollment for Training ──────────────────────────────────
@@ -248,47 +316,15 @@ function validateParticipantEnrollment(trainingId, employeeId) {
   const cleanTId   = String(trainingId || '').trim();
   const cleanEmpId = String(employeeId || '').trim();
 
-  // A. Check per-training spreadsheet TrainingParticipants / Participants tab
-  const ss = getTrainingDataSpreadsheet(cleanTId);
-  const tpSheet = ss ? (ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants') || ss.getSheetByName('ParticipantList')) : null;
-  if (tpSheet) {
-    const tpRows = sheetToJson(tpSheet);
-    const enrolled = tpRows.find(r => 
-      isSameEmployeeId(r.EmployeeID || r.EmployeeNo || r.ID || '', cleanEmpId) ||
-      (r.EmployeeName && String(r.EmployeeName).toLowerCase().includes(cleanEmpId.toLowerCase()))
-    );
-    if (enrolled) return { valid: true, participant: enrolled };
+  const partCheck = getValidParticipant(cleanEmpId, cleanTId);
+  if (partCheck.valid && partCheck.enrolled) {
+    return { valid: true, participant: partCheck.employee };
   }
 
-  // B. Check ParticipantList JSON on training record
-  try {
-    const tCheck = getValidTraining(cleanTId);
-    if (tCheck.valid && tCheck.training) {
-      const rawJson = tCheck.training.ParticipantList || tCheck.training.participants;
-      if (rawJson) {
-        const list = Array.isArray(rawJson) ? rawJson : JSON.parse(rawJson);
-        if (Array.isArray(list)) {
-          const m = list.find(p => isSameEmployeeId(p.EmployeeID || p.EmployeeNo || p.ID || '', cleanEmpId));
-          if (m) return { valid: true, participant: m };
-        }
-      }
-    }
-  } catch(jErr) {}
-
-  // C. Check central Participants sheet in Main DB
-  try {
-    const dbPartSheet = getSheet('Participants') || getSheet('TrainingParticipants');
-    if (dbPartSheet) {
-      const dbParts = sheetToJson(dbPartSheet);
-      const m = dbParts.find(p => {
-        const pTid = String(p.TrainingID || p.TrainingCode || p.ID || '').trim().toLowerCase();
-        return (pTid === cleanTId.toLowerCase()) && isSameEmployeeId(p.EmployeeID || p.EmployeeNo || p.ID || '', cleanEmpId);
-      });
-      if (m) return { valid: true, participant: m };
-    }
-  } catch(dbErr) {}
-
-  return { valid: false, message: `Employee ID (${cleanEmpId}) is not enrolled in this training.` };
+  return {
+    valid: false,
+    message: partCheck.message || `Employee ID (${cleanEmpId}) is not enrolled in this training programme.`
+  };
 }
 
 // ─── 4. Public Attendance Validation ─────────────────────────────────────────────
@@ -311,33 +347,9 @@ function validatePublicAttendance(sessionId, employeeId) {
     }
 
     const session = found.session;
-    const sSheet  = found.sessionSheet;
     const qrStatus = String(session.QRStatus || 'Active').trim();
-
-    // Check if SessionDate + EndTime has passed (only for valid current dates, ignoring 1899 date epoch)
-    if (session.SessionDate && qrStatus !== 'Active') {
-      try {
-        const currentDate = new Date();
-        const endTimeStr = session.EndTime || '17:00';
-        const sDate = new Date(session.SessionDate);
-        if (!isNaN(sDate.getTime()) && sDate.getFullYear() > 2020) {
-          const [hours, minutes] = String(endTimeStr).split(':').map(Number);
-          sDate.setHours(hours || 17, minutes || 0, 0, 0);
-
-          if (currentDate > sDate) {
-            if (sSheet) {
-              const row = findRowById(sSheet, cleanSessionId);
-              if (row !== -1) sSheet.getRange(row, 9).setValue('Expired');
-            }
-            return { valid: false, message: `Attendance registration for this session is closed.` };
-          }
-        }
-      } catch (err) {
-        Logger.log('Session time check error: ' + err.message);
-      }
-    }
-
     const statusLower = qrStatus.toLowerCase();
+
     if (statusLower === 'inactive' || statusLower === 'deleted') {
       return { valid: false, message: 'This QR attendance session is no longer active. Attendance cannot be recorded.' };
     }
@@ -354,22 +366,23 @@ function validatePublicAttendance(sessionId, employeeId) {
     const tCheck = getValidTraining(trainingId);
     if (!tCheck.valid) return tCheck;
 
-    // C. Validate Employee Existence (Checking training participant list first)
-    const empCheck = getValidEmployee(cleanEmpId, trainingId);
-    if (!empCheck.valid) return empCheck;
+    // C. Validate Participant Existence & Enrollment (Using Attendance/Participant DB only)
+    const partCheck = getValidParticipant(cleanEmpId, trainingId, found.spreadsheet);
+    if (!partCheck.valid || !partCheck.enrolled) {
+      return {
+        valid: false,
+        message: partCheck.message || `Employee ID (${cleanEmpId}) is not enrolled in this training programme.`
+      };
+    }
 
-    // D. Validate Employee Enrollment for Training
-    const enrollCheck = validateParticipantEnrollment(trainingId, cleanEmpId);
-    if (!enrollCheck.valid) return enrollCheck;
-
-    // E. Prevent Duplicate Attendance Submission
+    // D. Prevent Duplicate Attendance Submission (Using Attendance Tab in Training Data)
     const ss = found.spreadsheet;
     const attSheet = ss ? ss.getSheetByName('Attendance') : null;
     if (attSheet) {
       const attRows = sheetToJson(attSheet);
       const duplicate = attRows.find(r => {
         const rSessionId = String(r.SessionID || '').trim();
-        const rEmpNo     = String(r.EmployeeNo || r.EmployeeID || '').trim();
+        const rEmpNo     = String(r.EmployeeNo || r.EmployeeID || r.ID || '').trim();
         return rSessionId === cleanSessionId && isSameEmployeeId(rEmpNo, cleanEmpId);
       });
 
@@ -379,7 +392,7 @@ function validatePublicAttendance(sessionId, employeeId) {
           duplicate: true,
           scanTime: duplicate.ScanTime || duplicate.EditedAt || 'Earlier',
           message: `Attendance has already been recorded for Employee ID (${cleanEmpId}) for session ${cleanSessionId}.`,
-          employee: empCheck.employee,
+          employee: partCheck.employee,
           session: session
         };
       }
@@ -389,7 +402,7 @@ function validatePublicAttendance(sessionId, employeeId) {
       valid: true,
       session: session,
       training: tCheck.training,
-      employee: empCheck.employee
+      employee: partCheck.employee
     };
   } catch (e) {
     Logger.log('validatePublicAttendance error: ' + e.message);
@@ -397,7 +410,7 @@ function validatePublicAttendance(sessionId, employeeId) {
   }
 }
 
-// ─── 4.1 Attendance Eligibility Check for Evaluation ──────────────────────────────
+// ─── 4.1 Attendance Eligibility Check for Level 1 Evaluation ────────────────────
 function checkEmployeeAttendanceEligibility(trainingId, employeeId) {
   if (!trainingId || String(trainingId).trim() === '') {
     return { eligible: false, message: 'Training ID is required.' };
@@ -411,7 +424,7 @@ function checkEmployeeAttendanceEligibility(trainingId, employeeId) {
 
   const ss = getTrainingDataSpreadsheet(cleanTId);
   if (!ss) {
-    return { eligible: true, message: 'Training data sheet is unavailable, bypassing attendance lock.' };
+    return { eligible: true, message: 'Training data sheet is unavailable.' };
   }
 
   const attSheet = ss.getSheetByName('Attendance');
@@ -421,9 +434,15 @@ function checkEmployeeAttendanceEligibility(trainingId, employeeId) {
 
   const attRows = sheetToJson(attSheet);
   if (attRows.length === 0) {
-    return { eligible: true, message: 'No attendance rows recorded yet.' };
+    // If no attendance records exist yet for this entire training, verify enrollment
+    const partCheck = getValidParticipant(cleanEmpId, cleanTId);
+    if (partCheck.valid && partCheck.enrolled) {
+      return { eligible: true, participant: partCheck.employee };
+    }
+    return { eligible: false, message: `Employee ID (${cleanEmpId}) is not enrolled in this training.` };
   }
 
+  // Attendance records exist: Participant MUST have an attendance log
   const userAttRecord = attRows.find(r => {
     const rEmpNo = String(r.EmployeeNo || r.EmployeeID || r.ID || '').trim();
     return isSameEmployeeId(rEmpNo, cleanEmpId);
@@ -431,23 +450,20 @@ function checkEmployeeAttendanceEligibility(trainingId, employeeId) {
 
   if (userAttRecord) {
     const status = String(userAttRecord.Status || 'Present').trim().toLowerCase();
-    if (status === 'absent') {
+    if (status === 'absent' || status === 'did not attend' || status === 'not attend') {
       return {
         eligible: false,
-        message: 'Your attendance for this training was marked as Absent.'
+        message: 'Your attendance for this training was marked as Absent. Evaluation is not permitted.'
       };
     }
     return { eligible: true, attendanceRecord: userAttRecord };
   }
 
-  const enrollCheck = validateParticipantEnrollment(cleanTId, cleanEmpId);
-  if (enrollCheck.valid) {
-    return { eligible: true, participant: enrollCheck.participant };
-  }
-
+  // Attendance taken but this employee has no record
   return {
     eligible: false,
-    message: 'Our records show that you do not have an attendance record for this training.'
+    noAttendance: true,
+    message: 'Our records show that you do not have an attendance record for this training. Please attend the training session first.'
   };
 }
 
@@ -480,44 +496,64 @@ function verifyEmployeeForAttendance(sessionId, employeeId) {
   }
 }
 
-function isTrainingFinished(training) {
+function isTrainingFinished(training, employeeId) {
   if (!training) return false;
   const status = String(training.Status || '').trim().toLowerCase();
   const stage  = String(training.Stage || '').trim().toLowerCase();
 
-  if (status === 'completed' || stage === 'training completed' || stage === 'evaluation completed' || stage === 'waiting for 3-month review' || stage === 'programme closed') {
+  // 1. Status or stage indicates active or completed
+  if (status === 'completed' || status === 'in progress' || status === 'ongoing' ||
+      stage === 'training completed' || stage === 'evaluation completed' || 
+      stage === 'attendance in progress' || stage === 'waiting for 3-month review' || stage === 'programme closed') {
     return true;
   }
 
-  const dateVal = training.EndDate || training.StartDate;
+  // 2. If participant already attended, training is definitely active/evaluable
+  if (employeeId && (training.ID || training.TrainingID || training.Code)) {
+    try {
+      const ss = getTrainingDataSpreadsheet(training.ID || training.TrainingID || training.Code);
+      if (ss) {
+        const attSheet = ss.getSheetByName('Attendance');
+        if (attSheet) {
+          const attRows = sheetToJson(attSheet);
+          const hasAttended = attRows.some(r => isSameEmployeeId(r.EmployeeNo || r.EmployeeID || r.ID || '', employeeId) && String(r.Status).toLowerCase() !== 'absent');
+          if (hasAttended) return true;
+        }
+      }
+    } catch(e) {}
+  }
+
+  // 3. Compare start date by calendar day (00:00:00) so same-day evaluations are unlocked
+  const dateVal = training.StartDate || training.EndDate;
   if (!dateVal) return true;
 
-  let compDate = null;
+  let startDateObj = null;
   if (dateVal instanceof Date) {
-    compDate = isNaN(dateVal.getTime()) ? null : new Date(dateVal);
+    startDateObj = isNaN(dateVal.getTime()) ? null : new Date(dateVal);
   } else {
     const str = String(dateVal).trim();
     const ymd = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
     if (ymd) {
-      compDate = new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]), 23, 59, 59, 999);
+      startDateObj = new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]), 0, 0, 0, 0);
     } else {
       const dmy = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
       if (dmy) {
-        compDate = new Date(Number(dmy[3]), Number(dmy[2]) - 1, Number(dmy[1]), 23, 59, 59, 999);
+        startDateObj = new Date(Number(dmy[3]), Number(dmy[2]) - 1, Number(dmy[1]), 0, 0, 0, 0);
       } else {
         const d = new Date(str);
         if (!isNaN(d.getTime())) {
-          d.setHours(23, 59, 59, 999);
-          compDate = d;
+          d.setHours(0, 0, 0, 0);
+          startDateObj = d;
         }
       }
     }
   }
 
-  if (!compDate) return true;
+  if (!startDateObj) return true;
 
   const now = new Date();
-  return now.getTime() >= compDate.getTime();
+  now.setHours(0, 0, 0, 0);
+  return now.getTime() >= startDateObj.getTime();
 }
 
 function verifyEmployeeForEvaluation(trainingId, employeeId) {
@@ -536,28 +572,26 @@ function verifyEmployeeForEvaluation(trainingId, employeeId) {
     const tCheck = getValidTraining(cleanTId);
     if (!tCheck.valid) return err(tCheck.message);
 
-    // B. Validate Employee Existence (checking training participant list first)
-    const empCheck = getValidEmployee(cleanEmpId, cleanTId);
-    if (!empCheck.valid) return err(empCheck.message);
+    // B. Validate Participant Existence & Enrollment (Using Participant/Attendance DB only)
+    const partCheck = getValidParticipant(cleanEmpId, cleanTId);
+    if (!partCheck.valid || !partCheck.enrolled) {
+      return err(partCheck.message || `Employee ID (${cleanEmpId}) is not enrolled in this training programme.`);
+    }
 
-    // C. Validate Employee Enrollment
-    const enrollCheck = validateParticipantEnrollment(cleanTId, cleanEmpId);
-    if (!enrollCheck.valid) return err(enrollCheck.message);
-
-    // D. Validate Training Completion: Training must be finished before evaluation is allowed
-    if (!isTrainingFinished(tCheck.training)) {
-      const compDateStr = formatMinimalistDate(tCheck.training.EndDate || tCheck.training.StartDate);
+    // C. Validate Training Timeline: Unlocks on training date or once attended
+    if (!isTrainingFinished(tCheck.training, cleanEmpId)) {
+      const compDateStr = formatMinimalistDate(tCheck.training.StartDate || tCheck.training.EndDate);
       return ok({
         eligible: false,
         notFinished: true,
         completionDate: compDateStr,
-        message: `Training evaluation is not available yet. This evaluation can only be submitted after the training programme has finished (Scheduled completion: ${compDateStr}).`,
+        message: `Training evaluation is not available yet. This evaluation opens on the training date (Scheduled: ${compDateStr}).`,
         training: tCheck.training,
-        employee: empCheck.employee
+        employee: partCheck.employee
       });
     }
 
-    // E. Validate Attendance Eligibility (CRITICAL REQUIREMENT: Must have attended at least 1 session)
+    // D. Validate Attendance Eligibility (Must have attended at least 1 session)
     const attCheck = checkEmployeeAttendanceEligibility(cleanTId, cleanEmpId);
     if (!attCheck.eligible) {
       return ok({
@@ -565,17 +599,17 @@ function verifyEmployeeForEvaluation(trainingId, employeeId) {
         noAttendance: true,
         message: attCheck.message,
         training: tCheck.training,
-        employee: empCheck.employee
+        employee: partCheck.employee
       });
     }
 
-    // E. Check if Evaluation Already Submitted
+    // E. Check if Evaluation Already Submitted (Using isSameEmployeeId)
     const ss = getTrainingDataSpreadsheet(cleanTId);
     const evalSheet = ss ? (ss.getSheetByName('Evaluation') || ss.getSheetByName('TrainingEval')) : null;
     if (evalSheet) {
       const evalRows = sheetToJson(evalSheet);
       const duplicate = evalRows.find(r => 
-        String(r.EmployeeID || r.EmployeeNo || '').trim().toLowerCase() === cleanEmpId.toLowerCase()
+        isSameEmployeeId(r.EmployeeID || r.EmployeeNo || r.ID || '', cleanEmpId)
       );
 
       if (duplicate) {
@@ -585,7 +619,7 @@ function verifyEmployeeForEvaluation(trainingId, employeeId) {
           submittedAt: duplicate.SubmittedAt || 'Earlier',
           message: 'You have already completed the evaluation for this training.',
           training: tCheck.training,
-          employee: empCheck.employee
+          employee: partCheck.employee
         });
       }
     }
@@ -594,11 +628,165 @@ function verifyEmployeeForEvaluation(trainingId, employeeId) {
       eligible: true,
       valid: true,
       training: tCheck.training,
-      employee: empCheck.employee
+      employee: partCheck.employee
     });
   } catch (e) {
     return err('Evaluation verification failed: ' + e.message);
   }
+}
+
+// ─── 5. Public Training Evaluation Validation ────────────────────────────────────
+function validatePublicEvaluation(trainingId, employeeId) {
+  try {
+    if (!trainingId || String(trainingId).trim() === '') {
+      return { valid: false, message: 'Training ID is required for evaluation.' };
+    }
+    if (!employeeId || String(employeeId).trim() === '') {
+      return { valid: false, message: 'Employee ID is required for evaluation.' };
+    }
+
+    const cleanTId   = String(trainingId).trim();
+    const cleanEmpId = String(employeeId).trim();
+
+    // A. Validate Training Existence
+    const tCheck = getValidTraining(cleanTId);
+    if (!tCheck.valid) return tCheck;
+
+    // B. Validate Participant Existence & Enrollment (Using Participant/Attendance DB only)
+    const partCheck = getValidParticipant(cleanEmpId, cleanTId);
+    if (!partCheck.valid || !partCheck.enrolled) {
+      return {
+        valid: false,
+        message: partCheck.message || `Employee ID (${cleanEmpId}) is not enrolled in this training programme.`
+      };
+    }
+
+    // C. Validate Training Timeline: Unlocks on training date or once attended
+    if (!isTrainingFinished(tCheck.training, cleanEmpId)) {
+      const compDateStr = formatMinimalistDate(tCheck.training.StartDate || tCheck.training.EndDate);
+      return {
+        valid: false,
+        message: `Submission Rejected: Training evaluation can only be submitted on or after the training date (Scheduled: ${compDateStr}).`
+      };
+    }
+
+    // D. Attendance Verification: Disallow evaluation for participants without attendance
+    const attCheck = checkEmployeeAttendanceEligibility(cleanTId, cleanEmpId);
+    if (!attCheck.eligible) {
+      return {
+        valid: false,
+        message: attCheck.message
+      };
+    }
+
+    // E. Prevent Duplicate Evaluation Submission
+    const ss = getTrainingDataSpreadsheet(cleanTId);
+    const evalSheet = ss ? (ss.getSheetByName('Evaluation') || ss.getSheetByName('TrainingEval')) : null;
+    if (evalSheet) {
+      const evalRows = sheetToJson(evalSheet);
+      const duplicate = evalRows.find(r => 
+        isSameEmployeeId(r.EmployeeID || r.EmployeeNo || r.ID || '', cleanEmpId)
+      );
+
+      if (duplicate) {
+        return {
+          valid: false,
+          message: `You have already completed the evaluation for this training programme (${tCheck.training.Code || cleanTId}).`
+        };
+      }
+    }
+
+    return {
+      valid: true,
+      training: tCheck.training,
+      employee: partCheck.employee
+    };
+  } catch (e) {
+    Logger.log('validatePublicEvaluation error: ' + e.message);
+    return { valid: false, message: 'Evaluation validation failure: ' + e.message };
+  }
+}
+
+// ─── 6. Evaluator Authentication & Post-Evaluation (Level 3 - Supervisor Review) ──
+/**
+ * Dedicated Evaluator / Supervisor Lookup (Used ONLY by 3-Month Post Evaluation).
+ */
+function getValidEvaluator(evaluatorInput) {
+  if (!evaluatorInput || String(evaluatorInput).trim() === '') {
+    return { valid: false, message: 'Supervisor / Evaluator Employee ID or Email is required.' };
+  }
+  const cleanInput = String(evaluatorInput).trim();
+  const cleanInputLower = cleanInput.toLowerCase();
+
+  const getRowEmpId = (r) => r.EmployeeID || r.EmployeeNo || r['Employee ID'] || r['Employee No'] || r.EmpID || r.StaffID || r.ID || '';
+  const getRowEmail = (r) => r.Email || r.EmailAddress || r['Email Address'] || r['HOD Email'] || r['HR Email'] || '';
+  const getRowName = (r) => r.Name || r.EmployeeName || r['HOD Name'] || r['HR Name'] || r.FullName || '';
+  const getRowDept = (r) => r.Department || r.CostCentre || r['Cost Centre'] || '';
+
+  // 1. Check Master Employee & HOD Tables
+  const evaluatorTabs = ['Employees', 'For IT', 'HOD email', 'HR email', 'Csuite email'];
+  for (const tabName of evaluatorTabs) {
+    try {
+      const sheet = getSheet(tabName);
+      if (sheet) {
+        const rows = sheetToJson(sheet);
+        const emp = rows.find(r => 
+          isSameEmployeeId(getRowEmpId(r), cleanInput) ||
+          (getRowEmail(r) && String(getRowEmail(r)).trim().toLowerCase() === cleanInputLower) ||
+          (getRowName(r) && String(getRowName(r)).trim().toLowerCase() === cleanInputLower) ||
+          (r.HODEmail && String(r.HODEmail).trim().toLowerCase() === cleanInputLower) ||
+          (r.HODName && String(r.HODName).trim().toLowerCase() === cleanInputLower)
+        );
+        if (emp) {
+          return {
+            valid: true,
+            evaluator: {
+              ID: getRowEmpId(emp) || cleanInput,
+              Name: getRowName(emp) || emp.HODName || cleanInput,
+              Department: getRowDept(emp) || 'Supervisor / Evaluator',
+              Email: getRowEmail(emp) || emp.HODEmail || (cleanInput.includes('@') ? cleanInput : '')
+            }
+          };
+        }
+      }
+    } catch(e) {}
+  }
+
+  // 2. Check Assigned Supervisor columns across Training Data spreadsheets
+  try {
+    const tSheet = getSheet(SHEET_NAMES.trainings);
+    if (tSheet) {
+      const allTrainings = sheetToJson(tSheet);
+      for (const t of allTrainings) {
+        const tId = t.ID || t.TrainingID || t.Code;
+        if (!tId) continue;
+        const ss = getTrainingDataSpreadsheet(tId);
+        if (!ss) continue;
+        const tpSheet = ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants');
+        if (!tpSheet) continue;
+        const tpRows = sheetToJson(tpSheet);
+        const found = tpRows.find(r => 
+          isSameEmployeeId(r.SupervisorID || '', cleanInput) ||
+          (r.SupervisorEmail && String(r.SupervisorEmail).trim().toLowerCase() === cleanInputLower) ||
+          (r.SupervisorName && String(r.SupervisorName).trim().toLowerCase() === cleanInputLower)
+        );
+        if (found) {
+          return {
+            valid: true,
+            evaluator: {
+              ID: found.SupervisorID || cleanInput,
+              EmployeeID: found.SupervisorID || cleanInput,
+              Name: found.SupervisorName || cleanInput,
+              Department: getRowDept(found) || 'Supervisor / Evaluator',
+              Email: found.SupervisorEmail || (cleanInput.includes('@') ? cleanInput : '')
+            }
+          };
+        }
+      }
+    }
+  } catch(e) {}
+
+  return { valid: false, message: `Evaluator (${cleanInput}) is not registered in the employee directory.` };
 }
 
 function verifyEvaluatorByEmployeeId(evaluatorEmployeeId, trainingId) {
@@ -609,17 +797,17 @@ function verifyEvaluatorByEmployeeId(evaluatorEmployeeId, trainingId) {
     const cleanEvalEmpId = String(evaluatorEmployeeId).trim();
     let trnIdFilter = String(trainingId || '').trim();
 
-    // 1. Verify Evaluator Employee Record from Directory or Per-Training Data
-    const empCheck = getValidEmployee(cleanEvalEmpId, trnIdFilter);
-    if (!empCheck.valid) {
-      return err(`Evaluator (${cleanEvalEmpId}) is not registered in the employee directory.`);
+    // 1. Verify Evaluator Employee Record
+    const evalCheck = getValidEvaluator(cleanEvalEmpId);
+    if (!evalCheck.valid) {
+      return err(evalCheck.message);
     }
 
-    const evaluator = empCheck.employee;
+    const evaluator = evalCheck.evaluator;
     const evalEmpId = evaluator.EmployeeID || evaluator.ID || cleanEvalEmpId;
-    const evalName  = evaluator.Name || evaluator.EmployeeName || cleanEvalEmpId;
-    const evalDept  = evaluator.CostCentre || evaluator.Department || '';
-    const evalEmail = evaluator.Email || evaluator.EmailAddress || '';
+    const evalName  = evaluator.Name || cleanEvalEmpId;
+    const evalDept  = evaluator.Department || '';
+    const evalEmail = evaluator.Email || '';
 
     // 2. Fetch all trainings from Master Sheet
     const tSheet = getSheet(SHEET_NAMES.trainings);
@@ -640,7 +828,6 @@ function verifyEvaluatorByEmployeeId(evaluatorEmployeeId, trainingId) {
     let overallCompletedCount = 0;
     let overallAssignedCount = 0;
     let isSelfParticipantAnywhere = false;
-    let anySupervisorConfiguredAnywhere = false;
 
     targetTrainingsList.forEach(t => {
       const tId = t.ID || t.TrainingID || t.Code;
@@ -660,16 +847,12 @@ function verifyEvaluatorByEmployeeId(evaluatorEmployeeId, trainingId) {
       const tCompleted = [];
 
       tpRows.forEach(p => {
-        const empId = String(p.EmployeeID || p.ID || '').trim();
+        const empId = String(p.EmployeeID || p.EmployeeNo || p.ID || '').trim();
         if (!empId) return;
 
         const pSupId = String(p.SupervisorID || '').trim();
         const pSupEmail = String(p.SupervisorEmail || '').trim().toLowerCase();
         const pSupName = String(p.SupervisorName || '').trim().toLowerCase();
-
-        if (pSupId || pSupEmail || pSupName) {
-          anySupervisorConfiguredAnywhere = true;
-        }
 
         // Rule: Block self-evaluation
         if (isSameEmployeeId(evalEmpId, empId) || isSameEmployeeId(cleanEvalEmpId, empId)) {
@@ -695,7 +878,7 @@ function verifyEvaluatorByEmployeeId(evaluatorEmployeeId, trainingId) {
           TrainingName: t.Name || ''
         };
 
-        if (completedEmpIds.includes(empId.toLowerCase())) {
+        if (completedEmpIds.some(cId => isSameEmployeeId(cId, empId))) {
           tCompleted.push(pObj);
         } else {
           tPending.push(pObj);
@@ -733,7 +916,6 @@ function verifyEvaluatorByEmployeeId(evaluatorEmployeeId, trainingId) {
       if (isSelfParticipantAnywhere && overallAssignedCount === 0) {
         return err(`Access Notice: You (${evalName}) are registered as a participant. Participants cannot evaluate themselves. 3-Month post-evaluations must be conducted by your assigned Supervisor or HOD.`);
       }
-      // When accessing general dashboard with no specific training filter, allow showing empty dashboard
     }
 
     const primaryTrainingCard = trnIdFilter
@@ -754,7 +936,6 @@ function verifyEvaluatorByEmployeeId(evaluatorEmployeeId, trainingId) {
         totalCompleted: overallCompletedCount,
         totalAssigned: overallAssignedCount
       },
-      // Backward-compatible fields
       training: primaryTrainingCard ? {
         ID: primaryTrainingCard.ID,
         Code: primaryTrainingCard.Code,
@@ -811,78 +992,7 @@ function computeTrainingLockInfo(training) {
   };
 }
 
-// ─── 5. Public Training Evaluation Validation ────────────────────────────────────
-function validatePublicEvaluation(trainingId, employeeId) {
-  try {
-    if (!trainingId || String(trainingId).trim() === '') {
-      return { valid: false, message: 'Training ID is required for evaluation.' };
-    }
-    if (!employeeId || String(employeeId).trim() === '') {
-      return { valid: false, message: 'Employee ID is required for evaluation.' };
-    }
-
-    const cleanTId   = String(trainingId).trim();
-    const cleanEmpId = String(employeeId).trim();
-
-    // A. Validate Training Existence
-    const tCheck = getValidTraining(cleanTId);
-    if (!tCheck.valid) return tCheck;
-
-    // B. Validate Employee Existence (checking training participant list first)
-    const empCheck = getValidEmployee(cleanEmpId, cleanTId);
-    if (!empCheck.valid) return empCheck;
-
-    // C. Validate Employee Enrollment
-    const enrollCheck = validateParticipantEnrollment(cleanTId, cleanEmpId);
-    if (!enrollCheck.valid) return enrollCheck;
-
-    // D1. Validate Training Completion: Training must be finished before evaluation is allowed
-    if (!isTrainingFinished(tCheck.training)) {
-      const compDateStr = formatMinimalistDate(tCheck.training.EndDate || tCheck.training.StartDate);
-      return {
-        valid: false,
-        message: `Submission Rejected: Training evaluation can only be submitted after the training programme has finished (Scheduled completion: ${compDateStr}).`
-      };
-    }
-
-    // D2. Attendance Verification: Disallow evaluation for participants without attendance
-    const attCheck = checkEmployeeAttendanceEligibility(cleanTId, cleanEmpId);
-    if (!attCheck.eligible) {
-      return {
-        valid: false,
-        message: attCheck.message
-      };
-    }
-
-    // E. Prevent Duplicate Evaluation Submission
-    const ss = getTrainingDataSpreadsheet(cleanTId);
-    const evalSheet = ss ? (ss.getSheetByName('Evaluation') || ss.getSheetByName('TrainingEval')) : null;
-    if (evalSheet) {
-      const evalRows = sheetToJson(evalSheet);
-      const duplicate = evalRows.find(r => 
-        String(r.EmployeeID || '').trim().toLowerCase() === cleanEmpId.toLowerCase()
-      );
-
-      if (duplicate) {
-        return {
-          valid: false,
-          message: `You have already completed the evaluation for this training programme (${tCheck.training.Code || cleanTId}).`
-        };
-      }
-    }
-
-    return {
-      valid: true,
-      training: tCheck.training,
-      employee: empCheck.employee
-    };
-  } catch (e) {
-    Logger.log('validatePublicEvaluation error: ' + e.message);
-    return { valid: false, message: 'Evaluation validation failure: ' + e.message };
-  }
-}
-
-// ─── 6. Public Post-Evaluation Validation (3-Month Supervisor Review) ────────────
+// ─── 7. Public Post-Evaluation Validation (3-Month Supervisor Review) ────────────
 function validatePublicPostEvaluation(trainingId, employeeId, token, evaluatorId, evaluatorName) {
   try {
     const cleanTId   = String(trainingId || '').trim();
@@ -920,21 +1030,19 @@ function validatePublicPostEvaluation(trainingId, employeeId, token, evaluatorId
     const tCheck = getValidTraining(effectiveTId);
     if (!tCheck.valid) return tCheck;
 
-    // B. Validate Employee Existence (checking training participant list first)
-    const empCheck = getValidEmployee(effectiveEmpId, effectiveTId);
-    if (!empCheck.valid) return empCheck;
+    // B. Validate Participant Existence & Enrollment
+    const partCheck = getValidParticipant(effectiveEmpId, effectiveTId);
+    if (!partCheck.valid || !partCheck.enrolled) {
+      return { valid: false, message: `Subordinate (${effectiveEmpId}) is not enrolled in this training programme.` };
+    }
 
-    // C. Validate Employee Enrollment
-    const enrollCheck = validateParticipantEnrollment(effectiveTId, effectiveEmpId);
-    if (!enrollCheck.valid) return enrollCheck;
-
-    // D. Validate Evaluator Authorization against Assigned Supervisor
+    // C. Validate Evaluator Authorization against Assigned Supervisor
     const ss = getTrainingDataSpreadsheet(effectiveTId);
     if (ss) {
       const tpSheet = ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants');
       if (tpSheet) {
         const tpRows = sheetToJson(tpSheet);
-        const p = tpRows.find(r => isSameEmployeeId(r.EmployeeID || r.ID || '', effectiveEmpId));
+        const p = tpRows.find(r => isSameEmployeeId(r.EmployeeID || r.EmployeeNo || r.ID || '', effectiveEmpId));
         if (p) {
           const pSupId = String(p.SupervisorID || '').trim();
           const pSupEmail = String(p.SupervisorEmail || '').trim().toLowerCase();
@@ -947,8 +1055,8 @@ function validatePublicPostEvaluation(trainingId, employeeId, token, evaluatorId
             };
           }
 
-          const evalCheck = cleanEvalId ? getValidEmployee(cleanEvalId, effectiveTId) : { valid: false };
-          const evalObj = evalCheck.valid ? evalCheck.employee : {};
+          const evalCheck = cleanEvalId ? getValidEvaluator(cleanEvalId) : { valid: false };
+          const evalObj = evalCheck.valid ? evalCheck.evaluator : {};
           const evalEmail = String(evalObj.Email || '').trim().toLowerCase();
           const evalName = String(evalObj.Name || evaluatorName || '').trim().toLowerCase();
 
@@ -968,7 +1076,7 @@ function validatePublicPostEvaluation(trainingId, employeeId, token, evaluatorId
       }
     }
 
-    // E. 3-Month Lock Enforcement (Must unlock AFTER 3 months of training completion)
+    // D. 3-Month Lock Enforcement (Must unlock AFTER 3 months of training completion)
     const endDateStr = tCheck.training.EndDate || tCheck.training.StartDate || new Date();
     const completionDate = new Date(endDateStr);
     completionDate.setHours(23, 59, 59, 999);
@@ -990,12 +1098,12 @@ function validatePublicPostEvaluation(trainingId, employeeId, token, evaluatorId
       };
     }
 
-    // F. Prevent Duplicate Post-Evaluation Submission
+    // E. Prevent Duplicate Post-Evaluation Submission
     const postSheet = ss ? (ss.getSheetByName('Post Evaluation') || ss.getSheetByName('PostEval')) : null;
     if (postSheet) {
       const postRows = sheetToJson(postSheet);
       const duplicate = postRows.find(r =>
-        String(r.EmployeeID || '').trim().toLowerCase() === effectiveEmpId.toLowerCase()
+        isSameEmployeeId(r.EmployeeID || r.EmployeeNo || r.ID || '', effectiveEmpId)
       );
 
       if (duplicate) {
@@ -1011,7 +1119,7 @@ function validatePublicPostEvaluation(trainingId, employeeId, token, evaluatorId
       trainingId: effectiveTId,
       employeeId: effectiveEmpId,
       training: tCheck.training,
-      employee: empCheck.employee
+      employee: partCheck.employee
     };
   } catch (e) {
     Logger.log('validatePublicPostEvaluation error: ' + e.message);
@@ -1024,7 +1132,7 @@ function validatePublicPostEvaluation(trainingId, employeeId, token, evaluatorId
  */
 function getEmployeeDetails(employeeId) {
   try {
-    const res = getValidEmployee(employeeId);
+    const res = getValidParticipant(employeeId);
     if (!res.valid) return err(res.message);
     return ok(res.employee);
   } catch (e) {

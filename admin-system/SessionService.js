@@ -15,7 +15,7 @@ function generateSessionId() {
         if (!t.ID) continue;
         const ss = getTrainingDataSpreadsheet(t.ID);
         if (!ss) continue;
-        const sessSheet = ss.getSheetByName('TrainingSessions');
+        const sessSheet = ss.getSheetByName('Sessions') || ss.getSheetByName('TrainingSessions') || ss.getSheetByName('Training Sessions') || ss.getSheetByName('Session');
         if (!sessSheet) continue;
         const data = sessSheet.getDataRange().getValues();
         for (let i = 1; i < data.length; i++) {

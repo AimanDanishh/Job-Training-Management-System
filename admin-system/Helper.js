@@ -1209,8 +1209,8 @@ function canonicalizeTrainingParticipants(participants) {
   const seen = {};
 
   (Array.isArray(participants) ? participants : []).forEach(participant => {
-    const rawId = String(participant.ID || participant.EmployeeID || participant.EmployeeNo || participant.EmpID || participant['Employee ID'] || participant['Employee No'] || '').trim();
-    const rawName = String(participant.Name || participant.EmployeeName || participant['Employee Name'] || '').trim();
+    const rawId = String(participant.EmployeeID || participant.EmployeeNo || participant['Employee ID'] || participant['Employee No'] || participant.EmpID || participant.StaffID || participant.ID || '').trim();
+    const rawName = String(participant.EmployeeName || participant['Employee Name'] || participant.Name || participant['Staff Name'] || '').trim();
     const employee = (rawId && directory.byId[rawId.toLowerCase()]) || (rawName && directory.byName[rawName.toLowerCase()]);
     if (!employee) {
       rejected.push(rawId || rawName || 'blank participant');

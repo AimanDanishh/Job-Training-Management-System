@@ -62,7 +62,10 @@
       <form onsubmit="handleVerifyEmployeeForEval(event)">
         <div class="form-group">
           <label for="inp-eval-empid" class="form-label">Employee ID <span class="req">*</span></label>
-          <input type="text" id="inp-eval-empid" class="form-control" placeholder="00000" required autocomplete="off" aria-label="Employee ID">
+          <input type="text" id="inp-eval-empid" class="form-control" placeholder="00000" oninput="onEmployeeIdTyping()" required autocomplete="off" aria-label="Employee ID">
+          <div id="eval-emp-name-preview" style="display:none; margin-top:8px; padding:8px 12px; background:var(--primary-light, #EFF6FF); border:1px solid var(--primary, #2563EB); border-radius:8px; font-size:13px; font-weight:700; color:var(--primary, #2563EB);">
+            <span class="icon sm" style="margin-right:4px">👤</span> Name: <span id="txt-eval-preview-name">Lookup...</span>
+          </div>
         </div>
 
         <button type="submit" id="btn-verify-eval-emp" class="btn-submit">
@@ -225,7 +228,7 @@
   let activeTrainingObj = null;
 
   document.addEventListener('DOMContentLoaded', async () => {
-    activeTrainingId = getQueryParam('id') || <?!= JSON.stringify((typeof params !== 'undefined' && params && params.id) ? params.id : '') ?>;
+    activeTrainingId = getQueryParam('id') || getQueryParam('training') || getQueryParam('trainingId') || getQueryParam('trn');
     
     if (!activeTrainingId) {
       showErrorState('Training ID parameter missing from URL link.');
@@ -270,6 +273,31 @@
       const bVal = Number(btn.dataset.v);
       btn.className = 'likert-btn' + (bVal === val ? ` active-${val}` : '');
     });
+  }
+
+  let _typingTimer = null;
+  function onEmployeeIdTyping() {
+    clearTimeout(_typingTimer);
+    const empId = document.getElementById('inp-eval-empid').value.trim();
+    const previewBox = document.getElementById('eval-emp-name-preview');
+    const previewName = document.getElementById('txt-eval-preview-name');
+    if (!empId) {
+      previewBox.style.display = 'none';
+      return;
+    }
+    _typingTimer = setTimeout(async () => {
+      try {
+        const res = await callServer('verifyEmployeeForEvaluation', activeTrainingId, empId);
+        if (res && res.employee && res.employee.Name) {
+          previewName.textContent = res.employee.Name;
+          previewBox.style.display = 'block';
+        } else {
+          previewBox.style.display = 'none';
+        }
+      } catch(e) {
+        previewBox.style.display = 'none';
+      }
+    }, 300);
   }
 
   async function handleVerifyEmployeeForEval(e) {
@@ -380,8 +408,5 @@
     document.getElementById('txt-error-msg').textContent = msg;
   }
 </script>
-
-</body>
-</html>
 </body>
 </html>

@@ -93,7 +93,7 @@ function submitAttendance(arg1, arg2, arg3, arg4) {
 
     const cleanEmpNo   = String(employeeNo).trim();
     const finalEmpName = (empInfo && empInfo.Name) ? empInfo.Name : (employeeName || cleanEmpNo);
-    const finalDept    = (empInfo && empInfo.Department) ? empInfo.Department : (department || '');
+    const finalDept    = (empInfo && (empInfo.Department || empInfo.CostCentre)) ? (empInfo.Department || empInfo.CostCentre) : (department || '');
     const trainingCode = training ? (training.Code || '') : '';
 
     const ss = getTrainingDataSpreadsheet(session.TrainingID);
@@ -105,6 +105,8 @@ function submitAttendance(arg1, arg2, arg3, arg4) {
       attSheet.appendRow(['AttendanceID', 'SessionID', 'TrainingID', 'EmployeeNo', 'EmployeeName', 'Department', 'ScanTime', 'Status', 'TrainingCode', 'Day', 'Date', 'Hours', 'Remarks', 'EditedBy', 'EditedAt']);
       attSheet.getRange('A1:O1').setFontWeight('bold').setBackground('#2563EB').setFontColor('#FFFFFF');
       attSheet.setFrozenRows(1);
+    } else {
+      ensureAttendanceSheetColumns(attSheet);
     }
 
     const attId = generateId('ATT');

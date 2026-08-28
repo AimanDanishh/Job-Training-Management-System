@@ -344,7 +344,7 @@
   document.addEventListener('DOMContentLoaded', async () => {
     applyLanguage(currentLang);
 
-    activeSessionId = getQueryParam('session') || getQueryParam('sessionId') || getQueryParam('id') || getQueryParam('s') || <?!= JSON.stringify((typeof params !== 'undefined' && params && (params.session || params.sessionId || params.id || params.s)) ? (params.session || params.sessionId || params.id || params.s) : '') ?>;
+    activeSessionId = getQueryParam('session') || getQueryParam('sessionId') || getQueryParam('id') || getQueryParam('s');
     
     if (!activeSessionId) {
       showErrorState(t('toastMissingSession'));
@@ -448,8 +448,8 @@
         verifiedEmployee = res.employee;
         document.getElementById('txt-verify-name').textContent = res.employee.Name || empId;
         document.getElementById('txt-verify-empid').textContent = res.employee.ID || empId;
-        document.getElementById('txt-verify-position').textContent = res.employee.Position || res.employee.JobTitle || (currentLang === 'bm' ? 'Pekerja' : 'Employee');
-        document.getElementById('txt-verify-dept').textContent = res.employee.CostCentre || res.employee.Department || '—';
+        document.getElementById('txt-verify-position').textContent = res.employee.Position || (currentLang === 'bm' ? 'Pekerja' : 'Employee');
+        document.getElementById('txt-verify-dept').textContent = res.employee.Department || '—';
         document.getElementById('txt-verify-training').textContent = activeSessionObj ? activeSessionObj.TrainingTitle : (currentLang === 'bm' ? 'Latihan' : 'Training');
         document.getElementById('txt-verify-session').textContent = activeSessionObj ? activeSessionObj.SessionName : (currentLang === 'bm' ? 'Sesi' : 'Session');
 
@@ -478,7 +478,7 @@
         sessionId: activeSessionId,
         employeeNo: verifiedEmployee.ID,
         employeeName: verifiedEmployee.Name,
-        department: verifiedEmployee.CostCentre || verifiedEmployee.Department || ''
+        department: verifiedEmployee.Department || ''
       });
 
       document.getElementById('view-step-confirm').style.display = 'none';

@@ -7,18 +7,10 @@
  */
 function getTrainingInfo(trainingId) {
   try {
-    if (!trainingId || String(trainingId).trim() === '') {
-      return err('Training ID is required.');
-    }
-    const cleanId = String(trainingId).trim();
-    const tSheet = getSheet(SHEET_NAMES.trainings);
-    if (!tSheet) return err('Trainings sheet unavailable.');
+    const tCheck = getValidTraining(trainingId);
+    if (!tCheck.valid) return err(tCheck.message);
 
-    const rows = sheetToJson(tSheet);
-    const t = rows.find(r => String(r.ID || r.TrainingID || '').trim() === cleanId);
-
-    if (!t) return err('Training programme not found.');
-
+    const t = tCheck.training;
     return ok({
       ID: t.ID,
       Code: t.Code || '',
@@ -154,7 +146,7 @@ function saveTrainingEvaluation(data) {
     }
 
     const evalRow = [
-      'EVAL-' + Date.now(),
+      generateId('EVL'),
       trainingId,
       employeeId,
       empName,
@@ -163,7 +155,7 @@ function saveTrainingEvaluation(data) {
       data.SectionB2 || '',
       data.SectionB3 || '',
       avg,
-      new Date().toISOString()
+      now()
     ];
 
     sheet.appendRow(evalRow);
@@ -216,16 +208,16 @@ function savePostEvaluation(data) {
     const ss = getTrainingDataSpreadsheet(finalTId);
     if (!ss) return err('Could not open per-training sheet for ID: ' + finalTId);
 
-    let sheet = ss.getSheetByName('PostEval');
+    let sheet = ss.getSheetByName('Post Evaluation') || ss.getSheetByName('PostEval');
     if (!sheet) {
-      sheet = ss.insertSheet('PostEval');
+      sheet = ss.insertSheet('Post Evaluation');
       sheet.appendRow(['ID', 'TrainingID', 'EmployeeID', 'EvaluatorName', 'EvaluatorID', 'CompetencyBefore', 'CompetencyAfter', 'Improvement', 'CanApply', 'FurtherTraining', 'Comments', 'SubmittedAt']);
       sheet.getRange('A1:L1').setFontWeight('bold').setBackground('#2563EB').setFontColor('#FFFFFF');
       sheet.setFrozenRows(1);
     }
 
     const postRow = [
-      'PEV-' + Date.now(),
+      generateId('PEV'),
       finalTId,
       finalEmpId,
       String(evaluatorName).trim(),
@@ -236,7 +228,7 @@ function savePostEvaluation(data) {
       data.CanApply           || '',
       data.FurtherTraining    || '',
       data.Comments           || '',
-      new Date().toISOString()
+      now()
     ];
     sheet.appendRow(postRow);
 
