@@ -59,6 +59,13 @@ function getEmployeeSpreadsheetId() {
   return getConfigProperty('EMPLOYEE_SPREADSHEET_ID', getSpreadsheetId());
 }
 
+/**
+ * Returns configured Admin Portal URL from Script Properties
+ */
+function getAdminPortalUrl() {
+  return getConfigProperty('ADMIN_PORTAL_URL', '') || getConfigProperty('ADMIN_SYSTEM_URL', '') || getConfigProperty('ADMIN_URL', '');
+}
+
 let _cachedEmployeeSpreadsheet = null;
 function getEmployeeSpreadsheet() {
   if (_cachedEmployeeSpreadsheet) return _cachedEmployeeSpreadsheet;
@@ -916,7 +923,7 @@ function ensureTrainingSheetColumns(sheet) {
     'EvaluationSheetID', 'PostSheetID', 'RequisitionFormFileID',
     'CreatedDate', 'UpdatedDate', 'CourseFee',
     'ApprovalStatus', 'RequestedBy', 'RequestedByName', 'RequestedByEmail', 'RequestedDate', 'ApprovedBy', 'ApprovedCostCentre', 'ApprovedAt', 'ApprovalRemarks', 'RescheduledDate', 'BrochureURL',
-    'TrainingProvider', 'ExpiryDate', 'CertExpiryDate',
+    'TrainingProvider', 'ExpiryDate', 'CertExpiryDate', 'TrainingMode', 'TnaSource',
     'HOD', 'Csuite', 'HOHR', 'HODStatus', 'CsuiteStatus', 'HOHRStatus'
   ];
   const lastCol = Math.max(sheet.getLastColumn(), 1);
@@ -1116,6 +1123,8 @@ function buildTrainingRequisitionEmailHtml(params) {
     badgeColor = '#1E40AF';
   }
 
+  const buttonText = params.buttonText || (params.isAdminAction ? 'VIEW TRAINING REQUEST' : (statusLower.includes('approved') ? 'VIEW TRAINING REQUEST' : 'REVIEW TRAINING REQUEST'));
+
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -1222,12 +1231,12 @@ function buildTrainingRequisitionEmailHtml(params) {
                                 </tr>
                             </table>
 
-                            <!-- Review Button (if reviewUrl provided) -->
+                            <!-- Action / Review Button (if reviewUrl provided) -->
                             ${reviewUrl ? `
                             <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto 16px auto;">
                                 <tr>
                                     <td align="center" style="border-radius: 6px; background-color: #17365D;">
-                                        <a href="${reviewUrl}" target="_blank" style="display: inline-block; padding: 14px 32px; font-family: Arial, sans-serif; font-size: 14px; font-weight: 700; color: #FFFFFF; text-decoration: none; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.5px;">REVIEW TRAINING REQUEST</a>
+                                        <a href="${reviewUrl}" target="_blank" style="display: inline-block; padding: 14px 32px; font-family: Arial, sans-serif; font-size: 14px; font-weight: 700; color: #FFFFFF; text-decoration: none; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.5px;">${buttonText}</a>
                                     </td>
                                 </tr>
                             </table>

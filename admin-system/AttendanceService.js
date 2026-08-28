@@ -13,19 +13,24 @@
  */
 function submitAttendance(arg1, arg2, arg3, arg4) {
   try {
-    let sessionId, employeeNo, employeeName, department;
+    let sessionId, employeeNo, employeeName, department, remarks, editedBy;
 
     if (typeof arg1 === 'object' && arg1 !== null) {
       sessionId    = arg1.sessionId    || arg1.SessionID;
       employeeNo   = arg1.employeeNo   || arg1.EmployeeNo || arg1.employeeId || arg1.EmployeeID;
       employeeName = arg1.employeeName || arg1.EmployeeName;
       department   = arg1.department   || arg1.Department;
+      remarks      = arg1.remarks      || arg1.Remarks;
+      editedBy     = arg1.editedBy     || arg1.EditedBy;
     } else {
       sessionId    = arg1;
       employeeNo   = arg2;
       employeeName = arg3;
       department   = arg4;
     }
+
+    const finalRemarks = remarks || 'Manual Attendance';
+    const finalEditedBy = editedBy || (finalRemarks === 'Manual Attendance' ? 'Admin' : 'System');
 
     // 1. Run Validation Rules
     const validation = validateAttendance(sessionId, employeeNo);
@@ -79,12 +84,13 @@ function submitAttendance(arg1, arg2, arg3, arg4) {
       session.SessionName || '',
       session.SessionDate || '',
       0,
-      'QR Code Check-In',
-      'System',
+      finalRemarks,
+      finalEditedBy,
       scanTime
     ];
 
     attSheet.appendRow(newRecord);
+    SpreadsheetApp.flush();
 
     // Automatically update training stage to 'Attendance In Progress'
     try {

@@ -915,7 +915,8 @@ function statusBadge(status) {
     'Rejected':         'badge-red',     'Postponed':         'badge-yellow',
     'Rescheduled':      'badge-yellow',  'Cancelled':         'badge-red',
     'Not Submitted':    'badge-gray',    'Inactive':          'badge-red',
-    'Expired':          'badge-yellow',
+    'Expired':          'badge-red',     'Deactivate':        'badge-red',
+    'Deactivated':      'badge-red',
   };
   const cls = map[status] || 'badge-gray';
   return `<span class="badge-th ${cls}">${status}</span>`;

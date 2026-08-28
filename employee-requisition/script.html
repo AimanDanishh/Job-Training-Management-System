@@ -786,15 +786,38 @@
     const name = document.getElementById('reqTrainingName').value.trim();
     const startDate = document.getElementById('reqStartDate').value;
     const endDate = document.getElementById('reqEndDate').value || startDate;
-    const fee = document.getElementById('reqFee').value || '0.00';
+    const rawFee = document.getElementById('reqFee').value.trim();
     const venue = document.getElementById('reqVenue').value.trim();
+    const reason = document.getElementById('reqReason').value.trim();
 
     const costCentreStr = selectedCostCentres.length > 0 ? selectedCostCentres.join(', ') : 'ALL';
     const totalPax = parseInt(document.getElementById('reqTotalPax').value) || selectedParticipants.length || 1;
 
-    if (!name || !startDate || !fee || !venue) {
-      showAlert('Training Title, Dates, Fee, and Venue are required.', true);
+    if (!name || !startDate || !venue) {
+      showAlert('Training Title, Start Date, and Venue are required.', true);
       return;
+    }
+
+    if (!reason) {
+      showAlert('Reason for training is required.', true);
+      return;
+    }
+
+    const durationDays = Math.max(1, Math.ceil((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24)) + 1);
+    const totalHours = parseFloat(document.getElementById('reqHours').value || 0);
+    if (isNaN(totalHours) || totalHours <= 0) {
+      showAlert('Duration (Hours) is required and must be greater than 0.', true);
+      return;
+    }
+    if (totalHours > (durationDays * 7) || (totalHours / durationDays) > 7.001) {
+      showAlert('Training duration cannot exceed 7 hours per day.', true);
+      return;
+    }
+
+    // Fee = 0 or empty is stored and displayed as TBD for employee requisition workflow
+    let feePayload = rawFee;
+    if (!rawFee || parseFloat(rawFee) === 0 || isNaN(parseFloat(rawFee))) {
+      feePayload = 'TBD';
     }
 
     if (!selectedParticipants || selectedParticipants.length === 0) {
@@ -823,14 +846,14 @@
       TrainingProvider: document.getElementById('reqProvider').value.trim(),
       StartDate: startDate,
       EndDate: endDate,
-      Duration: Math.max(1, Math.ceil((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24)) + 1),
-      TotalHours: document.getElementById('reqHours').value || 8,
+      Duration: durationDays,
+      TotalHours: totalHours,
       Venue: venue,
-      CourseFee: fee,
+      CourseFee: feePayload,
       CertExpiryDate: document.getElementById('reqCertExpiry').value,
       TotalPax: totalPax,
       ParticipantList: selectedParticipants,
-      Reason: document.getElementById('reqReason').value.trim(),
+      Reason: reason,
       BrochureUrl: document.getElementById('reqBrochureUrl').value.trim(),
       BrochureFile: uploadedFileObject
     };

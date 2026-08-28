@@ -45,18 +45,32 @@ function createSession(data) {
     if (!data.TrainingID) return err('Training ID is required.');
     if (!data.SessionName) return err('Session Name is required.');
 
+    const valRes = typeof validateSessionData === 'function' ? validateSessionData(data) : { valid: true };
+    if (!valRes.valid) {
+      return err(valRes.message);
+    }
+
     // Enforce Approval Check: QR session creation is only allowed for Approved trainings
+    let trainingObj = null;
     const tSheet = getSheet(SHEET_NAMES.trainings);
     if (tSheet) {
       const trainings = sheetToJson(tSheet);
-      const training = trainings.find(t => String(t.ID || '').trim() === String(data.TrainingID).trim() || String(t.Code || '').trim() === String(data.TrainingID).trim());
-      if (training) {
-        const appStatus = String(training.ApprovalStatus || '').trim().toLowerCase();
+      trainingObj = trainings.find(t => String(t.ID || '').trim() === String(data.TrainingID).trim() || String(t.Code || '').trim() === String(data.TrainingID).trim());
+      if (trainingObj) {
+        const appStatus = String(trainingObj.ApprovalStatus || '').trim().toLowerCase();
         const isApproved = !appStatus || appStatus === 'approved' || appStatus === 'auto-approved' || appStatus === 'completed' || appStatus === 'in progress' || appStatus === 'active' || appStatus === 'on going';
         if (!isApproved) {
-          return err(`QR session creation is only allowed for APPROVED training requisitions. Current approval status: '${training.ApprovalStatus || 'Pending Approval'}'.`);
+          return err(`QR session creation is only allowed for APPROVED training requisitions. Current approval status: '${trainingObj.ApprovalStatus || 'Pending Approval'}'.`);
         }
       }
+    }
+
+    let defaultSessionDate = data.SessionDate;
+    if (!defaultSessionDate && trainingObj && trainingObj.StartDate) {
+      defaultSessionDate = formatDate(trainingObj.StartDate);
+    }
+    if (!defaultSessionDate) {
+      defaultSessionDate = formatDate(new Date());
     }
 
     const sessionId = generateSessionId();
@@ -68,9 +82,9 @@ function createSession(data) {
       SessionID:     sessionId,
       TrainingID:    data.TrainingID,
       SessionName:   data.SessionName,
-      SessionDate:   data.SessionDate || formatDate(new Date()),
+      SessionDate:   defaultSessionDate,
       StartTime:     data.StartTime || '09:00',
-      EndTime:       data.EndTime || '17:00',
+      EndTime:       data.EndTime || '16:00',
       AttendanceURL: attendanceUrl,
       QRCodeURL:     qrCodeUrl,
       QRStatus:      data.QRStatus || 'Active',
@@ -362,6 +376,18 @@ function updateSession(sessionId, data) {
     const training = found.training || {};
     const trainingId = training.ID || (found.session && found.session.TrainingID) || (data && data.TrainingID) || '';
 
+    if (data.StartTime || data.EndTime) {
+      const valRes = typeof validateSessionData === 'function' ? validateSessionData({
+        TrainingID: trainingId || 'TRN',
+        SessionName: data.SessionName || (found.session && found.session.SessionName) || 'Session',
+        StartTime: data.StartTime || (found.session && found.session.StartTime) || '09:00',
+        EndTime: data.EndTime || (found.session && found.session.EndTime) || '16:00'
+      }) : { valid: true };
+      if (!valRes.valid) {
+        return err(valRes.message);
+      }
+    }
+
     const setColValFlexible = (targetSheet, rIdx, colHeaders, colPatterns, defaultHeaderName, value) => {
       if (rIdx < 2 || !targetSheet) return;
       for (let pattern of colPatterns) {
@@ -426,9 +452,8 @@ function updateSession(sessionId, data) {
         setColValFlexible(targetSheet, row, headers, [/^endtime$/i, /^end time$/i, /^time end$/i], 'EndTime', String(data.EndTime).trim());
       }
       if (data.QRStatus !== undefined && data.QRStatus !== null) {
-        const validStatuses = ['Active', 'Inactive', 'Expired'];
-        const cleanStatus = String(data.QRStatus).trim();
-        const finalStatus = validStatuses.find(s => s.toLowerCase() === cleanStatus.toLowerCase()) || cleanStatus;
+        const cleanStatus = String(data.QRStatus).trim().toLowerCase();
+        const finalStatus = (cleanStatus === 'deactivate' || cleanStatus === 'deactivated' || cleanStatus === 'inactive' || cleanStatus === 'expired' || cleanStatus === 'disabled') ? 'Deactivate' : 'Active';
         setColValFlexible(targetSheet, row, headers, [/^qrstatus$/i, /^qr status$/i, /^status$/i, /^state$/i], 'QRStatus', finalStatus);
       }
     };
@@ -502,7 +527,7 @@ function updateQRSession(sessionId, data) {
 }
 
 /**
- * Soft-delete a Training Session by marking its QRStatus as 'Inactive' in both spreadsheets.
+ * Soft-delete a Training Session by marking its QRStatus as 'Deactivate' in both spreadsheets.
  * Preserves all historical attendance records intact.
  * 
  * @param {string} sessionId - The session ID to deactivate
@@ -512,14 +537,82 @@ function deleteSession(sessionId) {
   try {
     if (!sessionId) return err('Session ID is required.');
     const cleanSessionId = String(sessionId).trim();
+    const lowerSessionId = cleanSessionId.toLowerCase();
 
-    const res = updateSession(cleanSessionId, { QRStatus: 'Inactive' });
-    const resObj = typeof res === 'string' ? JSON.parse(res) : res;
-    if (resObj && !resObj.success) {
-      return err(resObj.error || 'Failed to delete session.');
+    // 1. Direct deactivation in central Main Database Sessions tabs
+    try {
+      const mainSs = getSpreadsheet();
+      if (mainSs) {
+        const sessionSheetNames = ['TrainingSessions', 'Sessions', 'Training Sessions', 'Session'];
+        sessionSheetNames.forEach(sheetName => {
+          const sh = mainSs.getSheetByName(sheetName);
+          if (sh && sh.getLastRow() >= 2) {
+            const data = sh.getDataRange().getValues();
+            const headers = data[0].map(h => String(h || '').trim().toLowerCase());
+            const sidCol = headers.findIndex(h => h === 'sessionid' || h === 'session_id' || h === 'session id' || h === 'id' || h === 'sessioncode');
+            const qrCol = headers.findIndex(h => h === 'qrstatus' || h === 'qr status' || h === 'status' || h === 'state');
+
+            if (sidCol !== -1) {
+              for (let r = 1; r < data.length; r++) {
+                if (String(data[r][sidCol] || '').trim().toLowerCase() === lowerSessionId) {
+                  if (qrCol !== -1) {
+                    sh.getRange(r + 1, qrCol + 1).setValue('Deactivate');
+                  }
+                }
+              }
+            }
+          }
+        });
+      }
+    } catch(cErr) {
+      Logger.log('Central sheet deleteSession error: ' + cErr.message);
     }
 
-    return ok({ message: `QR session ${cleanSessionId} deleted successfully (marked Inactive).`, sessionId: cleanSessionId });
+    // 2. Direct deactivation across all per-training spreadsheets
+    try {
+      const tSheet = getSheet(SHEET_NAMES.trainings);
+      if (tSheet && tSheet.getLastRow() >= 2) {
+        const trainings = sheetToJson(tSheet);
+        for (const t of trainings) {
+          try {
+            const perSs = getTrainingDataSpreadsheet(t);
+            if (perSs) {
+              const sessionSheetNames = ['TrainingSessions', 'Sessions', 'Training Sessions', 'Session'];
+              sessionSheetNames.forEach(sheetName => {
+                const sh = perSs.getSheetByName(sheetName);
+                if (sh && sh.getLastRow() >= 2) {
+                  const data = sh.getDataRange().getValues();
+                  const headers = data[0].map(h => String(h || '').trim().toLowerCase());
+                  const sidCol = headers.findIndex(h => h === 'sessionid' || h === 'session_id' || h === 'session id' || h === 'id' || h === 'sessioncode');
+                  const qrCol = headers.findIndex(h => h === 'qrstatus' || h === 'qr status' || h === 'status' || h === 'state');
+
+                  if (sidCol !== -1) {
+                    for (let r = 1; r < data.length; r++) {
+                      if (String(data[r][sidCol] || '').trim().toLowerCase() === lowerSessionId) {
+                        if (qrCol !== -1) {
+                          sh.getRange(r + 1, qrCol + 1).setValue('Deactivate');
+                        }
+                      }
+                    }
+                  }
+                }
+              });
+            }
+          } catch(perTErr) {}
+        }
+      }
+    } catch(tErr) {
+      Logger.log('Per-training deleteSession error: ' + tErr.message);
+    }
+
+    // 3. Also run updateSession to trigger cache invalidations and hooks
+    try {
+      updateSession(cleanSessionId, { QRStatus: 'Deactivate' });
+    } catch(uErr) {}
+
+    invalidateTrainingCaches();
+
+    return ok({ message: `QR session ${cleanSessionId} deleted successfully (marked Deactivate).`, sessionId: cleanSessionId });
   } catch (e) {
     Logger.log('deleteSession error: ' + e.message);
     return err('Failed to delete session: ' + e.message);
@@ -542,7 +635,7 @@ function getQRSessions(trainingId) {
 
 /**
  * Server-side validator for a QR session's eligibility for attendance marking.
- * Reads fresh session record directly from the database sheet.
+ * Checks existence and that status is Active.
  * 
  * @param {string} sessionId - The session ID to check
  * @returns {string} JSON response
@@ -555,12 +648,9 @@ function validateQRSessionForAttendance(sessionId) {
     const found = findTrainingBySessionId(cleanSessionId);
     if (!found || !found.session) return err('Invalid session ID. Session does not exist.');
 
-    const status = String(found.session.QRStatus || 'Active').trim();
-    if (status.toLowerCase() === 'inactive') {
-      return err('This QR attendance session is no longer active. Attendance cannot be recorded.');
-    }
-    if (status.toLowerCase() === 'expired') {
-      return err('Attendance registration for this session is closed (Expired).');
+    const status = String(found.session.QRStatus || 'Active').trim().toLowerCase();
+    if (status === 'deactivate' || status === 'deactivated' || status === 'inactive' || status === 'expired' || status === 'disabled') {
+      return err('This QR attendance session is deactivated. Attendance cannot be recorded.');
     }
 
     return ok(found.session);

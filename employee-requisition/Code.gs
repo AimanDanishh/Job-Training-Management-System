@@ -268,6 +268,17 @@ function submitEmployeeRequisition(data) {
       return err('Employee ID, Training Name, and Start Date are required.');
     }
 
+    const valRes = typeof validateEmployeeRequisitionData === 'function'
+      ? validateEmployeeRequisitionData(data)
+      : { valid: true };
+    if (!valRes.valid) return err(valRes.message);
+
+    // Fee = 0 or empty is stored and displayed as TBD for employee requisition workflow
+    const rawFee = String(data.CourseFee || '').trim();
+    if (!rawFee || rawFee === '0' || rawFee === '0.00' || parseFloat(rawFee) === 0 || isNaN(parseFloat(rawFee))) {
+      data.CourseFee = 'TBD';
+    }
+
     // 1. Employee lookup
     const empCheck = getValidEmployee(data.EmployeeID);
     if (!empCheck.valid) return err(empCheck.message);
@@ -598,6 +609,8 @@ function submitEmployeeRequisition(data) {
 
     setCol('Name', data.TrainingName);
     setCol('Category', data.Category || 'General');
+    setCol('TrainingMode', data.TrainingType || data.TrainingMode || 'In-House Training');
+    setCol('TnaSource', data.TnaSource || 'Training Requisition Form');
     setCol('Trainer', data.Trainer || 'TBD');
     setCol('TrainingProvider', data.TrainingProvider || data.Provider || '');
     setCol('Venue', data.Venue || 'TBD');
@@ -699,7 +712,13 @@ function submitEmployeeRequisition(data) {
     let emailSendState = 'NOT_SENT';
     try {
       const hodPortalUrl = getConfigProperty('HOD_PORTAL_URL', '');
-      const reviewUrl = hodPortalUrl ? `${hodPortalUrl}?page=review&id=${id}` : getAppUrl();
+      const adminPortalUrl = getAdminPortalUrl();
+      const isAdminNotification = (currentApprovalStatus === 'Approved');
+      const adminDeepLink = adminPortalUrl
+        ? (adminPortalUrl.includes('?') ? `${adminPortalUrl}&page=training&id=${encodeURIComponent(id)}` : `${adminPortalUrl}?page=training&id=${encodeURIComponent(id)}`)
+        : '';
+      const hodReviewUrl = hodPortalUrl ? `${hodPortalUrl}?page=review&id=${encodeURIComponent(id)}` : getAppUrl();
+      const reviewUrl = isAdminNotification ? (adminDeepLink || hodReviewUrl) : hodReviewUrl;
 
       let recipientEmail = hodEmail;
       if (currentApprovalStatus === 'Pending C-Suite Approval' && csuiteEmail) recipientEmail = csuiteEmail;
@@ -707,19 +726,32 @@ function submitEmployeeRequisition(data) {
       else if (currentApprovalStatus === 'Approved') recipientEmail = 'arina.ismail@apollofood.com.my';
 
       const subject = `Training Requisition — ${data.TrainingName} | ${id}`;
-      const body = `Dear Approver / Manager,\n\nA Training Requisition Form (AP-HRD-F01-01) has been ${isEditing ? 'RESUBMITTED following updates by the employee' : 'submitted'}:\n\n` +
-        `Requester: ${emp.Name || data.EmployeeID} (${emp.Department || 'N/A'})\n` +
-        `Employee ID: ${emp.ID || data.EmployeeID}\n` +
-        `Assigned HOD: ${hodName || 'N/A'} (${hodEmail || recipientEmail || 'N/A'})\n` +
-        `Training Name: ${data.TrainingName}\n` +
-        `Category: ${data.Category || 'General'}\n` +
-        `Proposed Date: ${data.StartDate} to ${data.EndDate || data.StartDate}\n` +
-        `Duration: ${data.Duration || 1} days (${data.TotalHours || 8} hrs)\n` +
-        `Estimated Fee: RM ${data.CourseFee || '0.00'}\n` +
-        `Current Status: ${currentApprovalStatus}\n` +
-        (brochureUrl ? `Brochure Attachment/Link: ${brochureUrl}\n` : '') +
-        `\nPlease review the request details:\n${reviewUrl}\n\n` +
-        `Thank you,\nTrainHub Training Management System`;
+      const body = isAdminNotification
+        ? `Dear Arina,\n\nThe following Training Requisition (AP-HRD-F01-01) has been approved via auto-bypass:\n\n` +
+          `Requester: ${emp.Name || data.EmployeeID} (${emp.Department || 'N/A'})\n` +
+          `Employee ID: ${emp.ID || data.EmployeeID}\n` +
+          `Training Name: ${data.TrainingName} (${id})\n` +
+          `Category: ${data.Category || 'General'}\n` +
+          `Proposed Date: ${data.StartDate} to ${data.EndDate || data.StartDate}\n` +
+          `Duration: ${data.Duration || 1} days (${data.TotalHours || 8} hrs)\n` +
+          `Estimated Fee: RM ${data.CourseFee || '0.00'}\n` +
+          `Current Status: ${currentApprovalStatus}\n` +
+          (brochureUrl ? `Brochure Attachment/Link: ${brochureUrl}\n` : '') +
+          (adminDeepLink ? `\nView Training Request in Admin Portal:\n${adminDeepLink}\n\n` : `\nPlease access the Admin Portal directly.\n\n`) +
+          `Thank you,\nTrainHub Training Management System`
+        : `Dear Approver / Manager,\n\nA Training Requisition Form (AP-HRD-F01-01) has been ${isEditing ? 'RESUBMITTED following updates by the employee' : 'submitted'}:\n\n` +
+          `Requester: ${emp.Name || data.EmployeeID} (${emp.Department || 'N/A'})\n` +
+          `Employee ID: ${emp.ID || data.EmployeeID}\n` +
+          `Assigned HOD: ${hodName || 'N/A'} (${hodEmail || recipientEmail || 'N/A'})\n` +
+          `Training Name: ${data.TrainingName}\n` +
+          `Category: ${data.Category || 'General'}\n` +
+          `Proposed Date: ${data.StartDate} to ${data.EndDate || data.StartDate}\n` +
+          `Duration: ${data.Duration || 1} days (${data.TotalHours || 8} hrs)\n` +
+          `Estimated Fee: RM ${data.CourseFee || '0.00'}\n` +
+          `Current Status: ${currentApprovalStatus}\n` +
+          (brochureUrl ? `Brochure Attachment/Link: ${brochureUrl}\n` : '') +
+          `\nPlease review the request details:\n${reviewUrl}\n\n` +
+          `Thank you,\nTrainHub Training Management System`;
 
       const proposedDateStr = (data.EndDate && data.EndDate !== data.StartDate)
         ? `${formatDateForEmail(data.StartDate)} – ${formatDateForEmail(data.EndDate)}`
@@ -737,10 +769,14 @@ function submitEmployeeRequisition(data) {
         estimatedFee: formatFeeForEmail(data.CourseFee),
         status: currentApprovalStatus,
         reviewUrl: reviewUrl,
+        isAdminAction: isAdminNotification,
+        buttonText: isAdminNotification ? 'VIEW TRAINING REQUEST' : (currentApprovalStatus === 'Approved' ? 'VIEW TRAINING REQUEST' : 'REVIEW TRAINING REQUEST'),
         badgeText: 'ACTION REQUIRED',
-        headlineText: 'Training Requisition Requires Your Review',
-        greetingText: 'Dear Approver / Manager,',
-        introText: `A new training requisition has been ${isEditing ? 'resubmitted following updates by the employee' : 'submitted'} and is currently awaiting your review and approval.`
+        headlineText: isAdminNotification ? 'Training Requisition Fully Approved & Ready for Session Setup' : 'Training Requisition Requires Your Review',
+        greetingText: isAdminNotification ? 'Dear Arina,' : 'Dear Approver / Manager,',
+        introText: isAdminNotification
+          ? `The Training Requisition for "${data.TrainingName}" (${id}) submitted by ${emp.Name || data.EmployeeID} has been automatically approved and is ready for session setup in the Admin System.`
+          : `A new training requisition has been ${isEditing ? 'resubmitted following updates by the employee' : 'submitted'} and is currently awaiting your review and approval.`
       });
 
       if (recipientEmail) {

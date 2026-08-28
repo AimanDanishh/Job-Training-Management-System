@@ -486,6 +486,10 @@ function getHodPortalUrl() {
   return getConfigProperty('HOD_PORTAL_URL', '');
 }
 
+function getAdminPortalUrl() {
+  return getConfigProperty('ADMIN_PORTAL_URL', '') || getConfigProperty('ADMIN_SYSTEM_URL', '') || getConfigProperty('ADMIN_URL', '') || getAppUrl();
+}
+
 /**
  * Convert any Google Drive share link, preview link, or File ID into a direct public image CDN URL
  * suitable for external rendering engines like QuickChart.
@@ -855,7 +859,7 @@ function ensureTrainingSheetColumns(sheet) {
     'EvaluationSheetID', 'PostSheetID', 'RequisitionFormFileID',
     'CreatedDate', 'UpdatedDate', 'CourseFee',
     'ApprovalStatus', 'RequestedBy', 'RequestedByName', 'RequestedByEmail', 'RequestedDate', 'ApprovedBy', 'ApprovedCostCentre', 'ApprovedAt', 'ApprovalRemarks', 'RescheduledDate', 'BrochureURL',
-    'TrainingProvider', 'ExpiryDate', 'CertExpiryDate',
+    'TrainingProvider', 'ExpiryDate', 'CertExpiryDate', 'TrainingMode', 'TnaSource',
     'HOD', 'Csuite', 'HOHR', 'HODStatus', 'CsuiteStatus', 'HOHRStatus',
     'PostEvalEmailStatus', 'PostEvalEmailSentAt', 'PostEvalEmailError', 'PostEvalEmailLog'
   ];
@@ -1114,17 +1118,18 @@ function findTrainingBySessionId(sessionId) {
         if (session) {
           const tSheet = getSheet(SHEET_NAMES.trainings);
           const trainings = tSheet ? sheetToJson(tSheet) : [];
+          const sessionTId = String(session.TrainingID || '').trim().toLowerCase();
           const t = trainings.find(r => {
             const id = String(r.ID || '').trim().toLowerCase();
             const code = String(r.Code || '').trim().toLowerCase();
             const tId = String(r.TrainingID || '').trim().toLowerCase();
-            return id === String(session.TrainingID || '').trim().toLowerCase() ||
-                   code === String(session.TrainingID || '').trim().toLowerCase() ||
-                   tId === String(session.TrainingID || '').trim().toLowerCase();
-          }) || { ID: session.TrainingID };
+            return (id && id === sessionTId) ||
+                   (code && code === sessionTId) ||
+                   (tId && tId === sessionTId);
+          }) || (session.TrainingID ? { ID: session.TrainingID } : null);
 
-          const perTrainingSs = getTrainingDataSpreadsheet(t) || mainSs;
-          return { session: session, training: t, spreadsheet: perTrainingSs, sessionSheet: centralSessSheet };
+          const perTrainingSs = (t && (t.ID || t.Code)) ? (getTrainingDataSpreadsheet(t) || mainSs) : mainSs;
+          return { session: session, training: t || { ID: session.TrainingID }, spreadsheet: perTrainingSs, sessionSheet: centralSessSheet };
         }
       }
     }

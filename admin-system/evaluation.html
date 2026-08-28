@@ -118,11 +118,10 @@
                   <th>Attendance Status</th>
                   <th>2-Week Deadline</th>
                   <th>Evaluation Status</th>
-                  <th>Countdown Status</th>
                 </tr>
               </thead>
               <tbody id="post-eval-2week-tbody">
-                <tr><td colspan="6" style="text-align:center;color:#94A3B8;padding:40px">Select a training to view evaluation status</td></tr>
+                <tr><td colspan="5" style="text-align:center;color:#94A3B8;padding:40px">Select a training to view evaluation status</td></tr>
               </tbody>
             </table>
           </div>
@@ -226,12 +225,11 @@
                   <th>Assigned Supervisor / PIC</th>
                   <th>Supervisor Email</th>
                   <th>Assignment Status</th>
-                  <th>3-Month Lock Status</th>
                   <th style="width:140px; text-align:center">Actions</th>
                 </tr>
               </thead>
               <tbody id="post-assignment-tbody">
-                <tr><td colspan="9" style="text-align:center;color:#94A3B8;padding:40px">Select a training to view participants</td></tr>
+                <tr><td colspan="8" style="text-align:center;color:#94A3B8;padding:40px">Select a training to view participants</td></tr>
               </tbody>
             </table>
           </div>
@@ -525,21 +523,46 @@
     }
   }
 
+  function isSubmittedEvaluationRecord(evalRow) {
+    if (!evalRow || typeof evalRow !== 'object') return false;
+    const submittedAt = evalRow.SubmittedAt || evalRow.submittedAt || evalRow.Timestamp || evalRow.timestamp || evalRow.Date || evalRow.date;
+    if (submittedAt && String(submittedAt).trim() !== '' && String(submittedAt).trim() !== '-' && String(submittedAt).trim() !== 'undefined') {
+      return true;
+    }
+    const statusStr = String(evalRow.Status || evalRow.status || evalRow.EvaluationStatus || '').trim().toLowerCase();
+    if (statusStr === 'completed' || statusStr === 'submitted' || statusStr === 'done') {
+      return true;
+    }
+    const qScores = [evalRow.Q1, evalRow.Q2, evalRow.Q3, evalRow.Q4, evalRow.Q5, evalRow.Q6, evalRow.Q7]
+      .map(Number)
+      .filter(n => !isNaN(n) && n >= 1 && n <= 5);
+    if (qScores.length >= 5) {
+      return true;
+    }
+    if (evalRow.ID && evalRow.EmployeeID && Number(evalRow.AvgScore) > 0 && String(evalRow.ID).startsWith('EVL')) {
+      return true;
+    }
+    return false;
+  }
+
   function render2WeekPostEvalTable(participants, training) {
     const tbody = document.getElementById('post-eval-2week-tbody');
     if (!tbody) return;
     if (!participants || participants.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#94A3B8;padding:32px">No participants found.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#94A3B8;padding:32px">No participants found.</td></tr>';
       return;
     }
     const compDate = training ? (training.EndDate || training.StartDate) : null;
     const deadline = ApolloCountdown.calculate2WeekDeadline(compDate);
     const deadlineStr = formatMinimalistDate(deadline);
-    const isCompleted = ['Training Completed','Evaluation Completed','Waiting for 3-Month Review','Programme Closed','Completed'].includes((training && training.Stage) || (training && training.Status));
 
     tbody.innerHTML = participants.map((p, i) => {
-      const isDone = Boolean(p.PostEvalCompleted || p.L2Completed);
-      const st = ApolloCountdown.getStatus(compDate, '2week', isDone, !isCompleted);
+      const isDone = Boolean(
+        p.EvalCompleted ||
+        p.EvaluationCompleted ||
+        (p.EvaluationStatus && String(p.EvaluationStatus).toLowerCase() === 'completed') ||
+        (p.EvaluationSubmittedAt && String(p.EvaluationSubmittedAt).trim() !== '')
+      );
       const attColor = p.AttendanceColor || (p.Attended ? 'green' : 'red');
       const attText  = p.AttendanceStatus || (p.Attended ? 'Attended' : 'Absent');
 
@@ -557,8 +580,7 @@
           <td style="font-size:12px;color:var(--apollo-gray-600)">${p.Department || '-'}</td>
           <td><span class="badge-th badge-${attColor}">${attText}</span></td>
           <td style="font-size:12px;font-weight:600">${deadlineStr}</td>
-          <td>${isDone ? '<span class="badge-th badge-green">Submitted</span>' : '<span class="badge-th badge-yellow">Pending</span>'}</td>
-          <td>${ApolloCountdown.renderBadge(st)}</td>
+          <td>${isDone ? '<span class="badge-th badge-green">Completed</span>' : '<span class="badge-th badge-yellow">Pending</span>'}</td>
         </tr>
       `;
     }).join('');
@@ -849,6 +871,39 @@
         } catch(directErr) {}
       }
 
+      // Cross-match submitted evals and posts to ensure full synchronization
+      const submittedEvalEmpIds = new Set(
+        (evals || [])
+          .filter(e => isSubmittedEvaluationRecord(e))
+          .map(e => String(e.EmployeeID || e.EmployeeNo || e.ID || '').trim().toLowerCase())
+          .filter(Boolean)
+      );
+      const submittedEvalEmpNames = new Set(
+        (evals || [])
+          .filter(e => isSubmittedEvaluationRecord(e))
+          .map(e => String(e.EmployeeName || e.Name || '').trim().toLowerCase())
+          .filter(Boolean)
+      );
+      const submittedPostEmpIds = new Set(
+        (posts || [])
+          .map(pe => String(pe.EmployeeID || pe.EmployeeNo || pe.ID || '').trim().toLowerCase())
+          .filter(Boolean)
+      );
+
+      participantsList.forEach(p => {
+        const empIdLower = String(p.EmployeeID || p.ID || '').trim().toLowerCase();
+        const empNameLower = String(p.EmployeeName || p.Name || '').trim().toLowerCase();
+
+        const hasEval = p.EvalCompleted || p.EvaluationCompleted || submittedEvalEmpIds.has(empIdLower) || (empNameLower && submittedEvalEmpNames.has(empNameLower));
+        p.EvalCompleted = Boolean(hasEval);
+        p.EvaluationCompleted = Boolean(hasEval);
+        p.EvaluationStatus = hasEval ? 'Completed' : 'Pending';
+
+        const hasPost = p.PostEvalCompleted || p.PostEvaluationCompleted || submittedPostEmpIds.has(empIdLower);
+        p.PostEvalCompleted = Boolean(hasPost);
+        p.PostEvaluationCompleted = Boolean(hasPost);
+      });
+
       window.__activeAttendedParticipants__ = participantsList;
       const totalParts = participantsList.length || (tObj ? (tObj.ParticipantsCount || 0) : 0);
       const respPct = totalParts > 0 ? Math.round((compCount / totalParts) * 100) : 0;
@@ -889,7 +944,7 @@
     const tbody = document.getElementById('post-assignment-tbody');
     if (!tbody) return;
     if (!participants || participants.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#94A3B8;padding:32px">No participants found for this training programme.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#94A3B8;padding:32px">No participants found for this training programme.</td></tr>';
       return;
     }
 
@@ -909,18 +964,10 @@
       if (elAsg) elAsg.textContent = assignedCount;
     }
 
-    const isCompleted = ['Training Completed','Evaluation Completed','Waiting for 3-Month Review','Programme Closed','Completed'].includes((training && training.Stage) || (training && training.Status));
-    const compDate = training ? (training.EndDate || training.StartDate) : null;
-    const st3Mo = ApolloCountdown.getStatus(compDate, '3month', false, !isCompleted);
-
     tbody.innerHTML = participants.map((p, i) => {
-      const lockBadge = st3Mo.isOverdue || st3Mo.isDueToday
-        ? `<span class="badge-th badge-green"><span class="icon sm" style="font-size:12px">lock_open</span> Ready</span>`
-        : `<span class="badge-th badge-yellow"><span class="icon sm" style="font-size:12px">schedule</span> ${st3Mo.shortText || 'Locked'}</span>`;
-
       const supText = p.SupervisorName || p.SupervisorID ? `${p.SupervisorName || p.SupervisorID} (${p.SupervisorID || ''})` : '<em style="color:#94A3B8">Not Assigned</em>';
       const emailText = p.SupervisorEmail ? `<span style="color:#E91C2D;font-size:11.5px;font-weight:600">${p.SupervisorEmail}</span>` : '-';
-      const statusBadge = p.PostEvalCompleted
+      const statusBadge = (p.PostEvalCompleted || p.PostEvaluationCompleted)
         ? `<span class="badge-th badge-green">Completed</span>`
         : (p.SupervisorID || p.SupervisorEmail ? `<span class="badge-th badge-gold">Assigned</span>` : `<span class="badge-th badge-gray">Pending</span>`);
 
@@ -950,7 +997,6 @@
           <td style="font-size:12.5px">${supText}</td>
           <td>${emailText}</td>
           <td>${statusBadge}</td>
-          <td>${lockBadge}</td>
           <td style="text-align:center">
             <div style="display:flex; gap:4px; justify-content:center">
               <button class="btn-th btn-secondary btn-xs" onclick="openEditSupervisorModal('${p.EmployeeID}', '${escapedName}', '${escapedSup}')" title="Edit / Change Supervisor">

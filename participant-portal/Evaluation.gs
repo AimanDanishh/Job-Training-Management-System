@@ -145,6 +145,16 @@ function saveTrainingEvaluation(data) {
       sheet.setFrozenRows(1);
     }
 
+    // Prevent duplicate evaluation submission
+    const existingRows = sheetToJson(sheet);
+    const alreadyExists = existingRows.some(r =>
+      String(r.TrainingID || '').trim().toLowerCase() === String(trainingId).trim().toLowerCase() &&
+      isSameEmployeeId(r.EmployeeID || r.EmployeeNo || r.ID || '', employeeId)
+    );
+    if (alreadyExists) {
+      return err('You have already submitted an evaluation for this training.');
+    }
+
     const evalRow = [
       generateId('EVL'),
       trainingId,

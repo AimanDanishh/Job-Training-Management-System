@@ -81,7 +81,7 @@
 
 <!-- Training Modal -->
 <div id="modal-training" class="modal-overlay" style="display:none">
-  <div class="modal-box" style="max-width:640px">
+  <div class="modal-box" style="max-width:680px">
     <div class="modal-header">
       <div><h3 class="modal-title" id="t-modal-title">New Training Programme</h3><p class="modal-sub">Fill in programme details</p></div>
       <button class="modal-close" onclick="closeModal('modal-training')"><span class="icon sm">close</span></button>
@@ -94,10 +94,10 @@
       </div>
       <div class="col-12">
         <label for="t-name" class="label-th">Programme Name / Title <span class="required">*</span></label>
-        <input id="t-name" class="input-th" placeholder="e.g. Training Programme">
+        <input id="t-name" class="input-th" placeholder="e.g. ISO 22000:2018 Internal Auditor Training">
       </div>
       <div class="col-md-4">
-        <label for="t-cat" class="label-th">Training Category</label>
+        <label for="t-cat" class="label-th">Training Category <span class="required">*</span></label>
         <select id="t-cat" class="input-th">
           <option value="" disabled selected>Select Category</option>
           <option value="Behavioral Skills">Behavioral Skills</option>
@@ -108,7 +108,7 @@
         </select>
       </div>
       <div class="col-md-4">
-        <label for="t-mode" class="label-th">Training Type / Mode</label>
+        <label for="t-mode" class="label-th">Training Type / Mode <span class="required">*</span></label>
         <select id="t-mode" class="input-th">
           <option value="" disabled selected>Select Mode</option>
           <option value="In-House Training">In-House Training</option>
@@ -117,7 +117,7 @@
         </select>
       </div>
       <div class="col-md-4">
-        <label for="t-tna" class="label-th">TNA Source</label>
+        <label for="t-tna" class="label-th">TNA Source <span class="required">*</span></label>
         <select id="t-tna" class="input-th">
           <option value="" disabled selected>Select TNA Source</option>
           <option value="Training Requisition Form">Training Requisition Form</option>
@@ -134,23 +134,25 @@
         <input id="t-start" class="input-th" type="date">
       </div>
       <div class="col-md-4">
-        <label for="t-end" class="label-th">End Date</label>
+        <label for="t-end" class="label-th">End Date <span class="required">*</span></label>
         <input id="t-end" class="input-th" type="date">
       </div>
       <div class="col-md-2">
-        <label for="t-duration" class="label-th">Days</label>
-        <input id="t-duration" class="input-th" type="number" min="1" placeholder="e.g. 1">
+        <label for="t-duration" class="label-th">Days <span class="required">*</span></label>
+        <input id="t-duration" class="input-th" type="number" min="1" placeholder="1">
       </div>
       <div class="col-md-2">
-        <label for="t-hours" class="label-th">Total Hours</label>
-        <input id="t-hours" class="input-th" type="number" min="0.5" step="0.5" placeholder="e.g. 8">
+        <label for="t-hours" class="label-th">Total Hours <span class="required">*</span></label>
+        <input id="t-hours" class="input-th" type="number" min="0.5" step="0.5" placeholder="7">
+        <div style="font-size:10px; color:#64748B; margin-top:2px">Max 7h/day</div>
       </div>
       <div class="col-md-6">
-        <label for="t-fee" class="label-th">Course Fee (RM)</label>
-        <input id="t-fee" class="input-th" type="number" min="0" step="0.01" placeholder="1500.00">
+        <label for="t-fee" class="label-th">Course Fee (RM) <span class="required">*</span></label>
+        <input id="t-fee" class="input-th" type="text" placeholder="e.g. 1500.00 or 0.00">
+        <div style="font-size:10.5px; color:#64748B; margin-top:2px">Must be confirmed before saving (cannot be TBD)</div>
       </div>
       <div class="col-md-6">
-        <label for="t-dept" class="label-th">Department / Cost Centre</label>
+        <label for="t-dept" class="label-th">Department / Cost Centre <span class="required">*</span></label>
         <select id="t-dept" class="input-th">
           <option value="">All Departments / Cost Centres</option>
         </select>
@@ -165,11 +167,11 @@
         <input id="t-trainer" class="input-th" placeholder="Trainer name">
       </div>
       <div class="col-md-6">
-        <label for="t-venue" class="label-th">Training Venue</label>
+        <label for="t-venue" class="label-th">Training Venue <span class="required">*</span></label>
         <input id="t-venue" class="input-th" placeholder="e.g. Training Room A / Hotel Ballroom">
       </div>
       <div class="col-md-6">
-        <label for="t-provider" class="label-th">Training Provider / Vendor Company</label>
+        <label for="t-provider" class="label-th">Training Provider / Vendor Company <span class="required">*</span></label>
         <input id="t-provider" class="input-th" placeholder="Vendor / Provider Company Name">
       </div>
       <div class="col-md-6">
@@ -182,11 +184,28 @@
         <span class="icon sm" style="color:#2563EB">description</span> 4. Supporting Documents & Business Justification
       </div>
       <div class="col-12">
-        <label for="t-brochure" class="label-th">Brochure Link / Requisition URL</label>
+        <label for="t-brochure-file" class="label-th">Brochure File (PDF, Word, or Image)</label>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input id="t-brochure-file" class="input-th" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onchange="handleAdminBrochureSelect(this)" style="flex:1;padding:6px 10px;font-size:12.5px" aria-label="Upload Training Brochure">
+          <button type="button" id="btn-clear-brochure" class="btn-th btn-secondary btn-sm" style="display:none" onclick="clearAdminBrochureFile()"><span class="icon sm">clear</span>Clear File</button>
+        </div>
+        <div id="t-brochure-status" style="font-size:11.5px;color:#2563EB;margin-top:4px;font-weight:600"></div>
+        <div id="t-existing-brochure-box" style="display:none;margin-top:6px;padding:8px 12px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;font-size:12px;color:#1E40AF;align-items:center;justify-content:space-between">
+          <div style="display:flex;align-items:center;gap:6px;overflow:hidden;text-overflow:ellipsis">
+            <span class="icon sm" style="color:#2563EB">description</span>
+            <span id="t-existing-brochure-text" style="font-weight:600">Current Brochure Attached</span>
+          </div>
+          <div style="display:flex;gap:6px">
+            <a id="t-existing-brochure-link" href="#" target="_blank" class="btn-th btn-sm" style="background:#2563EB;color:#fff;border:none;text-decoration:none;padding:3px 8px;font-size:11px"><span class="icon sm" style="font-size:13px">open_in_new</span>View</a>
+          </div>
+        </div>
+      </div>
+      <div class="col-12">
+        <label for="t-brochure" class="label-th">Brochure URL / Drive Link (Optional)</label>
         <input id="t-brochure" class="input-th" type="url" placeholder="https://drive.google.com/...">
       </div>
       <div class="col-12">
-        <label for="t-reason" class="label-th">Reasons for Training</label>
+        <label for="t-reason" class="label-th">Reasons for Training <span class="required">*</span></label>
         <textarea id="t-reason" class="input-th" rows="3" placeholder="State reasons for training, programme objectives, business justification, or operational need..."></textarea>
       </div>
 
@@ -195,7 +214,7 @@
         <span class="icon sm" style="color:#2563EB">settings</span> 5. Lifecycle & Status Controls
       </div>
       <div class="col-md-4">
-        <label for="t-status" class="label-th">Status</label>
+        <label for="t-status" class="label-th">Status <span class="required">*</span></label>
         <select id="t-status" class="input-th">
           <option value="" disabled selected>Select Status</option>
           <option value="Draft">Draft</option>
@@ -205,7 +224,7 @@
         </select>
       </div>
       <div class="col-md-4">
-        <label for="t-stage" class="label-th">Lifecycle Stage</label>
+        <label for="t-stage" class="label-th">Lifecycle Stage <span class="required">*</span></label>
         <select id="t-stage" class="input-th">
           <option value="" disabled selected>Select Stage</option>
           <option value="Created">Created</option>
@@ -218,7 +237,7 @@
         </select>
       </div>
       <div class="col-md-4">
-        <label for="t-app-status" class="label-th">Approval Status</label>
+        <label for="t-app-status" class="label-th">Approval Status <span class="required">*</span></label>
         <select id="t-app-status" class="input-th">
           <option value="" disabled selected>Select Approval Status</option>
           <option value="Approved">Approved</option>
@@ -356,8 +375,7 @@
         <label for="s-status" class="label-th">QR Status <span class="required">*</span></label>
         <select id="s-status" class="input-th" aria-label="QR Status">
           <option value="Active">Active (Participants can record attendance)</option>
-          <option value="Inactive">Inactive (Disabled / Attendance rejected)</option>
-          <option value="Expired">Expired (Session time ended)</option>
+          <option value="Deactivate">Deactivate (Disabled / Attendance rejected)</option>
         </select>
       </div>
     </div>
@@ -476,6 +494,20 @@
       ApolloCache.set('trainings_list', trainings, 5 * 60 * 1000);
       console.log(`[loadTrainings] Successfully loaded ${allTrainings.length} training programmes.`);
       filterTrainings();
+
+      // Deep link auto-opening if id query parameter is supplied
+      try {
+        const urlParams = (typeof getQueryParam === 'function') ? null : new URLSearchParams(window.location.search);
+        const directId = (typeof getQueryParam === 'function' ? getQueryParam('id') : (urlParams ? urlParams.get('id') : null));
+        if (directId && !window.__autoOpenedDetailId) {
+          window.__autoOpenedDetailId = directId;
+          setTimeout(() => {
+            openDetail(directId);
+          }, 150);
+        }
+      } catch(dErr) {
+        console.warn('Deep link auto open error:', dErr);
+      }
     } catch(e) {
       console.error('[loadTrainings] Error loading trainings:', e);
       allTrainings = [];
@@ -743,7 +775,73 @@
   }
 
 
+  let selectedAdminBrochureFile = null;
+  let currentEditingTrainingSnapshot = null;
+
+  function isTbdValue(val) {
+    if (val === null || val === undefined) return false;
+    const clean = String(val).trim().toUpperCase();
+    return clean === 'TBD' || clean === 'T.B.D' || clean === 'T.B.D.' || clean === 'TO BE DETERMINED' || clean === 'TO BE DECIDED';
+  }
+
+  function handleAdminBrochureSelect(input) {
+    const file = input.files && input.files[0];
+    const statusEl = document.getElementById('t-brochure-status');
+    const clearBtn = document.getElementById('btn-clear-brochure');
+
+    if (!file) {
+      selectedAdminBrochureFile = null;
+      if (statusEl) statusEl.textContent = '';
+      if (clearBtn) clearBtn.style.display = 'none';
+      return;
+    }
+
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      showToast('File is too large. Maximum allowed brochure size is 10 MB.', 'error');
+      input.value = '';
+      selectedAdminBrochureFile = null;
+      if (statusEl) statusEl.textContent = '';
+      if (clearBtn) clearBtn.style.display = 'none';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const base64Data = e.target.result.split(',')[1];
+      selectedAdminBrochureFile = {
+        name: file.name,
+        mimeType: file.type || 'application/octet-stream',
+        data: base64Data
+      };
+      if (statusEl) statusEl.innerHTML = `<span class="icon sm" style="font-size:14px;color:#16A34A;vertical-align:middle">check_circle</span> Ready to upload: <strong>${file.name}</strong> (${(file.size/1024/1024).toFixed(2)} MB)`;
+      if (clearBtn) clearBtn.style.display = 'inline-flex';
+    };
+    reader.onerror = function() {
+      showToast('Failed to read file.', 'error');
+      selectedAdminBrochureFile = null;
+      if (statusEl) statusEl.textContent = '';
+      if (clearBtn) clearBtn.style.display = 'none';
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function clearAdminBrochureFile() {
+    const input = document.getElementById('t-brochure-file');
+    if (input) input.value = '';
+    selectedAdminBrochureFile = null;
+    const statusEl = document.getElementById('t-brochure-status');
+    if (statusEl) statusEl.textContent = '';
+    const clearBtn = document.getElementById('btn-clear-brochure');
+    if (clearBtn) clearBtn.style.display = 'none';
+  }
+
   function openCreateTrainingModal() {
+    currentEditingTrainingSnapshot = null;
+    clearAdminBrochureFile();
+    const existingBrochureBox = document.getElementById('t-existing-brochure-box');
+    if (existingBrochureBox) existingBrochureBox.style.display = 'none';
+
     loadCostCentres();
     document.getElementById('t-modal-title').textContent = 'New Training Programme';
     document.getElementById('t-id').value       = '';
@@ -758,32 +856,116 @@
     document.getElementById('t-dept').value     = '';
     document.getElementById('t-start').value    = '';
     document.getElementById('t-end').value      = '';
-    document.getElementById('t-duration').value = '';
-    document.getElementById('t-hours').value    = '';
+    document.getElementById('t-duration').value = '1';
+    document.getElementById('t-hours').value    = '7';
     document.getElementById('t-cert-expiry').value = '';
     document.getElementById('t-brochure').value = '';
     document.getElementById('t-reason').value   = '';
-    document.getElementById('t-status').value   = '';
+    document.getElementById('t-status').value   = 'Draft';
     const stageEl = document.getElementById('t-stage');
-    if (stageEl) stageEl.value = '';
+    if (stageEl) stageEl.value = 'Created';
     const appSelect = document.getElementById('t-app-status');
-    if (appSelect) appSelect.value = '';
+    if (appSelect) appSelect.value = 'Approved';
     openModal('modal-training');
   }
 
   function editTraining(idOrObj) {
     const t = typeof idOrObj === 'object' ? idOrObj : allTrainings.find(x => x.ID === idOrObj);
     if (!t) return;
+    currentEditingTrainingSnapshot = Object.assign({}, t);
+
+    loadCostCentres();
     document.getElementById('t-modal-title').textContent = 'Edit Training Programme';
     document.getElementById('t-id').value       = t.ID;
     document.getElementById('t-name').value     = t.Name || '';
-    document.getElementById('t-cat').value      = t.Category || '';
-    document.getElementById('t-mode').value     = t.TrainingMode || t.Mode || '';
-    document.getElementById('t-tna').value      = t.TnaSource || '';
+
+    // 1. Training Category Autofill (supports both short and full descriptive requisition names)
+    const rawCat = String(t.Category || t.TrainingCategory || t['Training Category'] || '').trim();
+    const catSelect = document.getElementById('t-cat');
+    if (catSelect) {
+      let matchedVal = '';
+      const rawCatLower = rawCat.toLowerCase();
+      if (rawCatLower) {
+        if (rawCatLower.includes('behavior') || rawCatLower.includes('leadership') || rawCatLower.includes('soft skill') || rawCatLower.includes('customer service')) {
+          matchedVal = 'Behavioral Skills';
+        } else if (rawCatLower.includes('technical') || rawCatLower.includes('quality') || rawCatLower.includes('she') || rawCatLower.includes('digital')) {
+          matchedVal = 'Technical Skills';
+        } else if (rawCatLower.includes('compliance') || rawCatLower.includes('safety') || rawCatLower.includes('legal') || rawCatLower.includes('regulatory')) {
+          matchedVal = 'Compliance Training';
+        } else if (rawCatLower.includes('business') || rawCatLower.includes('finance') || rawCatLower.includes('sales') || rawCatLower.includes('marketing') || rawCatLower.includes('project management')) {
+          matchedVal = 'Business Skills';
+        } else if (rawCatLower.includes('onboard') || rawCatLower.includes('induction')) {
+          matchedVal = 'Onboarding';
+        } else {
+          for (let opt of catSelect.options) {
+            const optVal = opt.value.toLowerCase();
+            if (optVal && (rawCatLower.includes(optVal) || optVal.includes(rawCatLower))) {
+              matchedVal = opt.value;
+              break;
+            }
+          }
+        }
+      }
+      if (!matchedVal && rawCat) {
+        const opt = document.createElement('option');
+        opt.value = rawCat;
+        opt.textContent = rawCat;
+        catSelect.appendChild(opt);
+        matchedVal = rawCat;
+      }
+      catSelect.value = matchedVal || '';
+    }
+
+    // 2. Training Type / Mode Autofill (supports In-House, Public, On-Job, and venue hints)
+    const rawMode = String(t.TrainingMode || t.TrainingType || t.Mode || t.Type || t['Training Mode'] || t['Training Type'] || (t.Venue && String(t.Venue).toLowerCase().includes('in-house') ? 'In-House Training' : t.Venue && String(t.Venue).toLowerCase().includes('public') ? 'Public' : '') || '').trim();
+    const modeSelect = document.getElementById('t-mode');
+    if (modeSelect) {
+      let matchedMode = '';
+      const rawModeLower = rawMode.toLowerCase();
+      if (rawModeLower.includes('in-house') || rawModeLower.includes('inhouse') || rawModeLower.includes('in house') || rawModeLower.includes('internal')) {
+        matchedMode = 'In-House Training';
+      } else if (rawModeLower.includes('public') || rawModeLower.includes('external')) {
+        matchedMode = 'Public';
+      } else if (rawModeLower.includes('on-job') || rawModeLower.includes('on job') || rawModeLower.includes('ojt') || rawModeLower.includes('on-the-job')) {
+        matchedMode = 'On-Job Training';
+      } else if (rawModeLower) {
+        for (let opt of modeSelect.options) {
+          if (opt.value && opt.value.toLowerCase() === rawModeLower) {
+            matchedMode = opt.value;
+            break;
+          }
+        }
+      }
+      if (!matchedMode && rawMode) {
+        const opt = document.createElement('option');
+        opt.value = rawMode;
+        opt.textContent = rawMode;
+        modeSelect.appendChild(opt);
+        matchedMode = rawMode;
+      }
+      modeSelect.value = matchedMode || 'In-House Training';
+    }
+
+    // 3. TNA Source Autofill (defaults to Training Requisition Form for employee requests)
+    const rawTna = String(t.TnaSource || t['TNA Source'] || t.TNA || t.Tna || (t.RequestedBy || t.RequisitionFormFileID || t.RequisitionUrl ? 'Training Requisition Form' : 'Training Requisition Form')).trim();
+    const tnaSelect = document.getElementById('t-tna');
+    if (tnaSelect) {
+      let matchedTna = '';
+      const rawTnaLower = rawTna.toLowerCase();
+      if (rawTnaLower.includes('procedure') || rawTnaLower.includes('policy')) {
+        matchedTna = 'Training Procedure';
+      } else {
+        matchedTna = 'Training Requisition Form';
+      }
+      tnaSelect.value = matchedTna;
+    }
+
     document.getElementById('t-trainer').value  = t.Trainer || '';
     document.getElementById('t-venue').value    = t.Venue || '';
     document.getElementById('t-provider').value = t.TrainingProvider || t.Vendor || '';
-    document.getElementById('t-fee').value      = t.CourseFee || '';
+
+    // Fee: display raw value (e.g. TBD or 1500 or 0.00)
+    document.getElementById('t-fee').value      = (t.CourseFee !== undefined && t.CourseFee !== null) ? String(t.CourseFee) : '';
 
     const deptSelect = document.getElementById('t-dept');
     if (t.Department && deptSelect) {
@@ -799,58 +981,149 @@
     }
 
     document.getElementById('t-start').value    = toInputDateStr(t.StartDate);
-    document.getElementById('t-end').value      = toInputDateStr(t.EndDate);
-    document.getElementById('t-duration').value = t.Duration  || '';
-    document.getElementById('t-hours').value    = t.TotalHours|| '';
-    document.getElementById('t-cert-expiry').value = toInputDateStr(t.ExpiryDate || t.CertificateExpiryDate);
-    document.getElementById('t-brochure').value = t.RequisitionUrl || t.BrochureUrl || '';
+    document.getElementById('t-end').value      = toInputDateStr(t.EndDate || t.StartDate);
+    document.getElementById('t-duration').value = t.Duration  || 1;
+    document.getElementById('t-hours').value    = t.TotalHours|| (Math.min(7, (t.Duration || 1) * 7));
+    document.getElementById('t-cert-expiry').value = toInputDateStr(t.ExpiryDate || t.CertExpiryDate || t.CertificateExpiryDate);
+    
+    // Brochure
+    clearAdminBrochureFile();
+    const existingBrochureUrl = t.BrochureURL || t.BrochureUrl || t.RequisitionUrl || '';
+    document.getElementById('t-brochure').value = existingBrochureUrl;
+    const existingBrochureBox = document.getElementById('t-existing-brochure-box');
+    const existingBrochureLink = document.getElementById('t-existing-brochure-link');
+    if (existingBrochureBox && existingBrochureLink) {
+      if (existingBrochureUrl) {
+        existingBrochureBox.style.display = 'flex';
+        existingBrochureLink.href = existingBrochureUrl;
+      } else {
+        existingBrochureBox.style.display = 'none';
+      }
+    }
+
     document.getElementById('t-reason').value   = t.Reason || t.Objectives || t.Justification || '';
-    document.getElementById('t-status').value   = t.Status    || '';
+    document.getElementById('t-status').value   = t.Status    || 'Draft';
     const stageEl = document.getElementById('t-stage');
-    if (stageEl) stageEl.value = t.Stage || '';
+    if (stageEl) stageEl.value = t.Stage || 'Created';
     const appSelect = document.getElementById('t-app-status');
-    if (appSelect) appSelect.value = t.ApprovalStatus || '';
+    if (appSelect) appSelect.value = t.ApprovalStatus || 'Approved';
+
     openModal('modal-training');
   }
 
   async function saveTraining() {
     const id        = document.getElementById('t-id').value;
     const name      = document.getElementById('t-name').value.trim();
+    const cat       = document.getElementById('t-cat').value;
+    const mode      = document.getElementById('t-mode').value;
+    const tna       = document.getElementById('t-tna').value;
     const trainer   = document.getElementById('t-trainer').value.trim();
+    const venue     = document.getElementById('t-venue').value.trim();
+    const provider  = document.getElementById('t-provider').value.trim();
+    const feeRaw    = document.getElementById('t-fee').value.trim();
+    const dept      = document.getElementById('t-dept').value;
     const startDate = document.getElementById('t-start').value;
-
-    if (!name) { showToast('Programme name is required.', 'error'); return; }
-    if (!trainer) { showToast('Trainer / Facilitator is required.', 'error'); return; }
-    if (!startDate) { showToast('Start Date is required.', 'error'); return; }
-
+    const endDate   = document.getElementById('t-end').value;
+    const duration  = parseInt(document.getElementById('t-duration').value || 1, 10);
+    const hours     = parseFloat(document.getElementById('t-hours').value || 0);
+    const certExpiry= document.getElementById('t-cert-expiry').value;
+    const brochureUrl= document.getElementById('t-brochure').value.trim();
+    const reasonVal = document.getElementById('t-reason').value.trim();
+    const status    = document.getElementById('t-status').value;
+    const stage     = document.getElementById('t-stage') ? document.getElementById('t-stage').value : 'Created';
     const appSelect = document.getElementById('t-app-status');
     const appStatusVal = appSelect ? appSelect.value : 'Approved';
 
-    const reasonVal = document.getElementById('t-reason').value.trim();
+    // 1. Mandatory Programme Name
+    if (!name || isTbdValue(name)) { showToast('Programme name cannot be TBD. Please enter confirmed name.', 'error'); return; }
+
+    // 2. Mandatory Category, Mode, TNA
+    if (!cat || isTbdValue(cat)) { showToast('Training Category is required.', 'error'); return; }
+    if (!mode || isTbdValue(mode)) { showToast('Training Type / Mode is required.', 'error'); return; }
+    if (!tna || isTbdValue(tna)) { showToast('TNA Source is required.', 'error'); return; }
+
+    // 3. Mandatory Start Date & End Date
+    if (!startDate || isTbdValue(startDate)) { showToast('Start Date is required.', 'error'); return; }
+
+    // 4. Duration & Max 7h/day Check
+    if (isNaN(duration) || duration <= 0) { showToast('Please enter a valid number of days (at least 1).', 'error'); return; }
+    if (isNaN(hours) || hours <= 0) { showToast('Total hours must be greater than 0.', 'error'); return; }
+    if (hours > (duration * 7) || (hours / duration) > 7.001) {
+      showToast('Training duration cannot exceed 7 hours per day.', 'error');
+      return;
+    }
+
+    // 5. Training Fee Check: TBD is prohibited, confirmed 0.00 is allowed
+    if (!feeRaw || isTbdValue(feeRaw)) {
+      showToast('Please confirm the training fee before saving.', 'error');
+      return;
+    }
+    const parsedFee = parseFloat(feeRaw.replace(/[^0-9.]/g, ''));
+    if (isNaN(parsedFee) || parsedFee < 0) {
+      showToast('Please enter a valid numeric training fee (e.g. 0.00 or higher).', 'error');
+      return;
+    }
+
+    // 6. Department / Cost Centre
+    if (!dept || isTbdValue(dept)) { showToast('Department / Cost Centre is required.', 'error'); return; }
+
+    // 7. Facilitator / Venue / Provider
+    if (!trainer || isTbdValue(trainer)) { showToast('Trainer / Facilitator name cannot be TBD.', 'error'); return; }
+    if (!venue || isTbdValue(venue)) { showToast('Training venue cannot be TBD. Please enter confirmed venue.', 'error'); return; }
+    if (!provider || isTbdValue(provider)) { showToast('Training provider cannot be TBD. Please enter confirmed provider.', 'error'); return; }
+
+    // 8. Reasons for Training
+    if (!reasonVal || isTbdValue(reasonVal)) { showToast('Reason for training is required.', 'error'); return; }
+
+    // 9. Status & Stage
+    if (!status || isTbdValue(status)) { showToast('Status is required.', 'error'); return; }
+    if (!stage || isTbdValue(stage)) { showToast('Lifecycle Stage is required.', 'error'); return; }
+
+    // Preserve unchanged dates from snapshot if applicable
+    let finalStartDate = startDate;
+    let finalEndDate = endDate || startDate;
+    let finalCertExpiry = certExpiry;
+
+    if (id && currentEditingTrainingSnapshot && currentEditingTrainingSnapshot.ID === id) {
+      if (startDate === toInputDateStr(currentEditingTrainingSnapshot.StartDate)) {
+        finalStartDate = currentEditingTrainingSnapshot.StartDate;
+      }
+      if (endDate === toInputDateStr(currentEditingTrainingSnapshot.EndDate)) {
+        finalEndDate = currentEditingTrainingSnapshot.EndDate;
+      }
+      const snapExp = currentEditingTrainingSnapshot.ExpiryDate || currentEditingTrainingSnapshot.CertExpiryDate || currentEditingTrainingSnapshot.CertificateExpiryDate;
+      if (certExpiry === toInputDateStr(snapExp)) {
+        finalCertExpiry = snapExp || '';
+      }
+    }
 
     const data = {
-      ID: id, Name: name,
-      Category:         document.getElementById('t-cat').value,
-      TrainingMode:     document.getElementById('t-mode').value,
-      TnaSource:        document.getElementById('t-tna').value,
-      Trainer:          trainer,
-      Venue:            document.getElementById('t-venue').value.trim(),
-      TrainingProvider: document.getElementById('t-provider').value.trim(),
-      CourseFee:        document.getElementById('t-fee').value,
-      Department:       document.getElementById('t-dept').value,
-      StartDate:        startDate,
-      EndDate:          document.getElementById('t-end').value,
-      Duration:         document.getElementById('t-duration').value || 1,
-      TotalHours:       document.getElementById('t-hours').value || 8,
-      ExpiryDate:       document.getElementById('t-cert-expiry').value,
-      RequisitionUrl:   document.getElementById('t-brochure').value.trim(),
-      Reason:           reasonVal,
-      Objectives:       reasonVal,
-      Status:           document.getElementById('t-status').value,
-      ApprovalStatus:   appStatusVal,
-      Stage:            document.getElementById('t-stage') ? document.getElementById('t-stage').value : 'Created',
-      Participants: 0
+      ID: id,
+      Name: name,
+      Category: cat,
+      TrainingMode: mode,
+      TnaSource: tna,
+      Trainer: trainer,
+      Venue: venue,
+      TrainingProvider: provider,
+      CourseFee: parsedFee.toFixed(2),
+      Department: dept,
+      StartDate: finalStartDate,
+      EndDate: finalEndDate,
+      Duration: duration,
+      TotalHours: hours,
+      ExpiryDate: finalCertExpiry,
+      CertExpiryDate: finalCertExpiry,
+      BrochureURL: brochureUrl,
+      BrochureFile: selectedAdminBrochureFile,
+      Reason: reasonVal,
+      Objectives: reasonVal,
+      Status: status,
+      ApprovalStatus: appStatusVal,
+      Stage: stage,
+      Participants: (id && currentEditingTrainingSnapshot) ? (currentEditingTrainingSnapshot.Participants || 0) : 0
     };
+
     const btn = document.getElementById('btn-save-t');
     setBtnLoading(btn, true, 'Saving...');
     try {
@@ -861,13 +1134,17 @@
           : '';
         showToast(`Programme & Drive Workspace created! <a href="${res.folderUrl}" target="_blank" style="color:white;text-decoration:underline;font-weight:600">Open Folder</a>${formLink}`, 'success');
       } else {
-        showToast(id ? 'Programme updated.' : 'Programme created.', 'success');
+        showToast(id ? 'Programme updated successfully.' : 'Programme created successfully.', 'success');
       }
       closeModal('modal-training');
-      clearTrainingForm();
+      clearAdminBrochureFile();
+      currentEditingTrainingSnapshot = null;
       loadTrainings();
-    } catch(e) { showToast(e.message, 'error'); }
-    finally { setBtnLoading(btn, false, '<span class="icon sm">save</span> Save Programme'); }
+    } catch(e) {
+      showToast(e.message, 'error');
+    } finally {
+      setBtnLoading(btn, false, '<span class="icon sm">save</span> Save Programme');
+    }
   }
 
   async function confirmDeleteT(id) {
@@ -1180,8 +1457,9 @@
       </tr>
     `).join('') : '<tr><td colspan="4" style="text-align:center;color:#94A3B8;padding:20px">No supervisor post-evaluations submitted yet.</td></tr>';
 
-    const activeSessions = (sessions || []).filter(s => String(s.QRStatus || 'Active').toLowerCase() !== 'inactive');
-    const inactiveSessions = (sessions || []).filter(s => String(s.QRStatus || 'Active').toLowerCase() === 'inactive');
+    const isSessionDeactivated = s => ['deactivate', 'deactivated', 'inactive', 'expired'].includes(String(s.QRStatus || '').toLowerCase());
+    const activeSessions = (sessions || []).filter(s => !isSessionDeactivated(s));
+    const inactiveSessions = (sessions || []).filter(s => isSessionDeactivated(s));
 
     const content = document.getElementById('detail-full-content');
     content.innerHTML = `
@@ -1271,37 +1549,8 @@
           </div>
         ` : ''}
 
-        <!-- Approval & Requisition Audit Trail -->
-        <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:16px; margin-top:16px">
-          <div class="section-label" style="margin-bottom:10px; display:flex; align-items:center; gap:6px">
-            <span class="icon sm" style="color:#2563EB">verified</span> Approval & Requisition Audit Trail
-          </div>
-          <div class="row g-3">
-            <div class="col-6 col-md-3">
-              <div style="font-size:11.5px; color:#64748B">Requested By</div>
-              <div style="font-size:13px; font-weight:600; color:#1E293B">${t.RequestedByName || t.RequestedBy || 'N/A'}</div>
-              <div style="font-size:11px; color:#94A3B8">${t.RequestedByEmail || ''}</div>
-            </div>
-            <div class="col-6 col-md-3">
-              <div style="font-size:11.5px; color:#64748B">Requested Date</div>
-              <div style="font-size:13px; font-weight:600; color:#1E293B">${toDisplayDateStr(t.RequestedDate) || 'N/A'}</div>
-            </div>
-            <div class="col-6 col-md-3">
-              <div style="font-size:11.5px; color:#64748B">Approved / Signed By</div>
-              <div style="font-size:13px; font-weight:600; color:#1E293B">${t.ApprovedBy || 'HOD / C-Suite / HOHR'}</div>
-              <div style="font-size:11px; color:#94A3B8">${t.ApprovedCostCentre ? 'Cost Centre: ' + t.ApprovedCostCentre : ''}</div>
-            </div>
-            <div class="col-6 col-md-3">
-              <div style="font-size:11.5px; color:#64748B">Approved Date / Status</div>
-              <div style="font-size:13px; font-weight:600; color:#16A34A">${toDisplayDateStr(t.ApprovedAt) || 'Approved'}</div>
-            </div>
-          </div>
-          ${t.ApprovalRemarks ? `
-            <div style="margin-top:10px; padding-top:10px; border-top:1px dashed #CBD5E1; font-size:12px; color:#475569">
-              <strong>Approval Remarks / Notes:</strong> "${t.ApprovalRemarks}"
-            </div>
-          ` : ''}
-        </div>
+        <!-- Approver / Remarks Section (Prominent Uncollapsed Section) -->
+        ${renderApproverRemarksSectionHtml(t)}
 
         <!-- Targeted Sync Status & Retry Sync Card -->
         <div style="margin-top:16px; padding-top:16px; border-top:1px solid #F1F5F9">
@@ -1402,14 +1651,14 @@
             <details style="cursor:pointer">
               <summary style="font-size:12px;font-weight:600;color:#64748B;user-select:none;display:flex;align-items:center;gap:6px">
                 <span class="icon sm" style="color:#EF4444;font-size:16px">block</span>
-                Inactive / Deleted Sessions (${inactiveSessions.length})
+                Deactivated Sessions (${inactiveSessions.length})
                 <span style="font-size:11px;color:#94A3B8;font-weight:400;margin-left:4px">(Attendance disabled)</span>
               </summary>
               <div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">
                 ${inactiveSessions.map(s => `
                   <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#FAFAFA;border:1px dashed #E2E8F0;border-radius:8px">
                     <div style="display:flex;align-items:center;gap:10px">
-                      <span class="badge-th badge-danger" style="font-size:10px;background:#FEE2E2;color:#DC2626;padding:2px 8px">Inactive</span>
+                      <span class="badge-th badge-danger" style="font-size:10px;background:#FEE2E2;color:#DC2626;padding:2px 8px">Deactivate</span>
                       <div>
                         <span style="font-size:13px;font-weight:700;color:#64748B;text-decoration:line-through">${s.SessionName}</span>
                         <span style="font-size:11.5px;color:#94A3B8;margin-left:8px">${formatMinimalistDate(s.SessionDate)} (${s.SessionID})</span>
@@ -1959,7 +2208,7 @@
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('s-date').value = (t && t.StartDate) ? toInputDateStr(t.StartDate) : today;
     document.getElementById('s-start-time').value = '09:00';
-    document.getElementById('s-end-time').value = '17:00';
+    document.getElementById('s-end-time').value = '16:00';
     document.getElementById('s-status').value = 'Active';
     document.getElementById('btn-save-session').innerHTML = '<span class="icon sm">save</span>Save Session';
     openModal('modal-session');
@@ -1982,8 +2231,8 @@
       document.getElementById('s-name').value = s.SessionName || '';
       document.getElementById('s-date').value = toInputDateStr(s.SessionDate);
       document.getElementById('s-start-time').value = toInputTimeStr(s.StartTime) || '09:00';
-      document.getElementById('s-end-time').value = toInputTimeStr(s.EndTime) || '17:00';
-      document.getElementById('s-status').value = s.QRStatus || 'Active';
+      const curStatusLower = String(s.QRStatus || 'Active').trim().toLowerCase();
+      document.getElementById('s-status').value = (curStatusLower === 'deactivate' || curStatusLower === 'deactivated' || curStatusLower === 'inactive' || curStatusLower === 'expired') ? 'Deactivate' : 'Active';
       document.getElementById('btn-save-session').innerHTML = '<span class="icon sm">save</span>Save Changes';
       openModal('modal-session');
     } catch(e) {
@@ -2000,12 +2249,29 @@
     const sessionName = document.getElementById('s-name').value.trim();
     const sessionDate = document.getElementById('s-date').value;
     const startTime   = document.getElementById('s-start-time').value || '09:00';
-    const endTime     = document.getElementById('s-end-time').value || '17:00';
+    const endTime     = document.getElementById('s-end-time').value || '16:00';
     const qrStatus    = document.getElementById('s-status').value || 'Active';
 
     if (!tId && !isEditing) { showToast('Please select a Training Programme.', 'error'); return; }
     if (!sessionName) { showToast('Please enter a Session Name.', 'error'); return; }
     if (!sessionDate) { showToast('Please select a Session Date.', 'error'); return; }
+
+    // Validate max 7 hours per day duration
+    const startMatch = (startTime || '09:00').match(/(\d{1,2}):(\d{2})/);
+    const endMatch = (endTime || '16:00').match(/(\d{1,2}):(\d{2})/);
+    if (startMatch && endMatch) {
+      const startMins = parseInt(startMatch[1], 10) * 60 + parseInt(startMatch[2], 10);
+      const endMins = parseInt(endMatch[1], 10) * 60 + parseInt(endMatch[2], 10);
+      const diffHours = (endMins - startMins) / 60;
+      if (diffHours <= 0) {
+        showToast('End Time must be later than Start Time.', 'error');
+        return;
+      }
+      if (diffHours > 7.001) {
+        showToast('Training duration cannot exceed 7 hours per day.', 'error');
+        return;
+      }
+    }
 
     const data = {
       TrainingID:  tId,
@@ -2037,6 +2303,109 @@
     } finally {
       setBtnLoading(btn, false, isEditing ? '<span class="icon sm">save</span>Save Changes' : '<span class="icon sm">save</span>Save Session');
     }
+  }
+
+  function renderApproverRemarksSectionHtml(t) {
+    const isApproved = String(t.ApprovalStatus || '').toLowerCase().includes('approved');
+    const isRejected = String(t.ApprovalStatus || '').toLowerCase().includes('reject');
+    const isReturned = String(t.ApprovalStatus || '').toLowerCase().includes('return') || String(t.ApprovalStatus || '').toLowerCase().includes('revision');
+
+    let borderColor = '#2563EB';
+    let headerBg = '#EFF6FF';
+    let badgeColor = '#1D4ED8';
+    let badgeBg = '#DBEAFE';
+
+    if (isApproved) {
+      borderColor = '#10B981';
+      headerBg = '#ECFDF5';
+      badgeColor = '#065F46';
+      badgeBg = '#D1FAE5';
+    } else if (isRejected) {
+      borderColor = '#EF4444';
+      headerBg = '#FEF2F2';
+      badgeColor = '#991B1B';
+      badgeBg = '#FEE2E2';
+    } else if (isReturned) {
+      borderColor = '#F59E0B';
+      headerBg = '#FFFBEB';
+      badgeColor = '#92400E';
+      badgeBg = '#FEF3C7';
+    }
+
+    // Chronological remarks collection
+    const remarksList = [];
+    if (t.ApprovalRemarks) {
+      const parts = String(t.ApprovalRemarks).split(/\n|(?:\s*;\s*)|(?:\s*\|\s*(?=[A-Z]))/);
+      parts.forEach(p => {
+        const tr = p.trim();
+        if (tr && !remarksList.includes(tr)) remarksList.push(tr);
+      });
+    }
+    if (t.HODRemarks && !remarksList.some(r => r.includes(t.HODRemarks))) {
+      remarksList.push(`HOD (${t.HODName || t.HOD || 'Manager'}): ${t.HODRemarks}`);
+    }
+    if (t.CsuiteRemarks && !remarksList.some(r => r.includes(t.CsuiteRemarks))) {
+      remarksList.push(`C-Suite (${t.CsuiteName || t.Csuite || 'Executive'}): ${t.CsuiteRemarks}`);
+    }
+    if (t.HOHRRemarks && !remarksList.some(r => r.includes(t.HOHRRemarks))) {
+      remarksList.push(`HOHR (${t.HOHRName || t.HOHR || 'Head of HR'}): ${t.HOHRRemarks}`);
+    }
+
+    return `
+      <!-- Approver / Remarks (Uncollapsed Distinct Section) -->
+      <div style="background:#FFFFFF; border:2px solid ${borderColor}; border-radius:12px; overflow:hidden; margin-top:20px; box-shadow:0 2px 8px rgba(0,0,0,0.04)">
+        <div style="background:${headerBg}; padding:12px 18px; border-bottom:1px solid ${borderColor}30; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px">
+          <div style="display:flex; align-items:center; gap:8px; font-weight:700; font-size:13.5px; color:#1E293B">
+            <span class="icon filled sm" style="color:${borderColor}">verified_user</span> Approver / Remarks
+          </div>
+          <div>
+            <span style="display:inline-block; background:${badgeBg}; color:${badgeColor}; font-size:11.5px; font-weight:700; padding:3px 10px; border-radius:12px; text-transform:uppercase; letter-spacing:0.5px">
+              ${t.ApprovalStatus || 'Approved'}
+            </span>
+          </div>
+        </div>
+
+        <div style="padding:16px 18px">
+          <div class="row g-3">
+            <div class="col-12 col-md-4">
+              <div style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:3px">Approver / Signatory</div>
+              <div style="font-size:13.5px; font-weight:700; color:#0F172A">${t.ApprovedBy || t.HODName || t.HOD || 'HOD / C-Suite / HOHR'}</div>
+              <div style="font-size:11.5px; color:#64748B; margin-top:1px">${t.ApprovedCostCentre ? 'Cost Centre: ' + t.ApprovedCostCentre : ''}</div>
+            </div>
+            <div class="col-6 col-md-4">
+              <div style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:3px">Approval Date & Status</div>
+              <div style="font-size:13px; font-weight:600; color:#0F172A">${toDisplayDateStr(t.ApprovedAt) || toDisplayDateStr(t.CreatedDate) || 'Approved'}</div>
+              <div style="font-size:11.5px; color:${badgeColor}; font-weight:600; margin-top:1px">${t.ApprovalStatus || 'Approved'}</div>
+            </div>
+            <div class="col-6 col-md-4">
+              <div style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:3px">Requested By</div>
+              <div style="font-size:13px; font-weight:600; color:#0F172A">${t.RequestedByName || t.RequestedBy || 'Employee'}</div>
+              <div style="font-size:11.5px; color:#64748B; margin-top:1px">${toDisplayDateStr(t.RequestedDate) || ''}</div>
+            </div>
+          </div>
+
+          <!-- Chronological Remarks & Notes -->
+          <div style="margin-top:14px; padding-top:12px; border-top:1px dashed #E2E8F0">
+            <div style="font-size:11.5px; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px">
+              Remarks & Decision History:
+            </div>
+            ${remarksList.length > 0 ? `
+              <div style="display:flex; flex-direction:column; gap:8px">
+                ${remarksList.map(r => `
+                  <div style="background:#F8FAFC; border-left:3px solid ${borderColor}; padding:8px 12px; border-radius:0 6px 6px 0; font-size:12.5px; color:#334155; line-height:1.5">
+                    ${r}
+                  </div>
+                `).join('')}
+              </div>
+            ` : `
+              <div style="background:#F8FAFC; padding:10px 12px; border-radius:6px; font-size:12px; color:#64748B; font-style:italic">
+                No additional remarks or notes recorded for this requisition.
+              </div>
+            `}
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   function confirmDeleteSessionForTraining(sessionId, trainingId) {

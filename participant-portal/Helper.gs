@@ -434,7 +434,12 @@ function findTrainingBySessionId(sessionId) {
             return id === String(session.TrainingID || '').trim().toLowerCase() ||
                    code === String(session.TrainingID || '').trim().toLowerCase() ||
                    tId === String(session.TrainingID || '').trim().toLowerCase();
-          }) || { ID: session.TrainingID };
+          });
+
+          if (!t) {
+            // Training was deleted or no longer exists
+            return null;
+          }
 
           const perTrainingSs = getTrainingDataSpreadsheet(t) || mainSs;
           return { session: session, training: t, spreadsheet: perTrainingSs, sessionSheet: centralSessSheet };

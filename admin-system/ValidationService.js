@@ -39,11 +39,8 @@ function validateAttendance(sessionId, employeeNo) {
 
     // 2. Check QR / Session Status
     const status = String(session.QRStatus || 'Active').trim().toLowerCase();
-    if (status === 'inactive' || status === 'deleted') {
-      return { valid: false, message: 'This QR attendance session is no longer active. Attendance cannot be recorded.', session: session };
-    }
-    if (status === 'expired') {
-      return { valid: false, message: 'Attendance registration for this session is closed (Expired).', session: session };
+    if (status === 'deactivate' || status === 'deactivated' || status === 'inactive' || status === 'deleted' || status === 'expired') {
+      return { valid: false, message: 'This QR attendance session is deactivated. Attendance cannot be recorded.', session: session };
     }
     // 2b. Check Parent Training Approval Status
     if (session.TrainingID) {
@@ -245,5 +242,125 @@ function validateSystemConfiguration() {
       details: ['Configuration validation error: ' + e.message]
     };
   }
+}
+
+/**
+ * Helper to check if a value represents prohibited TBD
+ */
+function isTbdString(val) {
+  if (!val) return false;
+  const clean = String(val).trim().toUpperCase();
+  return clean === 'TBD' || clean === 'T.B.D' || clean === 'T.B.D.' || clean === 'TO BE DETERMINED' || clean === 'TO BE DECIDED';
+}
+
+/**
+ * Server-side validator for Admin Training save/update
+ * @param {Object} data - Form data
+ * @param {boolean} isEdit - True if editing
+ * @returns {Object} { valid: boolean, message: string, field?: string }
+ */
+function validateAdminTrainingData(data, isEdit) {
+  if (!data) return { valid: false, message: 'No data provided.' };
+
+  // 1. Mandatory Programme Name
+  const name = String(data.Name || '').trim();
+  if (!name) return { valid: false, message: 'Programme name is required.', field: 'Name' };
+  if (isTbdString(name)) return { valid: false, message: 'Programme name cannot be TBD. Please enter confirmed name.', field: 'Name' };
+
+  // 2. Mandatory Category, Mode, TNA Source
+  const category = String(data.Category || '').trim();
+  if (!category || isTbdString(category)) return { valid: false, message: 'Training Category is required.', field: 'Category' };
+
+  const mode = String(data.TrainingMode || data.Mode || '').trim();
+  if (!mode || isTbdString(mode)) return { valid: false, message: 'Training Type / Mode is required.', field: 'TrainingMode' };
+
+  const tna = String(data.TnaSource || '').trim();
+  if (!tna || isTbdString(tna)) return { valid: false, message: 'TNA Source is required.', field: 'TnaSource' };
+
+  // 3. Mandatory Trainer & Venue & Provider
+  const trainer = String(data.Trainer || '').trim();
+  if (!trainer) return { valid: false, message: 'Trainer / Facilitator is required.', field: 'Trainer' };
+  if (isTbdString(trainer)) return { valid: false, message: 'Trainer name cannot be TBD. Please enter confirmed trainer.', field: 'Trainer' };
+
+  const venue = String(data.Venue || '').trim();
+  if (!venue) return { valid: false, message: 'Training Venue is required.', field: 'Venue' };
+  if (isTbdString(venue)) return { valid: false, message: 'Training venue cannot be TBD. Please enter the confirmed venue.', field: 'Venue' };
+
+  const provider = String(data.TrainingProvider || data.Vendor || '').trim();
+  if (!provider) return { valid: false, message: 'Training Provider / Vendor Company is required.', field: 'TrainingProvider' };
+  if (isTbdString(provider)) return { valid: false, message: 'Training provider cannot be TBD. Please enter confirmed provider.', field: 'TrainingProvider' };
+
+  // 4. Mandatory Department / Cost Centre
+  const dept = String(data.Department || '').trim();
+  if (!dept || isTbdString(dept)) return { valid: false, message: 'Department / Cost Centre is required.', field: 'Department' };
+
+  // 5. Mandatory Start Date
+  const startDate = String(data.StartDate || '').trim();
+  if (!startDate || isTbdString(startDate)) return { valid: false, message: 'Start Date is required.', field: 'StartDate' };
+
+  // 6. Mandatory Reason for Training (Reject empty / whitespace)
+  const reason = String(data.Reason || data.Objectives || data.Justification || '').trim();
+  if (!reason) return { valid: false, message: 'Reason for training is required.', field: 'Reason' };
+  if (isTbdString(reason)) return { valid: false, message: 'Reason for training cannot be TBD. Please state reasons for training.', field: 'Reason' };
+
+  // 7. Training Fee - TBD is prohibited; confirmed 0.00 is allowed
+  const feeStr = (data.CourseFee !== undefined && data.CourseFee !== null) ? String(data.CourseFee).trim() : '';
+  if (!feeStr || isTbdString(feeStr)) {
+    return { valid: false, message: 'Please confirm the training fee before saving.', field: 'CourseFee' };
+  }
+  const feeNum = parseFloat(feeStr.replace(/[^0-9.]/g, ''));
+  if (isNaN(feeNum) || feeNum < 0) {
+    return { valid: false, message: 'Please enter a valid numeric training fee (e.g. 0.00 or higher).', field: 'CourseFee' };
+  }
+
+  // 8. Duration & Max 7 Hours Per Day
+  const durationDays = Math.max(1, parseInt(data.Duration || 1, 10));
+  const totalHours = parseFloat(data.TotalHours || 0);
+  if (isNaN(totalHours) || totalHours <= 0) {
+    return { valid: false, message: 'Total hours must be greater than 0.', field: 'TotalHours' };
+  }
+  if (totalHours > (durationDays * 7) || (totalHours / durationDays) > 7.001) {
+    return { valid: false, message: 'Training duration cannot exceed 7 hours per day.', field: 'TotalHours' };
+  }
+
+  // 9. Status & Stage
+  const status = String(data.Status || '').trim();
+  if (!status || isTbdString(status)) return { valid: false, message: 'Status is required.', field: 'Status' };
+
+  const stage = String(data.Stage || '').trim();
+  if (!stage || isTbdString(stage)) return { valid: false, message: 'Lifecycle Stage is required.', field: 'Stage' };
+
+  // Note: Certificate Expiry Date is explicitly OPTIONAL.
+
+  return { valid: true, message: 'Validation successful.' };
+}
+
+/**
+ * Server-side validator for Session creation/update
+ */
+function validateSessionData(data) {
+  if (!data) return { valid: false, message: 'No session data provided.' };
+  if (!data.TrainingID) return { valid: false, message: 'Training ID is required.' };
+  if (!data.SessionName || String(data.SessionName).trim() === '') return { valid: false, message: 'Session Name is required.' };
+
+  // Validate session duration (EndTime - StartTime <= 7 hours)
+  const startTime = String(data.StartTime || '09:00').trim();
+  const endTime = String(data.EndTime || '17:00').trim();
+  const startMatch = startTime.match(/(\d{1,2}):(\d{2})/);
+  const endMatch = endTime.match(/(\d{1,2}):(\d{2})/);
+
+  if (startMatch && endMatch) {
+    const startMins = parseInt(startMatch[1], 10) * 60 + parseInt(startMatch[2], 10);
+    const endMins = parseInt(endMatch[1], 10) * 60 + parseInt(endMatch[2], 10);
+    const diffHours = (endMins - startMins) / 60;
+    if (diffHours <= 0) {
+      return { valid: false, message: 'End Time must be later than Start Time.' };
+    }
+    if (diffHours > 7.001) {
+      return { valid: false, message: 'Training duration cannot exceed 7 hours per day.' };
+    }
+  }
+
+  return { valid: true, message: 'Session validation successful.' };
 }
 

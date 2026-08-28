@@ -279,6 +279,21 @@
       }
     }
 
+    function getInitialTarget() {
+      try {
+        const urlParams = (typeof getQueryParam === 'function') ? null : new URLSearchParams(window.location.search);
+        const id = (typeof getQueryParam === 'function' ? getQueryParam('id') : urlParams.get('id'));
+        const reqPage = (typeof getQueryParam === 'function' ? getQueryParam('page') : urlParams.get('page'));
+        if (id) {
+          return { page: 'training', params: { id: id } };
+        }
+        if (reqPage && reqPage !== 'index') {
+          return { page: reqPage, params: {} };
+        }
+      } catch(e) {}
+      return { page: 'dashboard', params: {} };
+    }
+
     onReady(() => {
       // Apply SYSTEM_LOGO_URL exclusively to login page with resilient fallback
       applyLoginSystemLogo();
@@ -288,7 +303,8 @@
       if (signinBtn) {
         signinBtn.addEventListener('click', () => {
           if (activeGoogleUser && activeGoogleUser.success) {
-            safeNavTo('dashboard');
+            const target = getInitialTarget();
+            safeNavTo(target.page, target.params);
           } else {
             checkCurrentUser(true);
           }
@@ -329,10 +345,11 @@
         avatar.style.background = '#2563EB';
 
         btn.disabled = false;
-        btn.innerHTML = `<span class="icon filled sm">login</span> Continue to Dashboard (${res.name})`;
+        btn.innerHTML = `<span class="icon filled sm">login</span> Continue (${res.name})`;
 
         if (autoRedirect) {
-          safeNavTo('dashboard');
+          const target = getInitialTarget();
+          safeNavTo(target.page, target.params);
         }
       } else {
         const errorText = (res && res.message) || 'Access denied. Please ensure you log in with your company Google Account.';

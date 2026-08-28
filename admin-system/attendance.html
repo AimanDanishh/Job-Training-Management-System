@@ -186,34 +186,38 @@
 
       <!-- Manual Attendance Addition -->
       <div id="add-day-section" style="display:none" class="mt-4">
-        <div class="card-th">
-          <h4 style="font-size:14px;font-weight:700;color:#1E293B;margin:0 0 16px">Add Manual Attendance Records</h4>
+        <div class="card-th" style="position:relative">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+            <h4 style="font-size:14px;font-weight:700;color:#1E293B;margin:0">Add Manual Attendance Records</h4>
+            <div id="manual-att-loader" style="display:none;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#2563EB;background:#EFF6FF;border:1px solid #BFDBFE;padding:4px 12px;border-radius:20px">
+              <span class="spinner" style="width:12px;height:12px;border-width:2px;border-color:rgba(37,99,235,0.2);border-top-color:#2563EB" role="status"></span>
+              <span>Recording attendance & refreshing...</span>
+            </div>
+          </div>
           <div class="row g-3 mb-3">
-            <div class="col-md-6">
+            <div class="col-12">
               <label for="add-session-select" class="label-th">Training Session <span class="required">*</span></label>
-              <select id="add-session-select" class="input-th" onchange="onManualSessionSelect()" aria-label="Training Session">
+              <select id="add-session-select" class="input-th" aria-label="Training Session">
                 <option value="">- Select session -</option>
               </select>
-            </div>
-            <div class="col-md-3">
-              <label for="add-date" class="label-th">Session Date</label>
-              <input id="add-date" class="input-th" type="date">
             </div>
           </div>
 
           <!-- Quick Participant Search Bar -->
-          <div class="mb-3" style="background:#F8FAFC;padding:12px;border-radius:8px;border:1px solid #E2E8F0">
+          <div class="mb-3" style="background:#F8FAFC;padding:12px;border-radius:8px;border:1px solid #E2E8F0;position:relative">
             <label for="manual-att-search" class="label-th" style="margin-bottom:6px">Search Participant by Name or Employee ID to Record Attendance</label>
             <div class="autocomplete-wrapper">
               <div style="position:relative">
                 <span class="icon" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94A3B8;font-size:15px">search</span>
-                <input id="manual-att-search" class="input-th" style="padding-left:32px" placeholder="Type Employee Name or Employee ID to quick add..." autocomplete="off" aria-label="Search Participant by Name or Employee ID">
+                <input id="manual-att-search" class="input-th" style="padding-left:32px;padding-right:36px" placeholder="Type Employee Name or Employee ID to quick add..." autocomplete="off" aria-label="Search Participant by Name or Employee ID">
+                <span id="manual-att-input-spinner" class="spinner" style="display:none;position:absolute;right:12px;top:50%;transform:translateY(-50%);width:14px;height:14px;border-width:2px;border-color:rgba(37,99,235,0.2);border-top-color:#2563EB" role="status"></span>
               </div>
               <div id="manual-att-search-drop" class="autocomplete-dropdown" style="display:none"></div>
             </div>
           </div>
           <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">
             <button class="btn-th btn-secondary" onclick="document.getElementById('add-day-section').style.display='none'">Close</button>
+            <button id="btn-submit-manual-att" class="btn-th btn-primary" onclick="submitManualAttendance()"><span class="icon sm">check_circle</span> Submit Attendance</button>
           </div>
         </div>
       </div>
@@ -229,6 +233,7 @@
   let allEmployeesList = [];
   let selectedParticipantIds = new Set();
   let currentFilteredEmployees = [];
+  let selectedManualParticipant = null;
   const STATUS_OPTIONS = ['Present','Late','Partial Attendance','Left Early','Absent'];
   const REMARK_OPTIONS = ['No remarks','Left after lunch','Medical leave','Emergency','Personal reason','Attended morning session only'];
 
@@ -309,8 +314,9 @@
       document.getElementById('p-loading').style.display = 'none';
 
       // Check status
-      if (res.QRStatus === 'Expired' || res.QRStatus === 'Inactive') {
-        showCheckinError(`Session is ${res.QRStatus}. Check-in is closed for this session.`);
+      const statusLower = String(res.QRStatus || 'Active').trim().toLowerCase();
+      if (statusLower === 'deactivate' || statusLower === 'deactivated' || statusLower === 'inactive' || statusLower === 'expired') {
+        showCheckinError('Session is deactivated. Check-in is closed for this session.');
         return;
       }
 
@@ -411,14 +417,6 @@
 
   let currentTrainingParticipants = [];
 
-  function onManualSessionSelect() {
-    const sel = document.getElementById('add-session-select');
-    const selectedOpt = sel.options[sel.selectedIndex];
-    if (selectedOpt && selectedOpt.dataset.date) {
-      document.getElementById('add-date').value = selectedOpt.dataset.date;
-    }
-  }
-
   function setupManualAttSearch() {
     const searchInp = document.getElementById('manual-att-search');
     const searchDrop = document.getElementById('manual-att-search-drop');
@@ -426,6 +424,13 @@
 
     searchInp.addEventListener('input', () => {
       const q = searchInp.value.trim().toLowerCase();
+      if (selectedManualParticipant) {
+        const selName = (selectedManualParticipant.EmployeeName || selectedManualParticipant.Name || '').toLowerCase();
+        if (q !== selName) {
+          selectedManualParticipant = null;
+        }
+      }
+
       if (q.length < 1) { searchDrop.style.display = 'none'; return; }
 
       const combinedList = [...currentTrainingParticipants, ...allEmployeesList];
@@ -450,7 +455,7 @@
       if (!matches.length) { searchDrop.style.display = 'none'; return; }
 
       searchDrop.innerHTML = matches.slice(0, 8).map(m => `
-        <div class="autocomplete-item" onclick="addParticipantFromSearch('${m.ID}')">
+        <div class="autocomplete-item" onclick="selectParticipantForManual('${m.ID}')">
           <div><span class="emp-code">${m.ID}</span> <strong style="margin-left:6px">${m.Name}</strong></div>
           <span class="emp-dept">${m.Department || '-'}</span>
         </div>
@@ -458,37 +463,140 @@
       searchDrop.style.display = 'block';
     });
 
+    searchInp.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        searchDrop.style.display = 'none';
+        submitManualAttendance();
+      }
+    });
+
     searchInp.addEventListener('blur', () => {
       setTimeout(() => { searchDrop.style.display = 'none'; }, 200);
     });
   }
 
-  async function addParticipantFromSearch(empId) {
-    const selSessionId = document.getElementById('add-session-select').value;
+  function selectParticipantForManual(empId) {
+    const item = [...currentTrainingParticipants, ...allEmployeesList].find(e => (e.EmployeeID || e.ID) === empId);
+    if (!item) return;
+    selectedManualParticipant = item;
+    const pName = item.EmployeeName || item.Name || empId;
+    const searchInp = document.getElementById('manual-att-search');
+    const searchDrop = document.getElementById('manual-att-search-drop');
+    if (searchInp) {
+      searchInp.value = pName;
+      searchInp.focus();
+    }
+    if (searchDrop) searchDrop.style.display = 'none';
+  }
+
+  async function submitManualAttendance() {
+    const sessionSelect = document.getElementById('add-session-select');
+    const selSessionId = sessionSelect ? sessionSelect.value : '';
     if (!selSessionId) {
       showToast('Please select a Training Session first.', 'error');
       return;
     }
-    const item = [...currentTrainingParticipants, ...allEmployeesList].find(e => (e.EmployeeID || e.ID) === empId);
-    if (!item) return;
+
+    const searchInp = document.getElementById('manual-att-search');
+    const searchVal = searchInp ? searchInp.value.trim() : '';
+
+    let item = selectedManualParticipant;
+    if (!item && searchVal) {
+      const q = searchVal.toLowerCase();
+      item = [...currentTrainingParticipants, ...allEmployeesList].find(e => 
+        (e.EmployeeID || e.ID || '').toLowerCase() === q || 
+        (e.EmployeeName || e.Name || '').toLowerCase() === q ||
+        (e.EmployeeName || e.Name || '').toLowerCase().includes(q)
+      );
+    }
+
+    if (!item) {
+      showToast('Please search and select a participant first.', 'error');
+      return;
+    }
+
+    const pName = item.EmployeeName || item.Name || item.EmployeeID;
+    const searchDrop = document.getElementById('manual-att-search-drop');
+    const loaderEl = document.getElementById('manual-att-loader');
+    const inputSpinner = document.getElementById('manual-att-input-spinner');
+    const submitBtn = document.getElementById('btn-submit-manual-att');
+
+    // 1. Show loading animation in manual attendance box & disable inputs
+    if (loaderEl) loaderEl.style.display = 'inline-flex';
+    if (inputSpinner) inputSpinner.style.display = 'inline-block';
+    if (searchDrop) searchDrop.style.display = 'none';
+    if (searchInp) searchInp.disabled = true;
+    if (sessionSelect) sessionSelect.disabled = true;
+    if (submitBtn) setBtnLoading(submitBtn, true, 'Submitting...');
 
     try {
       const res = await callServer('submitAttendance', {
         sessionId: selSessionId,
         employeeNo: item.EmployeeID || item.ID,
         employeeName: item.EmployeeName || item.Name,
-        department: item.Department || ''
+        department: item.Department || '',
+        remarks: 'Manual Attendance',
+        editedBy: 'Admin'
       });
-      showToast(`Manual attendance recorded for ${item.EmployeeName || item.Name}!`, 'success');
-      loadAttendance();
+
+      // 2. Clear manual attendance form fields to avoid user confusion
+      selectedManualParticipant = null;
+      if (searchInp) {
+        searchInp.value = '';
+        searchInp.placeholder = 'Type Employee Name or Employee ID to quick add...';
+        searchInp.disabled = false;
+      }
+      if (sessionSelect) {
+        sessionSelect.value = '';
+        sessionSelect.disabled = false;
+      }
+      if (loaderEl) loaderEl.style.display = 'none';
+      if (inputSpinner) inputSpinner.style.display = 'none';
+      if (submitBtn) setBtnLoading(submitBtn, false, '<span class="icon sm">check_circle</span> Submit Attendance');
+
+      // 3. Display success message
+      showToast(`Manual attendance successfully recorded for ${pName}!`, 'success');
+
+      // 4. Fast reload attendance table with refreshed attendance records
+      const currentTrainingId = document.getElementById('sel-training').value;
+      if (currentTrainingId) {
+        await refreshAttendanceTables(currentTrainingId, selSessionId);
+      }
     } catch(e) {
-      showToast(e.message, 'error');
+      showToast(e.message || 'Failed to record attendance.', 'error');
+      if (searchInp) {
+        searchInp.disabled = false;
+      }
+      if (sessionSelect) sessionSelect.disabled = false;
+      if (loaderEl) loaderEl.style.display = 'none';
+      if (inputSpinner) inputSpinner.style.display = 'none';
+      if (submitBtn) setBtnLoading(submitBtn, false, '<span class="icon sm">check_circle</span> Submit Attendance');
     }
-    document.getElementById('manual-att-search').value = '';
-    document.getElementById('manual-att-search-drop').style.display = 'none';
   }
 
-  async function loadAttendance() {
+  async function refreshAttendanceTables(trainingId, autoOpenSessionId) {
+    try {
+      const [sum, grouped] = await Promise.all([
+        callServer('getAttendanceSummary', trainingId),
+        callServer('getAttendanceByTraining', trainingId).catch(() => [])
+      ]);
+      if (sum) {
+        document.getElementById('s-present').textContent = sum.present || 0;
+        document.getElementById('s-absent').textContent  = sum.absent  || 0;
+        document.getElementById('s-late').textContent    = sum.late    || 0;
+        document.getElementById('s-pct').textContent     = (sum.pct || 0) + '%';
+      }
+      if (Array.isArray(grouped)) {
+        renderSessionsAccordion(grouped, autoOpenSessionId);
+      }
+    } catch(e) {
+      // Fallback to full load if lightweight refresh fails
+      await loadAttendance(autoOpenSessionId);
+    }
+  }
+
+  async function loadAttendance(autoOpenSessionId) {
     const id = document.getElementById('sel-training').value;
     if (!id) { showToast('Please select a training first.', 'error'); return; }
 
@@ -539,21 +647,23 @@
     document.getElementById('s-late').textContent    = sum.late    || 0;
     document.getElementById('s-pct').textContent     = (sum.pct || 0) + '%';
 
-    // Populate Session Selector Dropdown with Session Name & Date ONLY
+    // Populate Session Selector Dropdown with Session Name, Date & Time without timezone
     const sSelect = document.getElementById('add-session-select');
     if (sSelect) {
-      sSelect.innerHTML = '<option value="">- Select session -</option>' + (sessions || []).map(s => `
-        <option value="${s.SessionID}" data-date="${s.SessionDate || ''}">${s.SessionName} (${s.SessionDate || '-'})</option>
-      `).join('');
+      sSelect.innerHTML = '<option value="">- Select session -</option>' + (sessions || []).map(s => {
+        const dStr = formatMinimalistDate(s.SessionDate) || '-';
+        const tStr = formatSessionTimeRange(s.StartTime, s.EndTime);
+        return `<option value="${s.SessionID}">${s.SessionName || 'Session'} — ${dStr} (${tStr})</option>`;
+      }).join('');
     }
 
     setupManualAttSearch();
 
-    renderSessionsAccordion(grouped);
+    renderSessionsAccordion(grouped, autoOpenSessionId);
     document.getElementById('add-day-section').style.display = isApproved ? '' : 'none';
   }
 
-  function renderSessionsAccordion(grouped) {
+  function renderSessionsAccordion(grouped, autoOpenSessionId) {
     const container = document.getElementById('days-container');
     if (!grouped.length) {
       container.innerHTML = '<div class="empty-state"><span class="icon">fact_check</span><p style="color:#94A3B8">No session attendance records yet.</p></div>';
@@ -563,6 +673,10 @@
       const s = g.session || {};
       const records = g.records || [];
       const pct = g.totalRecords > 0 ? Math.round((g.presentCount / g.totalRecords) * 100) : 0;
+      const dStr = formatMinimalistDate(s.SessionDate) || '-';
+      const tStr = formatSessionTimeRange(s.StartTime, s.EndTime);
+      const sessionHeader = `${s.SessionName || 'Session'} — ${dStr} (${tStr})`;
+      const isOpen = Boolean(autoOpenSessionId && String(s.SessionID).trim() === String(autoOpenSessionId).trim());
       return `
       <div style="border:1px solid #E2E8F0;border-radius:10px;overflow:hidden;background:#fff;margin-bottom:12px">
         <div style="padding:12px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;background:#F8FAFC;border-bottom:1px solid #E2E8F0"
@@ -573,7 +687,7 @@
           </div>
           <div style="flex:1">
             <div style="display:flex;align-items:center;gap:12px;margin-bottom:5px;flex-wrap:wrap">
-              <span style="font-size:14px;font-weight:700;color:#1E293B">${s.SessionName} (${s.SessionDate || '-'})</span>
+              <span style="font-size:14px;font-weight:700;color:#1E293B">${sessionHeader}</span>
               <span style="font-size:12px;font-weight:700;color:${pct>=90?'#22C55E':pct>=70?'#F59E0B':'#EF4444'}">
                 ${g.presentCount}/${g.totalRecords} Present
               </span>
@@ -583,7 +697,7 @@
           </div>
           <span class="icon" style="color:#94A3B8">expand_more</span>
         </div>
-        <div style="display:none;overflow-x:auto">
+        <div style="${isOpen ? 'display:block' : 'display:none'};overflow-x:auto">
           <table class="table-th">
             <thead><tr><th>Emp ID</th><th>Name</th><th>Dept</th><th>Scan / Check-In Time</th><th>Status</th><th>Remarks</th><th>Actions</th></tr></thead>
             <tbody>
@@ -595,7 +709,7 @@
                   <td style="font-family:monospace;font-size:11px;color:#2563EB;font-weight:700">${r.EmployeeNo || r.EmployeeID}</td>
                   <td><div style="display:flex;align-items:center;gap:7px">${avatar(r.EmployeeName,25,i)}<span style="font-size:13px;font-weight:500">${r.EmployeeName}</span></div></td>
                   <td style="font-size:12px;color:#64748B">${r.Department}</td>
-                  <td style="font-family:monospace;font-size:12px">${r.ScanTime || r.CheckIn || '-'}</td>
+                  <td style="font-family:monospace;font-size:12px">${formatMinimalistDateTime(r.ScanTime || r.CheckIn || r.Timestamp) || r.ScanTime || r.CheckIn || '-'}</td>
                   <td id="att-stat-cell-${recId}">${statusBadge(r.Status)}</td>
                   <td id="att-rem-cell-${recId}" style="font-size:12px;color:#64748B">${r.Remarks||'-'}</td>
                   <td id="att-act-cell-${recId}">

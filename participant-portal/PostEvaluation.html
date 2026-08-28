@@ -234,16 +234,16 @@
           <div class="form-group mb-4">
             <label class="form-label">3. Has the employee shown performance improvement after training?</label>
             <div class="radio-pill-group" id="opts-improvement">
-              <div class="radio-pill-item active" onclick="selectRadioOption('improvement', 'High')">
+              <div class="radio-pill-item active" onclick="selectRadioOption('improvement', 'High', this)">
                 <strong>High</strong> (Clear productivity gains and independent output)
               </div>
-              <div class="radio-pill-item" onclick="selectRadioOption('improvement', 'Moderate')">
+              <div class="radio-pill-item" onclick="selectRadioOption('improvement', 'Moderate', this)">
                 <strong>Moderate</strong> (Noticeable progress in daily tasks)
               </div>
-              <div class="radio-pill-item" onclick="selectRadioOption('improvement', 'Slight')">
+              <div class="radio-pill-item" onclick="selectRadioOption('improvement', 'Slight', this)">
                 <strong>Slight</strong> (Minimal changes observed)
               </div>
-              <div class="radio-pill-item" onclick="selectRadioOption('improvement', 'None')">
+              <div class="radio-pill-item" onclick="selectRadioOption('improvement', 'None', this)">
                 <strong>None</strong> (No observable change in performance)
               </div>
             </div>
@@ -253,13 +253,13 @@
           <div class="form-group mb-4">
             <label class="form-label">4. Can the employee apply what was learned to daily work?</label>
             <div class="radio-pill-group" id="opts-canApply">
-              <div class="radio-pill-item active" onclick="selectRadioOption('canApply', 'Yes')">
+              <div class="radio-pill-item active" onclick="selectRadioOption('canApply', 'Yes', this)">
                 <strong>Yes</strong> (Fully applicable to daily duties)
               </div>
-              <div class="radio-pill-item" onclick="selectRadioOption('canApply', 'Partially')">
+              <div class="radio-pill-item" onclick="selectRadioOption('canApply', 'Partially', this)">
                 <strong>Partially</strong> (Some techniques applied)
               </div>
-              <div class="radio-pill-item" onclick="selectRadioOption('canApply', 'No')">
+              <div class="radio-pill-item" onclick="selectRadioOption('canApply', 'No', this)">
                 <strong>No</strong> (Skills not applicable to current role)
               </div>
             </div>
@@ -402,12 +402,32 @@
     if (target) target.classList.add('active');
   }
 
-  function selectRadioOption(groupName, value) {
+  function selectRadioOption(groupName, value, targetElement) {
     selectedRadioValues[groupName] = value;
     const parent = document.getElementById(`opts-${groupName}`);
     if (!parent) return;
     parent.querySelectorAll('.radio-pill-item').forEach(el => el.classList.remove('active'));
-    event.currentTarget.classList.add('active');
+
+    if (targetElement && targetElement.classList) {
+      targetElement.classList.add('active');
+      return;
+    }
+
+    if (typeof event !== 'undefined' && event && event.currentTarget && event.currentTarget.classList) {
+      event.currentTarget.classList.add('active');
+      return;
+    }
+
+    // Match by value label text for programmatic calls (e.g. from handleSubordinateSelectionChange)
+    const items = parent.querySelectorAll('.radio-pill-item');
+    items.forEach(item => {
+      const strong = item.querySelector('strong');
+      if (strong && strong.textContent.trim().toLowerCase() === String(value).trim().toLowerCase()) {
+        item.classList.add('active');
+      } else if (item.textContent.trim().toLowerCase().startsWith(String(value).trim().toLowerCase())) {
+        item.classList.add('active');
+      }
+    });
   }
 
   async function handleVerifyEvaluator(e) {

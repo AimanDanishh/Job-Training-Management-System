@@ -100,9 +100,8 @@
             <label for="filter-status" class="label-th">Filter by QR Status</label>
             <select id="filter-status" class="input-th" onchange="loadSessions()" aria-label="Filter by QR Status">
               <option value="Active" selected>Active Sessions Only</option>
-              <option value="">All Statuses (Active, Expired, Inactive)</option>
-              <option value="Expired">Expired</option>
-              <option value="Inactive">Inactive (Deleted / Disabled)</option>
+              <option value="">All Statuses (Active, Deactivate)</option>
+              <option value="Deactivate">Deactivate (Disabled)</option>
             </select>
           </div>
           <div class="col-md-3 text-end">
@@ -147,7 +146,7 @@
     <div class="row g-3 mt-1">
       <div class="col-12">
         <label for="s-training-id" class="label-th">Training Programme <span class="required">*</span></label>
-        <select id="s-training-id" class="input-th" aria-label="Training Programme"></select>
+        <select id="s-training-id" class="input-th" aria-label="Training Programme" onchange="handleSessionTrainingChange()"></select>
         <div id="s-training-id-note" style="display:none;font-size:11px;color:#64748B;margin-top:4px">
           Training programme cannot be changed once a session is created.
         </div>
@@ -172,8 +171,7 @@
         <label for="s-status" class="label-th">QR Status <span class="required">*</span></label>
         <select id="s-status" class="input-th" aria-label="QR Status">
           <option value="Active">Active (Participants can record attendance)</option>
-          <option value="Inactive">Inactive (Disabled / Attendance rejected)</option>
-          <option value="Expired">Expired (Session time ended)</option>
+          <option value="Deactivate">Deactivate (Disabled / Attendance rejected)</option>
         </select>
       </div>
     </div>
@@ -361,7 +359,11 @@
       }
 
       if (selectedStatus) {
-        filtered = filtered.filter(s => String(s.QRStatus || 'Active').toLowerCase() === selectedStatus.toLowerCase());
+        const isDeactFilter = selectedStatus.toLowerCase() === 'deactivate';
+        filtered = filtered.filter(s => {
+          const isDeact = ['deactivate', 'deactivated', 'inactive', 'expired'].includes(String(s.QRStatus || '').toLowerCase());
+          return isDeactFilter ? isDeact : !isDeact;
+        });
       }
 
       document.getElementById('session-count').textContent = `Showing ${filtered.length} session(s)`;
@@ -411,7 +413,8 @@
     const attUrl = s.AttendanceURL || generateClientAttendanceURL(s.SessionID);
     const qrUrl  = ensureQRLogoUrl(s.QRCodeURL, attUrl);
     const status = s.QRStatus || 'Active';
-    const isInactive = String(status).toLowerCase() === 'inactive';
+    const isInactive = ['deactivate', 'deactivated', 'inactive', 'expired'].includes(String(status).toLowerCase());
+    const displayStatus = isInactive ? 'Deactivate' : 'Active';
 
     if (isInactive) {
       return `
@@ -425,7 +428,7 @@
                   ${trainingTitle}
                 </p>
               </div>
-              <div>${statusBadge(status)}</div>
+              <div>${statusBadge(displayStatus)}</div>
             </div>
 
             <div style="font-size:11.5px;color:#94A3B8;margin-top:10px;padding:8px 10px;background:#F1F5F9;border-radius:6px;display:flex;gap:12px">
@@ -539,6 +542,7 @@
     document.getElementById('s-training-id').disabled = false;
     document.getElementById('s-training-id-note').style.display = 'none';
 
+    let defaultStartDate = '';
     const preTrainingId = document.getElementById('filter-training').value;
     if (preTrainingId) {
       const selT = allTrainings.find(t => String(t.ID) === String(preTrainingId));
@@ -548,16 +552,33 @@
         return;
       }
       document.getElementById('s-training-id').value = preTrainingId;
+      if (selT && selT.StartDate) {
+        defaultStartDate = toInputDateStr(selT.StartDate);
+      }
     } else {
       document.getElementById('s-training-id').value = '';
     }
-    document.getElementById('s-date').value = '';
+
+    document.getElementById('s-date').value = defaultStartDate;
     document.getElementById('s-name').value = '';
     document.getElementById('s-start-time').value = '09:00';
-    document.getElementById('s-end-time').value = '17:00';
+    document.getElementById('s-end-time').value = '16:00';
     document.getElementById('s-status').value = 'Active';
     document.getElementById('btn-save-session').innerHTML = '<span class="icon sm">save</span>Save Session';
     openModal('modal-session');
+  }
+
+  function handleSessionTrainingChange() {
+    const isEditing = Boolean(document.getElementById('s-session-id').value.trim());
+    if (isEditing) return;
+    const trainingId = document.getElementById('s-training-id').value;
+    const dateInput = document.getElementById('s-date');
+    if (trainingId) {
+      const selT = allTrainings.find(t => String(t.ID) === String(trainingId));
+      if (selT && selT.StartDate) {
+        dateInput.value = toInputDateStr(selT.StartDate);
+      }
+    }
   }
 
   function openEditSessionModal(sessionId) {
@@ -583,8 +604,8 @@
     document.getElementById('s-name').value = s.SessionName || '';
     document.getElementById('s-date').value = toInputDateStr(s.SessionDate);
     document.getElementById('s-start-time').value = toInputTimeStr(s.StartTime) || '09:00';
-    document.getElementById('s-end-time').value = toInputTimeStr(s.EndTime) || '17:00';
-    document.getElementById('s-status').value = s.QRStatus || 'Active';
+    const curStatusLower = String(s.QRStatus || 'Active').trim().toLowerCase();
+    document.getElementById('s-status').value = (curStatusLower === 'deactivate' || curStatusLower === 'deactivated' || curStatusLower === 'inactive' || curStatusLower === 'expired') ? 'Deactivate' : 'Active';
 
     document.getElementById('btn-save-session').innerHTML = '<span class="icon sm">save</span>Save Changes';
     openModal('modal-session');
@@ -606,6 +627,23 @@
     if (!sessionName) { showToast('Please enter a Session Name.', 'error'); return; }
     if (!sessionDate) { showToast('Please select a Session Date.', 'error'); return; }
 
+    // Validate max 7 hours per day duration
+    const startMatch = (startTime || '09:00').match(/(\d{1,2}):(\d{2})/);
+    const endMatch = (endTime || '16:00').match(/(\d{1,2}):(\d{2})/);
+    if (startMatch && endMatch) {
+      const startMins = parseInt(startMatch[1], 10) * 60 + parseInt(startMatch[2], 10);
+      const endMins = parseInt(endMatch[1], 10) * 60 + parseInt(endMatch[2], 10);
+      const diffHours = (endMins - startMins) / 60;
+      if (diffHours <= 0) {
+        showToast('End Time must be later than Start Time.', 'error');
+        return;
+      }
+      if (diffHours > 7.001) {
+        showToast('Training duration cannot exceed 7 hours per day.', 'error');
+        return;
+      }
+    }
+
     if (!isEditing) {
       const selT = allTrainings.find(t => String(t.ID) === String(trainingId));
       if (selT && !isTrainingApproved(selT)) {
@@ -620,7 +658,7 @@
       SessionName: sessionName,
       SessionDate: sessionDate,
       StartTime:   startTime || '09:00',
-      EndTime:     endTime || '17:00',
+      EndTime:     endTime || '16:00',
       QRStatus:    qrStatus
     };
 

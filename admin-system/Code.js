@@ -9,7 +9,9 @@ function doGet(e) {
   // parameters as strings, but links copied from email can contain mixed case
   // or surrounding whitespace.  Without this normalisation those links were
   // silently sent back to the sign-in page.
-  const requestedPage = (e && e.parameter && e.parameter.page) ? e.parameter.page : 'index';
+  const requestedPage = (e && e.parameter && e.parameter.page)
+    ? e.parameter.page
+    : ((e && e.parameter && e.parameter.id) ? 'training' : 'index');
   const page = String(requestedPage || 'index').toLowerCase().trim();
   const allowedPages = [
     'index', 'dashboard', 'training', 'attendance', 'evaluation',

@@ -232,15 +232,17 @@
                 <input type="date" id="reqEndDate" class="form-control">
               </div>
               <div class="form-group">
-                <label class="form-label" for="reqHours">Duration (Hours) *</label>
-                <input type="number" id="reqHours" class="form-control" placeholder="e.g. 8" min="0.5" step="0.5">
+                <label class="form-label" for="reqHours">Duration (Hours, max 7h/day) *</label>
+                <input type="number" id="reqHours" class="form-control" placeholder="e.g. 7" min="0.5" step="0.5">
+                <div style="font-size:10.5px;color:var(--text-muted);margin-top:2px;">Maximum 7 hours per day</div>
               </div>
             </div>
 
             <div class="grid-3">
               <div class="form-group">
                 <label class="form-label" for="reqFee">Course Fee (RM) *</label>
-                <input type="number" id="reqFee" class="form-control" placeholder="1500.00" step="0.01">
+                <input type="number" id="reqFee" class="form-control" placeholder="e.g. 1500.00 (or 0 for TBD)" step="0.01" min="0">
+                <div style="font-size:10.5px;color:var(--text-muted);margin-top:2px;">Entering 0 will mark fee as TBD</div>
               </div>
               <div class="form-group">
                 <label class="form-label" for="reqVenue">Training Venue *</label>
@@ -278,8 +280,8 @@
             </div>
 
             <div class="form-group">
-              <label class="form-label" for="reqReason">Reason for Training</label>
-              <textarea id="reqReason" class="form-control" rows="2" placeholder="State business objective or skill gap..."></textarea>
+              <label class="form-label" for="reqReason">Reason for Training *</label>
+              <textarea id="reqReason" class="form-control" rows="2" placeholder="State reasons for training, business objective, or operational need..."></textarea>
             </div>
 
             <div class="form-group">

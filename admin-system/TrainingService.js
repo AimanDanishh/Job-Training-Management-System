@@ -30,7 +30,7 @@ function createTraining(data) {
           SessionName: s.name || s.SessionName || 'Session 1',
           SessionDate: s.date || s.SessionDate || data.StartDate,
           StartTime:   s.startTime || s.StartTime || '09:00',
-          EndTime:     s.endTime || s.EndTime || '17:00',
+          EndTime:     s.endTime || s.EndTime || '16:00',
           QRStatus:    'Active'
         });
         const sObj = typeof sRes === 'string' ? JSON.parse(sRes) : sRes;
@@ -39,19 +39,19 @@ function createTraining(data) {
     } else {
       // Auto-generate sessions based on Duration
       if (duration === 1) {
-        // One-day training -> 1 session (Full Day)
+        // One-day training -> 1 session (Full Day, max 7 hours)
         const sRes = createSession({
           TrainingID: trainingId,
           SessionName: 'Full Day',
           SessionDate: data.StartDate || formatDate(new Date()),
           StartTime:   '09:00',
-          EndTime:     '17:00',
+          EndTime:     '16:00',
           QRStatus:    'Active'
         });
         const sObj = typeof sRes === 'string' ? JSON.parse(sRes) : sRes;
         if (sObj && sObj.success) createdSessions.push(sObj.data);
       } else {
-        // Multi-day training -> 1 session per day
+        // Multi-day training -> 1 session per day (max 7 hours each)
         const startDate = new Date(data.StartDate || new Date());
         for (let i = 1; i <= duration; i++) {
           const sDate = new Date(startDate);
@@ -63,7 +63,7 @@ function createTraining(data) {
             SessionName: `Day ${i}`,
             SessionDate: dateStr,
             StartTime:   '09:00',
-            EndTime:     '17:00',
+            EndTime:     '16:00',
             QRStatus:    'Active'
           });
           const sObj = typeof sRes === 'string' ? JSON.parse(sRes) : sRes;

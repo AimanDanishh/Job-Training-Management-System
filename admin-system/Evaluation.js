@@ -285,6 +285,37 @@ function ensureTrainingParticipantsColumns(sheet) {
   });
 }
 
+function isSubmittedEvaluationRecord(evalRow) {
+  if (!evalRow || typeof evalRow !== 'object') return false;
+
+  // Rule 1: Valid SubmittedAt / Timestamp
+  const submittedAt = evalRow.SubmittedAt || evalRow.submittedAt || evalRow.Timestamp || evalRow.timestamp || evalRow.Date || evalRow.date;
+  if (submittedAt && String(submittedAt).trim() !== '' && String(submittedAt).trim() !== '-' && String(submittedAt).trim() !== 'undefined') {
+    return true;
+  }
+
+  // Rule 2: Explicit completed/submitted Status field
+  const statusStr = String(evalRow.Status || evalRow.status || evalRow.EvaluationStatus || '').trim().toLowerCase();
+  if (statusStr === 'completed' || statusStr === 'submitted' || statusStr === 'done') {
+    return true;
+  }
+
+  // Rule 3: Valid answered question data (Q1..Q7) where scores are valid (1 to 5)
+  const qScores = [evalRow.Q1, evalRow.Q2, evalRow.Q3, evalRow.Q4, evalRow.Q5, evalRow.Q6, evalRow.Q7]
+    .map(Number)
+    .filter(n => !isNaN(n) && n >= 1 && n <= 5);
+  if (qScores.length >= 5) {
+    return true;
+  }
+
+  // If there is an ID, and an AvgScore > 0 along with employee ID and training ID
+  if (evalRow.ID && evalRow.EmployeeID && Number(evalRow.AvgScore) > 0 && String(evalRow.ID).startsWith('EVL')) {
+    return true;
+  }
+
+  return false;
+}
+
 function getAttendedParticipantsForPostEval(trainingId) {
   try {
     if (!trainingId) return ok({ training: null, participants: [] });
@@ -293,14 +324,21 @@ function getAttendedParticipantsForPostEval(trainingId) {
     // 1. Get official participants using robust multi-tier resolver
     let tpRows = getTrainingParticipantsList(cleanTId) || [];
 
-    // 2. Fetch Attendance and Post Evaluation rows
+    // 2. Fetch Attendance, Participant Evaluation, and Post Evaluation rows in batch
     const ss = getTrainingDataSpreadsheet(cleanTId);
     let attRows = [];
+    let evalRows = [];
     let postRows = [];
     if (ss) {
       const allSheets = ss.getSheets();
       const attSheet = allSheets.find(s => s.getName().toLowerCase().replace(/[^a-z0-9]/g, '') === 'attendance');
       if (attSheet) attRows = sheetToJson(attSheet);
+
+      const evalSheet = allSheets.find(s => {
+        const clean = s.getName().toLowerCase().replace(/[^a-z0-9]/g, '');
+        return clean === 'evaluation' || clean === 'trainingeval' || clean === 'evaluations';
+      });
+      if (evalSheet) evalRows = sheetToJson(evalSheet);
 
       const postSheet = allSheets.find(s => {
         const clean = s.getName().toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -308,6 +346,26 @@ function getAttendedParticipantsForPostEval(trainingId) {
       });
       if (postSheet) postRows = sheetToJson(postSheet);
     }
+
+    // Build submitted evaluation lookup map by Employee ID & Name
+    const submittedEvalMap = new Map();
+    (evalRows || []).forEach(er => {
+      if (isSubmittedEvaluationRecord(er)) {
+        const erId = String(er.EmployeeID || er.EmployeeNo || er.EmpID || er.ID || '').trim().toLowerCase();
+        const erName = String(er.EmployeeName || er.Name || '').trim().toLowerCase();
+        if (erId) submittedEvalMap.set(erId, er);
+        if (erName) submittedEvalMap.set(erName, er);
+      }
+    });
+
+    // Build submitted post-evaluation lookup map by Employee ID & Name
+    const submittedPostMap = new Map();
+    (postRows || []).forEach(pr => {
+      const prId = String(pr.EmployeeID || pr.EmployeeNo || pr.ID || '').trim().toLowerCase();
+      const prName = String(pr.EmployeeName || pr.Name || '').trim().toLowerCase();
+      if (prId) submittedPostMap.set(prId, pr);
+      if (prName) submittedPostMap.set(prName, pr);
+    });
 
     // 3. Get master training record for 3-month milestone date
     const tSheet = getSheet(SHEET_NAMES.trainings);
@@ -390,10 +448,18 @@ function getAttendedParticipantsForPostEval(trainingId) {
         }
       }
 
-      const postEvalDone = postRows.some(pr => isSameEmployeeId(pr.EmployeeID || pr.EmployeeNo || pr.ID || '', empId));
+      // Check if participant has submitted evaluation
+      const evalRecord = submittedEvalMap.get(empKey) || (empName ? submittedEvalMap.get(empName.toLowerCase()) : null) || null;
+      const isEvalDone = Boolean(evalRecord);
+
+      // Check if participant has supervisor post-evaluation
+      const postRecord = submittedPostMap.get(empKey) || (empName ? submittedPostMap.get(empName.toLowerCase()) : null) || null;
+      const postEvalDone = Boolean(postRecord);
+
       const supId = String(p.SupervisorID || '').trim();
       const supEmail = String(p.SupervisorEmail || '').trim();
       const supName = String(p.SupervisorName || '').trim();
+      const isAssigned = Boolean(supId || supEmail);
 
       participantsMap.set(empKey, {
         ID: empId,
@@ -408,8 +474,15 @@ function getAttendedParticipantsForPostEval(trainingId) {
         AttendanceStatus: attStatusText,
         AttendanceColor: attColor,
         AttendanceCode: attCode,
+        EvalCompleted: isEvalDone,
+        EvaluationCompleted: isEvalDone,
+        EvaluationStatus: isEvalDone ? 'Completed' : 'Pending',
+        EvaluationScore: evalRecord ? (evalRecord.AvgScore || null) : null,
+        EvaluationSubmittedAt: evalRecord ? (evalRecord.SubmittedAt || null) : null,
         PostEvalCompleted: postEvalDone,
-        Status: postEvalDone ? 'Evaluation Completed' : (supId || supEmail ? 'Supervisor Assigned' : 'Pending Assignment')
+        PostEvaluationCompleted: postEvalDone,
+        AssignmentStatus: postEvalDone ? 'Completed' : (isAssigned ? 'Assigned' : 'Pending'),
+        Status: postEvalDone ? 'Evaluation Completed' : (isAssigned ? 'Supervisor Assigned' : 'Pending Assignment')
       });
     });
 
@@ -463,7 +536,18 @@ function getAttendedParticipantsForPostEval(trainingId) {
               }
             }
 
-            const postEvalDone = postRows.some(pr => isSameEmployeeId(pr.EmployeeID || pr.EmployeeNo || pr.ID || '', pEmpId));
+            // Check if participant has submitted evaluation
+            const evalRecord = submittedEvalMap.get(empKey) || (empName ? submittedEvalMap.get(empName.toLowerCase()) : null) || null;
+            const isEvalDone = Boolean(evalRecord);
+
+            // Check if participant has supervisor post-evaluation
+            const postRecord = submittedPostMap.get(empKey) || (empName ? submittedPostMap.get(empName.toLowerCase()) : null) || null;
+            const postEvalDone = Boolean(postRecord);
+
+            const supId = empRecord.SupervisorID || (typeof pItem === 'object' ? pItem.SupervisorID : '') || '';
+            const supName = empRecord.SupervisorName || (typeof pItem === 'object' ? pItem.SupervisorName : '') || '';
+            const supEmail = empRecord.SupervisorEmail || (typeof pItem === 'object' ? pItem.SupervisorEmail : '') || '';
+            const isAssigned = Boolean(supId || supEmail);
 
             participantsMap.set(empKey, {
               ID: pEmpId,
@@ -471,15 +555,22 @@ function getAttendedParticipantsForPostEval(trainingId) {
               EmployeeName: empName,
               Department: dept,
               Position: pos,
-              SupervisorID: empRecord.SupervisorID || (typeof pItem === 'object' ? pItem.SupervisorID : '') || '',
-              SupervisorName: empRecord.SupervisorName || (typeof pItem === 'object' ? pItem.SupervisorName : '') || '',
-              SupervisorEmail: empRecord.SupervisorEmail || (typeof pItem === 'object' ? pItem.SupervisorEmail : '') || '',
+              SupervisorID: supId,
+              SupervisorName: supName,
+              SupervisorEmail: supEmail,
               Attended: hasAttended,
               AttendanceStatus: attStatusText,
               AttendanceColor: attColor,
               AttendanceCode: attCode,
+              EvalCompleted: isEvalDone,
+              EvaluationCompleted: isEvalDone,
+              EvaluationStatus: isEvalDone ? 'Completed' : 'Pending',
+              EvaluationScore: evalRecord ? (evalRecord.AvgScore || null) : null,
+              EvaluationSubmittedAt: evalRecord ? (evalRecord.SubmittedAt || null) : null,
               PostEvalCompleted: postEvalDone,
-              Status: postEvalDone ? 'Evaluation Completed' : 'Pending Assignment'
+              PostEvaluationCompleted: postEvalDone,
+              AssignmentStatus: postEvalDone ? 'Completed' : (isAssigned ? 'Assigned' : 'Pending'),
+              Status: postEvalDone ? 'Evaluation Completed' : (isAssigned ? 'Supervisor Assigned' : 'Pending Assignment')
             });
           });
         }
@@ -698,13 +789,12 @@ function sendSupervisorPostEvalEmail(trainingId, supervisor, trainingObj, partic
   const compDateFormatted = formatMinimalistDate(compDateStr) || compDateStr || 'Recently';
 
   const publicUrl = getPublicPortalUrl() || getAppUrl();
-  const reviewUrl = `${publicUrl}?page=post&id=${encodeURIComponent(cleanTId)}&eval=${encodeURIComponent(supervisor.ID || supervisor.Email)}`;
-  const dashboardUrl = `${publicUrl}?page=post&emp=${encodeURIComponent(supervisor.ID || supervisor.Email)}`;
+  const dashboardUrl = `${publicUrl}?page=post&id=${encodeURIComponent(cleanTId)}&emp=${encodeURIComponent(supervisor.ID || supervisor.Email)}`;
 
   const isTestMode = Boolean(testRecipientEmail);
   const targetEmail = isTestMode ? String(testRecipientEmail).trim() : supervisor.Email;
   const subjectPrefix = isTestMode ? '[TEST MODE - REDIRECTED] ' : '';
-  const subject = `${subjectPrefix}[Apollo] 3-Month Post-Training Competency Review Required - ${tName}`;
+  const subject = `${subjectPrefix}[TrainHub] 3-Month Post-Training Competency Review Required — ${tName}`;
 
   // Build participants table/list
   let participantListText = '';
@@ -715,24 +805,26 @@ function sendSupervisorPostEvalEmail(trainingId, supervisor, trainingObj, partic
       participantsList.map((p, idx) => `  ${idx + 1}. ${p.EmployeeName || p.Name || 'Employee'} (${p.EmployeeID || p.EmployeeNo || p.ID || '-'}) - ${p.Department || 'Department'}`).join('\n') + '\n\n';
 
     participantListHtml = `
-      <div style="margin: 16px 0; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px 16px;">
-        <div style="font-size: 13px; font-weight: 700; color: #1E293B; margin-bottom: 8px;">Assigned Participant(s) for Review:</div>
-        <table style="width: 100%; border-collapse: collapse; font-size: 12.5px; color: #334155;">
+      <div style="margin: 0 0 24px 0; background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 6px; overflow: hidden;">
+        <div style="background-color: #F8FAFC; padding: 10px 16px; border-bottom: 1px solid #E2E8F0; font-size: 12.5px; font-weight: 700; color: #1E293B;">
+          Assigned Participant(s) for Review (${participantsList.length}):
+        </div>
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="font-size: 12.5px; color: #334155; border-collapse: collapse;">
           <thead>
-            <tr style="border-bottom: 1px solid #CBD5E1; text-align: left;">
-              <th style="padding: 6px 8px; font-size: 11.5px; color: #64748B;">No.</th>
-              <th style="padding: 6px 8px; font-size: 11.5px; color: #64748B;">Employee Name</th>
-              <th style="padding: 6px 8px; font-size: 11.5px; color: #64748B;">Employee ID</th>
-              <th style="padding: 6px 8px; font-size: 11.5px; color: #64748B;">Department</th>
+            <tr style="background-color: #F1F5F9; text-align: left; border-bottom: 1px solid #CBD5E1;">
+              <th style="padding: 8px 12px; font-size: 11.5px; font-weight: 700; color: #475569; width: 36px; text-align: center;">No.</th>
+              <th style="padding: 8px 12px; font-size: 11.5px; font-weight: 700; color: #475569;">Employee Name</th>
+              <th style="padding: 8px 12px; font-size: 11.5px; font-weight: 700; color: #475569;">Employee ID</th>
+              <th style="padding: 8px 12px; font-size: 11.5px; font-weight: 700; color: #475569;">Department</th>
             </tr>
           </thead>
           <tbody>
             ${participantsList.map((p, idx) => `
-              <tr style="border-bottom: 1px solid #F1F5F9;">
-                <td style="padding: 6px 8px; font-weight: 600;">${idx + 1}</td>
-                <td style="padding: 6px 8px; font-weight: 700; color: #0F172A;">${p.EmployeeName || p.Name || 'Employee'}</td>
-                <td style="padding: 6px 8px; color: #475569;">${p.EmployeeID || p.EmployeeNo || p.ID || '-'}</td>
-                <td style="padding: 6px 8px; color: #64748B;">${p.Department || '-'}</td>
+              <tr style="border-bottom: 1px solid #F1F5F9; ${idx % 2 === 1 ? 'background-color: #FAFAFA;' : ''}">
+                <td style="padding: 8px 12px; font-weight: 600; text-align: center; color: #64748B;">${idx + 1}</td>
+                <td style="padding: 8px 12px; font-weight: 700; color: #0F172A;">${p.EmployeeName || p.Name || 'Employee'}</td>
+                <td style="padding: 8px 12px; color: #475569;">${p.EmployeeID || p.EmployeeNo || p.ID || '-'}</td>
+                <td style="padding: 8px 12px; color: #64748B;">${p.Department || '-'}</td>
               </tr>
             `).join('')}
           </tbody>
@@ -747,54 +839,93 @@ function sendSupervisorPostEvalEmail(trainingId, supervisor, trainingObj, partic
     `Course Completed: ${compDateFormatted}\n\n` +
     `You have been assigned as the Supervisor / Person In Charge to evaluate the performance and competency improvement of the assigned participant(s).\n` +
     participantListText +
-    `Please use the links below to access the evaluation or your full supervisor dashboard:\n\n` +
-    `1. Evaluate This Training Directly:\n${reviewUrl}\n\n` +
-    `2. Open 3-Month Post Evaluation Dashboard (All Supervised Courses):\n${dashboardUrl}\n\n` +
-    `Thank you,\nApollo Job Training Management System`;
+    `Please open your 3-Month Post Evaluation Dashboard using the link below:\n\n` +
+    `${dashboardUrl}\n\n` +
+    `Thank you,\nApollo Job Training Management System (TrainHub)`;
 
-  const htmlBody = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1E293B; line-height: 1.5;">
-      <div style="background: #2563EB; padding: 18px 24px; border-radius: 8px 8px 0 0; color: #FFFFFF;">
-        <h2 style="margin: 0; font-size: 18px; font-weight: 800;">Apollo Job Training Management System</h2>
-        <div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">3-Month Post-Training Competency Review Notification</div>
-      </div>
-      <div style="border: 1px solid #E2E8F0; border-top: none; padding: 24px; border-radius: 0 0 8px 8px; background: #FFFFFF;">
-        <p style="font-size: 14px; margin-top: 0;">Dear <strong>${supervisor.Name || 'Supervisor / PIC'}</strong>,</p>
-        <p style="font-size: 13px; color: #475569;">
-          The <strong>3-month post-training milestone</strong> has been reached for the following training programme.
-          As the designated supervisor, please complete the competency review for your assigned participant(s).
-        </p>
+  const htmlBody = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3-Month Post-Training Competency Review</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #EEF1F5; font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; -webkit-font-smoothing: antialiased; width: 100%;">
+  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #EEF1F5; table-layout: fixed; padding: 20px 0;">
+    <tr>
+      <td align="center" style="padding: 10px;">
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 640px; background-color: #FFFFFF; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); border: 1px solid #E3E7EC;">
+          
+          <!-- Header Banner -->
+          <tr>
+            <td style="background-color: #17365D; padding: 26px 32px; text-align: left;">
+              <div style="font-size: 24px; font-weight: 800; color: #FFFFFF; letter-spacing: 1.5px; line-height: 1.2; text-transform: uppercase; margin: 0;">TRAINHUB</div>
+              <div style="font-size: 11px; font-weight: 600; color: rgba(255, 255, 255, 0.75); letter-spacing: 2px; text-transform: uppercase; margin-top: 4px;">Apollo Training Management System</div>
+            </td>
+          </tr>
 
-        <div style="background: #F8FAFC; border-left: 4px solid #2563EB; padding: 12px 16px; border-radius: 4px; margin: 16px 0;">
-          <div style="font-size: 14px; font-weight: 800; color: #1E293B;">${tName}</div>
-          <div style="font-size: 12px; color: #64748B; margin-top: 3px;">
-            Training Code: <strong>${tCode}</strong> &bull; Completed: <strong>${compDateFormatted}</strong>
-          </div>
-        </div>
+          <!-- Email Content Body -->
+          <tr>
+            <td style="padding: 32px;">
+              
+              <!-- Action Badge & Headline -->
+              <div style="margin-bottom: 20px;">
+                <span style="display: inline-block; background-color: #FEF3C7; border: 1px solid #FCD34D; color: #92400E; font-size: 10px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; padding: 4px 10px; border-radius: 4px;">ACTION REQUIRED</span>
+                <h2 style="font-size: 20px; font-weight: 800; color: #17365D; margin: 12px 0 0 0; line-height: 1.3;">3-Month Post-Training Competency Review</h2>
+              </div>
 
-        ${participantListHtml}
+              <p style="font-size: 14px; color: #2C3E50; margin: 0 0 16px 0; line-height: 1.5;">Dear <strong>${supervisor.Name || 'Supervisor / PIC'}</strong>,</p>
+              
+              <p style="font-size: 13.5px; color: #4B5563; line-height: 1.6; margin: 0 0 20px 0;">
+                The <strong>3-month post-training milestone</strong> has elapsed for the programme below. As the designated Supervisor / Person In Charge, please conduct the competency and performance evaluation for your supervised participant(s).
+              </p>
 
-        <div style="text-align: center; margin: 28px 0 18px; display: flex; flex-direction: column; gap: 10px; align-items: center;">
-          <a href="${reviewUrl}" target="_blank" style="background: #2563EB; color: #FFFFFF; text-decoration: none; padding: 13px 26px; border-radius: 6px; font-size: 14px; font-weight: 700; display: inline-block; box-shadow: 0 2px 5px rgba(37,99,235,0.25); min-width: 260px; text-align: center; margin-bottom: 8px;">
-            📝 Evaluate This Training (${tCode}) &rarr;
-          </a>
-          <a href="${dashboardUrl}" target="_blank" style="background: #0F172A; color: #FFFFFF; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-size: 13.5px; font-weight: 700; display: inline-block; box-shadow: 0 2px 5px rgba(15,23,42,0.2); min-width: 260px; text-align: center;">
-            📊 3-Month Post Evaluation Dashboard &rarr;
-          </a>
-        </div>
+              <!-- Training Details Summary Card -->
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-left: 4px solid #17365D; border-radius: 6px; margin: 0 0 24px 0;">
+                <tr>
+                  <td style="padding: 16px 20px;">
+                    <div style="font-size: 15px; font-weight: 800; color: #0F172A; margin-bottom: 6px;">${tName}</div>
+                    <div style="font-size: 12.5px; color: #64748B; line-height: 1.5;">
+                      <strong>Training Code:</strong> ${tCode}<br/>
+                      <strong>Course Completed:</strong> ${compDateFormatted}<br/>
+                      <strong>Review Milestone:</strong> 3-Month Competency Assessment
+                    </div>
+                  </td>
+                </tr>
+              </table>
 
-        <div style="background: #F1F5F9; border-radius: 6px; padding: 12px 14px; margin: 20px 0 10px; font-size: 11.5px; color: #64748B;">
-          <strong>Direct Links:</strong><br/>
-          • <strong>Training Form:</strong> <a href="${reviewUrl}" style="color: #2563EB; word-break: break-all;">${reviewUrl}</a><br/>
-          • <strong>Supervisor Dashboard:</strong> <a href="${dashboardUrl}" style="color: #2563EB; word-break: break-all;">${dashboardUrl}</a>
-        </div>
-        <hr style="border: none; border-top: 1px solid #E2E8F0; margin: 20px 0 14px;" />
-        <div style="font-size: 11px; color: #94A3B8; text-align: center;">
-          This is an automated system email from the Apollo Job Training Management System. Please do not reply directly.
-        </div>
-      </div>
-    </div>
-  `;
+              ${participantListHtml}
+
+              <!-- Single Combined Dashboard Button -->
+              <div style="text-align: center; margin: 30px 0 22px 0;">
+                <a href="${dashboardUrl}" target="_blank" style="background-color: #17365D; color: #FFFFFF; text-decoration: none; padding: 14px 34px; border-radius: 6px; font-size: 14px; font-weight: 700; display: inline-block; box-shadow: 0 3px 6px rgba(23, 54, 93, 0.25); text-align: center; letter-spacing: 0.3px;">
+                  OPEN 3-MONTH EVALUATION DASHBOARD &rarr;
+                </a>
+              </div>
+
+              <!-- Direct Link Fallback Box -->
+              <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 12px 16px; margin: 0 0 24px 0; font-size: 11.5px; color: #64748B; line-height: 1.5;">
+                <strong>Direct Link:</strong><br/>
+                <a href="${dashboardUrl}" style="color: #2563EB; word-break: break-all; text-decoration: underline;">${dashboardUrl}</a>
+              </div>
+
+              <!-- Divider -->
+              <hr style="border: none; border-top: 1px solid #E5E7EB; margin: 24px 0 16px 0;" />
+
+              <!-- Footer -->
+              <div style="font-size: 11.5px; color: #9CA3AF; text-align: center; line-height: 1.4;">
+                This is an automated notification sent from the <strong>Apollo Job Training Management System (TrainHub)</strong>.<br/>
+                Please do not reply directly to this email.
+              </div>
+
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
 
   let sendSuccess = false;
   let primaryErr = null;

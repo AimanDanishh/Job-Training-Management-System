@@ -350,11 +350,8 @@ function validatePublicAttendance(sessionId, employeeId) {
     const qrStatus = String(session.QRStatus || 'Active').trim();
     const statusLower = qrStatus.toLowerCase();
 
-    if (statusLower === 'inactive' || statusLower === 'deleted') {
-      return { valid: false, message: 'This QR attendance session is no longer active. Attendance cannot be recorded.' };
-    }
-    if (statusLower === 'expired') {
-      return { valid: false, message: 'Attendance registration for this session is closed (Expired).' };
+    if (statusLower === 'deactivate' || statusLower === 'deactivated' || statusLower === 'inactive' || statusLower === 'deleted' || statusLower === 'expired') {
+      return { valid: false, message: 'This QR attendance session is deactivated. Attendance cannot be recorded.' };
     }
     if (statusLower === 'scheduled' || statusLower === 'draft') {
       return { valid: false, message: 'Attendance check-in has not opened yet for this session.' };

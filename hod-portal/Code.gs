@@ -857,6 +857,11 @@ function submitHODDecision(data) {
           sendOrDraftEmail(requesterEmail, reqSubject, reqBody, 'requester', emailLog, reqHtml);
 
           // Notification to Arina (HR Admin)
+          const adminPortalBase = getAdminPortalUrl();
+          const adminDeepLink = adminPortalBase
+            ? (adminPortalBase.includes('?') ? `${adminPortalBase}&page=training&id=${encodeURIComponent(cleanId)}` : `${adminPortalBase}?page=training&id=${encodeURIComponent(cleanId)}`)
+            : '';
+
           const arinaSubject = `Training Requisition — ${trainingName} | ${cleanId}`;
           const arinaBody = `Dear Arina,\n\n` +
             `The following Training Requisition has received all required approvals (HOD, C-Suite, HOHR):\n\n` +
@@ -866,6 +871,7 @@ function submitHODDecision(data) {
             `Cost Centre: ${hodCostCentre}\n` +
             `Date Approved: ${timestamp}\n\n` +
             `The Admin System can now proceed with session creation, QR code generation, and participant attendance tracking.\n\n` +
+            (adminDeepLink ? `View Training Request in Admin Portal:\n${adminDeepLink}\n\n` : '') +
             `Thank you,\nTrainHub Training Management System`;
 
           const arinaHtml = buildTrainingRequisitionEmailHtml({
@@ -879,7 +885,9 @@ function submitHODDecision(data) {
             duration: durationStr,
             estimatedFee: feeStr,
             status: 'Approved',
-            reviewUrl: '',
+            reviewUrl: adminDeepLink,
+            isAdminAction: true,
+            buttonText: 'VIEW TRAINING REQUEST',
             badgeText: 'ACTION REQUIRED',
             headlineText: 'Training Requisition Fully Approved & Ready for Session Setup',
             greetingText: 'Dear Arina,',

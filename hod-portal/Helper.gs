@@ -75,6 +75,14 @@ function getParticipantPortalUrl() {
   return url;
 }
 
+/**
+ * Returns configured Admin Portal URL from Script Properties
+ */
+function getAdminPortalUrl() {
+  let url = getConfigProperty('ADMIN_PORTAL_URL', '') || getConfigProperty('ADMIN_SYSTEM_URL', '') || getConfigProperty('ADMIN_URL', '');
+  return url;
+}
+
 
 
 function getSpreadsheetId() {
@@ -895,6 +903,8 @@ function buildTrainingRequisitionEmailHtml(params) {
     badgeColor = '#1E40AF';
   }
 
+  const buttonText = params.buttonText || (params.isAdminAction ? 'VIEW TRAINING REQUEST' : (statusLower.includes('approved') ? 'VIEW TRAINING REQUEST' : 'REVIEW TRAINING REQUEST'));
+
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -1001,12 +1011,12 @@ function buildTrainingRequisitionEmailHtml(params) {
                                 </tr>
                             </table>
 
-                            <!-- Review Button (if reviewUrl provided) -->
+                            <!-- Action / Review Button (if reviewUrl provided) -->
                             ${reviewUrl ? `
                             <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto 16px auto;">
                                 <tr>
                                     <td align="center" style="border-radius: 6px; background-color: #17365D;">
-                                        <a href="${reviewUrl}" target="_blank" style="display: inline-block; padding: 14px 32px; font-family: Arial, sans-serif; font-size: 14px; font-weight: 700; color: #FFFFFF; text-decoration: none; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.5px;">REVIEW TRAINING REQUEST</a>
+                                        <a href="${reviewUrl}" target="_blank" style="display: inline-block; padding: 14px 32px; font-family: Arial, sans-serif; font-size: 14px; font-weight: 700; color: #FFFFFF; text-decoration: none; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.5px;">${buttonText}</a>
                                     </td>
                                 </tr>
                             </table>

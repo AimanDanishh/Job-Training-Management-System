@@ -80,6 +80,17 @@ function autoUpdateTrainingLifecycleStages() {
       let isUpdated = false;
       const rowIdx = (t._row && t._row >= 2) ? (t._row - 1) : -1;
 
+      // Ensure Category, TrainingMode, and TnaSource fallbacks exist
+      if (!t.Category) {
+        t.Category = t.TrainingCategory || t['Training Category'] || 'General';
+      }
+      if (!t.TrainingMode) {
+        t.TrainingMode = t.TrainingType || t.Mode || t.Type || t['Training Mode'] || t['Training Type'] || (t.Venue && String(t.Venue).toLowerCase().includes('public') ? 'Public' : 'In-House Training');
+      }
+      if (!t.TnaSource) {
+        t.TnaSource = t['TNA Source'] || t.TNA || t.Tna || 'Training Requisition Form';
+      }
+
       // Database Auto-Repair: Fix any CourseFee values corrupted by previous date timestamp overwrites
       const rawFee = String(t.CourseFee || '').trim();
       if (rawFee && (rawFee.includes(':') || rawFee.includes('2026') || rawFee.includes('Aug') || rawFee.includes('/'))) {
@@ -257,19 +268,17 @@ function send3MonthPostEvalNotifications() {
     trainings.forEach(t => {
       if (t.isThreeMonthsReached && ['Training Completed', 'Evaluation Completed', 'Waiting for 3-Month Review'].includes(t.Stage)) {
         const publicPortalUrl = getPublicPortalUrl() || getAppUrl();
-        const postEvalUrl = `${publicPortalUrl}?page=post&id=${t.ID}`;
-        const postDashboardUrl = `${publicPortalUrl}?page=post`;
+        const postDashboardUrl = `${publicPortalUrl}?page=post&id=${t.ID}`;
 
         if (hodEmail) {
-          const subject = `[TrainHub] 3-Month Post-Training Evaluation Due - ${t.Name}`;
+          const subject = `[TrainHub] 3-Month Post-Training Evaluation Due — ${t.Name}`;
           const body = `Dear HOD / Manager,\n\n` +
             `The 3-month milestone after course completion has elapsed for training programme:\n` +
             `Training Name: ${t.Name} (${t.Code || t.ID})\n` +
             `Completed Date: ${t.EndDate || t.StartDate}\n\n` +
-            `Please click the links below to conduct the post-training evaluations for your assigned staff:\n\n` +
-            `• Evaluate This Training: ${postEvalUrl}\n` +
-            `• 3-Month Post Evaluation Dashboard: ${postDashboardUrl}\n\n` +
-            `Thank you,\nApollo Job Training Management System`;
+            `Please open the 3-Month Post Evaluation Dashboard using the link below to conduct the evaluation for your assigned staff:\n\n` +
+            `${postDashboardUrl}\n\n` +
+            `Thank you,\nApollo Job Training Management System (TrainHub)`;
 
           MailApp.sendEmail(hodEmail, subject, body, {
             name: 'Apollo Training Hub'
@@ -287,10 +296,49 @@ function send3MonthPostEvalNotifications() {
 }
 
 // --- Create ---------------------------------------------------------------------
+/**
+ * Saves uploaded base64 brochure file to the Training Drive workspace Brochure/ folder
+ */
+function saveBrochureFile(folderId, code, brochureFile) {
+  if (!brochureFile || !brochureFile.data) return '';
+  try {
+    const fileBlob = Utilities.newBlob(
+      Utilities.base64Decode(brochureFile.data),
+      brochureFile.mimeType || 'application/octet-stream',
+      brochureFile.name || `${code}_brochure`
+    );
+    let targetFolder = null;
+    if (folderId) {
+      try {
+        const mainFolder = DriveApp.getFolderById(folderId);
+        const bIter = mainFolder.getFoldersByName('Brochure');
+        targetFolder = bIter.hasNext() ? bIter.next() : mainFolder.createFolder('Brochure');
+      } catch(fldErr) {
+        Logger.log('Error opening Brochure subfolder: ' + fldErr.message);
+      }
+    }
+    if (!targetFolder && folderId) {
+      try { targetFolder = DriveApp.getFolderById(folderId); } catch(e) {}
+    }
+    if (!targetFolder) {
+      targetFolder = getSystemRootFolder();
+    }
+    const driveFile = targetFolder.createFile(fileBlob);
+    driveFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    return driveFile.getUrl();
+  } catch(e) {
+    Logger.log('saveBrochureFile error: ' + e.message);
+    return '';
+  }
+}
+
+// --- Create ---------------------------------------------------------------------
 function addTraining(data) {
   try {
-    if (!data.Name || !data.Trainer || !data.StartDate)
-      return err('Name, Trainer, and Start Date are required.');
+    const valRes = validateAdminTrainingData(data, false);
+    if (!valRes.valid) {
+      return err(valRes.message);
+    }
 
     const sheet = getSheet(SHEET_NAMES.trainings);
     ensureTrainingSheetColumns(sheet);
@@ -322,6 +370,13 @@ function addTraining(data) {
 
     const participantsList = Array.isArray(data.ParticipantList) ? data.ParticipantList : (Array.isArray(data.participants) ? data.participants : []);
 
+    // Handle Brochure Upload if provided
+    let brochureUrl = data.BrochureURL || data.RequisitionUrl || '';
+    if (data.BrochureFile && data.BrochureFile.data) {
+      const uploadedUrl = saveBrochureFile(workspace.folderId, code, data.BrochureFile);
+      if (uploadedUrl) brochureUrl = uploadedUrl;
+    }
+
     const headers = ensureTrainingSheetColumns(sheet);
     const rowObj = {};
     headers.forEach(h => rowObj[h] = '');
@@ -330,14 +385,18 @@ function addTraining(data) {
     rowObj['Code'] = code;
     rowObj['Name'] = data.Name || '';
     rowObj['Category'] = data.Category || 'General';
+    rowObj['TrainingMode'] = data.TrainingMode || data.Mode || '';
+    rowObj['TnaSource'] = data.TnaSource || '';
     rowObj['Trainer'] = data.Trainer || '';
     rowObj['Venue'] = data.Venue || '';
+    rowObj['TrainingProvider'] = data.TrainingProvider || data.Vendor || '';
     rowObj['StartDate'] = data.StartDate || '';
-    rowObj['EndDate'] = data.EndDate || '';
+    rowObj['EndDate'] = data.EndDate || data.StartDate || '';
     rowObj['Duration'] = data.Duration || 1;
     rowObj['TotalHours'] = data.TotalHours || 8;
     rowObj['Department'] = data.Department || '';
-    rowObj['Objectives'] = data.Objectives || '';
+    rowObj['Objectives'] = data.Reason || data.Objectives || '';
+    rowObj['Reason'] = data.Reason || data.Objectives || '';
     rowObj['Status'] = data.Status || 'Draft';
     rowObj['Stage'] = data.Stage || (participantsList.length > 0 ? 'Participants Imported' : 'Created');
     rowObj['Participants'] = data.Participants || participantsList.length;
@@ -351,6 +410,9 @@ function addTraining(data) {
     rowObj['CreatedDate'] = timeNow;
     rowObj['UpdatedDate'] = timeNow;
     rowObj['CourseFee'] = (data.CourseFee !== undefined && data.CourseFee !== null && data.CourseFee !== '') ? String(data.CourseFee) : '0.00';
+    rowObj['BrochureURL'] = brochureUrl;
+    rowObj['ExpiryDate'] = data.ExpiryDate || data.CertExpiryDate || '';
+    rowObj['CertExpiryDate'] = data.ExpiryDate || data.CertExpiryDate || '';
     rowObj['ApprovalStatus'] = data.ApprovalStatus || 'Approved';
     rowObj['RequestedBy'] = requesterSigData.employeeNo || '';
     rowObj['RequestedByName'] = requesterSigData.name || '';
@@ -402,6 +464,11 @@ function updateTraining(data) {
   try {
     if (!data.ID) return err('Training ID is required.');
 
+    const valRes = validateAdminTrainingData(data, true);
+    if (!valRes.valid) {
+      return err(valRes.message);
+    }
+
     const sheet = getSheet(SHEET_NAMES.trainings);
     const headers = ensureTrainingSheetColumns(sheet);
     const row = findRowById(sheet, data.ID);
@@ -421,19 +488,43 @@ function updateTraining(data) {
     if (data.Trainer !== undefined) rowObj['Trainer'] = data.Trainer;
     if (data.Venue !== undefined) rowObj['Venue'] = data.Venue;
     if (data.TrainingProvider !== undefined) rowObj['TrainingProvider'] = data.TrainingProvider;
-    if (data.StartDate !== undefined) rowObj['StartDate'] = data.StartDate;
-    if (data.EndDate !== undefined) rowObj['EndDate'] = data.EndDate;
+
+    // Date preservation: Only update if explicitly non-empty and changed
+    if (data.StartDate !== undefined && String(data.StartDate).trim() !== '') {
+      rowObj['StartDate'] = data.StartDate;
+    }
+    if (data.EndDate !== undefined && String(data.EndDate).trim() !== '') {
+      rowObj['EndDate'] = data.EndDate;
+    }
+
     if (data.Duration !== undefined) rowObj['Duration'] = data.Duration;
     if (data.TotalHours !== undefined) rowObj['TotalHours'] = data.TotalHours;
     if (data.Department !== undefined) rowObj['Department'] = data.Department;
+
     if (data.ExpiryDate !== undefined || data.CertExpiryDate !== undefined) {
-      const expVal = data.ExpiryDate || data.CertExpiryDate || '';
+      const expVal = (data.ExpiryDate !== undefined ? data.ExpiryDate : data.CertExpiryDate) || '';
       rowObj['ExpiryDate'] = expVal;
       rowObj['CertExpiryDate'] = expVal;
     }
-    if (data.RequisitionUrl !== undefined) rowObj['RequisitionUrl'] = data.RequisitionUrl;
-    if (data.Reason !== undefined) rowObj['Reason'] = data.Reason;
-    if (data.Objectives !== undefined) rowObj['Objectives'] = data.Objectives;
+
+    // Handle Brochure Upload or link update
+    if (data.BrochureFile && data.BrochureFile.data) {
+      const uploadedUrl = saveBrochureFile(rowObj['FolderID'], rowObj['Code'] || data.ID, data.BrochureFile);
+      if (uploadedUrl) {
+        rowObj['BrochureURL'] = uploadedUrl;
+      }
+    } else if (data.BrochureURL !== undefined && data.BrochureURL !== null) {
+      rowObj['BrochureURL'] = String(data.BrochureURL).trim();
+    } else if (data.RequisitionUrl !== undefined && data.RequisitionUrl !== null) {
+      rowObj['BrochureURL'] = String(data.RequisitionUrl).trim();
+    }
+
+    const reasonVal = data.Reason !== undefined ? data.Reason : data.Objectives;
+    if (reasonVal !== undefined) {
+      rowObj['Reason'] = reasonVal;
+      rowObj['Objectives'] = reasonVal;
+    }
+
     if (data.Status !== undefined) rowObj['Status'] = data.Status;
     if (data.Stage !== undefined) rowObj['Stage'] = data.Stage;
     if (data.Participants !== undefined) rowObj['Participants'] = data.Participants;
@@ -460,6 +551,28 @@ function updateTraining(data) {
 
     const updatedRowValues = headers.map(h => rowObj[h] !== undefined ? rowObj[h] : '');
     sheet.getRange(row, 1, 1, headers.length).setValues([updatedRowValues]);
+
+    // Keep AP-HRD-F01-01 template synchronized with edited values
+    if (rowObj['RequisitionFormFileID']) {
+      try {
+        const ssForm = SpreadsheetApp.openById(rowObj['RequisitionFormFileID']);
+        const shForm = ssForm.getSheetByName('Training Form') || ssForm.getSheets()[0];
+        const setTemplateValue = (area, value) => shForm.getRange(String(area || '').split(':')[0]).setValue(value == null ? '' : value);
+        
+        setTemplateValue('C5:I5', rowObj['Name'] || '');
+        setTemplateValue('C6:E6', rowObj['CourseFee'] || '0.00');
+        const sDateStr = formatDate(rowObj['StartDate']);
+        const eDateStr = formatDate(rowObj['EndDate']);
+        setTemplateValue('G6:I6', eDateStr && eDateStr !== sDateStr ? `${sDateStr} - ${eDateStr}` : (sDateStr || ''));
+        const durHours = rowObj['TotalHours'] ? ` (${rowObj['TotalHours']} hours)` : '';
+        setTemplateValue('C7:E7', `${rowObj['Duration'] || 1} day(s)${durHours}`);
+        setTemplateValue('G7:I7', rowObj['Venue'] || '');
+        setTemplateValue('C8:I8', rowObj['TrainingProvider'] || rowObj['Trainer'] || '');
+        setTemplateValue('A11:I12', rowObj['Objectives'] || rowObj['Reason'] || '');
+      } catch (fSyncErr) {
+        Logger.log('Template sync error on updateTraining: ' + fSyncErr.message);
+      }
+    }
 
     const appStatusCol = headers.indexOf('ApprovalStatus') + 1;
     if (appStatusCol && data.ApprovalStatus !== undefined) {
@@ -579,6 +692,8 @@ function deleteTraining(id) {
     const folderId = values[headers.indexOf('FolderID')];
     const trainingCode = values[headers.indexOf('Code')] || id;
     const trainingName = values[headers.indexOf('Name')] || '';
+    const participantsSheetId = headers.indexOf('ParticipantsSheetID') !== -1 ? values[headers.indexOf('ParticipantsSheetID')] : null;
+    const sessionsSheetId = headers.indexOf('SessionsSheetID') !== -1 ? values[headers.indexOf('SessionsSheetID')] : null;
     const startDate = values[headers.indexOf('StartDate')];
     let year = '2026';
     if (startDate) {
@@ -595,7 +710,19 @@ function deleteTraining(id) {
       }
     }
 
-    // 2. Remove orphaned rows from central database sheets if any exist
+    // Also trash independent spreadsheet files if created outside folder
+    [participantsSheetId, sessionsSheetId].forEach(fId => {
+      if (fId && String(fId).trim()) {
+        try {
+          const file = DriveApp.getFileById(String(fId).trim());
+          if (file && !file.isTrashed()) {
+            file.setTrashed(true);
+          }
+        } catch(fErr) {}
+      }
+    });
+
+    // 2. Remove orphaned rows from central database sheets (Sessions/QR Codes, Attendance, Evals, Participants)
     cleanCentralDatabaseForTraining(id, trainingCode);
 
     // 3. Delete the row from the master Trainings sheet
@@ -612,29 +739,111 @@ function deleteTraining(id) {
 
     invalidateTrainingCaches(id);
 
-    return ok({ message: 'Training, database records, and reports were successfully updated.' });
+    return ok({ message: 'Training, QR attendance sessions, database records, and reports were successfully updated.' });
   } catch (e) {
     return err('Failed to delete training: ' + e.message);
   }
 }
 
 /**
- * Cleans up any rows associated with the deleted training across central database sheets.
+ * Cleans up any rows associated with the deleted training across central database sheets,
+ * including all QR attendance sessions, attendance check-in records, evaluations, and participants.
  */
 function cleanCentralDatabaseForTraining(trainingId, trainingCode) {
   const cleanTid = String(trainingId || '').trim().toLowerCase();
   const cleanCode = String(trainingCode || '').trim().toLowerCase();
   if (!cleanTid && !cleanCode) return;
 
-  const targetSheetNames = [
-    SHEET_NAMES.attendance,
-    SHEET_NAMES.trainingSessions,
-    SHEET_NAMES.trainingEval,
-    SHEET_NAMES.postEval,
-    SHEET_NAMES.trainingParticipants
-  ];
+  const deletedSessionIds = new Set();
 
-  targetSheetNames.forEach(sheetName => {
+  // 1. First, find all SessionIDs associated with this training from Sessions sheets
+  const sessionSheetNames = [
+    SHEET_NAMES.trainingSessions,
+    'Sessions',
+    'TrainingSessions',
+    'Training Sessions',
+    'Session'
+  ];
+  const uniqueSessionSheets = Array.from(new Set(sessionSheetNames.filter(Boolean)));
+
+  uniqueSessionSheets.forEach(sheetName => {
+    try {
+      const sh = getSheet(sheetName);
+      if (!sh) return;
+      const data = sh.getDataRange().getValues();
+      if (data.length <= 1) return;
+
+      const headers = data[0].map(h => String(h || '').trim().toLowerCase());
+      const tidCol = headers.findIndex(h => h === 'trainingid' || h === 'training_id' || h === 'training id' || h === 'training code' || h === 'trainingcode');
+      const sidCol = headers.findIndex(h => h === 'sessionid' || h === 'session_id' || h === 'session id' || h === 'id' || h === 'sessioncode');
+
+      if (tidCol === -1) return;
+
+      for (let r = data.length - 1; r >= 1; r--) {
+        const val = String(data[r][tidCol] || '').trim().toLowerCase();
+        if ((cleanTid && val === cleanTid) || (cleanCode && val === cleanCode)) {
+          if (sidCol !== -1) {
+            const sidVal = String(data[r][sidCol] || '').trim().toLowerCase();
+            if (sidVal) deletedSessionIds.add(sidVal);
+          }
+          sh.deleteRow(r + 1);
+        }
+      }
+    } catch (e) {
+      Logger.log(`Error cleaning sessions sheet ${sheetName} for training ${trainingId}: ${e.message}`);
+    }
+  });
+
+  // 2. Clean Attendance sheets by TrainingID OR SessionID
+  const attendanceSheetNames = [
+    SHEET_NAMES.attendance,
+    'Attendance',
+    'SessionAttendance'
+  ];
+  const uniqueAttSheets = Array.from(new Set(attendanceSheetNames.filter(Boolean)));
+
+  uniqueAttSheets.forEach(sheetName => {
+    try {
+      const sh = getSheet(sheetName);
+      if (!sh) return;
+      const data = sh.getDataRange().getValues();
+      if (data.length <= 1) return;
+
+      const headers = data[0].map(h => String(h || '').trim().toLowerCase());
+      const tidCol = headers.findIndex(h => h === 'trainingid' || h === 'training_id' || h === 'training id' || h === 'training code' || h === 'trainingcode');
+      const sidCol = headers.findIndex(h => h === 'sessionid' || h === 'session_id' || h === 'session id' || h === 'session');
+
+      for (let r = data.length - 1; r >= 1; r--) {
+        const tidVal = tidCol !== -1 ? String(data[r][tidCol] || '').trim().toLowerCase() : '';
+        const sidVal = sidCol !== -1 ? String(data[r][sidCol] || '').trim().toLowerCase() : '';
+
+        const matchesTraining = (cleanTid && tidVal === cleanTid) || (cleanCode && tidVal === cleanCode);
+        const matchesSession = Boolean(sidVal && deletedSessionIds.has(sidVal));
+
+        if (matchesTraining || matchesSession) {
+          sh.deleteRow(r + 1);
+        }
+      }
+    } catch (e) {
+      Logger.log(`Error cleaning attendance sheet ${sheetName} for training ${trainingId}: ${e.message}`);
+    }
+  });
+
+  // 3. Clean remaining target sheets (Evaluations, Post Evaluations, Participants)
+  const remainingSheetNames = [
+    SHEET_NAMES.trainingEval,
+    'Evaluation',
+    'TrainingEval',
+    SHEET_NAMES.postEval,
+    'Post Evaluation',
+    'PostEval',
+    SHEET_NAMES.trainingParticipants,
+    'Participants',
+    'TrainingParticipants'
+  ];
+  const uniqueRemainingSheets = Array.from(new Set(remainingSheetNames.filter(Boolean)));
+
+  uniqueRemainingSheets.forEach(sheetName => {
     try {
       const sh = getSheet(sheetName);
       if (!sh) return;
