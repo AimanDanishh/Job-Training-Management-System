@@ -2129,10 +2129,10 @@
             <tbody>
               ${days.length ? days.map(d => {
                 const recs = d.records || [];
-                const pres = recs.filter(r => r.Status === 'Present').length;
-                const abs  = recs.filter(r => r.Status === 'Absent').length;
-                const late = recs.filter(r => r.Status === 'Late').length;
-                const pct  = recs.length ? Math.round(pres / recs.length * 100) : 0;
+                const pres = recs.filter(r => String(r.Status || '').trim().toLowerCase() === 'present').length;
+                const abs  = recs.filter(r => String(r.Status || '').trim().toLowerCase() === 'absent').length;
+                const late = recs.filter(r => String(r.Status || '').trim().toLowerCase() === 'late').length;
+                const pct  = recs.length ? Math.round((pres + late) / recs.length * 100) : 0;
                 const dayLabel = !d.day ? 'Day 1' : (String(d.day).toLowerCase().startsWith('day') ? d.day : ('Day ' + d.day));
                 const dateStr = formatFn(d.date) || d.date || '-';
                 return `<tr>

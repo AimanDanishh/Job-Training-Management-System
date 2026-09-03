@@ -384,14 +384,17 @@ function validatePublicAttendance(sessionId, employeeId) {
       });
 
       if (duplicate) {
-        return {
-          valid: false,
-          duplicate: true,
-          scanTime: duplicate.ScanTime || duplicate.EditedAt || 'Earlier',
-          message: `Attendance has already been recorded for Employee ID (${cleanEmpId}) for session ${cleanSessionId}.`,
-          employee: partCheck.employee,
-          session: session
-        };
+        const isAbsent = String(duplicate.Status || '').trim().toLowerCase() === 'absent';
+        if (!isAbsent) {
+          return {
+            valid: false,
+            duplicate: true,
+            scanTime: duplicate.ScanTime || duplicate.EditedAt || 'Earlier',
+            message: `Attendance has already been recorded for Employee ID (${cleanEmpId}) for session ${cleanSessionId}.`,
+            employee: partCheck.employee,
+            session: session
+          };
+        }
       }
     }
 

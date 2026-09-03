@@ -111,27 +111,77 @@ function submitAttendance(arg1, arg2, arg3, arg4) {
 
     const attId = generateId('ATT');
     const scanTime = now();
-    const status = 'Present';
+    
+    // Evaluate if check-in is Late based on session start time
+    let status = 'Present';
+    try {
+      if (session && session.StartTime) {
+        const startStr = String(session.StartTime).trim();
+        const match = startStr.match(/(\d{1,2}):(\d{2})(?:\s*([AaPp][Mm]))?/);
+        if (match) {
+          let startH = parseInt(match[1], 10);
+          const startM = parseInt(match[2], 10);
+          const ampm = match[3];
+          if (ampm) {
+            if (ampm.toLowerCase() === 'pm' && startH < 12) startH += 12;
+            if (ampm.toLowerCase() === 'am' && startH === 12) startH = 0;
+          }
+          const startTotalMinutes = startH * 60 + startM;
+          const scanMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+          if (scanMinutes > (startTotalMinutes + 15)) {
+            status = 'Late';
+          }
+        }
+      }
+    } catch(tErr) {}
 
-    const newRecord = [
-      attId,
-      session.SessionID,
-      session.TrainingID,
-      cleanEmpNo,
-      finalEmpName,
-      finalDept,
-      scanTime,
-      status,
-      trainingCode,
-      session.SessionName || '',
-      session.SessionDate || '',
-      0,
-      'QR Code Public Check-In',
-      'Public Portal',
-      scanTime
-    ];
+    // Check if an existing row for this participant was marked 'Absent'
+    let updatedExisting = false;
+    try {
+      if (attSheet.getLastRow() >= 2) {
+        const data = attSheet.getDataRange().getValues();
+        const headers = data[0].map(h => String(h || '').trim().toLowerCase());
+        const empCol = headers.findIndex(h => h === 'employeeno' || h === 'employeeid' || h === 'empid');
+        const sessCol = headers.findIndex(h => h === 'sessionid');
+        const statCol = headers.findIndex(h => h === 'status');
+        const scanCol = headers.findIndex(h => h === 'scantime' || h === 'checkin');
+        const remCol  = headers.findIndex(h => h === 'remarks');
 
-    attSheet.appendRow(newRecord);
+        if (empCol !== -1 && sessCol !== -1) {
+          for (let r = 1; r < data.length; r++) {
+            if (String(data[r][empCol] || '').trim().toLowerCase() === cleanEmpNo.toLowerCase() &&
+                String(data[r][sessCol] || '').trim().toLowerCase() === String(session.SessionID || '').trim().toLowerCase()) {
+              if (statCol !== -1) attSheet.getRange(r + 1, statCol + 1).setValue(status);
+              if (scanCol !== -1) attSheet.getRange(r + 1, scanCol + 1).setValue(scanTime);
+              if (remCol !== -1)  attSheet.getRange(r + 1, remCol + 1).setValue('QR Code Public Check-In');
+              updatedExisting = true;
+              break;
+            }
+          }
+        }
+      }
+    } catch(e) {}
+
+    if (!updatedExisting) {
+      const newRecord = [
+        attId,
+        session.SessionID,
+        session.TrainingID,
+        cleanEmpNo,
+        finalEmpName,
+        finalDept,
+        scanTime,
+        status,
+        trainingCode,
+        session.SessionName || '',
+        session.SessionDate || '',
+        0,
+        'QR Code Public Check-In',
+        'Public Portal',
+        scanTime
+      ];
+      attSheet.appendRow(newRecord);
+    }
 
     return ok({
       message: `Attendance successfully recorded for ${finalEmpName} (${cleanEmpNo})!`,

@@ -455,6 +455,15 @@ function updateSession(sessionId, data) {
         const cleanStatus = String(data.QRStatus).trim().toLowerCase();
         const finalStatus = (cleanStatus === 'deactivate' || cleanStatus === 'deactivated' || cleanStatus === 'inactive' || cleanStatus === 'expired' || cleanStatus === 'disabled') ? 'Deactivate' : 'Active';
         setColValFlexible(targetSheet, row, headers, [/^qrstatus$/i, /^qr status$/i, /^status$/i, /^state$/i], 'QRStatus', finalStatus);
+        if (finalStatus === 'Deactivate') {
+          try {
+            if (typeof markUnscannedParticipantsAbsent === 'function') {
+              markUnscannedParticipantsAbsent(cleanSessionId, (training && training.ID) || (found.session && found.session.TrainingID));
+            }
+          } catch(mErr) {
+            Logger.log('markUnscannedParticipantsAbsent in updateSession error: ' + mErr.message);
+          }
+        }
       }
     };
 
@@ -609,6 +618,15 @@ function deleteSession(sessionId) {
     try {
       updateSession(cleanSessionId, { QRStatus: 'Deactivate' });
     } catch(uErr) {}
+
+    // 4. Mark all enrolled participants who haven't scanned as Absent
+    try {
+      if (typeof markUnscannedParticipantsAbsent === 'function') {
+        markUnscannedParticipantsAbsent(cleanSessionId);
+      }
+    } catch(mErr) {
+      Logger.log('markUnscannedParticipantsAbsent in deleteSession error: ' + mErr.message);
+    }
 
     invalidateTrainingCaches();
 

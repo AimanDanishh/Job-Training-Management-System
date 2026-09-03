@@ -195,10 +195,18 @@
             </div>
           </div>
           <div class="row g-3 mb-3">
-            <div class="col-12">
+            <div class="col-md-8">
               <label for="add-session-select" class="label-th">Training Session <span class="required">*</span></label>
               <select id="add-session-select" class="input-th" aria-label="Training Session">
                 <option value="">- Select session -</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label for="add-status-select" class="label-th">Status</label>
+              <select id="add-status-select" class="input-th" aria-label="Attendance Status">
+                <option value="Present" selected>Present</option>
+                <option value="Late">Late</option>
+                <option value="Absent">Absent</option>
               </select>
             </div>
           </div>
@@ -441,17 +449,18 @@
 
       if (q.length < 1) { searchDrop.style.display = 'none'; return; }
 
-      const combinedList = [...currentTrainingParticipants, ...allEmployeesList];
+      // Search ONLY within registered training participants
+      const candidateList = Array.isArray(currentTrainingParticipants) ? currentTrainingParticipants : [];
       const seen = new Set();
       const matches = [];
 
-      combinedList.forEach(e => {
-        const empId = e.EmployeeID || e.ID || '';
-        const empName = e.EmployeeName || e.Name || '';
-        if (!empId || seen.has(empId)) return;
+      candidateList.forEach(e => {
+        const empId = String(e.EmployeeID || e.ID || '').trim();
+        const empName = String(e.EmployeeName || e.Name || '').trim();
+        if (!empId || seen.has(empId.toLowerCase())) return;
 
         if (empId.toLowerCase().includes(q) || empName.toLowerCase().includes(q)) {
-          seen.add(empId);
+          seen.add(empId.toLowerCase());
           matches.push({
             ID: empId,
             Name: empName,
@@ -460,7 +469,16 @@
         }
       });
 
-      if (!matches.length) { searchDrop.style.display = 'none'; return; }
+      if (!matches.length) {
+        searchDrop.innerHTML = `
+          <div style="padding:10px 12px;font-size:12px;color:#EF4444;font-weight:600">
+            <span class="icon sm" style="vertical-align:middle;margin-right:4px">warning</span>
+            Employee is not a training participant
+          </div>
+        `;
+        searchDrop.style.display = 'block';
+        return;
+      }
 
       searchDrop.innerHTML = matches.slice(0, 8).map(m => `
         <div class="autocomplete-item" onclick="selectParticipantForManual('${m.ID}')">
@@ -485,14 +503,14 @@
   }
 
   function selectParticipantForManual(empId) {
-    const item = [...currentTrainingParticipants, ...allEmployeesList].find(e => (e.EmployeeID || e.ID) === empId);
+    const item = (currentTrainingParticipants || []).find(e => String(e.EmployeeID || e.ID || '').trim().toLowerCase() === String(empId).trim().toLowerCase());
     if (!item) return;
     selectedManualParticipant = item;
     const pName = item.EmployeeName || item.Name || empId;
     const searchInp = document.getElementById('manual-att-search');
     const searchDrop = document.getElementById('manual-att-search-drop');
     if (searchInp) {
-      searchInp.value = pName;
+      searchInp.value = `[${item.EmployeeID || item.ID}] ${pName}`;
       searchInp.focus();
     }
     if (searchDrop) searchDrop.style.display = 'none';
@@ -512,15 +530,26 @@
     let item = selectedManualParticipant;
     if (!item && searchVal) {
       const q = searchVal.toLowerCase();
-      item = [...currentTrainingParticipants, ...allEmployeesList].find(e => 
-        (e.EmployeeID || e.ID || '').toLowerCase() === q || 
-        (e.EmployeeName || e.Name || '').toLowerCase() === q ||
-        (e.EmployeeName || e.Name || '').toLowerCase().includes(q)
-      );
+      item = (currentTrainingParticipants || []).find(e => {
+        const id = String(e.EmployeeID || e.ID || '').trim().toLowerCase();
+        const name = String(e.EmployeeName || e.Name || '').trim().toLowerCase();
+        return id === q || name === q || `[${id}] ${name}` === q || name.includes(q);
+      });
     }
 
     if (!item) {
-      showToast('Please search and select a participant first.', 'error');
+      showToast('Employee is not a training participant. Only registered participants can have attendance recorded.', 'error');
+      return;
+    }
+
+    const isEnrolled = (currentTrainingParticipants || []).some(p => {
+      const pId = String(p.EmployeeID || p.ID || p.EmployeeNo || '').trim().toLowerCase();
+      const targetId = String(item.EmployeeID || item.ID || '').trim().toLowerCase();
+      return pId === targetId || (typeof isSameEmployeeId === 'function' && isSameEmployeeId(pId, targetId));
+    });
+
+    if (!isEnrolled) {
+      showToast('Employee is not a training participant.', 'error');
       return;
     }
 
@@ -539,12 +568,16 @@
     if (submitBtn) setBtnLoading(submitBtn, true, 'Submitting...');
 
     try {
+      const statusSelect = document.getElementById('add-status-select');
+      const selStatus = statusSelect ? statusSelect.value : 'Present';
+
       const res = await callServer('submitAttendance', {
         sessionId: selSessionId,
         employeeNo: item.EmployeeID || item.ID,
         employeeName: item.EmployeeName || item.Name,
         department: item.Department || '',
-        remarks: 'Manual Attendance',
+        status: selStatus,
+        remarks: 'Manual Attendance (' + selStatus + ')',
         editedBy: 'Admin'
       });
 

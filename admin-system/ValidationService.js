@@ -79,55 +79,69 @@ function validateAttendance(sessionId, employeeNo) {
       }
     }
 
-    // 4. Duplicate Check: One employee can only submit attendance once per session
-    const ss = getTrainingDataSpreadsheet(session.TrainingID);
-    const attSheet = ss ? ss.getSheetByName('Attendance') : null;
-    if (attSheet) {
-      const rows = sheetToJson(attSheet);
-      const duplicate = rows.find(r => {
-        const rSessionId = String(r.SessionID || '').trim();
-        const rEmpNo = String(r.EmployeeNo || r.EmployeeID || r.EmployeeId || '').trim();
-        return rSessionId === cleanSessionId && rEmpNo.toLowerCase() === cleanEmpNo.toLowerCase();
-      });
+    // 3b. Verify employee is a registered participant in this training programme
+    let tpEmp = null;
+    if (session.TrainingID) {
+      let enrolledParticipants = [];
+      try {
+        if (typeof getEnrolledParticipantsForTraining === 'function') {
+          enrolledParticipants = getEnrolledParticipantsForTraining(session.TrainingID);
+        } else if (typeof getTrainingParticipantsList === 'function') {
+          enrolledParticipants = getTrainingParticipantsList(session.TrainingID);
+        }
+      } catch (pErr) {}
 
-      if (duplicate) {
-        return {
-          valid: false,
-          message: `Attendance already submitted by employee (${cleanEmpNo}) for this session.`,
-          session: session,
-          duplicate: true
-        };
+      if (enrolledParticipants && enrolledParticipants.length > 0) {
+        tpEmp = enrolledParticipants.find(e => isSameEmployeeId(e.EmployeeID || e.EmployeeNo || e.ID || '', cleanEmpNo));
+        if (!tpEmp) {
+          return {
+            valid: false,
+            message: `Employee (${cleanEmpNo}) is not a training participant. Only registered participants can have attendance recorded.`,
+            session: session
+          };
+        }
       }
     }
 
-    // 5. Look up employee details (if available) to complement submission
-    let empDetails = null;
-    try {
-      if (session.TrainingID) {
-        const ss = getTrainingDataSpreadsheet(session.TrainingID);
-        const tpSheet = ss ? (ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants')) : null;
-        if (tpSheet) {
-          const tpRows = sheetToJson(tpSheet);
-          const tpEmp = tpRows.find(e => isSameEmployeeId(e.EmployeeID || e.EmployeeNo || e.ID || '', cleanEmpNo));
-          if (tpEmp) {
-            empDetails = {
-              ID: tpEmp.EmployeeID || tpEmp.ID || cleanEmpNo,
-              Name: tpEmp.EmployeeName || tpEmp.Name || cleanEmpNo,
-              Department: tpEmp.Department || tpEmp.CostCentre || '',
-              Position: tpEmp.Position || tpEmp.JobTitle || ''
-            };
+    // 4. Duplicate Check: One employee can only submit attendance once per session
+    const ss = getTrainingDataSpreadsheet(session.TrainingID);
+    const attSheet = ss ? ss.getSheetByName('Attendance') : null;
+    if (attSheet && attSheet.getLastRow() >= 2) {
+      const data = attSheet.getDataRange().getValues();
+      const headers = data[0].map(h => String(h || '').trim().toLowerCase().replace(/[^a-z0-9]/g, ''));
+      const sessCol = headers.findIndex(h => h === 'sessionid' || h === 'session' || h === 'sessioncode');
+      const empCol  = headers.findIndex(h => h === 'employeeno' || h === 'employeeid' || h === 'empid' || h === 'id' || h === 'staffid');
+      const statCol = headers.findIndex(h => h === 'status');
+
+      if (sessCol !== -1 && empCol !== -1) {
+        for (let r = 1; r < data.length; r++) {
+          const rSession = String(data[r][sessCol] || '').trim().toLowerCase();
+          const rEmp = String(data[r][empCol] || '').trim().toLowerCase();
+          const rStat = statCol !== -1 ? String(data[r][statCol] || '').trim().toLowerCase() : '';
+
+          if (rSession === cleanSessionId.toLowerCase() && isSameEmployeeId(rEmp, cleanEmpNo)) {
+            if (rStat !== 'absent') {
+              return {
+                valid: false,
+                message: `Attendance already submitted by employee (${cleanEmpNo}) for this session.`,
+                session: session,
+                duplicate: true
+              };
+            }
           }
         }
       }
-      if (!empDetails) {
-        const empSheet = getSheet(SHEET_NAMES.employees);
-        if (empSheet) {
-          const empRows = sheetToJson(empSheet);
-          empDetails = empRows.find(e => isSameEmployeeId(e.ID || e.EmployeeID || e.EmployeeNo || '', cleanEmpNo));
-        }
-      }
-    } catch (e) {
-      Logger.log('Employee lookup non-fatal error: ' + e.message);
+    }
+
+    // 5. Look up employee details to complement submission
+    let empDetails = null;
+    if (tpEmp) {
+      empDetails = {
+        ID: tpEmp.EmployeeID || tpEmp.ID || cleanEmpNo,
+        Name: tpEmp.EmployeeName || tpEmp.Name || cleanEmpNo,
+        Department: tpEmp.Department || tpEmp.CostCentre || '',
+        Position: tpEmp.Position || tpEmp.JobTitle || ''
+      };
     }
 
     return {
