@@ -564,10 +564,52 @@ Reports Page - remove the export filtered results button
 
 Add edit button for QR session, to edit session name, time and QR active or inactive, so if the participant scan the QR when the admin set the QR session to inactive, the participant cannot mark their attendance, also add a delete button to the QR session to delete the QR session (also mark as inactive if the participant scan)
 
+//////////////////////////////////////////////////////////////////////////////////////////
 
-Add hyperlink to email
+**Dashboard:**
+1. Fix the name "Pending 3-Mo Review" to "Pending 3-Month Review"
+2. Remove "open evaluation center" button
+3. Change name in UI: "generate reports" -> "reports"
 
 
 
-HOD, Participant
+**Training:**
+1. View Attendance button should open training attendance directly (future)
+
+2. Remove Google Workspace & Training Data Sheets
+
+3. Report synchronization status: date did not display correctly: missing 'T', "Last Sync: ue Sep 01 2026 09: | Duration: 34.49s | Trigger: System Lifecycle Auto-Advance"
+
+4. Remove "View Logs" in deactivate sessions
+
+5. Add participant > "Master Registry Picker" did not display participants, it keeps loading with error in console "Uncaught (in promise) ReferenceError: escapeHtml is not defined
+&#x20;   at userCodeAppPanel?createOAuthDialog=true:1663:20
+&#x20;   at Array.map (<anonymous>)
+&#x20;   at renderPmPickerList (userCodeAppPanel?createOAuthDialog=true:1658:38)
+&#x20;   at filterPmEmployees (userCodeAppPanel?createOAuthDialog=true:1646:5)
+&#x20;   at showAddParticipantPicker (userCodeAppPanel?createOAuthDialog=true:1624:5)
+(anonymous) @ userCodeAppPanel?createOAuthDialog=true:1663
+renderPmPickerList @ userCodeAppPanel?createOAuthDialog=true:1658
+filterPmEmployees @ userCodeAppPanel?createOAuthDialog=true:1646
+showAddParticipantPicker @ userCodeAppPanel?createOAuthDialog=true:1624
+await in showAddParticipantPicker
+switchPmTab @ userCodeAppPanel?createOAuthDialog=true:1522
+onclick @ userCodeAppPanel?createOAuthDialog=true:1"
+
+6. Submitted Evaluation Records - did not display "DEPT" (the cost centre) and date submitted
+
+Evaluation
+1. Remove "2-Week Deadline" column in the table besides "Attendance Status"
+2. Department is not shown at the submitted participant evaluation records
+3. For Supervisor Evaluation, do not say deadline in 3-month, but open in 3-month
+4. For "Post Training Evaluation Form", make it search & dropdown Participant ID & name AND make "Evaluator Employee ID/Name" and show the both Evaluator's ID and Name together instead of 2 box "Evaluator Name" and "Evaluator Employee ID".
+5. for Post Training Evaluation Form - Make all questions required except "Additional Comments"
+6. For Training Evaluation, make all questions required except "Section B - Open Feedback" questions.
+
+Report
+1. For "Single Programme Report" in "Custom Sheet Reports", make the full detail smaller, its too big. (see image)
+
+
+
+Objective & Summary (User Manual)
 
