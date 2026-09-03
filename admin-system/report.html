@@ -2070,46 +2070,84 @@
     const subEl   = document.getElementById('report-output-sub');
     const tableContainer = document.getElementById('report-table-container');
 
-    const t = report.training;
-    titleEl.textContent = `6. Single Programme Report - [${t.Code}] ${t.Name}`;
-    subEl.textContent   = `Full detail summary for ${t.Name} generated on ${report.generatedAt}`;
+    const t = report.training || {};
+    titleEl.textContent = `6. Single Programme Report - [${t.Code || ''}] ${t.Name || ''}`;
+    subEl.textContent   = `Full detail summary for ${t.Name || ''} generated on ${report.generatedAt || ''}`;
 
     const att = report.attendance || {};
     const days = att.days || [];
 
+    const formatFn = (typeof formatMinimalistDate === 'function')
+      ? formatMinimalistDate
+      : (val) => String(val || '').split(' GMT')[0];
+
     tableContainer.innerHTML = `
-      <div style="padding:16px">
-        <div class="row g-3 mb-4">
-          <div class="col-md-3"><div class="stat-card"><div class="stat-value" style="color:#2563EB">${t.Category}</div><div class="stat-label">Category</div></div></div>
-          <div class="col-md-3"><div class="stat-card"><div class="stat-value" style="color:#16A34A">${t.Trainer}</div><div class="stat-label">Trainer</div></div></div>
-          <div class="col-md-3"><div class="stat-card"><div class="stat-value" style="color:#D97706">${t.Participants || 0} pax</div><div class="stat-label">Enrolled Pax</div></div></div>
-          <div class="col-md-3"><div class="stat-card"><div class="stat-value" style="color:#7C3AED">RM ${t.CourseFee || '0.00'}</div><div class="stat-label">Course Fee</div></div></div>
+      <div style="padding:10px 14px">
+        <div class="row g-2 mb-3">
+          <div class="col-6 col-md-3">
+            <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:10px 12px">
+              <div style="font-size:11px; font-weight:600; color:#64748B; text-transform:uppercase; letter-spacing:0.3px; margin-bottom:2px">Category</div>
+              <div style="font-size:13.5px; font-weight:700; color:#2563EB; line-height:1.2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap" title="${t.Category || '-'}">${t.Category || '-'}</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:10px 12px">
+              <div style="font-size:11px; font-weight:600; color:#64748B; text-transform:uppercase; letter-spacing:0.3px; margin-bottom:2px">Trainer</div>
+              <div style="font-size:13.5px; font-weight:700; color:#16A34A; line-height:1.2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap" title="${t.Trainer || '-'}">${t.Trainer || '-'}</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:10px 12px">
+              <div style="font-size:11px; font-weight:600; color:#64748B; text-transform:uppercase; letter-spacing:0.3px; margin-bottom:2px">Enrolled Pax</div>
+              <div style="font-size:13.5px; font-weight:700; color:#D97706; line-height:1.2">${t.Participants || 0} pax</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:10px 12px">
+              <div style="font-size:11px; font-weight:600; color:#64748B; text-transform:uppercase; letter-spacing:0.3px; margin-bottom:2px">Course Fee</div>
+              <div style="font-size:13.5px; font-weight:700; color:#7C3AED; line-height:1.2">RM ${t.CourseFee || '0.00'}</div>
+            </div>
+          </div>
         </div>
 
-        <h4 style="font-size:14px; font-weight:700; color:#1E293B; margin-bottom:10px">Attendance Breakdown by Day</h4>
-        <table class="table-report mb-4">
-          <thead>
-            <tr><th>Day</th><th>Date</th><th>Total Records</th><th>Present</th><th>Absent</th><th>Late</th><th>Rate (%)</th></tr>
-          </thead>
-          <tbody>
-            ${days.length ? days.map(d => {
-              const recs = d.records || [];
-              const pres = recs.filter(r => r.Status === 'Present').length;
-              const abs  = recs.filter(r => r.Status === 'Absent').length;
-              const late = recs.filter(r => r.Status === 'Late').length;
-              const pct  = recs.length ? Math.round(pres / recs.length * 100) : 0;
-              return `<tr>
-                <td style="font-weight:700">Day ${d.day}</td>
-                <td>${d.date}</td>
-                <td>${recs.length}</td>
-                <td style="color:#16A34A; font-weight:bold">${pres}</td>
-                <td style="color:#DC2626; font-weight:bold">${abs}</td>
-                <td style="color:#D97706">${late}</td>
-                <td><strong>${pct}%</strong></td>
-              </tr>`;
-            }).join('') : '<tr><td colspan="7" style="text-align:center; padding:16px; color:#94A3B8">No attendance records registered.</td></tr>'}
-          </tbody>
-        </table>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
+          <h4 style="font-size:13px; font-weight:700; color:#1E293B; margin:0">Attendance Breakdown by Day</h4>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="table-report mb-2" style="font-size:12px">
+            <thead>
+              <tr>
+                <th style="padding:6px 10px; font-size:11.5px">Day</th>
+                <th style="padding:6px 10px; font-size:11.5px">Date</th>
+                <th style="padding:6px 10px; font-size:11.5px">Total Records</th>
+                <th style="padding:6px 10px; font-size:11.5px">Present</th>
+                <th style="padding:6px 10px; font-size:11.5px">Absent</th>
+                <th style="padding:6px 10px; font-size:11.5px">Late</th>
+                <th style="padding:6px 10px; font-size:11.5px">Rate (%)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${days.length ? days.map(d => {
+                const recs = d.records || [];
+                const pres = recs.filter(r => r.Status === 'Present').length;
+                const abs  = recs.filter(r => r.Status === 'Absent').length;
+                const late = recs.filter(r => r.Status === 'Late').length;
+                const pct  = recs.length ? Math.round(pres / recs.length * 100) : 0;
+                const dayLabel = !d.day ? 'Day 1' : (String(d.day).toLowerCase().startsWith('day') ? d.day : ('Day ' + d.day));
+                const dateStr = formatFn(d.date) || d.date || '-';
+                return `<tr>
+                  <td style="font-weight:700; text-align:center; padding:6px 10px">${dayLabel}</td>
+                  <td style="text-align:center; padding:6px 10px">${dateStr}</td>
+                  <td style="text-align:center; padding:6px 10px">${recs.length}</td>
+                  <td style="color:#16A34A; font-weight:bold; text-align:center; padding:6px 10px">${pres}</td>
+                  <td style="color:#DC2626; font-weight:bold; text-align:center; padding:6px 10px">${abs}</td>
+                  <td style="color:#D97706; text-align:center; padding:6px 10px">${late}</td>
+                  <td style="text-align:center; padding:6px 10px"><strong>${pct}%</strong></td>
+                </tr>`;
+              }).join('') : '<tr><td colspan="7" style="text-align:center; padding:14px; color:#94A3B8; font-size:12px">No attendance records registered.</td></tr>'}
+            </tbody>
+          </table>
+        </div>
       </div>
     `;
   }
