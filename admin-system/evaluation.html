@@ -116,12 +116,11 @@
                   <th>Participant</th>
                   <th>Department</th>
                   <th>Attendance Status</th>
-                  <th>2-Week Deadline</th>
                   <th>Evaluation Status</th>
                 </tr>
               </thead>
               <tbody id="post-eval-2week-tbody">
-                <tr><td colspan="5" style="text-align:center;color:#94A3B8;padding:40px">Select a training to view evaluation status</td></tr>
+                <tr><td colspan="4" style="text-align:center;color:#94A3B8;padding:40px">Select a training to view evaluation status</td></tr>
               </tbody>
             </table>
           </div>
@@ -261,12 +260,12 @@
     <input type="hidden" id="eval-tid">
     <div class="row g-2 mb-3">
       <div class="col-md-6 autocomplete-wrapper">
-        <label for="eval-empid" class="label-th">Employee ID</label>
+        <label for="eval-empid" class="label-th">Employee ID <span style="color:#DC2626">*</span></label>
         <input id="eval-empid" class="input-th" placeholder="00000" autocomplete="off" aria-label="Employee ID">
         <div id="eval-empid-drop" class="autocomplete-dropdown" style="display:none"></div>
       </div>
       <div class="col-md-6 autocomplete-wrapper">
-        <label for="eval-empname" class="label-th">Employee Name</label>
+        <label for="eval-empname" class="label-th">Employee Name <span style="color:#DC2626">*</span></label>
         <input id="eval-empname" class="input-th" placeholder="Full name" autocomplete="off" aria-label="Employee Name">
         <div id="eval-empname-drop" class="autocomplete-dropdown" style="display:none"></div>
       </div>
@@ -274,15 +273,15 @@
 
     <!-- Section A -->
     <div style="background:#FFF8CF;border-radius:10px;padding:14px 16px;margin-bottom:20px;border:1px solid #FEC30D">
-      <h4 style="font-size:13px;font-weight:700;color:var(--apollo-dark);margin:0 0 4px">Section A - Programme Assessment</h4>
-      <p style="font-size:11.5px;color:#92400E;margin:0">Rate each statement: 1 = Strongly Disagree, 5 = Strongly Agree</p>
+      <h4 style="font-size:13px;font-weight:700;color:var(--apollo-dark);margin:0 0 4px">Section A - Programme Assessment <span style="color:#DC2626">*</span></h4>
+      <p style="font-size:11.5px;color:#92400E;margin:0">Rate each statement: 1 = Strongly Disagree, 5 = Strongly Agree (All required)</p>
     </div>
 
     <div id="likert-questions"></div>
 
     <!-- Section B -->
     <div style="margin:20px 0 14px">
-      <h4 style="font-size:13px;font-weight:700;color:var(--apollo-dark);margin:0 0 14px">Section B - Open Feedback</h4>
+      <h4 style="font-size:13px;font-weight:700;color:var(--apollo-dark);margin:0 0 14px">Section B - Open Feedback <small style="font-weight:400;color:#64748B;font-size:12px">(Optional)</small></h4>
       <div style="display:flex;flex-direction:column;gap:14px">
         <div>
           <label for="eval-b1" class="label-th">1. What was the most valuable part of the training?<br><small style="font-weight:400;color:#94A3B8">Apakah bahagian latihan yang paling bernilai kepada anda?</small></label>
@@ -314,26 +313,25 @@
       <button class="modal-close" onclick="closeModal('modal-post-eval')"><span class="icon sm">close</span></button>
     </div>
     <input type="hidden" id="post-tid">
+    <input type="hidden" id="post-empid">
+    <input type="hidden" id="post-evid">
+    <input type="hidden" id="post-evname">
     <div class="row g-2 mb-3">
       <div class="col-md-6 autocomplete-wrapper">
-        <label for="post-empid" class="label-th">Employee ID</label>
-        <input id="post-empid" class="input-th" placeholder="00000" autocomplete="off" aria-label="Employee ID">
+        <label for="post-participant-search" class="label-th">Participant (ID / Name) <span style="color:#DC2626">*</span></label>
+        <input id="post-participant-search" class="input-th" placeholder="Search participant ID or name..." autocomplete="off" aria-label="Participant ID / Name">
         <div id="post-empid-drop" class="autocomplete-dropdown" style="display:none"></div>
       </div>
-      <div class="col-md-6">
-        <label for="post-evname" class="label-th">Evaluator Name</label>
-        <input id="post-evname" class="input-th" placeholder="Supervisor name">
-      </div>
       <div class="col-md-6 autocomplete-wrapper">
-        <label for="post-evid" class="label-th">Evaluator Employee ID</label>
-        <input id="post-evid" class="input-th" placeholder="00000" autocomplete="off" aria-label="Evaluator Employee ID">
+        <label for="post-evaluator-search" class="label-th">Evaluator Employee ID / Name <span style="color:#DC2626">*</span></label>
+        <input id="post-evaluator-search" class="input-th" placeholder="Search evaluator ID or name..." autocomplete="off" aria-label="Evaluator Employee ID / Name">
         <div id="post-evid-drop" class="autocomplete-dropdown" style="display:none"></div>
       </div>
     </div>
 
     <!-- Competency Before -->
     <div style="margin-bottom:18px">
-      <h4 style="font-size:13px;font-weight:700;color:var(--apollo-dark);margin:0 0 10px">Competency Level Before Training</h4>
+      <h4 style="font-size:13px;font-weight:700;color:var(--apollo-dark);margin:0 0 10px">Competency Level Before Training <span style="color:#DC2626">*</span></h4>
       <div id="comp-before" style="display:flex;flex-direction:column;gap:6px"></div>
     </div>
 
@@ -342,13 +340,13 @@
 
     <!-- Competency After -->
     <div style="margin-bottom:18px">
-      <h4 style="font-size:13px;font-weight:700;color:var(--apollo-dark);margin:0 0 10px">Competency Level After Training</h4>
+      <h4 style="font-size:13px;font-weight:700;color:var(--apollo-dark);margin:0 0 10px">Competency Level After Training <span style="color:#DC2626">*</span></h4>
       <div id="comp-after" style="display:flex;flex-direction:column;gap:6px"></div>
     </div>
 
     <div style="margin-bottom:18px">
-      <label for="post-comments" class="label-th">Additional Comments</label>
-      <textarea id="post-comments" class="input-th" rows="3" placeholder="Optional..."></textarea>
+      <label for="post-comments" class="label-th">Additional Comments <small style="font-weight:400;color:#94A3B8">(Optional)</small></label>
+      <textarea id="post-comments" class="input-th" rows="3" placeholder="Optional comments..."></textarea>
     </div>
 
     <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:16px;border-top:1px solid #F1F5F9">
@@ -385,6 +383,7 @@
 
   let likertScores = Array(7).fill(0);
   let allEmployees = [];
+  let activeParticipantsList = [];
   let activeEvalUrls = { l1: '', l3: '' };
   let currentActiveTab = 'training-eval';
   let activeTrainingObj = null;
@@ -403,8 +402,12 @@
 
   function openCreatePostEvalModal() {
     document.getElementById('post-empid').value = '';
+    const partSearch = document.getElementById('post-participant-search');
+    if (partSearch) partSearch.value = '';
     document.getElementById('post-evname').value = '';
     document.getElementById('post-evid').value = '';
+    const evSearch = document.getElementById('post-evaluator-search');
+    if (evSearch) evSearch.value = '';
     document.getElementById('post-comments').value = '';
     buildCompetency('comp-before', 'cb');
     buildCompetency('comp-after', 'ca');
@@ -460,7 +463,7 @@
     const opts = { improvement: ['Yes','Partially','No'], canApply: ['Yes','Partially','No'], further: ['Yes','No'] };
     el.innerHTML = IMPROVE_QS.map(q => `
       <div>
-        <p style="font-size:13px;font-weight:600;color:#374151;margin:0 0 8px">${q.label}</p>
+        <p style="font-size:13px;font-weight:600;color:#374151;margin:0 0 8px">${q.label} <span style="color:#DC2626">*</span></p>
         <div style="display:flex;gap:8px" id="opts-${q.id}">
           ${(opts[q.id] || ['Yes','No']).map(o => `
             <label class="radio-pill" id="opt-${q.id}-${o}" onclick="selectOpt('${q.id}','${o}')">
@@ -549,12 +552,9 @@
     const tbody = document.getElementById('post-eval-2week-tbody');
     if (!tbody) return;
     if (!participants || participants.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#94A3B8;padding:32px">No participants found.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#94A3B8;padding:32px">No participants found.</td></tr>';
       return;
     }
-    const compDate = training ? (training.EndDate || training.StartDate) : null;
-    const deadline = ApolloCountdown.calculate2WeekDeadline(compDate);
-    const deadlineStr = formatMinimalistDate(deadline);
 
     tbody.innerHTML = participants.map((p, i) => {
       const isDone = Boolean(
@@ -579,7 +579,6 @@
           </td>
           <td style="font-size:12px;color:var(--apollo-gray-600)">${p.Department || '-'}</td>
           <td><span class="badge-th badge-${attColor}">${attText}</span></td>
-          <td style="font-size:12px;font-weight:600">${deadlineStr}</td>
           <td>${isDone ? '<span class="badge-th badge-green">Completed</span>' : '<span class="badge-th badge-yellow">Pending</span>'}</td>
         </tr>
       `;
@@ -630,12 +629,14 @@
       document.getElementById('eval-empid').value = emp.ID || '';
       document.getElementById('eval-empname').value = emp.Name || '';
     });
-    setupFieldAutocomplete('post-empid', 'post-empid-drop', (emp) => {
+    setupFieldAutocomplete('post-participant-search', 'post-empid-drop', (emp) => {
       document.getElementById('post-empid').value = emp.ID || '';
+      document.getElementById('post-participant-search').value = `[${emp.ID}] ${emp.Name}`;
     });
-    setupFieldAutocomplete('post-evid', 'post-evid-drop', (emp) => {
+    setupFieldAutocomplete('post-evaluator-search', 'post-evid-drop', (emp) => {
       document.getElementById('post-evid').value = emp.ID || '';
       document.getElementById('post-evname').value = emp.Name || '';
+      document.getElementById('post-evaluator-search').value = `[${emp.ID}] ${emp.Name}`;
     });
     setupFieldAutocomplete('as-search-input', 'as-search-drop', (emp) => {
       document.getElementById('as-search-input').value = `${emp.Name} (${emp.ID})`;
@@ -662,12 +663,18 @@
     const dropEl  = document.getElementById(dropId);
     if (!inputEl || !dropEl) return;
 
-    inputEl.addEventListener('input', () => {
+    const renderMatches = () => {
       const q = inputEl.value.trim().toLowerCase();
-      if (q.length < 1) { dropEl.style.display = 'none'; return; }
-      const matches = allEmployees.filter(e =>
-        (e.ID || '').toLowerCase().includes(q) ||
-        (e.Name || '').toLowerCase().includes(q)
+      let sourceList = allEmployees;
+      if (inputId === 'post-participant-search' && Array.isArray(activeParticipantsList) && activeParticipantsList.length > 0) {
+        sourceList = activeParticipantsList.map(p => ({
+          ID: p.EmployeeID || p.ID || p.EmployeeNo || '',
+          Name: p.EmployeeName || p.Name || '',
+          Department: p.Department || ''
+        }));
+      }
+      const matches = sourceList.filter(e =>
+        !q || (e.ID || '').toLowerCase().includes(q) || (e.Name || '').toLowerCase().includes(q)
       ).slice(0, 8);
 
       if (!matches.length) { dropEl.style.display = 'none'; return; }
@@ -678,7 +685,7 @@
             <span class="emp-code">${m.ID}</span>
             <strong style="margin-left:6px">${m.Name}</strong>
           </div>
-          <span class="emp-dept">${m.Department}</span>
+          <span class="emp-dept">${m.Department || ''}</span>
         </div>
       `).join('');
       dropEl.style.display = 'block';
@@ -686,12 +693,15 @@
       dropEl.querySelectorAll('.autocomplete-item').forEach(item => {
         item.addEventListener('mousedown', (e) => {
           e.preventDefault();
-          const emp = allEmployees.find(x => x.ID === item.dataset.id);
+          const emp = sourceList.find(x => x.ID === item.dataset.id) || allEmployees.find(x => x.ID === item.dataset.id);
           if (emp) onSelect(emp);
           dropEl.style.display = 'none';
         });
       });
-    });
+    };
+
+    inputEl.addEventListener('input', renderMatches);
+    inputEl.addEventListener('focus', renderMatches);
 
     inputEl.addEventListener('blur', () => {
       setTimeout(() => { dropEl.style.display = 'none'; }, 200);
@@ -905,6 +915,7 @@
       });
 
       window.__activeAttendedParticipants__ = participantsList;
+      activeParticipantsList = participantsList;
       const totalParts = participantsList.length || (tObj ? (tObj.ParticipantsCount || 0) : 0);
       const respPct = totalParts > 0 ? Math.round((compCount / totalParts) * 100) : 0;
       const respRateEl = document.getElementById('e-response-rate');
@@ -912,12 +923,22 @@
 
       // Render Level 1 Evaluations Table
       document.getElementById('eval-tbody').innerHTML = evals.length
-        ? evals.map((r, i) => `<tr>
-            <td><div style="display:flex;align-items:center;gap:8px">${avatar(r.EmployeeName,27,i)}<div><div style="font-size:13px;font-weight:600;color:var(--apollo-dark)">${r.EmployeeName}</div><div style="font-size:11px;color:var(--apollo-gray-500)">${r.EmployeeID}</div></div></div></td>
-            <td style="font-size:12px;color:var(--apollo-gray-600)">-</td>
-            <td><span style="font-size:14px;font-weight:800;color:${r.AvgScore>=4?'#16A34A':r.AvgScore>=3?'#D97706':'#E91C2D'}">${Number(r.AvgScore).toFixed(1)}</span><span style="font-size:11px;color:#94A3B8"> / 5.0</span></td>
-            <td style="font-size:12px;color:var(--apollo-gray-600)">${r.SubmittedAt}</td>
-          </tr>`).join('')
+        ? evals.map((r, i) => {
+            const eId = String(r.EmployeeID || '').trim().toLowerCase();
+            const pMatch = (participantsList || []).find(p => String(p.EmployeeID || p.ID || p.EmployeeNo || '').trim().toLowerCase() === eId);
+            const aMatch = (!pMatch && Array.isArray(allEmployees))
+              ? allEmployees.find(e => String(e.ID || e.EmployeeID || '').trim().toLowerCase() === eId)
+              : null;
+            const dept = r.Department || (pMatch ? (pMatch.Department || pMatch.CostCentre) : '') || (aMatch ? (aMatch.Department || aMatch.CostCentre) : '') || '-';
+            const empName = r.EmployeeName || (pMatch ? pMatch.EmployeeName || pMatch.Name : '') || (aMatch ? aMatch.Name : '') || r.EmployeeID || '-';
+            const submittedTime = r.SubmittedAt ? (formatMinimalistDateTime(r.SubmittedAt) || r.SubmittedAt) : '-';
+            return `<tr>
+              <td><div style="display:flex;align-items:center;gap:8px">${avatar(empName, 27, i)}<div><div style="font-size:13px;font-weight:600;color:var(--apollo-dark)">${empName}</div><div style="font-size:11px;color:var(--apollo-gray-500)">${r.EmployeeID}</div></div></div></td>
+              <td style="font-size:12px;color:var(--apollo-gray-600)">${dept}</td>
+              <td><span style="font-size:14px;font-weight:800;color:${r.AvgScore>=4?'#16A34A':r.AvgScore>=3?'#D97706':'#E91C2D'}">${Number(r.AvgScore).toFixed(1)}</span><span style="font-size:11px;color:#94A3B8"> / 5.0</span></td>
+              <td style="font-size:12px;color:var(--apollo-gray-600)">${submittedTime}</td>
+            </tr>`;
+          }).join('')
         : '<tr><td colspan="4" style="text-align:center;color:#94A3B8;padding:32px">No evaluations submitted yet.</td></tr>';
 
       // Render Level 2 and Level 3 tables
@@ -1142,8 +1163,9 @@
     const tid = document.getElementById('eval-tid').value || document.getElementById('sel-eval-t').value;
     const empId = document.getElementById('eval-empid').value.trim();
     const empName = document.getElementById('eval-empname').value.trim();
-    if (!tid) { showToast('Select a training first.', 'error'); return; }
+    if (!tid) { showToast('Please select a training programme first.', 'error'); return; }
     if (!empId) { showToast('Employee ID is required.', 'error'); return; }
+    if (!empName) { showToast('Employee Name is required.', 'error'); return; }
 
     const unrated = likertScores.findIndex(s => s === 0);
     if (unrated !== -1) {
@@ -1174,10 +1196,39 @@
 
   async function submitPostEval() {
     const tid = document.getElementById('post-tid').value || document.getElementById('sel-eval-t').value;
-    const empId   = document.getElementById('post-empid').value.trim();
-    const evName  = document.getElementById('post-evname').value.trim();
-    const evId    = document.getElementById('post-evid').value.trim();
-    if (!tid || !empId || !evName) { showToast('Training, Employee ID and Evaluator Name are required.', 'error'); return; }
+    let empId   = document.getElementById('post-empid').value.trim();
+    const pSearch = (document.getElementById('post-participant-search') ? document.getElementById('post-participant-search').value.trim() : '');
+    if (!empId && pSearch) {
+      const match = allEmployees.find(e => String(e.ID).toLowerCase() === pSearch.toLowerCase() || String(e.Name).toLowerCase() === pSearch.toLowerCase() || `[${e.ID}] ${e.Name}`.toLowerCase() === pSearch.toLowerCase());
+      if (match) empId = match.ID;
+      else {
+        const idMatch = pSearch.match(/\[([^\]]+)\]/);
+        empId = idMatch ? idMatch[1].trim() : pSearch;
+      }
+    }
+
+    let evId    = document.getElementById('post-evid').value.trim();
+    let evName  = document.getElementById('post-evname').value.trim();
+    const evSearch = (document.getElementById('post-evaluator-search') ? document.getElementById('post-evaluator-search').value.trim() : '');
+    if ((!evName || !evId) && evSearch) {
+      const match = allEmployees.find(e => String(e.ID).toLowerCase() === evSearch.toLowerCase() || String(e.Name).toLowerCase() === evSearch.toLowerCase() || `[${e.ID}] ${e.Name}`.toLowerCase() === evSearch.toLowerCase());
+      if (match) {
+        evId = match.ID || evId;
+        evName = match.Name || evName;
+      } else {
+        const idMatch = evSearch.match(/\[([^\]]+)\]\s*(.*)/);
+        if (idMatch) {
+          evId = idMatch[1].trim();
+          evName = idMatch[2].trim() || evId;
+        } else {
+          evName = evSearch;
+        }
+      }
+    }
+
+    if (!tid) { showToast('Please select a training programme first.', 'error'); return; }
+    if (!empId) { showToast('Participant ID / Name is required.', 'error'); return; }
+    if (!evName && !evId) { showToast('Evaluator Employee ID / Name is required.', 'error'); return; }
 
     const getComp = name => {
       const el = document.querySelector(`input[name="${name}"]:checked`);
@@ -1190,17 +1241,37 @@
 
     const cb = getComp('cb');
     const ca = getComp('ca');
-    if (!cb || !ca) {
-      showToast('Competency levels before and after training (scale 1-5) are required.', 'error');
+    const imp = getOpt('improvement');
+    const canApply = getOpt('canApply');
+    const further = getOpt('further');
+
+    if (!cb) {
+      showToast('Please select the Competency Level Before Training (scale 1-5).', 'error');
+      return;
+    }
+    if (!imp) {
+      showToast('Please answer Question 1 (noticeable improvement in work performance).', 'error');
+      return;
+    }
+    if (!canApply) {
+      showToast('Please answer Question 2 (ability to apply knowledge/skills to job).', 'error');
+      return;
+    }
+    if (!further) {
+      showToast('Please answer Question 3 (further training/coaching recommendation).', 'error');
+      return;
+    }
+    if (!ca) {
+      showToast('Please select the Competency Level After Training (scale 1-5).', 'error');
       return;
     }
 
     const data = {
-      TrainingID: tid, EmployeeID: empId, EvaluatorName: evName, EvaluatorID: evId,
-      CompetencyBefore: getComp('cb'), CompetencyAfter: getComp('ca'),
-      Improvement:      getOpt('improvement'), CanApply: getOpt('canApply'),
-      FurtherTraining:  getOpt('further'),
-      Comments: document.getElementById('post-comments').value,
+      TrainingID: tid, EmployeeID: empId, EvaluatorName: evName || evId, EvaluatorID: evId,
+      CompetencyBefore: cb, CompetencyAfter: ca,
+      Improvement: imp, CanApply: canApply,
+      FurtherTraining: further,
+      Comments: document.getElementById('post-comments').value.trim()
     };
     const btn = document.getElementById('btn-submit-post');
     setBtnLoading(btn, true, 'Submitting...');

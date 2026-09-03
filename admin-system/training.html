@@ -8,7 +8,7 @@
   <?!= include('script') ?>
 </head>
 <body>
-<div id="__trainhub_config__" style="display:none" data-config="<?!= encodeURIComponent(JSON.stringify({ page: currentPage || '', appUrl: (typeof appUrl !== 'undefined' && appUrl) ? appUrl : '', publicPortalUrl: (typeof publicPortalUrl !== 'undefined' && publicPortalUrl) ? publicPortalUrl : '', companyLogoUrl: (typeof companyLogoUrl !== 'undefined' && companyLogoUrl) ? companyLogoUrl : '', currentUser: (typeof currentUserJson !== 'undefined' && currentUserJson) ? JSON.parse(currentUserJson) : {} })) ?>"></div>
+<div id="__trainhub_config__" style="display:none" data-config="<?!= encodeURIComponent(JSON.stringify({ page: currentPage || '', appUrl: (typeof appUrl !== 'undefined' && appUrl) ? appUrl : '', queryParams: (typeof queryParams !== 'undefined' && queryParams) ? JSON.parse(queryParams) : {}, publicPortalUrl: (typeof publicPortalUrl !== 'undefined' && publicPortalUrl) ? publicPortalUrl : '', companyLogoUrl: (typeof companyLogoUrl !== 'undefined' && companyLogoUrl) ? companyLogoUrl : '', currentUser: (typeof currentUserJson !== 'undefined' && currentUserJson) ? JSON.parse(currentUserJson) : {} })) ?>"></div>
 <div class="app-shell">
   <!-- Sidebar -->
   <?!= include('sidebar') ?>
@@ -425,6 +425,15 @@
 <div id="toast-container"></div>
 <script>
   console.log("=== APOLLO TRAINING SCRIPT START ===");
+  function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
   let allTrainings = [];
 
   function initTrainingPage() {
@@ -1439,23 +1448,37 @@
       </tr>
     `).join('') : '<tr><td colspan="6" style="text-align:center;color:#94A3B8;padding:30px">No attendance check-ins recorded for this training yet.</td></tr>';
 
-    const level1EvalsHtml = (evals || []).length ? (evals || []).map(e => `
+    const level1EvalsHtml = (evals || []).length ? (evals || []).map(e => {
+      const empId = String(e.EmployeeID || e.EmployeeNo || e.ID || '').trim();
+      const pMatch = (participants || []).find(p => String(p.EmployeeID || p.ID || p.EmployeeNo || '').trim().toLowerCase() === empId.toLowerCase());
+      const mMatch = (!pMatch && typeof allMasterEmployees !== 'undefined' && Array.isArray(allMasterEmployees))
+        ? allMasterEmployees.find(m => String(m.ID || m.EmployeeID || '').trim().toLowerCase() === empId.toLowerCase())
+        : null;
+      const dept = e.Department || (pMatch ? (pMatch.Department || pMatch.CostCentre) : '') || (mMatch ? (mMatch.Department || mMatch.CostCentre) : '') || '-';
+      const rawDate = e.SubmittedAt || e.Timestamp || e.Date || e.CreatedAt || '';
+      const displayDate = toDisplayDateStr(rawDate) || rawDate || '-';
+      return `
       <tr>
-        <td style="font-weight:600">${e.EmployeeName || e.EmployeeID || '-'}</td>
-        <td style="color:#64748B">${e.Department || '-'}</td>
+        <td style="font-weight:600">${e.EmployeeName || (pMatch ? (pMatch.EmployeeName || pMatch.Name) : '') || empId || '-'}</td>
+        <td style="color:#64748B">${dept}</td>
         <td style="font-weight:700;color:#2563EB">${e.AvgScore ? e.AvgScore + ' / 5' : '-'}</td>
-        <td style="color:#64748B;font-size:11px">${toDisplayDateStr(e.Timestamp || e.Date) || '-'}</td>
+        <td style="color:#64748B;font-size:11px">${displayDate}</td>
       </tr>
-    `).join('') : '<tr><td colspan="4" style="text-align:center;color:#94A3B8;padding:20px">No training evaluations submitted yet.</td></tr>';
+    `;}).join('') : '<tr><td colspan="4" style="text-align:center;color:#94A3B8;padding:20px">No training evaluations submitted yet.</td></tr>';
 
-    const level3PostEvalsHtml = (postEvals || []).length ? (postEvals || []).map(pe => `
+    const level3PostEvalsHtml = (postEvals || []).length ? (postEvals || []).map(pe => {
+      const empId = String(pe.EmployeeID || pe.EmployeeNo || pe.ID || '').trim();
+      const pMatch = (participants || []).find(p => String(p.EmployeeID || p.ID || p.EmployeeNo || '').trim().toLowerCase() === empId.toLowerCase());
+      const rawDate = pe.SubmittedAt || pe.Timestamp || pe.Date || pe.CreatedAt || '';
+      const displayDate = toDisplayDateStr(rawDate) || rawDate || '-';
+      return `
       <tr>
-        <td style="font-weight:600">${pe.EmployeeName || pe.EmployeeID || '-'}</td>
-        <td style="color:#64748B">${pe.SupervisorName || pe.SupervisorID || '-'}</td>
+        <td style="font-weight:600">${pe.EmployeeName || (pMatch ? (pMatch.EmployeeName || pMatch.Name) : '') || empId || '-'}</td>
+        <td style="color:#64748B">${pe.EvaluatorName || pe.SupervisorName || pe.EvaluatorID || pe.SupervisorID || '-'}</td>
         <td style="font-weight:700;color:#059669">${pe.CompetencyBefore || '-'} -> ${pe.CompetencyAfter || '-'}</td>
-        <td style="color:#64748B;font-size:11px">${toDisplayDateStr(pe.Timestamp || pe.Date) || '-'}</td>
+        <td style="color:#64748B;font-size:11px">${displayDate}</td>
       </tr>
-    `).join('') : '<tr><td colspan="4" style="text-align:center;color:#94A3B8;padding:20px">No supervisor post-evaluations submitted yet.</td></tr>';
+    `;}).join('') : '<tr><td colspan="4" style="text-align:center;color:#94A3B8;padding:20px">No supervisor post-evaluations submitted yet.</td></tr>';
 
     const isSessionDeactivated = s => ['deactivate', 'deactivated', 'inactive', 'expired'].includes(String(s.QRStatus || '').toLowerCase());
     const activeSessions = (sessions || []).filter(s => !isSessionDeactivated(s));
@@ -1518,18 +1541,6 @@
               </div>
             </div>
           `).join('')}
-        </div>
-
-        <!-- Google Workspace & Training Data Sheets Card -->
-        <div style="background:#ECFDF5;border:1px solid #A7F3D0;border-radius:10px;padding:14px 16px;margin-top:14px">
-          <div style="font-size:13px;font-weight:700;color:#065F46;margin-bottom:8px;display:flex;align-items:center;gap:6px">
-            <span class="icon sm" style="color:#059669">table_chart</span> Google Workspace & Training Data Sheets
-          </div>
-          <div style="display:flex;gap:10px;flex-wrap:wrap">
-            ${dataSheetUrl ? `<a href="${dataSheetUrl}" target="_blank" class="btn-th btn-sm" style="background:#059669;color:#fff;border:none;text-decoration:none;display:inline-flex;align-items:center;gap:4px"><span class="icon sm">table_chart</span> Open Training Data Sheet (6 Tabs)</a>` : ''}
-            ${reqUrl ? `<a href="${reqUrl}" target="_blank" class="btn-th btn-secondary btn-sm" style="background:#fff;text-decoration:none;display:inline-flex;align-items:center;gap:4px"><span class="icon sm">description</span> Open Requisition Form (AP-HRD-F01-01)</a>` : ''}
-            ${folderUrl ? `<a href="${folderUrl}" target="_blank" class="btn-th btn-secondary btn-sm" style="background:#fff;text-decoration:none;display:inline-flex;align-items:center;gap:4px"><span class="icon sm">folder</span> Open Drive Workspace Folder</a>` : ''}
-          </div>
         </div>
 
         ${rawObj ? `
@@ -1665,9 +1676,6 @@
                       </div>
                     </div>
                     <div style="display:flex;align-items:center;gap:8px">
-                      <button class="btn-th btn-secondary btn-xs" onclick="navTo('attendance', {session:'${s.SessionID}'})">
-                        <span class="icon sm">visibility</span> View Logs
-                      </button>
                       <button class="btn-th btn-primary btn-xs" onclick="openEditSessionForTraining('${s.SessionID}', '${t.ID}')" title="Reactivate or Edit">
                         <span class="icon sm">edit</span> Edit / Reactivate
                       </button>
@@ -1885,7 +1893,17 @@
         }
 
         if (metaEl) {
-          const timeStr = res.lastSync ? res.lastSync.replace('T', ' ').slice(0, 19) : 'Never';
+          let timeStr = 'Never';
+          if (res.lastSync && res.lastSync !== 'Never') {
+            const raw = String(res.lastSync).trim();
+            const d = new Date(raw);
+            if (!isNaN(d.getTime())) {
+              const pad = n => String(n).padStart(2, '0');
+              timeStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+            } else {
+              timeStr = raw.replace(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2}).*$/, '$1 $2');
+            }
+          }
           metaEl.innerHTML = `Last Sync: <strong>${timeStr}</strong> | Duration: <strong>${res.lastDuration || '-'}</strong> | Trigger: <strong>${res.lastTrigger || '-'}</strong>`;
         }
       }

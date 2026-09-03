@@ -27,6 +27,7 @@ function readTrainHubConfig() {
         if (cfg.companyLogoUrl) window.__COMPANY_LOGO_URL__ = cfg.companyLogoUrl;
         if (cfg.systemLogoUrl) window.__SYSTEM_LOGO_URL__ = cfg.systemLogoUrl;
         if (cfg.currentUser) window.__CURRENT_USER__ = cfg.currentUser;
+        if (cfg.queryParams) window.__QUERY_PARAMS__ = cfg.queryParams;
       }
     } catch(e) {}
   }
@@ -294,8 +295,31 @@ function setBtnLoading(btn, loading, text) {
   }
 }
 
+// --- HTML Escape Helper ---------------------------------------------------
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 // --- Cross-Origin Safe Query Param Reader ----------------------------------
 function getQueryParam(name) {
+  try {
+    if (window.__TRAINHUB_CONFIG__ && window.__TRAINHUB_CONFIG__.queryParams && window.__TRAINHUB_CONFIG__.queryParams[name]) {
+      return window.__TRAINHUB_CONFIG__.queryParams[name];
+    }
+  } catch(e) {}
+
+  try {
+    if (window.__QUERY_PARAMS__ && window.__QUERY_PARAMS__[name]) {
+      return window.__QUERY_PARAMS__[name];
+    }
+  } catch(e) {}
+
   try {
     if (window.location && window.location.search) {
       const v = new URLSearchParams(window.location.search).get(name);
@@ -699,6 +723,22 @@ const ApolloCountdown = {
     const deadStr = formatMinimalistDate(deadline);
 
     if (diffDays < 0) {
+      if (is3Mo) {
+        return {
+          status: 'completed',
+          label: 'Open for Review',
+          badgeText: 'Open Now',
+          shortText: 'Open Now',
+          detail: `Review opened on ${deadStr}`,
+          completionDateStr: compStr,
+          deadlineDateStr: deadStr,
+          daysDiff: diffDays,
+          deadlineDate: deadline,
+          completionDate: completionDate,
+          is3Mo: true,
+          isOpen: true
+        };
+      }
       const overdueDays = Math.abs(diffDays);
       const dayText = overdueDays === 1 ? '1 day' : `${overdueDays} days`;
       return {
@@ -712,75 +752,81 @@ const ApolloCountdown = {
         daysDiff: diffDays,
         deadlineDate: deadline,
         completionDate: completionDate,
-        isOverdue: true
+        isOverdue: true,
+        is3Mo: false
       };
     }
 
     if (diffDays === 0) {
       return {
-        status: 'today',
-        label: 'Due Today',
-        badgeText: 'Due Today',
-        shortText: 'Due Today',
-        detail: `Deadline is today (${deadStr})`,
+        status: is3Mo ? 'completed' : 'today',
+        label: is3Mo ? 'Opens Today' : 'Due Today',
+        badgeText: is3Mo ? 'Opens Today' : 'Due Today',
+        shortText: is3Mo ? 'Opens Today' : 'Due Today',
+        detail: is3Mo ? `Review opens today (${deadStr})` : `Deadline is today (${deadStr})`,
         completionDateStr: compStr,
         deadlineDateStr: deadStr,
         daysDiff: 0,
         deadlineDate: deadline,
         completionDate: completionDate,
-        isDueToday: true
+        isDueToday: !is3Mo,
+        is3Mo: is3Mo,
+        isOpen: is3Mo
       };
     }
 
     if (diffDays === 1) {
       return {
         status: 'approaching',
-        label: 'Due Tomorrow',
-        badgeText: 'Due Tomorrow',
-        shortText: 'Due Tomorrow',
-        detail: `Deadline: ${deadStr}`,
+        label: is3Mo ? 'Opens Tomorrow' : 'Due Tomorrow',
+        badgeText: is3Mo ? 'Opens Tomorrow' : 'Due Tomorrow',
+        shortText: is3Mo ? 'Opens Tomorrow' : 'Due Tomorrow',
+        detail: is3Mo ? `Opens: ${deadStr}` : `Deadline: ${deadStr}`,
         completionDateStr: compStr,
         deadlineDateStr: deadStr,
         daysDiff: 1,
         deadlineDate: deadline,
         completionDate: completionDate,
-        isApproaching: true
+        isApproaching: true,
+        is3Mo: is3Mo
       };
     }
 
     if (diffDays <= 14) {
       const isApproaching = diffDays <= 5;
-      const text = (diffDays === 14 && !is3Mo) ? 'Due in 2 weeks' : `Due in ${diffDays} days`;
+      const text = is3Mo ? `Opens in ${diffDays} days` : ((diffDays === 14) ? 'Due in 2 weeks' : `Due in ${diffDays} days`);
       return {
         status: isApproaching ? 'approaching' : 'normal',
         label: text,
         badgeText: text,
         shortText: text,
-        detail: `Deadline: ${deadStr}`,
+        detail: is3Mo ? `Opens: ${deadStr}` : `Deadline: ${deadStr}`,
         completionDateStr: compStr,
         deadlineDateStr: deadStr,
         daysDiff: diffDays,
         deadlineDate: deadline,
         completionDate: completionDate,
-        isApproaching: isApproaching
+        isApproaching: isApproaching,
+        is3Mo: is3Mo
       };
     }
 
     const months = Math.max(1, Math.round(diffDays / 30.43));
     const monthText = months === 1 ? '1 month' : `${months} months`;
-    const labelText = `Due in ${monthText}`;
+    const labelText = is3Mo ? `Opens in ${monthText}` : `Due in ${monthText}`;
 
     return {
       status: 'normal',
       label: labelText,
       badgeText: labelText,
       shortText: labelText,
-      detail: `Deadline: ${deadStr}`,
+      detail: is3Mo ? `Opens: ${deadStr}` : `Deadline: ${deadStr}`,
       completionDateStr: compStr,
       deadlineDateStr: deadStr,
       daysDiff: diffDays,
       deadlineDate: deadline,
-      completionDate: completionDate
+      completionDate: completionDate,
+      is3Mo: is3Mo
     };
   },
 
@@ -833,7 +879,7 @@ const ApolloCountdown = {
               <strong style="color:var(--apollo-dark);display:block">${statusObj.completionDateStr || '-'}</strong>
             </div>
             <div class="col-6 col-md-4">
-              <span style="color:var(--apollo-gray-500)">Target Deadline:</span>
+              <span style="color:var(--apollo-gray-500)">${statusObj.is3Mo ? 'Review Opens:' : 'Target Deadline:'}</span>
               <strong style="color:var(--apollo-dark);display:block">${statusObj.deadlineDateStr || '-'}</strong>
             </div>
             <div class="col-12 col-md-4">
@@ -1283,6 +1329,7 @@ window.addEventListener('beforeunload', () => {
 });
 
 // Explicitly bind utility functions to global window object
+window.escapeHtml = escapeHtml;
 window.navTo = navTo;
 window.callServer = callServer;
 window.showToast = showToast;

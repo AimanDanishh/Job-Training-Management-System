@@ -11,6 +11,23 @@ function getTrainingEvaluations(trainingId) {
     const sheet = ss.getSheetByName('Evaluation') || ss.getSheetByName('TrainingEval');
     if (!sheet) return ok([]);
     const rows = sheetToJson(sheet);
+    try {
+      const partSheet = ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants');
+      if (partSheet && partSheet.getLastRow() > 1) {
+        const parts = sheetToJson(partSheet);
+        const pMap = new Map();
+        parts.forEach(p => {
+          const id = String(p.EmployeeID || p.ID || p.EmployeeNo || '').trim().toLowerCase();
+          if (id) pMap.set(id, p.Department || p.CostCentre || '');
+        });
+        rows.forEach(r => {
+          if (!r.Department) {
+            const id = String(r.EmployeeID || '').trim().toLowerCase();
+            if (pMap.has(id)) r.Department = pMap.get(id);
+          }
+        });
+      }
+    } catch(pErr) {}
     return ok(rows);
   } catch (e) {
     return err(e.message);
@@ -114,6 +131,9 @@ function savePostEvaluation(data) {
     const ca = Number(data.CompetencyAfter);
     if (isNaN(cb) || cb < 1 || cb > 5 || isNaN(ca) || ca < 1 || ca > 5) {
       return err('Competency levels before and after training (scale 1-5) are required.');
+    }
+    if (!data.Improvement || !data.CanApply || !data.FurtherTraining) {
+      return err('All evaluation questions are required.');
     }
 
     const ss = getTrainingDataSpreadsheet(data.TrainingID);

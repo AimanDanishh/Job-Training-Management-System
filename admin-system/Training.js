@@ -1771,6 +1771,19 @@ function getTrainingFullDetails(trainingId) {
       const evalSheet = ss.getSheetByName('Evaluation') || ss.getSheetByName('TrainingEval');
       if (evalSheet && evalSheet.getLastRow() > 1) {
         evals = sheetToJson(evalSheet);
+        if (evals && evals.length && participants && participants.length) {
+          const pMap = new Map();
+          participants.forEach(p => {
+            const pId = String(p.EmployeeID || p.ID || p.EmployeeNo || '').trim().toLowerCase();
+            if (pId) pMap.set(pId, p.Department || p.CostCentre || '');
+          });
+          evals.forEach(e => {
+            if (!e.Department) {
+              const eId = String(e.EmployeeID || e.EmployeeNo || e.ID || '').trim().toLowerCase();
+              if (pMap.has(eId)) e.Department = pMap.get(eId);
+            }
+          });
+        }
       }
 
       // Post Evaluation tab

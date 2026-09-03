@@ -1661,9 +1661,17 @@ function getSyncHistory(limit, filterTrainingId, filterStatus) {
 
     let rows = [];
     for (let i = 1; i < data.length; i++) {
+      let ts = data[i][1];
+      if (ts instanceof Date) {
+        try {
+          ts = Utilities.formatDate(ts, Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+        } catch(dErr) {
+          ts = String(ts);
+        }
+      }
       rows.push({
         syncId:     String(data[i][0] || ''),
-        timestamp:  String(data[i][1] || ''),
+        timestamp:  String(ts || ''),
         trainingId: String(data[i][2] || ''),
         action:     String(data[i][3] || ''),
         trigger:    String(data[i][4] || ''),
