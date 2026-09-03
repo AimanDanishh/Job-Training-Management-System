@@ -16,6 +16,27 @@
                   border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;font-size:13px;
                   font-weight:400;color:var(--apollo-dark);transition:all 0.12s; }
     .radio-pill.active { border-color:#E91C2D;background:#FFF8CF;color:#E91C2D;font-weight:700; }
+
+    @media (max-width: 576px) {
+      .likert-question-row {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 8px !important;
+      }
+      .likert-btns-wrap {
+        width: 100% !important;
+        justify-content: space-between !important;
+        gap: 6px !important;
+      }
+      .likert-btns-wrap .likert-btn {
+        flex: 1 !important;
+        height: 38px !important;
+        font-size: 13px !important;
+      }
+      .radio-pill {
+        width: 100%;
+      }
+    }
   </style>
 </head>
 <body>
@@ -26,6 +47,7 @@
 
   <div class="main-area">
     <header class="topbar">
+      <button id="sidebar-toggle" class="btn-th btn-secondary btn-sm sidebar-toggle-btn" style="display:none" aria-label="Toggle navigation menu"><span class="icon sm">menu</span></button>
       <div style="flex:1"><h1 class="topbar-title">Evaluation Dashboard</h1><p class="topbar-sub">Real-Time Training, Post-Training & Supervisor Evaluations</p></div>
     </header>
 
@@ -420,12 +442,12 @@
     const el = document.getElementById('likert-questions');
     if (!el) return;
     el.innerHTML = LIKERT_QS.map((q, qi) => `
-      <div style="display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid #F8FAFC">
+      <div class="likert-question-row" style="display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid #F8FAFC">
         <div style="flex:1;min-width:0">
           <p style="font-size:13px;color:#1E293B;margin:0 0 2px;line-height:1.4">${qi+1}. ${q.en}</p>
           <p style="font-size:11px;color:#94A3B8;margin:0;font-style:italic">${q.ms}</p>
         </div>
-        <div style="display:flex;gap:4px;flex-shrink:0" id="likert-row-${qi}">
+        <div class="likert-btns-wrap" style="display:flex;gap:4px;flex-shrink:0" id="likert-row-${qi}">
           ${[1,2,3,4,5].map(n => `<button class="likert-btn" data-q="${qi}" data-v="${n}" onclick="selectLikert(${qi},${n})">${n}</button>`).join('')}
         </div>
       </div>
