@@ -80,7 +80,7 @@
 <div id="__trainhub_config__" style="display:none" data-config="<?!= encodeURIComponent(JSON.stringify({ page: currentPage || '', appUrl: (typeof appUrl !== 'undefined' && appUrl) ? appUrl : '', sessionParam: typeof sessionParam !== 'undefined' ? sessionParam : '', queryParams: (typeof queryParams !== 'undefined' && queryParams) ? JSON.parse(queryParams) : {}, publicPortalUrl: (typeof publicPortalUrl !== 'undefined' && publicPortalUrl) ? publicPortalUrl : '', companyLogoUrl: (typeof companyLogoUrl !== 'undefined' && companyLogoUrl) ? companyLogoUrl : '', currentUser: (typeof currentUserJson !== 'undefined' && currentUserJson) ? JSON.parse(currentUserJson) : {} })) ?>"></div>
 
 <!-- Participant Check-In Container (Shown when QR code scanned with session param) -->
-<div id="participant-checkin-view" style="display:none; min-height: 100vh; background: #F8FAFC; padding: 20px;">
+<div id="participant-checkin-view" style="display:none; min-height: 100vh; background: #F8FAFC; padding: 20px; box-sizing: border-box; width: 100%; max-width: 100%;">
   <div class="qr-checkin-card">
     <div class="checkin-header">
       <span class="session-badge" id="p-session-badge">Session Attendance</span>
@@ -145,7 +145,7 @@
 </div>
 
 <!-- Admin Attendance Management View -->
-<div id="admin-attendance-view" class="app-shell">
+<div id="admin-attendance-view" class="app-shell" style="display:flex">
   <!-- Sidebar -->
   <?!= include('sidebar') ?>
 
@@ -268,7 +268,7 @@
         initDeptFilter();
 
         document.getElementById('participant-checkin-view').style.display = 'none';
-        document.getElementById('admin-attendance-view').style.display = 'block';
+        document.getElementById('admin-attendance-view').style.display = 'flex';
 
         const trainings = Array.isArray(trainingsRes) ? trainingsRes : [];
         const sel = document.getElementById('sel-training');
@@ -720,16 +720,16 @@
       const sessionHeader = `${s.SessionName || 'Session'} — ${dStr} (${tStr})`;
       const isOpen = Boolean(autoOpenSessionId && String(s.SessionID).trim() === String(autoOpenSessionId).trim());
       return `
-      <div style="border:1px solid #E2E8F0;border-radius:10px;overflow:hidden;background:#fff;margin-bottom:12px">
+      <div style="border:1px solid #E2E8F0;border-radius:10px;overflow:hidden;background:#fff;margin-bottom:12px;width:100%;max-width:100%;box-sizing:border-box">
         <div style="padding:12px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;background:#F8FAFC;border-bottom:1px solid #E2E8F0"
              onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none'">
           <div style="width:38px;height:38px;border-radius:99px;background:#EFF6FF;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0">
             <span style="font-size:8px;font-weight:700;color:#2563EB;text-transform:uppercase">SES</span>
             <span style="font-size:11px;font-weight:800;color:#2563EB;line-height:1">${s.SessionID || '-'}</span>
           </div>
-          <div style="flex:1">
+          <div style="flex:1;min-width:0">
             <div style="display:flex;align-items:center;gap:12px;margin-bottom:5px;flex-wrap:wrap">
-              <span style="font-size:14px;font-weight:700;color:#1E293B">${sessionHeader}</span>
+              <span style="font-size:14px;font-weight:700;color:#1E293B;word-break:break-word">${sessionHeader}</span>
               <span style="font-size:12px;font-weight:700;color:${pct>=90?'#22C55E':pct>=70?'#F59E0B':'#EF4444'}">
                 ${g.presentCount}/${g.totalRecords} Present
               </span>
@@ -737,9 +737,9 @@
             </div>
             ${progressBar(pct, pct>=90?'#22C55E':pct>=70?'#F59E0B':'#EF4444', 5)}
           </div>
-          <span class="icon" style="color:#94A3B8">expand_more</span>
+          <span class="icon" style="color:#94A3B8;flex-shrink:0">expand_more</span>
         </div>
-        <div style="${isOpen ? 'display:block' : 'display:none'};overflow-x:auto">
+        <div class="table-responsive" style="${isOpen ? 'display:block' : 'display:none'};overflow-x:auto;width:100%;max-width:100%">
           <table class="table-th">
             <thead><tr><th>Emp ID</th><th>Name</th><th>Dept</th><th>Scan / Check-In Time</th><th>Status</th><th>Remarks</th><th>Actions</th></tr></thead>
             <tbody>

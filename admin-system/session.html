@@ -160,12 +160,12 @@
         <input id="s-date" class="input-th" type="date">
       </div>
       <div class="col-md-3">
-        <label for="s-start-time" class="label-th">Start Time</label>
-        <input id="s-start-time" class="input-th" type="time">
+        <label for="s-start-time" class="label-th">Start Time <span class="required">*</span></label>
+        <input id="s-start-time" class="input-th" type="time" required>
       </div>
       <div class="col-md-3">
-        <label for="s-end-time" class="label-th">End Time</label>
-        <input id="s-end-time" class="input-th" type="time">
+        <label for="s-end-time" class="label-th">End Time <span class="required">*</span></label>
+        <input id="s-end-time" class="input-th" type="time" required>
       </div>
       <div class="col-12">
         <label for="s-status" class="label-th">QR Status <span class="required">*</span></label>
@@ -306,18 +306,47 @@
 
   function toInputTimeStr(val) {
     if (!val) return '';
-    const str = String(val).replace(/GMT.*$/, '').replace(/\(.*\)$/, '').trim();
-    const match = str.match(/^(\d{1,2}):(\d{2})/);
-    if (match && !str.includes('1899') && !str.includes('Singapore') && !str.includes('Standard')) {
-      return `${match[1].padStart(2, '0')}:${match[2]}`;
+    if (val instanceof Date) {
+      if (!isNaN(val.getTime())) {
+        return `${String(val.getHours()).padStart(2, '0')}:${String(val.getMinutes()).padStart(2, '0')}`;
+      }
+      return '';
     }
+    const str = String(val).trim();
+    if (!str) return '';
+
+    // Handle 12-hour format with AM/PM (e.g., "09:00 AM", "2:30 PM", "02:30 pm")
+    const ampmMatch = str.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])/);
+    if (ampmMatch) {
+      let h = parseInt(ampmMatch[1], 10);
+      const m = ampmMatch[2];
+      const isPm = ampmMatch[3].toUpperCase() === 'PM';
+      if (isPm && h < 12) h += 12;
+      if (!isPm && h === 12) h = 0;
+      return `${String(h).padStart(2, '0')}:${m}`;
+    }
+
+    // Handle 24-hour format (e.g., "09:00", "14:30", "14:30:00")
+    const match24 = str.match(/^(\d{1,2}):(\d{2})/);
+    if (match24 && !str.includes('1899') && !str.includes('GMT') && !str.includes('Singapore') && !str.includes('Standard')) {
+      return `${match24[1].padStart(2, '0')}:${match24[2]}`;
+    }
+
+    // Handle Date-parsable strings (e.g. "Sat Dec 30 1899 09:00:00 GMT+0730")
+    const cleanedStr = str.replace(/GMT.*$/, '').replace(/\(.*\)$/, '').trim();
     const d = new Date(str);
     if (!isNaN(d.getTime())) {
       return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
     }
+    const dCleaned = new Date(cleanedStr);
+    if (!isNaN(dCleaned.getTime())) {
+      return `${String(dCleaned.getHours()).padStart(2, '0')}:${String(dCleaned.getMinutes()).padStart(2, '0')}`;
+    }
+
     const simpleMatch = str.match(/(\d{2}):(\d{2})/);
     if (simpleMatch) return `${simpleMatch[1]}:${simpleMatch[2]}`;
-    return '';
+
+    return str;
   }
 
   function findParentTraining(trainingIdOrCode) {
@@ -442,11 +471,8 @@
               <div style="font-size:11px;color:#7F1D1D;margin-top:2px">Scans for this session are rejected.</div>
             </div>
 
-            <div style="margin-top:auto;display:flex;gap:6px">
-              <button class="btn-th btn-secondary btn-sm" style="flex:1" onclick="navTo('attendance', {session:'${s.SessionID}'})">
-                <span class="icon sm">visibility</span>View Logs
-              </button>
-              <button class="btn-th btn-primary btn-sm" style="flex:1" onclick="openEditSessionModal('${s.SessionID}')" title="Reactivate or Edit">
+            <div style="margin-top:auto">
+              <button class="btn-th btn-primary btn-sm" style="width:100%" onclick="openEditSessionModal('${s.SessionID}')" title="Reactivate or Edit">
                 <span class="icon sm">edit</span>Edit / Reactivate
               </button>
             </div>
@@ -561,8 +587,8 @@
 
     document.getElementById('s-date').value = defaultStartDate;
     document.getElementById('s-name').value = '';
-    document.getElementById('s-start-time').value = '09:00';
-    document.getElementById('s-end-time').value = '16:00';
+    document.getElementById('s-start-time').value = '';
+    document.getElementById('s-end-time').value = '';
     document.getElementById('s-status').value = 'Active';
     document.getElementById('btn-save-session').innerHTML = '<span class="icon sm">save</span>Save Session';
     openModal('modal-session');
@@ -603,7 +629,8 @@
 
     document.getElementById('s-name').value = s.SessionName || '';
     document.getElementById('s-date').value = toInputDateStr(s.SessionDate);
-    document.getElementById('s-start-time').value = toInputTimeStr(s.StartTime) || '09:00';
+    document.getElementById('s-start-time').value = toInputTimeStr(s.StartTime) || String(s.StartTime || '').trim();
+    document.getElementById('s-end-time').value = toInputTimeStr(s.EndTime) || String(s.EndTime || '').trim();
     const curStatusLower = String(s.QRStatus || 'Active').trim().toLowerCase();
     document.getElementById('s-status').value = (curStatusLower === 'deactivate' || curStatusLower === 'deactivated' || curStatusLower === 'inactive' || curStatusLower === 'expired') ? 'Deactivate' : 'Active';
 
@@ -626,22 +653,26 @@
     if (!trainingId && !isEditing) { showToast('Please select a Training Programme.', 'error'); return; }
     if (!sessionName) { showToast('Please enter a Session Name.', 'error'); return; }
     if (!sessionDate) { showToast('Please select a Session Date.', 'error'); return; }
+    if (!startTime) { showToast('Please enter a Session Start Time.', 'error'); return; }
+    if (!endTime) { showToast('Please enter a Session End Time.', 'error'); return; }
 
     // Validate max 7 hours per day duration
-    const startMatch = (startTime || '09:00').match(/(\d{1,2}):(\d{2})/);
-    const endMatch = (endTime || '16:00').match(/(\d{1,2}):(\d{2})/);
-    if (startMatch && endMatch) {
-      const startMins = parseInt(startMatch[1], 10) * 60 + parseInt(startMatch[2], 10);
-      const endMins = parseInt(endMatch[1], 10) * 60 + parseInt(endMatch[2], 10);
-      const diffHours = (endMins - startMins) / 60;
-      if (diffHours <= 0) {
-        showToast('End Time must be later than Start Time.', 'error');
-        return;
-      }
-      if (diffHours > 7.001) {
-        showToast('Training duration cannot exceed 7 hours per day.', 'error');
-        return;
-      }
+    const startMatch = startTime.match(/(\d{1,2}):(\d{2})/);
+    const endMatch = endTime.match(/(\d{1,2}):(\d{2})/);
+    if (!startMatch || !endMatch) {
+      showToast('Please enter valid Start Time and End Time in HH:MM format.', 'error');
+      return;
+    }
+    const startMins = parseInt(startMatch[1], 10) * 60 + parseInt(startMatch[2], 10);
+    const endMins = parseInt(endMatch[1], 10) * 60 + parseInt(endMatch[2], 10);
+    const diffHours = (endMins - startMins) / 60;
+    if (diffHours <= 0) {
+      showToast('End Time must be later than Start Time.', 'error');
+      return;
+    }
+    if (diffHours > 7.001) {
+      showToast('Training duration cannot exceed 7 hours per day.', 'error');
+      return;
     }
 
     if (!isEditing) {
