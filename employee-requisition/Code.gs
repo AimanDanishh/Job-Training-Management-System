@@ -222,12 +222,19 @@ function getEmployeeSubmittedRequests(employeeId) {
       const dbPax = parseInt(r.Participants || r.TotalPax || r['Total Pax'] || r['TotalPax'] || r['Total Participants'] || r['TotalParticipant'] || 0, 10) || 0;
       const totalPaxVal = Math.max(dbPax, reqParticipants.length);
 
+      const resolvedTrainers = parseTrainersData(r.Trainers, r.Trainer);
+      const resolvedAttachments = parseAttachmentsData(r.Attachments, r.BrochureURL || r.BrochureUrl);
+      const trainerDisplayStr = resolvedTrainers.join(', ') || String(r.Trainer || 'TBD').trim();
+      const primaryBrochureUrl = resolvedAttachments.length > 0 ? resolvedAttachments[0].url : String(r.BrochureURL || r.BrochureUrl || '').trim();
+
       return {
         ID: tId,
         Code: tCode,
         Name: String(r.Name || r.TrainingName || '').trim(),
         Category: String(r.Category || 'General').trim(),
-        Trainer: String(r.Trainer || 'TBD').trim(),
+        trainers: resolvedTrainers,
+        Trainers: JSON.stringify(resolvedTrainers),
+        Trainer: trainerDisplayStr,
         TrainingProvider: String(r.TrainingProvider || r.Provider || r.Vendor || '').trim(),
         Venue: String(r.Venue || 'TBD').trim(),
         StartDate: String(r.StartDate || '').trim(),
@@ -243,7 +250,9 @@ function getEmployeeSubmittedRequests(employeeId) {
         ApprovalRemarks: String(r.ApprovalRemarks || '').trim(),
         ApprovedBy: String(r.ApprovedBy || '').trim(),
         RequestedDate: String(r.RequestedDate || r.CreatedDate || '').trim(),
-        BrochureURL: String(r.BrochureURL || r.BrochureUrl || '').trim(),
+        attachments: resolvedAttachments,
+        Attachments: JSON.stringify(resolvedAttachments),
+        BrochureURL: primaryBrochureUrl,
         RequisitionFormFileID: String(r.RequisitionFormFileID || '').trim(),
         FolderID: String(r.FolderID || '').trim(),
         Participants: totalPaxVal,
@@ -482,6 +491,10 @@ function submitEmployeeRequisition(data) {
       date: getFormattedCurrentDate()
     };
 
+    // Normalize multiple trainers
+    const trainersList = parseTrainersData(data.trainers, data.Trainer);
+    const trainerStr = trainersList.join(', ') || 'TBD';
+
     if (!reqForm.fileId) {
       try {
         reqForm = createTrainingRequisitionForm(code, {
@@ -492,7 +505,9 @@ function submitEmployeeRequisition(data) {
           Duration: data.Duration || 1,
           TotalHours: data.TotalHours || 8,
           Venue: data.Venue,
-          Trainer: data.Trainer,
+          Trainer: trainerStr,
+          trainers: trainersList,
+          Trainers: JSON.stringify(trainersList),
           TrainingProvider: data.TrainingProvider,
           Objectives: objectivesVal,
           ParticipantList: participantsList
@@ -517,8 +532,11 @@ function submitEmployeeRequisition(data) {
         setTemplateValue('C7:E7', `${data.Duration || 1} day(s) (${data.TotalHours || 8} hours)`);
         shForm.getRange('F7').setValue('Venue:');
         setTemplateValue('G7:I7', data.Venue || '');
+
+        const prov = data.TrainingProvider || data.Provider || '';
+        const providerAndTrainer = (prov && trainerStr && trainerStr !== 'TBD') ? `${prov} (Trainer: ${trainerStr})` : (prov || trainerStr || '');
         shForm.getRange('A8').setValue('Training Provider:');
-        setTemplateValue('C8:I8', data.TrainingProvider || data.Provider || data.Trainer || '');
+        setTemplateValue('C8:I8', providerAndTrainer);
         shForm.getRange('A10').setValue('Reasons for Training:');
         setTemplateValue('A11:I12', objectivesVal || '');
 
@@ -538,31 +556,73 @@ function submitEmployeeRequisition(data) {
       }
     }
 
-    // Handle Brochure / Attachment File upload
-    let brochureUrl = data.BrochureUrl || '';
-    if (isEditing && !brochureUrl) {
-      brochureUrl = String(getValFromRow(targetRow, 'BrochureURL') || '');
+    // Handle Attachments / Supporting Documents upload
+    let attachmentsList = [];
+    if (Array.isArray(data.existingAttachments)) {
+      attachmentsList = parseAttachmentsData(data.existingAttachments);
+    } else if (Array.isArray(data.attachments)) {
+      attachmentsList = parseAttachmentsData(data.attachments);
+    } else if (isEditing) {
+      const existingAttJson = getValFromRow(targetRow, 'Attachments');
+      const existingBrochureUrl = getValFromRow(targetRow, 'BrochureURL');
+      attachmentsList = parseAttachmentsData(existingAttJson, existingBrochureUrl);
     }
-    if (data.BrochureFile && data.BrochureFile.data) {
-      try {
-        const fileBlob = Utilities.newBlob(
-          Utilities.base64Decode(data.BrochureFile.data),
-          data.BrochureFile.mimeType || 'application/octet-stream',
-          data.BrochureFile.name || `${code}_brochure`
-        );
-        let targetFolder = null;
-        if (workspace.folderId) {
-          try { targetFolder = DriveApp.getFolderById(workspace.folderId); } catch(fldErr) {}
+
+    const newFiles = Array.isArray(data.attachmentFiles) ? data.attachmentFiles : (data.BrochureFile && data.BrochureFile.data ? [data.BrochureFile] : []);
+    const uploadErrors = [];
+
+    if (newFiles.length > 0) {
+      let targetFolder = null;
+      if (workspace && workspace.folderId) {
+        try {
+          const mainFolder = DriveApp.getFolderById(workspace.folderId);
+          const bIter = mainFolder.getFoldersByName('Brochure');
+          targetFolder = bIter.hasNext() ? bIter.next() : mainFolder.createFolder('Brochure');
+        } catch(fldErr) {
+          Logger.log('Error opening Brochure subfolder: ' + fldErr.message);
         }
-        if (!targetFolder) {
-          targetFolder = getSystemRootFolder();
-        }
-        const driveFile = targetFolder.createFile(fileBlob);
-        driveFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-        brochureUrl = driveFile.getUrl();
-      } catch(fErr) {
-        Logger.log('Brochure file upload error: ' + fErr.message);
       }
+      if (!targetFolder && workspace && workspace.folderId) {
+        try { targetFolder = DriveApp.getFolderById(workspace.folderId); } catch(e) {}
+      }
+      if (!targetFolder) {
+        targetFolder = getSystemRootFolder();
+      }
+
+      for (let i = 0; i < newFiles.length; i++) {
+        const f = newFiles[i];
+        if (!f || !f.data) continue;
+        try {
+          const fileBlob = Utilities.newBlob(
+            Utilities.base64Decode(f.data),
+            f.mimeType || 'application/octet-stream',
+            f.name || `${code}_attachment_${i + 1}`
+          );
+          const driveFile = targetFolder.createFile(fileBlob);
+          driveFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+          attachmentsList.push({
+            name: f.name || `${code}_attachment_${i + 1}`,
+            url: driveFile.getUrl(),
+            fileId: driveFile.getId(),
+            mimeType: f.mimeType || 'application/octet-stream',
+            size: f.size || 0
+          });
+        } catch(fErr) {
+          Logger.log(`Attachment upload error (${f.name}): ` + fErr.message);
+          uploadErrors.push({ name: f.name || `File ${i + 1}`, error: fErr.message });
+        }
+      }
+    }
+
+    if (uploadErrors.length > 0 && attachmentsList.length === 0 && newFiles.length > 0) {
+      return err(`Failed to upload attachment(s): ${uploadErrors.map(e => e.name + ' (' + e.error + ')').join(', ')}`);
+    }
+
+    let brochureUrl = data.BrochureUrl || '';
+    if (attachmentsList.length > 0) {
+      brochureUrl = attachmentsList[0].url;
+    } else if (isEditing && !brochureUrl) {
+      brochureUrl = String(getValFromRow(targetRow, 'BrochureURL') || '');
     }
 
     let activeRowIndex = -1;
@@ -574,7 +634,7 @@ function submitEmployeeRequisition(data) {
         code,                              // Col 2 (B): Code
         data.TrainingName,                 // Col 3 (C): Name
         data.Category || 'General',        // Col 4 (D): Category
-        data.Trainer || 'TBD',             // Col 5 (E): Trainer
+        trainerStr || 'TBD',               // Col 5 (E): Trainer
         data.Venue || 'TBD',               // Col 6 (F): Venue
         data.StartDate,                    // Col 7 (G): StartDate
         data.EndDate || data.StartDate,    // Col 8 (H): EndDate
@@ -611,7 +671,8 @@ function submitEmployeeRequisition(data) {
     setCol('Category', data.Category || 'General');
     setCol('TrainingMode', data.TrainingType || data.TrainingMode || 'In-House Training');
     setCol('TnaSource', data.TnaSource || 'Training Requisition Form');
-    setCol('Trainer', data.Trainer || 'TBD');
+    setCol('Trainer', trainerStr || 'TBD');
+    setCol('Trainers', JSON.stringify(trainersList));
     setCol('TrainingProvider', data.TrainingProvider || data.Provider || '');
     setCol('Venue', data.Venue || 'TBD');
     setCol('StartDate', data.StartDate);
@@ -650,6 +711,7 @@ function submitEmployeeRequisition(data) {
     setCol('PostSheetID', workspace.postSheetId || '');
     setCol('RequisitionFormFileID', reqForm.fileId || '');
     setCol('BrochureURL', brochureUrl);
+    setCol('Attachments', JSON.stringify(attachmentsList));
     setCol('ParticipantList', JSON.stringify(participantsList));
 
     SpreadsheetApp.flush();
@@ -726,17 +788,24 @@ function submitEmployeeRequisition(data) {
       else if (currentApprovalStatus === 'Approved') recipientEmail = 'arina.ismail@apollofood.com.my';
 
       const subject = `Training Requisition — ${data.TrainingName} | ${id}`;
+      const trainersText = (trainersList && trainersList.length > 0) ? `Trainer(s): ${trainersList.join(', ')}\n` : '';
+      const attachmentsText = (attachmentsList && attachmentsList.length > 0)
+        ? `Supporting Document(s):\n${attachmentsList.map(a => `  - ${a.name || 'Document'}: ${a.url}`).join('\n')}\n`
+        : (brochureUrl ? `Brochure Attachment/Link: ${brochureUrl}\n` : '');
+
       const body = isAdminNotification
         ? `Dear Arina,\n\nThe following Training Requisition (AP-HRD-F01-01) has been approved via auto-bypass:\n\n` +
           `Requester: ${emp.Name || data.EmployeeID} (${emp.Department || 'N/A'})\n` +
           `Employee ID: ${emp.ID || data.EmployeeID}\n` +
           `Training Name: ${data.TrainingName} (${id})\n` +
           `Category: ${data.Category || 'General'}\n` +
+          (data.Provider ? `Provider: ${data.Provider}\n` : '') +
+          trainersText +
           `Proposed Date: ${data.StartDate} to ${data.EndDate || data.StartDate}\n` +
           `Duration: ${data.Duration || 1} days (${data.TotalHours || 8} hrs)\n` +
           `Estimated Fee: RM ${data.CourseFee || '0.00'}\n` +
           `Current Status: ${currentApprovalStatus}\n` +
-          (brochureUrl ? `Brochure Attachment/Link: ${brochureUrl}\n` : '') +
+          attachmentsText +
           (adminDeepLink ? `\nView Training Request in Admin Portal:\n${adminDeepLink}\n\n` : `\nPlease access the Admin Portal directly.\n\n`) +
           `Thank you,\nTrainHub Training Management System`
         : `Dear Approver / Manager,\n\nA Training Requisition Form (AP-HRD-F01-01) has been ${isEditing ? 'RESUBMITTED following updates by the employee' : 'submitted'}:\n\n` +
@@ -745,11 +814,13 @@ function submitEmployeeRequisition(data) {
           `Assigned HOD: ${hodName || 'N/A'} (${hodEmail || recipientEmail || 'N/A'})\n` +
           `Training Name: ${data.TrainingName}\n` +
           `Category: ${data.Category || 'General'}\n` +
+          (data.Provider ? `Provider: ${data.Provider}\n` : '') +
+          trainersText +
           `Proposed Date: ${data.StartDate} to ${data.EndDate || data.StartDate}\n` +
           `Duration: ${data.Duration || 1} days (${data.TotalHours || 8} hrs)\n` +
           `Estimated Fee: RM ${data.CourseFee || '0.00'}\n` +
           `Current Status: ${currentApprovalStatus}\n` +
-          (brochureUrl ? `Brochure Attachment/Link: ${brochureUrl}\n` : '') +
+          attachmentsText +
           `\nPlease review the request details:\n${reviewUrl}\n\n` +
           `Thank you,\nTrainHub Training Management System`;
 
@@ -764,6 +835,9 @@ function submitEmployeeRequisition(data) {
         employeeId: emp.ID || data.EmployeeID,
         department: emp.Department || data.Department || 'N/A',
         category: data.Category || 'General',
+        provider: data.Provider || '',
+        trainers: trainersList,
+        attachments: attachmentsList,
         proposedDate: proposedDateStr,
         duration: formatDurationForEmail(data.Duration || 1, data.TotalHours || 8),
         estimatedFee: formatFeeForEmail(data.CourseFee),

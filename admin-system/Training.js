@@ -41,6 +41,7 @@ function getTrainingById(id) {
       String(r.Code || '').trim().toLowerCase() === cleanId
     );
     if (!t) return err('Training not found.');
+    enrichTrainingWithUrls(t);
     return ok(t);
   } catch (e) {
     return err(e.message);
@@ -370,11 +371,74 @@ function addTraining(data) {
 
     const participantsList = Array.isArray(data.ParticipantList) ? data.ParticipantList : (Array.isArray(data.participants) ? data.participants : []);
 
-    // Handle Brochure Upload if provided
+    // Parse Trainers List
+    let trainersList = [];
+    if (Array.isArray(data.Trainers) && data.Trainers.length > 0) {
+      trainersList = data.Trainers.map(t => String(t || '').trim()).filter(Boolean);
+    } else if (Array.isArray(data.trainers) && data.trainers.length > 0) {
+      trainersList = data.trainers.map(t => String(t || '').trim()).filter(Boolean);
+    } else if (typeof data.Trainers === 'string' && data.Trainers.trim().startsWith('[')) {
+      try { trainersList = JSON.parse(data.Trainers).map(t => String(t || '').trim()).filter(Boolean); } catch(e) {}
+    } else if (data.Trainer) {
+      trainersList = String(data.Trainer).split(',').map(s => s.trim()).filter(Boolean);
+    }
+
+    // Parse & Upload Multiple Attachments
+    let attachmentsList = [];
+    if (Array.isArray(data.existingAttachments)) {
+      attachmentsList = data.existingAttachments;
+    } else if (Array.isArray(data.Attachments)) {
+      attachmentsList = data.Attachments;
+    }
+
+    const newFilesToUpload = [];
+    if (Array.isArray(data.attachmentFiles) && data.attachmentFiles.length > 0) {
+      newFilesToUpload.push(...data.attachmentFiles);
+    } else if (data.BrochureFile && data.BrochureFile.data) {
+      newFilesToUpload.push(data.BrochureFile);
+    }
+
+    if (newFilesToUpload.length > 0 && workspace.folderId) {
+      let brochureFolder = null;
+      try {
+        const mainFolder = DriveApp.getFolderById(workspace.folderId);
+        const bIter = mainFolder.getFoldersByName('Brochure');
+        brochureFolder = bIter.hasNext() ? bIter.next() : mainFolder.createFolder('Brochure');
+      } catch(fldErr) {
+        Logger.log('Error opening Brochure subfolder: ' + fldErr.message);
+      }
+      if (!brochureFolder) {
+        try { brochureFolder = DriveApp.getFolderById(workspace.folderId); } catch(e) {}
+      }
+
+      newFilesToUpload.forEach((fileObj, idx) => {
+        if (fileObj && fileObj.data) {
+          try {
+            const fileName = fileObj.name || `${code}_attachment_${idx + 1}`;
+            const fileBlob = Utilities.newBlob(
+              Utilities.base64Decode(fileObj.data),
+              fileObj.mimeType || 'application/octet-stream',
+              fileName
+            );
+            const driveFile = (brochureFolder || DriveApp.getRootFolder()).createFile(fileBlob);
+            driveFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+            attachmentsList.push({
+              name: fileName,
+              url: driveFile.getUrl(),
+              fileId: driveFile.getId(),
+              mimeType: fileObj.mimeType || 'application/octet-stream',
+              size: fileBlob.getBytes().length
+            });
+          } catch(upErr) {
+            Logger.log('Attachment upload error: ' + upErr.message);
+          }
+        }
+      });
+    }
+
     let brochureUrl = data.BrochureURL || data.RequisitionUrl || '';
-    if (data.BrochureFile && data.BrochureFile.data) {
-      const uploadedUrl = saveBrochureFile(workspace.folderId, code, data.BrochureFile);
-      if (uploadedUrl) brochureUrl = uploadedUrl;
+    if (attachmentsList.length > 0) {
+      brochureUrl = attachmentsList[0].url;
     }
 
     const headers = ensureTrainingSheetColumns(sheet);
@@ -387,7 +451,8 @@ function addTraining(data) {
     rowObj['Category'] = data.Category || 'General';
     rowObj['TrainingMode'] = data.TrainingMode || data.Mode || '';
     rowObj['TnaSource'] = data.TnaSource || '';
-    rowObj['Trainer'] = data.Trainer || '';
+    rowObj['Trainer'] = trainersList.join(', ') || data.Trainer || '';
+    rowObj['Trainers'] = JSON.stringify(trainersList);
     rowObj['Venue'] = data.Venue || '';
     rowObj['TrainingProvider'] = data.TrainingProvider || data.Vendor || '';
     rowObj['StartDate'] = data.StartDate || '';
@@ -411,6 +476,7 @@ function addTraining(data) {
     rowObj['UpdatedDate'] = timeNow;
     rowObj['CourseFee'] = (data.CourseFee !== undefined && data.CourseFee !== null && data.CourseFee !== '') ? String(data.CourseFee) : '0.00';
     rowObj['BrochureURL'] = brochureUrl;
+    rowObj['Attachments'] = JSON.stringify(attachmentsList);
     rowObj['ExpiryDate'] = data.ExpiryDate || data.CertExpiryDate || '';
     rowObj['CertExpiryDate'] = data.ExpiryDate || data.CertExpiryDate || '';
     rowObj['ApprovalStatus'] = data.ApprovalStatus || 'Approved';
@@ -485,7 +551,20 @@ function updateTraining(data) {
     if (data.Category !== undefined) rowObj['Category'] = data.Category;
     if (data.TrainingMode !== undefined) rowObj['TrainingMode'] = data.TrainingMode;
     if (data.TnaSource !== undefined) rowObj['TnaSource'] = data.TnaSource;
-    if (data.Trainer !== undefined) rowObj['Trainer'] = data.Trainer;
+    if (data.Trainers !== undefined || data.trainers !== undefined || data.Trainer !== undefined) {
+      let trainersList = [];
+      if (Array.isArray(data.Trainers) && data.Trainers.length > 0) {
+        trainersList = data.Trainers.map(t => String(t || '').trim()).filter(Boolean);
+      } else if (Array.isArray(data.trainers) && data.trainers.length > 0) {
+        trainersList = data.trainers.map(t => String(t || '').trim()).filter(Boolean);
+      } else if (typeof data.Trainers === 'string' && data.Trainers.trim().startsWith('[')) {
+        try { trainersList = JSON.parse(data.Trainers).map(t => String(t || '').trim()).filter(Boolean); } catch(e) {}
+      } else if (data.Trainer) {
+        trainersList = String(data.Trainer).split(',').map(s => s.trim()).filter(Boolean);
+      }
+      rowObj['Trainer'] = trainersList.join(', ');
+      rowObj['Trainers'] = JSON.stringify(trainersList);
+    }
     if (data.Venue !== undefined) rowObj['Venue'] = data.Venue;
     if (data.TrainingProvider !== undefined) rowObj['TrainingProvider'] = data.TrainingProvider;
 
@@ -507,11 +586,69 @@ function updateTraining(data) {
       rowObj['CertExpiryDate'] = expVal;
     }
 
-    // Handle Brochure Upload or link update
-    if (data.BrochureFile && data.BrochureFile.data) {
-      const uploadedUrl = saveBrochureFile(rowObj['FolderID'], rowObj['Code'] || data.ID, data.BrochureFile);
-      if (uploadedUrl) {
-        rowObj['BrochureURL'] = uploadedUrl;
+    // Handle Multiple Attachments & Brochure Upload or link update
+    let existingAtts = [];
+    if (Array.isArray(data.existingAttachments)) {
+      existingAtts = data.existingAttachments;
+    } else if (data.Attachments !== undefined && Array.isArray(data.Attachments)) {
+      existingAtts = data.Attachments;
+    } else if (data.Attachments !== undefined && typeof data.Attachments === 'string' && data.Attachments.trim().startsWith('[')) {
+      try { existingAtts = JSON.parse(data.Attachments); } catch(e) {}
+    } else {
+      existingAtts = parseAttachmentsData(rowObj['Attachments'], rowObj['BrochureURL']);
+    }
+
+    const newFilesToUpload = [];
+    if (Array.isArray(data.attachmentFiles) && data.attachmentFiles.length > 0) {
+      newFilesToUpload.push(...data.attachmentFiles);
+    } else if (data.BrochureFile && data.BrochureFile.data) {
+      newFilesToUpload.push(data.BrochureFile);
+    }
+
+    if (newFilesToUpload.length > 0 && rowObj['FolderID']) {
+      let brochureFolder = null;
+      try {
+        const mainFolder = DriveApp.getFolderById(rowObj['FolderID']);
+        const bIter = mainFolder.getFoldersByName('Brochure');
+        brochureFolder = bIter.hasNext() ? bIter.next() : mainFolder.createFolder('Brochure');
+      } catch(fldErr) {
+        Logger.log('Error opening Brochure subfolder: ' + fldErr.message);
+      }
+      if (!brochureFolder) {
+        try { brochureFolder = DriveApp.getFolderById(rowObj['FolderID']); } catch(e) {}
+      }
+
+      newFilesToUpload.forEach((fileObj, idx) => {
+        if (fileObj && fileObj.data) {
+          try {
+            const fileName = fileObj.name || `${rowObj['Code'] || data.ID}_attachment_${existingAtts.length + idx + 1}`;
+            const fileBlob = Utilities.newBlob(
+              Utilities.base64Decode(fileObj.data),
+              fileObj.mimeType || 'application/octet-stream',
+              fileName
+            );
+            const driveFile = (brochureFolder || DriveApp.getRootFolder()).createFile(fileBlob);
+            driveFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+            existingAtts.push({
+              name: fileName,
+              url: driveFile.getUrl(),
+              fileId: driveFile.getId(),
+              mimeType: fileObj.mimeType || 'application/octet-stream',
+              size: fileBlob.getBytes().length
+            });
+          } catch(upErr) {
+            Logger.log('Attachment upload error: ' + upErr.message);
+          }
+        }
+      });
+    }
+
+    if (data.existingAttachments !== undefined || newFilesToUpload.length > 0 || data.Attachments !== undefined) {
+      rowObj['Attachments'] = JSON.stringify(existingAtts);
+      if (existingAtts.length > 0) {
+        rowObj['BrochureURL'] = existingAtts[0].url;
+      } else if (!data.BrochureURL) {
+        rowObj['BrochureURL'] = '';
       }
     } else if (data.BrochureURL !== undefined && data.BrochureURL !== null) {
       rowObj['BrochureURL'] = String(data.BrochureURL).trim();
@@ -567,7 +704,10 @@ function updateTraining(data) {
         const durHours = rowObj['TotalHours'] ? ` (${rowObj['TotalHours']} hours)` : '';
         setTemplateValue('C7:E7', `${rowObj['Duration'] || 1} day(s)${durHours}`);
         setTemplateValue('G7:I7', rowObj['Venue'] || '');
-        setTemplateValue('C8:I8', rowObj['TrainingProvider'] || rowObj['Trainer'] || '');
+        const pVal = rowObj['TrainingProvider'] || '';
+        const trVal = rowObj['Trainer'] || '';
+        const combVal = (pVal && trVal) ? `${pVal} (Trainer: ${trVal})` : (pVal || trVal || '');
+        setTemplateValue('C8:I8', combVal);
         setTemplateValue('A11:I12', rowObj['Objectives'] || rowObj['Reason'] || '');
       } catch (fSyncErr) {
         Logger.log('Template sync error on updateTraining: ' + fSyncErr.message);

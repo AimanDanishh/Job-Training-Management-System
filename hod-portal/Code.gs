@@ -150,16 +150,22 @@ function getApproverDashboardData() {
       const csSt = String(r.CsuiteStatus || 'N/A').trim();
       const hrSt = String(r.HOHRStatus || 'N/A').trim();
 
+      const trainersList = parseTrainersData(r.Trainers, r.Trainer);
+      const attachmentsList = parseAttachmentsData(r.Attachments, r.BrochureURL || r.BrochureUrl);
+
       const item = {
         ID: getTrainingId(r),
         Code: getTrainingCode(r),
         Name: String(r.Name || r.TrainingName || 'Training Request').trim(),
         Category: String(r.Category || 'General').trim(),
+        Provider: String(r.Provider || '').trim(),
         RequestedBy: formatDisplayName(String(r.RequestedByName || r.RequestedBy || 'Employee Requester').trim()),
         EmployeeID: String(r.RequestedBy || r.EmployeeID || 'N/A').trim(),
         RequestedByEmail: String(r.RequestedByEmail || '').trim(),
         Department: String(r.Department || r.CostCentre || 'N/A').trim(),
-        Trainer: formatDisplayName(String(r.Trainer || 'TBD').trim()),
+        Trainer: trainersList.join(', ') || formatDisplayName(String(r.Trainer || 'TBD').trim()),
+        Trainers: trainersList,
+        trainers: trainersList,
         Venue: String(r.Venue || 'TBD').trim(),
         StartDate: String(r.StartDate || '').trim(),
         EndDate: String(r.EndDate || r.StartDate || '').trim(),
@@ -183,7 +189,9 @@ function getApproverDashboardData() {
         ApprovedBy: formatDisplayName(String(r.ApprovedBy || '').trim()),
         ApprovedAt: String(r.ApprovedAt || '').trim(),
         ApprovedCostCentre: String(r.ApprovedCostCentre || '').trim(),
-        BrochureURL: String(r.BrochureURL || r.BrochureUrl || '').trim()
+        BrochureURL: String(r.BrochureURL || r.BrochureUrl || (attachmentsList[0] ? attachmentsList[0].url : '')).trim(),
+        Attachments: attachmentsList,
+        attachments: attachmentsList
       };
 
       const isAssignedHod = isSameApprover(hodProfile, assignedApprovers.HOD);
@@ -356,8 +364,19 @@ function getRequisitionDetails(trainingId) {
     if (training.RequestedByName) {
       training.RequestedByName = formatDisplayName(training.RequestedByName);
     }
-    if (training.Trainer) {
+    const trainersList = parseTrainersData(training.Trainers, training.Trainer);
+    const attachmentsList = parseAttachmentsData(training.Attachments, training.BrochureURL || training.BrochureUrl);
+    training.trainers = trainersList;
+    training.Trainers = trainersList;
+    if (trainersList.length > 0) {
+      training.Trainer = trainersList.join(', ');
+    } else if (training.Trainer) {
       training.Trainer = formatDisplayName(training.Trainer);
+    }
+    training.attachments = attachmentsList;
+    training.Attachments = attachmentsList;
+    if (!training.BrochureURL && attachmentsList.length > 0) {
+      training.BrochureURL = attachmentsList[0].url;
     }
     if (training.HOD) {
       training.HOD = formatDisplayName(training.HOD);
@@ -654,6 +673,13 @@ function submitHODDecision(data) {
       ) || {};
       const trainingName = currentT.Name || currentT.TrainingTitle || cleanId;
       const trainingCode = currentT.Code || currentT.ID || cleanId;
+      const trainersList = parseTrainersData(currentT.Trainers, currentT.Trainer);
+      const attachmentsList = parseAttachmentsData(currentT.Attachments, currentT.BrochureURL || currentT.BrochureUrl);
+      const providerStr = currentT.Provider || '';
+      const trainersText = (trainersList && trainersList.length > 0) ? `Trainer(s): ${trainersList.join(', ')}\n` : '';
+      const attachmentsText = (attachmentsList && attachmentsList.length > 0)
+        ? `Supporting Document(s):\n${attachmentsList.map(a => `  - ${a.name || 'Document'}: ${a.url}`).join('\n')}\n`
+        : (currentT.BrochureURL ? `Brochure Attachment/Link: ${currentT.BrochureURL}\n` : '');
 
       let requesterEmail = currentT.RequestedByEmail || currentT['Requested By Email'] || currentT.Email || currentT['Email Address'] || currentT.UserEmail || '';
       const requesterId = currentT.RequestedBy || currentT['Requested By'] || currentT.EmployeeID || currentT['Employee ID'] || '';
@@ -728,6 +754,9 @@ function submitHODDecision(data) {
           employeeId: requesterId,
           department: requesterCostCentre,
           category: categoryStr,
+          provider: providerStr,
+          trainers: trainersList,
+          attachments: attachmentsList,
           proposedDate: proposedDateStr,
           duration: durationStr,
           estimatedFee: feeStr,
@@ -756,9 +785,12 @@ function submitHODDecision(data) {
             `Training Name: ${trainingName}\n` +
             `Requester: ${requesterName} (${requesterId})\n` +
             `Requester Department / Cost Centre: ${requesterCostCentre}\n` +
+            (providerStr ? `Provider: ${providerStr}\n` : '') +
+            trainersText +
             `HOD Approved By: ${hodName} (${hodId})\n` +
             `Date Approved: ${timestamp}\n` +
             `HOD Remarks: ${remarks || 'Approved by HOD.'}\n\n` +
+            attachmentsText +
             `Please review and issue your digital approval in the TrainHub HOD Portal:\n${reviewUrl}\n\n` +
             `Thank you,\nTrainHub Training Management System`;
 
@@ -769,6 +801,9 @@ function submitHODDecision(data) {
             employeeId: requesterId,
             department: requesterCostCentre,
             category: categoryStr,
+            provider: providerStr,
+            trainers: trainersList,
+            attachments: attachmentsList,
             proposedDate: proposedDateStr,
             duration: durationStr,
             estimatedFee: feeStr,
@@ -796,8 +831,11 @@ function submitHODDecision(data) {
             `Requester: ${requesterName} (${requesterId})\n` +
             `C-Suite Approver: ${hodName} (${hodId})\n` +
             `Department / Cost Centre: ${hodCostCentre}\n` +
+            (providerStr ? `Provider: ${providerStr}\n` : '') +
+            trainersText +
             `Date Approved: ${timestamp}\n` +
             `Remarks: ${remarks || 'Approved by C-Suite.'}\n\n` +
+            attachmentsText +
             `Please review and issue your digital approval in the TrainHub HOD Portal:\n${reviewUrl}\n\n` +
             `Thank you,\nTrainHub Training Management System`;
 
@@ -808,6 +846,9 @@ function submitHODDecision(data) {
             employeeId: requesterId,
             department: requesterCostCentre,
             category: categoryStr,
+            provider: providerStr,
+            trainers: trainersList,
+            attachments: attachmentsList,
             proposedDate: proposedDateStr,
             duration: durationStr,
             estimatedFee: feeStr,
@@ -843,6 +884,9 @@ function submitHODDecision(data) {
             employeeId: requesterId,
             department: requesterCostCentre,
             category: categoryStr,
+            provider: providerStr,
+            trainers: trainersList,
+            attachments: attachmentsList,
             proposedDate: proposedDateStr,
             duration: durationStr,
             estimatedFee: feeStr,
@@ -869,7 +913,10 @@ function submitHODDecision(data) {
             `Requester: ${requesterName} (${requesterId})\n` +
             `HOHR Approved By: ${hodName} (${hodId})\n` +
             `Cost Centre: ${hodCostCentre}\n` +
+            (providerStr ? `Provider: ${providerStr}\n` : '') +
+            trainersText +
             `Date Approved: ${timestamp}\n\n` +
+            attachmentsText +
             `The Admin System can now proceed with session creation, QR code generation, and participant attendance tracking.\n\n` +
             (adminDeepLink ? `View Training Request in Admin Portal:\n${adminDeepLink}\n\n` : '') +
             `Thank you,\nTrainHub Training Management System`;
@@ -881,6 +928,9 @@ function submitHODDecision(data) {
             employeeId: requesterId,
             department: requesterCostCentre,
             category: categoryStr,
+            provider: providerStr,
+            trainers: trainersList,
+            attachments: attachmentsList,
             proposedDate: proposedDateStr,
             duration: durationStr,
             estimatedFee: feeStr,
@@ -894,7 +944,6 @@ function submitHODDecision(data) {
             introText: `The Training Requisition for "${trainingName}" (${cleanId}) submitted by ${requesterName} (${requesterId}) has received all required approvals (HOD, C-Suite, HOHR) and is ready for session setup.`
           });
 
-          sendOrDraftEmail('arina.ismail@apollofood.com.my', arinaSubject, arinaBody, 'Arina (HR Admin)', emailLog, arinaHtml);
         }
       }
     } catch (mailErr) {

@@ -865,7 +865,11 @@ function buildTrainingRequisitionEmailHtml(params) {
   const estimatedFee = params.estimatedFee || 'RM 0.00';
   const status = params.status || 'Pending HOD Approval';
   const reviewUrl = params.reviewUrl || '';
-  
+
+  const trainersList = parseTrainersData(params.trainers, params.trainer || params.Trainer);
+  const trainerDisplay = trainersList.join(', ');
+  const attachmentsList = parseAttachmentsData(params.attachments, params.brochureUrl || params.BrochureUrl || params.BrochureURL);
+
   const badgeText = params.badgeText || 'ACTION REQUIRED';
   const headlineText = formatDisplayName(params.headlineText || 'Training Requisition Requires Your Review');
   const greetingText = formatDisplayName(params.greetingText || 'Dear Approver / Manager,');
@@ -985,6 +989,20 @@ function buildTrainingRequisitionEmailHtml(params) {
                                                 <td style="color: #667085; font-size: 13px; font-weight: 600; padding: 6px 12px 6px 0; vertical-align: top;">Duration</td>
                                                 <td style="color: #101828; font-size: 14px; font-weight: 500; padding: 6px 0; vertical-align: top;">${duration}</td>
                                             </tr>
+                                            ${trainerDisplay ? `
+                                            <tr>
+                                                <td style="color: #667085; font-size: 13px; font-weight: 600; padding: 6px 12px 6px 0; vertical-align: top;">Trainer(s)</td>
+                                                <td style="color: #101828; font-size: 14px; font-weight: 500; padding: 6px 0; vertical-align: top;">${escapeHtml(trainerDisplay)}</td>
+                                            </tr>
+                                            ` : ''}
+                                            ${attachmentsList.length > 0 ? `
+                                            <tr>
+                                                <td style="color: #667085; font-size: 13px; font-weight: 600; padding: 6px 12px 6px 0; vertical-align: top;">Supporting Document(s)</td>
+                                                <td style="color: #101828; font-size: 14px; font-weight: 500; padding: 6px 0; vertical-align: top;">
+                                                    ${attachmentsList.map(a => `<div style="margin-bottom: 4px;"><a href="${a.url}" target="_blank" style="color: #2563EB; text-decoration: underline; font-weight: 600;">📎 ${escapeHtml(a.name || 'Document')}</a></div>`).join('')}
+                                                </td>
+                                            </tr>
+                                            ` : ''}
                                         </table>
 
                                         <!-- Estimated Training Fee Card -->
@@ -1620,4 +1638,148 @@ function syncTrainingById(trainingId, triggerName, actionName) {
       try { lock.releaseLock(); } catch(rErr) {}
     }
   }
+}
+
+/**
+ * Normalizes multiple trainer inputs or legacy single trainer field into a clean array of strings
+ */
+function parseTrainersData(rawTrainers, rawTrainer) {
+  let list = [];
+  if (rawTrainers) {
+    if (Array.isArray(rawTrainers)) {
+      list = rawTrainers;
+    } else if (typeof rawTrainers === 'string' && rawTrainers.trim()) {
+      try {
+        const parsed = JSON.parse(rawTrainers);
+        if (Array.isArray(parsed)) list = parsed;
+      } catch (e) {
+        list = rawTrainers.split(/[,;\n]+/).map(s => s.trim()).filter(Boolean);
+      }
+    }
+  }
+
+  // Normalize list entries to trimmed strings
+  let normalized = list
+    .map(item => (typeof item === 'object' && item !== null) ? (item.name || item.Name || '') : String(item || ''))
+    .map(s => s.trim())
+    .filter(s => s && s.toLowerCase() !== 'tbd' && s.toLowerCase() !== 'n/a');
+
+  // Fallback to legacy single trainer field if empty
+  if (normalized.length === 0 && rawTrainer) {
+    const single = String(rawTrainer).trim();
+    if (single && single.toLowerCase() !== 'tbd' && single.toLowerCase() !== 'n/a') {
+      try {
+        const parsed = JSON.parse(single);
+        if (Array.isArray(parsed)) {
+          normalized = parsed.map(s => String(s).trim()).filter(Boolean);
+        } else {
+          normalized = [single];
+        }
+      } catch (e) {
+        normalized = [single];
+      }
+    }
+  }
+
+  // Remove duplicate trainer names case-insensitively
+  const seen = new Set();
+  const deduped = [];
+  normalized.forEach(t => {
+    const key = t.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      deduped.push(t);
+    }
+  });
+
+  return deduped;
+}
+
+/**
+ * Normalizes multiple attachments or legacy BrochureURL into an array of attachment objects:
+ * [{ name: string, url: string, fileId: string, mimeType: string, size: number }]
+ */
+function parseAttachmentsData(rawAttachments, rawBrochureUrl) {
+  let list = [];
+  if (rawAttachments) {
+    if (Array.isArray(rawAttachments)) {
+      list = rawAttachments;
+    } else if (typeof rawAttachments === 'string' && rawAttachments.trim()) {
+      try {
+        const parsed = JSON.parse(rawAttachments);
+        if (Array.isArray(parsed)) list = parsed;
+      } catch (e) {}
+    }
+  }
+
+  const normalized = list.map(item => {
+    if (typeof item === 'string' && item.trim()) {
+      const u = item.trim();
+      return {
+        name: extractFileNameFromUrl(u) || 'Supporting Document',
+        url: u,
+        fileId: extractDriveFileId(u) || '',
+        mimeType: 'application/pdf',
+        size: 0
+      };
+    }
+    if (typeof item === 'object' && item !== null && (item.url || item.fileUrl || item.Url)) {
+      const u = String(item.url || item.fileUrl || item.Url).trim();
+      return {
+        name: String(item.name || item.fileName || item.Name || extractFileNameFromUrl(u) || 'Supporting Document').trim(),
+        url: u,
+        fileId: String(item.fileId || item.id || extractDriveFileId(u) || '').trim(),
+        mimeType: String(item.mimeType || 'application/pdf').trim(),
+        size: parseInt(item.size || item.fileSize || 0, 10) || 0
+      };
+    }
+    return null;
+  }).filter(Boolean);
+
+  // Fallback to legacy single brochure URL if empty
+  if (normalized.length === 0 && rawBrochureUrl && String(rawBrochureUrl).trim()) {
+    const u = String(rawBrochureUrl).trim();
+    normalized.push({
+      name: extractFileNameFromUrl(u) || 'Supporting Brochure',
+      url: u,
+      fileId: extractDriveFileId(u) || '',
+      mimeType: 'application/pdf',
+      size: 0
+    });
+  }
+
+  // Deduplicate by URL
+  const seenUrls = new Set();
+  return normalized.filter(a => {
+    if (!a.url || seenUrls.has(a.url.toLowerCase())) return false;
+    seenUrls.add(a.url.toLowerCase());
+    return true;
+  });
+}
+
+function extractDriveFileId(url) {
+  if (!url || typeof url !== 'string') return '';
+  const match = url.match(/[-\w]{25,}/);
+  return match ? match[0] : '';
+}
+
+function extractFileNameFromUrl(url) {
+  if (!url || typeof url !== 'string') return '';
+  try {
+    const cleanUrl = url.split('?')[0].split('#')[0];
+    const segments = cleanUrl.split('/');
+    const lastSeg = decodeURIComponent(segments[segments.length - 1] || '');
+    if (lastSeg && lastSeg.includes('.')) return lastSeg;
+  } catch (e) {}
+  return '';
+}
+
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }

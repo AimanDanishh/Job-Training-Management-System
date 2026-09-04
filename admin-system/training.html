@@ -163,9 +163,15 @@
       <div class="col-12" style="font-weight:700; font-size:13px; color:#2563EB; border-bottom:1px solid #E2E8F0; padding-bottom:4px; margin-top:16px">
         <span class="icon sm" style="color:#2563EB">corporate_fare</span> 3. Facilitator, Venue & Provider Details
       </div>
-      <div class="col-md-6">
-        <label for="t-trainer" class="label-th">Trainer / Facilitator Name <span class="required">*</span></label>
-        <input id="t-trainer" class="input-th" placeholder="Trainer name">
+      <div class="col-12">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <label class="label-th" style="margin-bottom:0">Trainer / Facilitator Name(s) <span class="required">*</span></label>
+          <button type="button" class="btn-th btn-secondary btn-sm" id="btn-add-admin-trainer" onclick="addAdminTrainerField()" style="font-size:11.5px;padding:3px 8px">
+            <span class="icon sm">add</span> Add Trainer
+          </button>
+        </div>
+        <div id="adminTrainerListContainer" style="display:flex;flex-direction:column;gap:8px"></div>
+        <input type="hidden" id="t-trainer">
       </div>
       <div class="col-md-6">
         <label for="t-venue" class="label-th">Training Venue <span class="required">*</span></label>
@@ -185,24 +191,25 @@
         <span class="icon sm" style="color:#2563EB">description</span> 4. Supporting Documents & Business Justification
       </div>
       <div class="col-12">
-        <label for="t-brochure-file" class="label-th">Brochure File (PDF, Word, or Image)</label>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <input id="t-brochure-file" class="input-th" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onchange="handleAdminBrochureSelect(this)" style="flex:1;padding:6px 10px;font-size:12.5px" aria-label="Upload Training Brochure">
-          <button type="button" id="btn-clear-brochure" class="btn-th btn-secondary btn-sm" style="display:none" onclick="clearAdminBrochureFile()"><span class="icon sm">clear</span>Clear File</button>
+        <label class="label-th">Supporting Document(s) & Brochure</label>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+          <input id="t-brochure-file" type="file" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onchange="handleAdminMultipleAttachmentsSelect(this)" style="display:none" aria-label="Upload Supporting Documents">
+          <button type="button" class="btn-th btn-secondary btn-sm" onclick="document.getElementById('t-brochure-file').click()">
+            <span class="icon sm">upload_file</span> + Add Document(s)
+          </button>
+          <span style="font-size:11.5px;color:#64748B">Max 10MB per file. Formats: PDF, DOC, DOCX, JPG, PNG (Max 10 files).</span>
         </div>
+        
+        <!-- Existing Attachments Box -->
+        <div id="t-existing-attachments-container" style="display:none;flex-direction:column;gap:6px;margin-bottom:8px"></div>
+
+        <!-- Staged New Attachments Box -->
+        <div id="t-staged-attachments-container" style="display:none;flex-direction:column;gap:6px;margin-bottom:8px"></div>
+
         <div id="t-brochure-status" style="font-size:11.5px;color:#2563EB;margin-top:4px;font-weight:600"></div>
-        <div id="t-existing-brochure-box" style="display:none;margin-top:6px;padding:8px 12px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;font-size:12px;color:#1E40AF;align-items:center;justify-content:space-between">
-          <div style="display:flex;align-items:center;gap:6px;overflow:hidden;text-overflow:ellipsis">
-            <span class="icon sm" style="color:#2563EB">description</span>
-            <span id="t-existing-brochure-text" style="font-weight:600">Current Brochure Attached</span>
-          </div>
-          <div style="display:flex;gap:6px">
-            <a id="t-existing-brochure-link" href="#" target="_blank" class="btn-th btn-sm" style="background:#2563EB;color:#fff;border:none;text-decoration:none;padding:3px 8px;font-size:11px"><span class="icon sm" style="font-size:13px">open_in_new</span>View</a>
-          </div>
-        </div>
       </div>
       <div class="col-12">
-        <label for="t-brochure" class="label-th">Brochure URL / Drive Link (Optional)</label>
+        <label for="t-brochure" class="label-th">Primary Brochure / Document Link (Optional)</label>
         <input id="t-brochure" class="input-th" type="url" placeholder="https://drive.google.com/...">
       </div>
       <div class="col-12">
@@ -787,6 +794,9 @@
 
   let selectedAdminBrochureFile = null;
   let currentEditingTrainingSnapshot = null;
+  let adminTrainerNames = [''];
+  let adminStagedAttachmentFiles = [];
+  let adminExistingAttachments = [];
 
   function isTbdValue(val) {
     if (val === null || val === undefined) return false;
@@ -794,63 +804,178 @@
     return clean === 'TBD' || clean === 'T.B.D' || clean === 'T.B.D.' || clean === 'TO BE DETERMINED' || clean === 'TO BE DECIDED';
   }
 
-  function handleAdminBrochureSelect(input) {
-    const file = input.files && input.files[0];
-    const statusEl = document.getElementById('t-brochure-status');
-    const clearBtn = document.getElementById('btn-clear-brochure');
-
-    if (!file) {
-      selectedAdminBrochureFile = null;
-      if (statusEl) statusEl.textContent = '';
-      if (clearBtn) clearBtn.style.display = 'none';
-      return;
-    }
-
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    if (file.size > maxSize) {
-      showToast('File is too large. Maximum allowed brochure size is 10 MB.', 'error');
-      input.value = '';
-      selectedAdminBrochureFile = null;
-      if (statusEl) statusEl.textContent = '';
-      if (clearBtn) clearBtn.style.display = 'none';
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      const base64Data = e.target.result.split(',')[1];
-      selectedAdminBrochureFile = {
-        name: file.name,
-        mimeType: file.type || 'application/octet-stream',
-        data: base64Data
+  function renderAdminTrainerInputs() {
+    const container = document.getElementById('adminTrainerListContainer');
+    if (!container) return;
+    container.innerHTML = '';
+    
+    adminTrainerNames.forEach((name, idx) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;gap:8px;align-items:center;';
+      
+      const input = document.createElement('input');
+      input.className = 'input-th';
+      input.placeholder = `Trainer name ${idx + 1}`;
+      input.value = name || '';
+      input.style.flex = '1';
+      input.oninput = (e) => {
+        adminTrainerNames[idx] = e.target.value;
       };
-      if (statusEl) statusEl.innerHTML = `<span class="icon sm" style="font-size:14px;color:#16A34A;vertical-align:middle">check_circle</span> Ready to upload: <strong>${file.name}</strong> (${(file.size/1024/1024).toFixed(2)} MB)`;
-      if (clearBtn) clearBtn.style.display = 'inline-flex';
-    };
-    reader.onerror = function() {
-      showToast('Failed to read file.', 'error');
-      selectedAdminBrochureFile = null;
-      if (statusEl) statusEl.textContent = '';
-      if (clearBtn) clearBtn.style.display = 'none';
-    };
-    reader.readAsDataURL(file);
+      row.appendChild(input);
+
+      if (adminTrainerNames.length > 1) {
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'btn-th btn-secondary btn-sm';
+        removeBtn.style.cssText = 'color:#DC2626;border-color:#FCA5A5;padding:6px 10px;flex-shrink:0;';
+        removeBtn.innerHTML = '<span class="icon sm">delete</span> Remove';
+        removeBtn.onclick = () => removeAdminTrainerField(idx);
+        row.appendChild(removeBtn);
+      }
+      container.appendChild(row);
+    });
+
+    const addBtn = document.getElementById('btn-add-admin-trainer');
+    if (addBtn) {
+      addBtn.style.display = adminTrainerNames.length >= 10 ? 'none' : 'inline-flex';
+    }
+  }
+
+  function addAdminTrainerField() {
+    if (adminTrainerNames.length >= 10) {
+      showToast('Maximum 10 trainers allowed.', 'error');
+      return;
+    }
+    adminTrainerNames.push('');
+    renderAdminTrainerInputs();
+  }
+
+  function removeAdminTrainerField(index) {
+    if (adminTrainerNames.length <= 1) return;
+    adminTrainerNames.splice(index, 1);
+    renderAdminTrainerInputs();
+  }
+
+  function handleAdminMultipleAttachmentsSelect(input) {
+    const files = Array.from(input.files || []);
+    if (!files || files.length === 0) return;
+
+    const allowedExts = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png'];
+    const maxSizeBytes = 10 * 1024 * 1024; // 10MB
+    const totalAllowed = 10;
+
+    for (const file of files) {
+      if (adminExistingAttachments.length + adminStagedAttachmentFiles.length >= totalAllowed) {
+        showToast(`Maximum ${totalAllowed} documents allowed per training.`, 'error');
+        break;
+      }
+      const ext = '.' + (file.name.split('.').pop() || '').toLowerCase();
+      if (!allowedExts.includes(ext)) {
+        showToast(`File "${file.name}" is not supported. Allowed formats: PDF, DOC, DOCX, JPG, PNG.`, 'error');
+        continue;
+      }
+      if (file.size > maxSizeBytes) {
+        showToast(`File "${file.name}" exceeds maximum allowed size (10MB).`, 'error');
+        continue;
+      }
+      if (adminStagedAttachmentFiles.some(f => f.file.name === file.name && f.file.size === file.size)) {
+        continue;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const base64Data = e.target.result.split(',')[1];
+        adminStagedAttachmentFiles.push({
+          file: file,
+          name: file.name,
+          size: file.size,
+          mimeType: file.type || 'application/octet-stream',
+          data: base64Data
+        });
+        renderAdminAttachmentsList();
+      };
+      reader.readAsDataURL(file);
+    }
+    input.value = '';
+  }
+
+  function renderAdminAttachmentsList() {
+    const existContainer = document.getElementById('t-existing-attachments-container');
+    const stageContainer = document.getElementById('t-staged-attachments-container');
+    
+    if (existContainer) {
+      if (adminExistingAttachments.length > 0) {
+        existContainer.style.display = 'flex';
+        existContainer.innerHTML = `
+          <div style="font-size:11px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px">Existing Attached Documents (${adminExistingAttachments.length})</div>
+          ${adminExistingAttachments.map((att, idx) => `
+            <div style="display:flex;align-items:center;justify-content:space-between;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:6px;padding:6px 10px">
+              <div style="display:flex;align-items:center;gap:6px;overflow:hidden">
+                <span class="icon sm" style="color:#2563EB">description</span>
+                <span style="font-size:12px;font-weight:600;color:#1E40AF;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(att.name || ('Document ' + (idx + 1)))}</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px">
+                <a href="${escapeHtml(att.url)}" target="_blank" class="btn-th btn-sm" style="background:#2563EB;color:#fff;border:none;text-decoration:none;padding:2px 6px;font-size:11px"><span class="icon sm" style="font-size:12px">open_in_new</span>View</a>
+                <button type="button" class="btn-th btn-secondary btn-sm" style="color:#DC2626;border-color:#FCA5A5;padding:2px 6px;font-size:11px" onclick="removeAdminExistingAttachment(${idx})"><span class="icon sm" style="font-size:12px">delete</span></button>
+              </div>
+            </div>
+          `).join('')}
+        `;
+      } else {
+        existContainer.style.display = 'none';
+        existContainer.innerHTML = '';
+      }
+    }
+
+    if (stageContainer) {
+      if (adminStagedAttachmentFiles.length > 0) {
+        stageContainer.style.display = 'flex';
+        stageContainer.innerHTML = `
+          <div style="font-size:11px;font-weight:700;color:#16A34A;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px">New Documents Ready to Upload (${adminStagedAttachmentFiles.length})</div>
+          ${adminStagedAttachmentFiles.map((st, idx) => `
+            <div style="display:flex;align-items:center;justify-content:space-between;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:6px;padding:6px 10px">
+              <div style="display:flex;align-items:center;gap:6px;overflow:hidden">
+                <span class="icon sm" style="color:#16A34A">check_circle</span>
+                <span style="font-size:12px;font-weight:600;color:#166534;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(st.name)}</span>
+                <span style="font-size:11px;color:#16A34A">(${(st.size/1024/1024).toFixed(2)} MB)</span>
+              </div>
+              <button type="button" class="btn-th btn-secondary btn-sm" style="color:#DC2626;border-color:#FCA5A5;padding:2px 6px;font-size:11px" onclick="removeAdminStagedAttachment(${idx})"><span class="icon sm" style="font-size:12px">delete</span></button>
+            </div>
+          `).join('')}
+        `;
+      } else {
+        stageContainer.style.display = 'none';
+        stageContainer.innerHTML = '';
+      }
+    }
+  }
+
+  function removeAdminExistingAttachment(idx) {
+    adminExistingAttachments.splice(idx, 1);
+    renderAdminAttachmentsList();
+  }
+
+  function removeAdminStagedAttachment(idx) {
+    adminStagedAttachmentFiles.splice(idx, 1);
+    renderAdminAttachmentsList();
   }
 
   function clearAdminBrochureFile() {
     const input = document.getElementById('t-brochure-file');
     if (input) input.value = '';
     selectedAdminBrochureFile = null;
+    adminStagedAttachmentFiles = [];
+    adminExistingAttachments = [];
+    renderAdminAttachmentsList();
     const statusEl = document.getElementById('t-brochure-status');
     if (statusEl) statusEl.textContent = '';
-    const clearBtn = document.getElementById('btn-clear-brochure');
-    if (clearBtn) clearBtn.style.display = 'none';
   }
 
   function openCreateTrainingModal() {
     currentEditingTrainingSnapshot = null;
+    adminTrainerNames = [''];
+    renderAdminTrainerInputs();
     clearAdminBrochureFile();
-    const existingBrochureBox = document.getElementById('t-existing-brochure-box');
-    if (existingBrochureBox) existingBrochureBox.style.display = 'none';
 
     loadCostCentres();
     document.getElementById('t-modal-title').textContent = 'New Training Programme';
@@ -970,7 +1095,20 @@
       tnaSelect.value = matchedTna;
     }
 
-    document.getElementById('t-trainer').value  = t.Trainer || '';
+    let tTrainers = [];
+    if (Array.isArray(t.trainers) && t.trainers.length > 0) {
+      tTrainers = t.trainers.slice();
+    } else if (Array.isArray(t.Trainers) && t.Trainers.length > 0) {
+      tTrainers = t.Trainers.slice();
+    } else if (typeof t.Trainers === 'string' && t.Trainers.trim().startsWith('[')) {
+      try { tTrainers = JSON.parse(t.Trainers); } catch(e) {}
+    } else if (t.Trainer) {
+      tTrainers = String(t.Trainer).split(',').map(s => s.trim()).filter(Boolean);
+    }
+    adminTrainerNames = tTrainers.length > 0 ? tTrainers : [''];
+    renderAdminTrainerInputs();
+    document.getElementById('t-trainer').value = adminTrainerNames.join(', ');
+
     document.getElementById('t-venue').value    = t.Venue || '';
     document.getElementById('t-provider').value = t.TrainingProvider || t.Vendor || '';
 
@@ -996,20 +1134,23 @@
     document.getElementById('t-hours').value    = t.TotalHours|| (Math.min(7, (t.Duration || 1) * 7));
     document.getElementById('t-cert-expiry').value = toInputDateStr(t.ExpiryDate || t.CertExpiryDate || t.CertificateExpiryDate);
     
-    // Brochure
+    // Brochure & Attachments
     clearAdminBrochureFile();
     const existingBrochureUrl = t.BrochureURL || t.BrochureUrl || t.RequisitionUrl || '';
     document.getElementById('t-brochure').value = existingBrochureUrl;
-    const existingBrochureBox = document.getElementById('t-existing-brochure-box');
-    const existingBrochureLink = document.getElementById('t-existing-brochure-link');
-    if (existingBrochureBox && existingBrochureLink) {
-      if (existingBrochureUrl) {
-        existingBrochureBox.style.display = 'flex';
-        existingBrochureLink.href = existingBrochureUrl;
-      } else {
-        existingBrochureBox.style.display = 'none';
-      }
+
+    let tAttachments = [];
+    if (Array.isArray(t.attachments) && t.attachments.length > 0) {
+      tAttachments = t.attachments.slice();
+    } else if (Array.isArray(t.Attachments) && t.Attachments.length > 0) {
+      tAttachments = t.Attachments.slice();
+    } else if (typeof t.Attachments === 'string' && t.Attachments.trim().startsWith('[')) {
+      try { tAttachments = JSON.parse(t.Attachments); } catch(e) {}
+    } else if (existingBrochureUrl) {
+      tAttachments = [{ name: 'Current Brochure / Document', url: existingBrochureUrl }];
     }
+    adminExistingAttachments = tAttachments;
+    renderAdminAttachmentsList();
 
     document.getElementById('t-reason').value   = t.Reason || t.Objectives || t.Justification || '';
     document.getElementById('t-status').value   = t.Status    || 'Draft';
@@ -1027,7 +1168,8 @@
     const cat       = document.getElementById('t-cat').value;
     const mode      = document.getElementById('t-mode').value;
     const tna       = document.getElementById('t-tna').value;
-    const trainer   = document.getElementById('t-trainer').value.trim();
+    const cleanedTrainers = adminTrainerNames.map(t => (t || '').trim()).filter(Boolean);
+    const trainer   = cleanedTrainers.join(', ');
     const venue     = document.getElementById('t-venue').value.trim();
     const provider  = document.getElementById('t-provider').value.trim();
     const feeRaw    = document.getElementById('t-fee').value.trim();
@@ -1078,7 +1220,20 @@
     if (!dept || isTbdValue(dept)) { showToast('Department / Cost Centre is required.', 'error'); return; }
 
     // 7. Facilitator / Venue / Provider
-    if (!trainer || isTbdValue(trainer)) { showToast('Trainer / Facilitator name cannot be TBD.', 'error'); return; }
+    if (cleanedTrainers.length === 0) { showToast('At least one Trainer / Facilitator is required.', 'error'); return; }
+    if (cleanedTrainers.length > 10) { showToast('Maximum 10 trainers allowed.', 'error'); return; }
+    for (const tr of cleanedTrainers) {
+      if (isTbdValue(tr)) { showToast('Trainer / Facilitator name cannot be TBD.', 'error'); return; }
+    }
+    const adminTrainerSet = new Set();
+    for (const tr of cleanedTrainers) {
+      const lower = tr.toLowerCase();
+      if (adminTrainerSet.has(lower)) {
+        showToast(`Duplicate trainer "${tr}" detected. Each trainer must be unique.`, 'error');
+        return;
+      }
+      adminTrainerSet.add(lower);
+    }
     if (!venue || isTbdValue(venue)) { showToast('Training venue cannot be TBD. Please enter confirmed venue.', 'error'); return; }
     if (!provider || isTbdValue(provider)) { showToast('Training provider cannot be TBD. Please enter confirmed provider.', 'error'); return; }
 
@@ -1114,6 +1269,9 @@
       TrainingMode: mode,
       TnaSource: tna,
       Trainer: trainer,
+      Trainers: cleanedTrainers,
+      existingAttachments: adminExistingAttachments,
+      attachmentFiles: adminStagedAttachmentFiles.map(f => ({ name: f.name, mimeType: f.mimeType, data: f.data, size: f.size })),
       Venue: venue,
       TrainingProvider: provider,
       CourseFee: parsedFee.toFixed(2),
@@ -1124,8 +1282,8 @@
       TotalHours: hours,
       ExpiryDate: finalCertExpiry,
       CertExpiryDate: finalCertExpiry,
-      BrochureURL: brochureUrl,
-      BrochureFile: selectedAdminBrochureFile,
+      BrochureURL: brochureUrl || (adminExistingAttachments[0] ? adminExistingAttachments[0].url : ''),
+      BrochureFile: adminStagedAttachmentFiles[0] ? { name: adminStagedAttachmentFiles[0].name, mimeType: adminStagedAttachmentFiles[0].mimeType, data: adminStagedAttachmentFiles[0].data } : null,
       Reason: reasonVal,
       Objectives: reasonVal,
       Status: status,
@@ -1377,6 +1535,18 @@
       rawObj = rawObj.replace(/\[Brochure File:\s*[^\]]+\]/g, '').trim();
     }
 
+    let drawerAttachments = [];
+    if (Array.isArray(t.attachments) && t.attachments.length > 0) {
+      drawerAttachments = t.attachments;
+    } else if (Array.isArray(t.Attachments) && t.Attachments.length > 0) {
+      drawerAttachments = t.Attachments;
+    } else if (typeof t.Attachments === 'string' && t.Attachments.trim().startsWith('[')) {
+      try { drawerAttachments = JSON.parse(t.Attachments); } catch(e) {}
+    }
+    if (drawerAttachments.length === 0 && brochureUrl) {
+      drawerAttachments = [{ name: 'Supporting Document / Brochure', url: brochureUrl }];
+    }
+
     const compDate = t.EndDate || t.StartDate;
     const isCompleted = ['Training Completed','Evaluation Completed','Waiting for 3-Month Review','Programme Closed','Completed'].includes(t.Stage || t.Status);
     const is2WDone = ['Evaluation Completed','Waiting for 3-Month Review','Programme Closed'].includes(t.Stage);
@@ -1552,12 +1722,22 @@
         ` : ''}
 
 
-        ${brochureUrl ? `
+        ${drawerAttachments.length > 0 ? `
           <div style="margin-top:16px;padding-top:16px;border-top:1px solid #F1F5F9">
-            <div class="section-label" style="margin-bottom:6px">Uploaded Supporting Brochure / Document</div>
-            <a href="${brochureUrl}" target="_blank" class="btn-th btn-secondary btn-sm" style="display:inline-flex;align-items:center;gap:6px;text-decoration:none;font-weight:600;color:#2563EB;background:#EFF6FF;border:1px solid #BFDBFE">
-              <span class="icon sm">open_in_new</span>View Uploaded Brochure / Attachment
-            </a>
+            <div class="section-label" style="margin-bottom:8px">Uploaded Supporting Document(s) / Brochure (${drawerAttachments.length})</div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              ${drawerAttachments.map((att, idx) => `
+                <div style="display:flex;align-items:center;justify-content:space-between;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:8px 12px">
+                  <div style="display:flex;align-items:center;gap:8px;overflow:hidden">
+                    <span class="icon sm" style="color:#2563EB">description</span>
+                    <span style="font-size:12.5px;font-weight:600;color:#1E293B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(att.name || ('Document ' + (idx + 1)))}</span>
+                  </div>
+                  <a href="${escapeHtml(att.url)}" target="_blank" class="btn-th btn-secondary btn-sm" style="display:inline-flex;align-items:center;gap:4px;text-decoration:none;font-weight:600;color:#2563EB;background:#EFF6FF;border:1px solid #BFDBFE;padding:3px 10px;font-size:11.5px;flex-shrink:0">
+                    <span class="icon sm" style="font-size:13px">open_in_new</span>View
+                  </a>
+                </div>
+              `).join('')}
+            </div>
           </div>
         ` : ''}
 

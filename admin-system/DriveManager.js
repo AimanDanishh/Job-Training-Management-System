@@ -339,7 +339,21 @@ function createTrainingRequisitionForm(code, training, targetFolderId, requester
     sheet.getRange('F7').setValue('Venue:');
     setTemplateValue('G7:I7', training.Venue || '');
     sheet.getRange('A8').setValue('Training Provider:');
-    setTemplateValue('C8:I8', training.TrainingProvider || training.Provider || training.Trainer || '');
+    const providerVal = training.TrainingProvider || training.Provider || '';
+    let trainersStr = '';
+    if (Array.isArray(training.trainers) && training.trainers.length > 0) {
+      trainersStr = training.trainers.join(', ');
+    } else if (Array.isArray(training.Trainers) && training.Trainers.length > 0) {
+      trainersStr = training.Trainers.join(', ');
+    } else if (typeof training.Trainers === 'string' && training.Trainers.trim().startsWith('[')) {
+      try { trainersStr = JSON.parse(training.Trainers).join(', '); } catch(e) { trainersStr = training.Trainers; }
+    } else if (training.Trainer) {
+      trainersStr = String(training.Trainer);
+    }
+    const combinedProviderTrainer = (providerVal && trainersStr)
+      ? `${providerVal} (Trainer: ${trainersStr})`
+      : (providerVal || trainersStr || '');
+    setTemplateValue('C8:I8', combinedProviderTrainer);
     sheet.getRange('A10').setValue('Reasons for Training:');
     setTemplateValue('A11:I12', training.Objectives || training.Reason || '');
 

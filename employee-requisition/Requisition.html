@@ -264,11 +264,20 @@
               </div>
             </div>
 
-            <div class="grid-3">
-              <div class="form-group">
-                <label class="form-label" for="reqTrainer">Trainer's Name</label>
-                <input type="text" id="reqTrainer" class="form-control" placeholder="Trainer Name (Optional)">
+            <!-- Dynamic Trainer Names Section -->
+            <div class="form-group" style="margin-bottom:16px;">
+              <label class="form-label" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:6px;">
+                <span>Trainer Name(s) <span style="font-size:11px;font-weight:normal;color:var(--text-muted);">(Optional)</span></span>
+                <button type="button" id="btnAddTrainerTop" class="btn btn-neo btn-sm" onclick="addTrainerField()" style="display:none;cursor:pointer;">
+                  <span>➕</span> Add Trainer
+                </button>
+              </label>
+              <div id="trainerListContainer" style="display:flex;flex-direction:column;gap:8px;">
+                <!-- Rendered dynamically by renderTrainerInputs() -->
               </div>
+            </div>
+
+            <div class="grid-2">
               <div class="form-group">
                 <label class="form-label" for="reqProvider">Training Provider</label>
                 <input type="text" id="reqProvider" class="form-control" placeholder="Vendor Company Name (Optional)">
@@ -284,17 +293,28 @@
               <textarea id="reqReason" class="form-control" rows="2" placeholder="State reasons for training, business objective, or operational need..."></textarea>
             </div>
 
-            <div class="form-group">
-              <label for="reqBrochureFile" class="form-label">Brochure Attachment / Link (Optional)</label>
-              <div class="grid-2">
-                <div>
-                  <input type="file" id="reqBrochureFile" class="form-control" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onchange="handleBrochureFileSelect(this)" style="padding:8px 12px;font-size:12.5px;" aria-label="Upload Brochure File">
-                  <div id="fileUploadStatus" style="font-size:11.5px;color:var(--primary);margin-top:4px;font-weight:600;"></div>
-                </div>
-                <div>
-                  <label for="reqBrochureUrl" class="visually-hidden" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">Brochure Link URL</label>
-                  <input type="url" id="reqBrochureUrl" class="form-control" placeholder="Or paste link (https://...)" aria-label="Brochure Link URL">
-                </div>
+            <!-- Supporting Documents / Multiple Attachments Section -->
+            <div class="form-group" style="margin-bottom:18px;">
+              <label class="form-label" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:6px;">
+                <span>Supporting Documents <span style="font-size:11px;font-weight:normal;color:var(--text-muted);">(PDF, Word, Images up to 10MB each)</span></span>
+                <button type="button" class="btn btn-neo btn-sm" onclick="triggerAttachmentPicker()" style="cursor:pointer;">
+                  <span>📎</span> + Add Document
+                </button>
+              </label>
+
+              <!-- Hidden multi-file input -->
+              <input type="file" id="reqAttachmentFileInput" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onchange="handleMultipleAttachmentsSelect(this)" style="display:none;" aria-label="Upload Supporting Documents">
+
+              <!-- Staged & Existing Attachments List Container -->
+              <div id="attachmentsListContainer" style="display:flex;flex-direction:column;gap:6px;margin-top:6px;">
+                <!-- Dynamically rendered items -->
+              </div>
+              <div id="attachmentValidationMsg" style="display:none;font-size:12px;color:var(--danger);margin-top:6px;font-weight:600;"></div>
+
+              <!-- Optional external link / URL -->
+              <div style="margin-top:10px;">
+                <label for="reqBrochureUrl" style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">Or paste external document / Drive link (Optional):</label>
+                <input type="url" id="reqBrochureUrl" class="form-control" placeholder="https://drive.google.com/..." aria-label="Brochure Link URL">
               </div>
             </div>
           </div>

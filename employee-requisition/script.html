@@ -1,4 +1,16 @@
 <script>
+  // Utility: HTML Escaping
+  function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+  window.escapeHtml = escapeHtml;
+
   // State Management
   let activeEmployee = null;
   let masterParticipants = [];
@@ -9,6 +21,11 @@
   let editingTrainingId = '';
   let uploadedFileObject = null;
   let loggedInUserEmail = '';
+
+  // Multiple Trainers & Attachments State
+  let trainerNames = [''];
+  let stagedAttachmentFiles = []; // Staged files: [{ name, size, mimeType, data }]
+  let existingAttachments = []; // Existing files: [{ name, url, fileId, mimeType, size }]
 
   function readPortalConfig() {
     var el = document.getElementById('__trainhub_config__');
@@ -51,6 +68,8 @@
     initTheme();
     applyPortalSystemLogo();
     loadCostCentres();
+    renderTrainerInputs();
+    renderAttachmentsList();
     // Focus Employee ID input on initial page load
     const empInput = document.getElementById('employeeIdInput');
     if (empInput) empInput.focus();
@@ -578,6 +597,30 @@
 
     const paxList = req.participants || [];
 
+    // Parse Trainers
+    let reqTrainers = [];
+    if (Array.isArray(req.trainers)) {
+      reqTrainers = req.trainers;
+    } else if (req.Trainers) {
+      try { reqTrainers = typeof req.Trainers === 'string' ? JSON.parse(req.Trainers) : req.Trainers; } catch(e) {}
+    }
+    if ((!reqTrainers || reqTrainers.length === 0) && req.Trainer && req.Trainer !== 'TBD' && req.Trainer !== 'N/A') {
+      reqTrainers = req.Trainer.split(/[,;\n]+/).map(s => s.trim()).filter(Boolean);
+    }
+    if (!reqTrainers) reqTrainers = [];
+
+    // Parse Attachments
+    let reqAttachments = [];
+    if (Array.isArray(req.attachments)) {
+      reqAttachments = req.attachments;
+    } else if (req.Attachments) {
+      try { reqAttachments = typeof req.Attachments === 'string' ? JSON.parse(req.Attachments) : req.Attachments; } catch(e) {}
+    }
+    if ((!reqAttachments || reqAttachments.length === 0) && req.BrochureURL) {
+      reqAttachments = [{ name: 'Supporting Brochure Document', url: req.BrochureURL }];
+    }
+    if (!reqAttachments) reqAttachments = [];
+
     document.getElementById('modalBodyContent').innerHTML = `
       <div style="margin-bottom:16px;">
         <span class="status-badge ${badgeClass}">${status}</span>
@@ -605,8 +648,15 @@
           <div class="detail-val">${req.Venue || 'TBD'}</div>
         </div>
         <div class="detail-item">
-          <div class="detail-label">Trainer / Provider</div>
-          <div class="detail-val">${req.Trainer || 'N/A'}${req.TrainingProvider ? ' / ' + req.TrainingProvider : ''}</div>
+          <div class="detail-label">Trainer(s) / Provider</div>
+          <div class="detail-val">
+            ${reqTrainers.length > 1 ? `
+              <ol style="margin:2px 0 2px 18px;padding:0;">
+                ${reqTrainers.map(t => `<li style="font-weight:600;">${escapeHtml(t)}</li>`).join('')}
+              </ol>
+            ` : (reqTrainers.length === 1 ? `<strong style="color:var(--text-primary);">${escapeHtml(reqTrainers[0])}</strong>` : `<span>${escapeHtml(req.Trainer || 'N/A')}</span>`)}
+            ${req.TrainingProvider ? `<div style="font-size:11.5px;color:var(--text-muted);margin-top:3px;">Provider: ${escapeHtml(req.TrainingProvider)}</div>` : ''}
+          </div>
         </div>
         <div class="detail-item">
           <div class="detail-label">Department / Cost Centre</div>
@@ -641,18 +691,32 @@
             ${paxList.map(p => `
               <span class="pax-chip">
                 <span>👤</span>
-                <span>${p.Name || p.EmployeeName || 'Employee'} (${p.ID || p.EmployeeID || ''})</span>
+                <span>${escapeHtml(p.Name || p.EmployeeName || 'Employee')} (${escapeHtml(p.ID || p.EmployeeID || '')})</span>
               </span>
             `).join('')}
           </div>
         </div>
       ` : ''}
 
-      ${req.BrochureURL ? `
+      ${reqAttachments.length > 0 ? `
         <div class="detail-item" style="margin-bottom:16px;">
-          <div class="detail-label">Brochure Attachment</div>
-          <div class="detail-val">
-            <a href="${req.BrochureURL}" target="_blank" style="color:var(--primary);text-decoration:underline;">📎 Open Brochure Document</a>
+          <div class="detail-label">Supporting Documents (${reqAttachments.length})</div>
+          <div class="detail-val" style="display:flex;flex-direction:column;gap:6px;margin-top:6px;">
+            ${reqAttachments.map(a => `
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-sm);box-shadow:var(--shadow-raised-sm);gap:8px;">
+                <div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1;">
+                  <span style="font-size:16px;">📄</span>
+                  <span style="font-weight:600;font-size:12.5px;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(a.name || 'Supporting Document')}">
+                    ${escapeHtml(a.name || 'Supporting Document')}
+                  </span>
+                </div>
+                ${a.url ? `
+                  <a href="${a.url}" target="_blank" class="btn btn-neo btn-sm" style="text-decoration:none;padding:4px 10px;font-size:11.5px;white-space:nowrap;" title="Open Document">
+                    <span>↗</span> View
+                  </a>
+                ` : ''}
+              </div>
+            `).join('')}
           </div>
         </div>
       ` : ''}
@@ -698,12 +762,41 @@
     document.getElementById('reqHours').value = req.TotalHours || 8;
     document.getElementById('reqFee').value = req.CourseFee || '';
     document.getElementById('reqVenue').value = req.Venue || '';
-    document.getElementById('reqTrainer').value = req.Trainer || '';
+    // Populate Trainers
+    let editTrainers = [];
+    if (Array.isArray(req.trainers)) {
+      editTrainers = req.trainers;
+    } else if (req.Trainers) {
+      try { editTrainers = typeof req.Trainers === 'string' ? JSON.parse(req.Trainers) : req.Trainers; } catch(e) {}
+    }
+    if ((!editTrainers || editTrainers.length === 0) && req.Trainer && req.Trainer !== 'TBD' && req.Trainer !== 'N/A') {
+      editTrainers = req.Trainer.split(/[,;\n]+/).map(s => s.trim()).filter(Boolean);
+    }
+    trainerNames = (editTrainers && editTrainers.length > 0) ? [...editTrainers] : [''];
+    renderTrainerInputs();
+
     document.getElementById('reqProvider').value = req.TrainingProvider || req.Provider || req.Vendor || '';
     document.getElementById('reqCertExpiry').value = toInputDateStr(req.CertExpiryDate || req.ExpiryDate || req.CertificateExpiryDate);
     document.getElementById('reqReason').value = req.Objectives || '';
+
+    // Populate Attachments
+    let editAttachments = [];
+    if (Array.isArray(req.attachments)) {
+      editAttachments = req.attachments;
+    } else if (req.Attachments) {
+      try { editAttachments = typeof req.Attachments === 'string' ? JSON.parse(req.Attachments) : req.Attachments; } catch(e) {}
+    }
+    if ((!editAttachments || editAttachments.length === 0) && req.BrochureURL) {
+      editAttachments = [{ name: 'Supporting Brochure Document', url: req.BrochureURL }];
+    }
+    existingAttachments = (editAttachments && editAttachments.length > 0) ? [...editAttachments] : [];
+    stagedAttachmentFiles = [];
+    renderAttachmentsList();
+
     if (req.BrochureURL) {
       document.getElementById('reqBrochureUrl').value = req.BrochureURL;
+    } else {
+      document.getElementById('reqBrochureUrl').value = '';
     }
 
     // Populate Department Bubble Chips
@@ -759,24 +852,266 @@
 
 
   // ==========================================
-  // 6. REQUISITION FORM SUBMISSION
+  // 6. DYNAMIC TRAINER FIELDS MANAGEMENT
   // ==========================================
-  function handleBrochureFileSelect(input) {
-    if (input.files && input.files[0]) {
-      const file = input.files[0];
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        uploadedFileObject = {
-          name: file.name,
-          mimeType: file.type,
-          data: e.target.result.split(',')[1]
-        };
-        document.getElementById('fileUploadStatus').innerText = `✓ Attached: ${file.name}`;
+  function renderTrainerInputs() {
+    const container = document.getElementById('trainerListContainer');
+    if (!container) return;
+
+    if (!trainerNames || trainerNames.length === 0) {
+      trainerNames = [''];
+    }
+
+    container.innerHTML = '';
+    const isSingle = trainerNames.length === 1;
+
+    // Toggle header button if it exists
+    const topBtn = document.getElementById('btnAddTrainerTop');
+    if (topBtn) {
+      topBtn.style.display = isSingle ? 'none' : 'inline-flex';
+    }
+
+    trainerNames.forEach((name, index) => {
+      const row = document.createElement('div');
+      row.className = 'trainer-input-row';
+      row.style.cssText = 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;';
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'form-control';
+      input.placeholder = `Trainer Name ${index + 1}${index === 0 ? ' (Optional)' : ''}`;
+      input.value = name || '';
+      input.style.cssText = 'flex:1;min-width:180px;';
+      input.setAttribute('aria-label', `Trainer Name ${index + 1}`);
+      input.oninput = function() {
+        trainerNames[index] = this.value;
       };
-      reader.readAsDataURL(file);
+
+      row.appendChild(input);
+
+      if (isSingle) {
+        // First/only trainer: [ Trainer Name 1 ] [ + Add Trainer ]
+        const addBtn = document.createElement('button');
+        addBtn.type = 'button';
+        addBtn.className = 'btn btn-neo btn-sm';
+        addBtn.style.cssText = 'white-space:nowrap;min-height:42px;cursor:pointer;';
+        addBtn.innerHTML = '<span>➕</span> Add Trainer';
+        addBtn.onclick = function() { addTrainerField(); };
+        row.appendChild(addBtn);
+      } else {
+        // Multiple trainers: [ Trainer Name i ] [ Remove ]
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'btn btn-neo-danger btn-sm';
+        removeBtn.style.cssText = 'white-space:nowrap;min-height:42px;cursor:pointer;';
+        removeBtn.innerHTML = '<span>🗑️</span> Remove';
+        removeBtn.setAttribute('aria-label', `Remove Trainer ${index + 1}`);
+        removeBtn.onclick = function() { removeTrainerField(index); };
+        row.appendChild(removeBtn);
+      }
+
+      container.appendChild(row);
+    });
+
+    if (!isSingle) {
+      // Show [ + Add Trainer ] below list when > 1 trainer
+      const bottomRow = document.createElement('div');
+      bottomRow.style.cssText = 'margin-top:4px;';
+      const addMoreBtn = document.createElement('button');
+      addMoreBtn.type = 'button';
+      addMoreBtn.className = 'btn btn-neo btn-sm';
+      addMoreBtn.style.cssText = 'cursor:pointer;';
+      addMoreBtn.innerHTML = '<span>➕</span> Add Trainer';
+      addMoreBtn.onclick = function() { addTrainerField(); };
+      bottomRow.appendChild(addMoreBtn);
+      container.appendChild(bottomRow);
     }
   }
 
+  function addTrainerField(initialValue = '') {
+    if (trainerNames.length >= 10) {
+      showAlert('Maximum of 10 trainers allowed per training request.', true);
+      return;
+    }
+    trainerNames.push(initialValue);
+    renderTrainerInputs();
+    const inputs = document.querySelectorAll('#trainerListContainer input');
+    if (inputs && inputs.length > 0) {
+      inputs[inputs.length - 1].focus();
+    }
+  }
+
+  function removeTrainerField(index) {
+    if (trainerNames.length <= 1) {
+      trainerNames = [''];
+      renderTrainerInputs();
+      return;
+    }
+    trainerNames.splice(index, 1);
+    renderTrainerInputs();
+  }
+
+  // ==========================================
+  // 7. MULTIPLE ATTACHMENTS MANAGEMENT
+  // ==========================================
+  function triggerAttachmentPicker() {
+    const input = document.getElementById('reqAttachmentFileInput');
+    if (input) input.click();
+  }
+
+  function formatFileSize(bytes) {
+    if (!bytes || isNaN(bytes) || bytes === 0) return '0 KB';
+    const k = 1024;
+    if (bytes < k * 1024) return (bytes / k).toFixed(1) + ' KB';
+    return (bytes / (k * k)).toFixed(2) + ' MB';
+  }
+
+  function handleMultipleAttachmentsSelect(input) {
+    const errEl = document.getElementById('attachmentValidationMsg');
+    if (errEl) { errEl.style.display = 'none'; errEl.innerText = ''; }
+
+    if (!input.files || input.files.length === 0) return;
+
+    const allowedExtensions = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png'];
+    const maxFileSize = 10 * 1024 * 1024; // 10 MB per file limit
+    const maxTotalAttachments = 10;
+
+    const files = Array.from(input.files);
+
+    if ((stagedAttachmentFiles.length + existingAttachments.length + files.length) > maxTotalAttachments) {
+      showAlert(`You can attach a maximum of ${maxTotalAttachments} supporting documents.`, true);
+      input.value = '';
+      return;
+    }
+
+    let errors = [];
+
+    files.forEach(file => {
+      const ext = '.' + file.name.split('.').pop().toLowerCase();
+      if (!allowedExtensions.includes(ext)) {
+        errors.push(`"${file.name}": Unsupported format. Allowed types: ${allowedExtensions.join(', ')}`);
+        return;
+      }
+      if (file.size > maxFileSize) {
+        errors.push(`"${file.name}": Exceeds maximum size of 10MB (${(file.size / 1024 / 1024).toFixed(2)} MB).`);
+        return;
+      }
+      // Check duplicate in staged files
+      const isDuplicateStaged = stagedAttachmentFiles.some(f => f.name === file.name && f.size === file.size);
+      const isDuplicateExisting = existingAttachments.some(f => f.name === file.name);
+      if (isDuplicateStaged || isDuplicateExisting) {
+        errors.push(`"${file.name}": File is already attached.`);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const base64Data = e.target.result.split(',')[1];
+        stagedAttachmentFiles.push({
+          name: file.name,
+          size: file.size,
+          mimeType: file.type || 'application/octet-stream',
+          data: base64Data
+        });
+        renderAttachmentsList();
+      };
+      reader.readAsDataURL(file);
+    });
+
+    if (errors.length > 0) {
+      if (errEl) {
+        errEl.innerText = errors.join(' | ');
+        errEl.style.display = 'block';
+      }
+      showAlert(errors.join('\n'), true);
+    }
+
+    input.value = ''; // Reset file input so user can pick same or more files incrementally
+  }
+
+  function removeStagedAttachment(index) {
+    if (index >= 0 && index < stagedAttachmentFiles.length) {
+      stagedAttachmentFiles.splice(index, 1);
+      renderAttachmentsList();
+    }
+  }
+
+  function removeExistingAttachment(index) {
+    if (index >= 0 && index < existingAttachments.length) {
+      existingAttachments.splice(index, 1);
+      renderAttachmentsList();
+    }
+  }
+
+  function renderAttachmentsList() {
+    const container = document.getElementById('attachmentsListContainer');
+    if (!container) return;
+
+    const totalCount = existingAttachments.length + stagedAttachmentFiles.length;
+
+    if (totalCount === 0) {
+      container.innerHTML = `
+        <div style="padding:12px 16px;background:var(--bg-card);border:1px dashed var(--border-color);border-radius:var(--radius-md);box-shadow:var(--shadow-inset);font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
+          <span>📄</span> No supporting documents attached. Click <strong>"+ Add Document"</strong> to attach proposals, quotations, or trainer profiles.
+        </div>
+      `;
+      return;
+    }
+
+    let html = '';
+
+    // 1. Existing attachments (from DB, when editing)
+    existingAttachments.forEach((att, idx) => {
+      html += `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-sm);box-shadow:var(--shadow-raised-sm);gap:8px;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1;">
+            <span style="font-size:16px;">📄</span>
+            <span style="font-weight:600;font-size:12.5px;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(att.name)}">
+              ${escapeHtml(att.name)}
+            </span>
+            <span style="font-size:11px;color:var(--success-text);background:var(--success-bg);padding:2px 6px;border-radius:4px;font-weight:600;white-space:nowrap;">Existing Document</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            ${att.url ? `
+              <a href="${att.url}" target="_blank" class="btn btn-neo btn-sm" style="padding:4px 10px;font-size:11.5px;text-decoration:none;display:inline-flex;align-items:center;gap:4px;" title="View Document">
+                <span>↗</span> View
+              </a>
+            ` : ''}
+            <button type="button" class="btn btn-neo-danger btn-sm" onclick="removeExistingAttachment(${idx})" style="padding:4px 10px;font-size:11.5px;cursor:pointer;" title="Remove Document">
+              <span>🗑️</span> Remove
+            </button>
+          </div>
+        </div>
+      `;
+    });
+
+    // 2. Staged attachments (ready to upload)
+    stagedAttachmentFiles.forEach((fileObj, idx) => {
+      html += `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-sm);box-shadow:var(--shadow-raised-sm);gap:8px;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1;">
+            <span style="font-size:16px;">📄</span>
+            <span style="font-weight:600;font-size:12.5px;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(fileObj.name)}">
+              ${escapeHtml(fileObj.name)}
+            </span>
+            <span style="font-size:11px;color:var(--text-muted);white-space:nowrap;">(${formatFileSize(fileObj.size)})</span>
+            <span style="font-size:11px;color:var(--primary-dark);background:var(--primary-bg);padding:2px 6px;border-radius:4px;font-weight:600;white-space:nowrap;">Ready to Upload</span>
+          </div>
+          <div>
+            <button type="button" class="btn btn-neo-danger btn-sm" onclick="removeStagedAttachment(${idx})" style="padding:4px 10px;font-size:11.5px;cursor:pointer;" title="Remove Document">
+              <span>🗑️</span> Remove
+            </button>
+          </div>
+        </div>
+      `;
+    });
+
+    container.innerHTML = html;
+  }
+
+  // ==========================================
+  // 8. REQUISITION FORM SUBMISSION
+  // ==========================================
   function submitRequisition() {
     if (!activeEmployee) {
       showAlert('Please verify your Employee ID first.', true);
@@ -814,6 +1149,29 @@
       return;
     }
 
+    // Process and validate trainers
+    const rawTrainers = Array.isArray(trainerNames) ? trainerNames : [];
+    const cleanTrainers = [];
+    const seenTrainers = new Set();
+
+    for (let i = 0; i < rawTrainers.length; i++) {
+      const t = String(rawTrainers[i] || '').trim();
+      if (!t) {
+        if (rawTrainers.length > 1) {
+          showAlert(`Trainer #${i + 1} is empty. Please fill in the trainer name or remove the empty field before submitting.`, true);
+          return;
+        }
+        continue;
+      }
+      const key = t.toLowerCase();
+      if (seenTrainers.has(key)) {
+        showAlert(`Duplicate trainer name detected: "${t}". Each trainer should be entered only once.`, true);
+        return;
+      }
+      seenTrainers.add(key);
+      cleanTrainers.push(t);
+    }
+
     // Fee = 0 or empty is stored and displayed as TBD for employee requisition workflow
     let feePayload = rawFee;
     if (!rawFee || parseFloat(rawFee) === 0 || isNaN(parseFloat(rawFee))) {
@@ -842,7 +1200,8 @@
       TrainingName: name,
       Category: document.getElementById('reqCategory').value,
       TrainingType: document.getElementById('reqTrainingType').value,
-      Trainer: document.getElementById('reqTrainer').value.trim(),
+      trainers: cleanTrainers,
+      Trainer: cleanTrainers.join(', '),
       TrainingProvider: document.getElementById('reqProvider').value.trim(),
       StartDate: startDate,
       EndDate: endDate,
@@ -854,8 +1213,11 @@
       TotalPax: totalPax,
       ParticipantList: selectedParticipants,
       Reason: reason,
-      BrochureUrl: document.getElementById('reqBrochureUrl').value.trim(),
-      BrochureFile: uploadedFileObject
+      attachments: existingAttachments,
+      existingAttachments: existingAttachments,
+      attachmentFiles: stagedAttachmentFiles,
+      BrochureFile: stagedAttachmentFiles.length > 0 ? stagedAttachmentFiles[0] : null,
+      BrochureUrl: document.getElementById('reqBrochureUrl').value.trim()
     };
 
     google.script.run
@@ -917,15 +1279,26 @@
     if (costSel) costSel.value = '';
     selectedCostCentres = [];
     renderCostCentreChips();
-    document.getElementById('reqTrainer').value = '';
+
+    // Reset Trainers
+    trainerNames = [''];
+    renderTrainerInputs();
+
     document.getElementById('reqProvider').value = '';
     document.getElementById('reqCertExpiry').value = '';
     document.getElementById('reqReason').value = '';
     document.getElementById('reqBrochureUrl').value = '';
-    if (document.getElementById('reqBrochureFile')) document.getElementById('reqBrochureFile').value = '';
-    if (document.getElementById('fileUploadStatus')) document.getElementById('fileUploadStatus').textContent = '';
-    selectedBrochureBase64 = null;
-    selectedBrochureFileName = null;
+
+    // Reset Attachments
+    stagedAttachmentFiles = [];
+    existingAttachments = [];
+    renderAttachmentsList();
+    const attFileInput = document.getElementById('reqAttachmentFileInput');
+    if (attFileInput) attFileInput.value = '';
+    const attValMsg = document.getElementById('attachmentValidationMsg');
+    if (attValMsg) { attValMsg.style.display = 'none'; attValMsg.innerText = ''; }
+
+    uploadedFileObject = null;
     selectedParticipants = [];
     const paxInput = document.getElementById('reqTotalPax');
     if (paxInput) paxInput.value = '';

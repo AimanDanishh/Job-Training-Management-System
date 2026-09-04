@@ -74,5 +74,48 @@ function validateEmployeeRequisitionData(data) {
     return { valid: false, message: 'Training duration cannot exceed 7 hours per day.' };
   }
 
+  // Trainers validation
+  const rawTrainers = Array.isArray(data.trainers) ? data.trainers : [];
+  if (rawTrainers.length > 10) {
+    return { valid: false, message: 'Maximum of 10 trainers allowed per training request.' };
+  }
+  const seenTrainers = new Set();
+  for (let i = 0; i < rawTrainers.length; i++) {
+    const t = String(rawTrainers[i] || '').trim();
+    if (!t) {
+      if (rawTrainers.length > 1) {
+        return { valid: false, message: `Trainer #${i + 1} cannot be empty. Please enter trainer name or remove the empty field.` };
+      }
+      continue;
+    }
+    const key = t.toLowerCase();
+    if (seenTrainers.has(key)) {
+      return { valid: false, message: `Duplicate trainer name detected: "${t}".` };
+    }
+    seenTrainers.add(key);
+  }
+
+  // Attachments validation
+  const allowedExtensions = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png'];
+  const maxFileSize = 10 * 1024 * 1024; // 10MB
+  const files = Array.isArray(data.attachmentFiles) ? data.attachmentFiles : (data.BrochureFile && data.BrochureFile.data ? [data.BrochureFile] : []);
+  const existingAtts = Array.isArray(data.existingAttachments) ? data.existingAttachments : (Array.isArray(data.attachments) ? data.attachments : []);
+
+  if ((files.length + existingAtts.length) > 10) {
+    return { valid: false, message: 'Maximum of 10 supporting documents allowed per request.' };
+  }
+
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    if (!f || !f.name) continue;
+    const ext = '.' + f.name.split('.').pop().toLowerCase();
+    if (!allowedExtensions.includes(ext)) {
+      return { valid: false, message: `File "${f.name}" has an unsupported format. Allowed types: ${allowedExtensions.join(', ')}` };
+    }
+    if (f.size && f.size > maxFileSize) {
+      return { valid: false, message: `File "${f.name}" exceeds the maximum allowed size of 10MB.` };
+    }
+  }
+
   return { valid: true };
 }

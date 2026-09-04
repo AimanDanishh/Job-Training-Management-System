@@ -262,7 +262,7 @@
             </div>
 
             <div id="modalBrochureBox" style="margin-top:10px;display:none;background:var(--bg-input);padding:12px 14px;border-radius:var(--radius-md);border:1px solid var(--border-color);">
-              <div class="data-item-label">📁 Supporting Document / Brochure</div>
+              <div class="data-item-label">📁 Supporting Document(s) / Brochure</div>
               <div id="modalBrochureLink" style="margin-top:4px;">--</div>
             </div>
           </div>
@@ -744,9 +744,31 @@
 
       // Specifications
       document.getElementById('modalCategory').innerText = t.Category || 'General';
-      const trainerStr = formatDisplayName(t.Trainer || 'TBD');
       const providerStr = t.TrainingProvider || t.Provider || t.Vendor || '';
-      document.getElementById('modalTrainer').innerText = providerStr ? `${trainerStr} (${providerStr})` : trainerStr;
+      let trainersList = [];
+      if (Array.isArray(t.trainers) && t.trainers.length > 0) {
+        trainersList = t.trainers;
+      } else if (Array.isArray(t.Trainers) && t.Trainers.length > 0) {
+        trainersList = t.Trainers;
+      } else if (typeof t.Trainers === 'string' && t.Trainers.trim().startsWith('[')) {
+        try { trainersList = JSON.parse(t.Trainers); } catch(e) {}
+      } else if (t.Trainer) {
+        trainersList = String(t.Trainer).split(',').map(s => s.trim()).filter(Boolean);
+      }
+
+      let trainersHtml = '';
+      if (providerStr) {
+        trainersHtml += `<div style="margin-bottom:4px;"><span style="color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:0.5px;font-weight:700;">Provider:</span> <strong>${escapeHtml(providerStr)}</strong></div>`;
+      }
+      if (trainersList.length > 1) {
+        trainersHtml += `<ol style="margin:0;padding-left:18px;line-height:1.5;">${trainersList.map(tr => `<li style="font-weight:600;">${escapeHtml(formatDisplayName(tr))}</li>`).join('')}</ol>`;
+      } else if (trainersList.length === 1) {
+        trainersHtml += `<div style="font-weight:600;">${escapeHtml(formatDisplayName(trainersList[0]))}</div>`;
+      } else {
+        trainersHtml += `<div style="font-weight:500;color:var(--text-muted);">TBD</div>`;
+      }
+      document.getElementById('modalTrainer').innerHTML = trainersHtml;
+
       document.getElementById('modalSchedule').innerText = `${formatDateStr(t.StartDate) || 'N/A'} to ${formatDateStr(t.EndDate || t.StartDate) || 'N/A'}`;
       document.getElementById('modalHours').innerText = `${t.Duration || 1} Days (${t.TotalHours || 8} Total Hours)`;
       document.getElementById('modalVenue').innerText = t.Venue || 'TBD';
@@ -755,11 +777,34 @@
       // Objectives & Brochure
       document.getElementById('modalObjectives').innerText = t.Objectives || 'No training objectives specified.';
       
-      const brochureUrl = t.BrochureURL || t.BrochureUrl || '';
+      let attachmentsList = [];
+      if (Array.isArray(t.attachments) && t.attachments.length > 0) {
+        attachmentsList = t.attachments;
+      } else if (Array.isArray(t.Attachments) && t.Attachments.length > 0) {
+        attachmentsList = t.Attachments;
+      } else if (typeof t.Attachments === 'string' && t.Attachments.trim().startsWith('[')) {
+        try { attachmentsList = JSON.parse(t.Attachments); } catch(e) {}
+      }
+      const legacyBrochureUrl = t.BrochureURL || t.BrochureUrl || '';
+      if (attachmentsList.length === 0 && legacyBrochureUrl && legacyBrochureUrl.trim()) {
+        attachmentsList = [{ name: 'Supporting Document', url: legacyBrochureUrl.trim() }];
+      }
+
       const brochureBox = document.getElementById('modalBrochureBox');
-      if (brochureUrl && brochureUrl.trim()) {
+      if (attachmentsList.length > 0) {
         brochureBox.style.display = 'block';
-        document.getElementById('modalBrochureLink').innerHTML = `<a href="${brochureUrl.trim()}" target="_blank" style="color:var(--accent);font-weight:700;text-decoration:underline;">📄 View Uploaded Supporting Brochure / Document ↗</a>`;
+        document.getElementById('modalBrochureLink').innerHTML = `
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            ${attachmentsList.map((att, idx) => `
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span>📄</span>
+                <a href="${escapeHtml(att.url)}" target="_blank" style="color:var(--accent);font-weight:700;text-decoration:underline;word-break:break-all;">
+                  ${escapeHtml(att.name || `Supporting Document ${idx + 1}`)} ↗
+                </a>
+              </div>
+            `).join('')}
+          </div>
+        `;
       } else {
         brochureBox.style.display = 'none';
       }

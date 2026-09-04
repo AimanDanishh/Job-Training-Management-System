@@ -292,9 +292,30 @@ function validateAdminTrainingData(data, isEdit) {
   if (!tna || isTbdString(tna)) return { valid: false, message: 'TNA Source is required.', field: 'TnaSource' };
 
   // 3. Mandatory Trainer & Venue & Provider
-  const trainer = String(data.Trainer || '').trim();
-  if (!trainer) return { valid: false, message: 'Trainer / Facilitator is required.', field: 'Trainer' };
-  if (isTbdString(trainer)) return { valid: false, message: 'Trainer name cannot be TBD. Please enter confirmed trainer.', field: 'Trainer' };
+  let trainersList = [];
+  if (Array.isArray(data.Trainers) && data.Trainers.length > 0) {
+    trainersList = data.Trainers.map(t => String(t || '').trim()).filter(Boolean);
+  } else if (Array.isArray(data.trainers) && data.trainers.length > 0) {
+    trainersList = data.trainers.map(t => String(t || '').trim()).filter(Boolean);
+  } else if (typeof data.Trainers === 'string' && data.Trainers.trim().startsWith('[')) {
+    try { trainersList = JSON.parse(data.Trainers).map(t => String(t || '').trim()).filter(Boolean); } catch(e) {}
+  } else if (data.Trainer) {
+    trainersList = String(data.Trainer).split(',').map(s => s.trim()).filter(Boolean);
+  }
+
+  if (trainersList.length === 0) return { valid: false, message: 'At least one Trainer / Facilitator is required.', field: 'Trainer' };
+  if (trainersList.length > 10) return { valid: false, message: 'Maximum 10 trainers allowed per training.', field: 'Trainer' };
+
+  const seenTrainers = new Set();
+  for (let i = 0; i < trainersList.length; i++) {
+    const tr = trainersList[i];
+    if (isTbdString(tr)) return { valid: false, message: `Trainer name ("${tr}") cannot be TBD. Please enter confirmed trainer.`, field: 'Trainer' };
+    const lower = tr.toLowerCase();
+    if (seenTrainers.has(lower)) {
+      return { valid: false, message: `Duplicate trainer "${tr}" detected. Each trainer must be unique.`, field: 'Trainer' };
+    }
+    seenTrainers.add(lower);
+  }
 
   const venue = String(data.Venue || '').trim();
   if (!venue) return { valid: false, message: 'Training Venue is required.', field: 'Venue' };
