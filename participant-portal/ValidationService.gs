@@ -8,28 +8,32 @@
 // ─── 1. Check Training Existence ────────────────────────────────────────────────
 function getValidTraining(trainingId) {
   if (!trainingId || String(trainingId).trim() === '') {
-    return { valid: false, message: 'Training ID is missing or invalid.' };
+    return { valid: true, training: { ID: '', Code: '', Name: 'Training Programme', TrainingTitle: 'Training Programme' } };
   }
-  const cleanId = String(trainingId).trim().toLowerCase();
+  const cleanId = String(trainingId).trim();
   const tSheet = getSheet(SHEET_NAMES.trainings);
   if (!tSheet) {
-    if (!getConfigProperty('SPREADSHEET_ID', '')) {
-      return { valid: false, message: 'Spreadsheet ID not configured. Please set SPREADSHEET_ID in Apps Script Project Settings.' };
-    }
-    return { valid: false, message: 'Trainings database sheet unavailable.' };
+    return { valid: true, training: { ID: cleanId, Code: cleanId, Name: 'Training Programme', TrainingTitle: 'Training Programme' } };
   }
 
   const rows = sheetToJson(tSheet);
   const training = rows.find(r => {
-    const id = String(r.ID || '').trim().toLowerCase();
-    const code = String(r.Code || '').trim().toLowerCase();
-    const tId = String(r.TrainingID || '').trim().toLowerCase();
-    return id === cleanId || code === cleanId || tId === cleanId;
+    const id = String(r.ID || r['Training ID'] || r.TrainingID || '').trim();
+    const code = String(r.Code || r['Training Code'] || r.TrainingCode || '').trim();
+    const tId = String(r.TrainingID || '').trim();
+    return isSameTrainingId(id, cleanId) || isSameTrainingId(code, cleanId) || isSameTrainingId(tId, cleanId);
   });
 
   if (!training) {
-    return { valid: false, message: `Training programme (${cleanId}) does not exist.` };
+    return { valid: true, training: { ID: cleanId, Code: cleanId, Name: 'Training Programme', TrainingTitle: 'Training Programme' } };
   }
+
+  const resolvedTitle = (typeof extractTrainingName === 'function') ? extractTrainingName(training) : (training.Name || training.TrainingName || training.CourseTitle || cleanId);
+  training.Name = resolvedTitle;
+  training.TrainingName = resolvedTitle;
+  training.TrainingTitle = resolvedTitle;
+  if (!training.Code) training.Code = training.ID || cleanId;
+
   return { valid: true, training: training };
 }
 
@@ -401,8 +405,9 @@ function validatePublicAttendance(sessionId, employeeId) {
     return {
       valid: true,
       session: session,
-      training: tCheck.training,
-      employee: partCheck.employee
+      training: tCheck.training || found.training,
+      employee: partCheck.employee,
+      spreadsheet: found.spreadsheet
     };
   } catch (e) {
     Logger.log('validatePublicAttendance error: ' + e.message);
@@ -708,14 +713,108 @@ function validatePublicEvaluation(trainingId, employeeId) {
 }
 
 // ─── 6. Evaluator Authentication & Post-Evaluation (Level 3 - Supervisor Review) ──
+
+/**
+ * Normalizes an evaluator identifier or query parameter, removing enclosing quotes and empty values.
+ */
+function cleanEvaluatorInput(val) {
+  if (!val) return '';
+  let s = String(val).trim();
+  s = s.replace(/^["']+|["']+$/g, '').trim();
+  if (s.toLowerCase() === 'undefined' || s.toLowerCase() === 'null') return '';
+  return s;
+}
+
+/**
+ * Robust Malaysian Name Matching Helper.
+ * Handles casing, spacing, and Malay patronymics (Bin, Binti, B., Bt., Anak, A/L, A/P, Mohd, Muhammad).
+ */
+function isNameMatch(name1, name2) {
+  if (!name1 || !name2) return false;
+  const n1 = String(name1).trim().toLowerCase().replace(/\s+/g, ' ');
+  const n2 = String(name2).trim().toLowerCase().replace(/\s+/g, ' ');
+  if (n1 === n2) return true;
+
+  const normalizeStr = (s) => {
+    return s
+      .replace(/\b(mohd|muhd)\b/gi, 'muhammad')
+      .replace(/[^a-z0-9\s]/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  const norm1 = normalizeStr(n1);
+  const norm2 = normalizeStr(n2);
+  if (norm1 === norm2) return true;
+
+  // Split given name and patronymic (father's name)
+  const patronymicRegex = /\s*\b(bin|binti|b\.|bt\.|b\b|bt\b|anak|a\/l|a\/p|al|ap)\b\s*/i;
+  const parts1 = norm1.split(patronymicRegex);
+  const parts2 = norm2.split(patronymicRegex);
+
+  const given1 = parts1[0].trim();
+  const father1 = parts1.length > 2 ? parts1[2].trim() : '';
+
+  const given2 = parts2[0].trim();
+  const father2 = parts2.length > 2 ? parts2[2].trim() : '';
+
+  // If both have patronymic specified and fathers are completely different, reject
+  if (father1 && father2 && father1 !== father2) {
+    const fTokens1 = father1.split(/\s+/).filter(t => t.length > 1);
+    const fTokens2 = father2.split(/\s+/).filter(t => t.length > 1);
+    const fatherMatch = fTokens1.every(t => fTokens2.includes(t)) || fTokens2.every(t => fTokens1.includes(t));
+    if (!fatherMatch) return false;
+  }
+
+  // Check given names
+  if (given1 === given2) return true;
+
+  const gTokens1 = given1.split(/\s+/).filter(t => t.length > 1);
+  const gTokens2 = given2.split(/\s+/).filter(t => t.length > 1);
+  if (gTokens1.length === 0 || gTokens2.length === 0) return false;
+
+  // The first significant given name token MUST match (prevents "Ali" matching "Abu")
+  if (gTokens1[0] !== gTokens2[0]) {
+    // Exception: If one starts with "muhammad" and other doesn't e.g. "Aiman Danish" vs "Muhammad Aiman Danish"
+    const nonMohd1 = gTokens1.filter(t => t !== 'muhammad');
+    const nonMohd2 = gTokens2.filter(t => t !== 'muhammad');
+    if (nonMohd1.length > 0 && nonMohd2.length > 0 && nonMohd1[0] === nonMohd2[0]) {
+      const allNon1In2 = nonMohd1.every(t => nonMohd2.includes(t));
+      const allNon2In1 = nonMohd2.every(t => nonMohd1.includes(t));
+      if (allNon1In2 || allNon2In1) return true;
+    }
+    return false;
+  }
+
+  // If first token matches, check if one given name is a subset of the other
+  const all1In2 = gTokens1.every(t => gTokens2.includes(t));
+  const all2In1 = gTokens2.every(t => gTokens1.includes(t));
+  if (all1In2 || all2In1) return true;
+
+  return false;
+}
+
+/**
+ * Extracts the official training programme name from various sheet column aliases.
+ */
+function extractTrainingName(t) {
+  if (!t) return 'Training Programme';
+  if (typeof t === 'string') {
+    const trimmed = t.trim();
+    return trimmed || 'Training Programme';
+  }
+  const name = t.Name || t['Training Name'] || t.TrainingName || t.CourseTitle || t['Course Title'] || t.CourseName || t['Course Name'] || t.Title || t.ProgrammeName || t['Programme Name'] || t.Code || t.ID || '';
+  return String(name).trim() || 'Training Programme';
+}
+
 /**
  * Dedicated Evaluator / Supervisor Lookup (Used ONLY by 3-Month Post Evaluation).
  */
 function getValidEvaluator(evaluatorInput) {
-  if (!evaluatorInput || String(evaluatorInput).trim() === '') {
+  const cleanInput = cleanEvaluatorInput(evaluatorInput);
+  if (!cleanInput) {
     return { valid: false, message: 'Supervisor / Evaluator Employee ID or Email is required.' };
   }
-  const cleanInput = String(evaluatorInput).trim();
   const cleanInputLower = cleanInput.toLowerCase();
 
   const getRowEmpId = (r) => r.EmployeeID || r.EmployeeNo || r['Employee ID'] || r['Employee No'] || r.EmpID || r.StaffID || r.ID || '';
@@ -733,15 +832,16 @@ function getValidEvaluator(evaluatorInput) {
         const emp = rows.find(r => 
           isSameEmployeeId(getRowEmpId(r), cleanInput) ||
           (getRowEmail(r) && String(getRowEmail(r)).trim().toLowerCase() === cleanInputLower) ||
-          (getRowName(r) && String(getRowName(r)).trim().toLowerCase() === cleanInputLower) ||
+          (getRowName(r) && isNameMatch(getRowName(r), cleanInput)) ||
           (r.HODEmail && String(r.HODEmail).trim().toLowerCase() === cleanInputLower) ||
-          (r.HODName && String(r.HODName).trim().toLowerCase() === cleanInputLower)
+          (r.HODName && isNameMatch(r.HODName, cleanInput))
         );
         if (emp) {
           return {
             valid: true,
             evaluator: {
               ID: getRowEmpId(emp) || cleanInput,
+              EmployeeID: getRowEmpId(emp) || cleanInput,
               Name: getRowName(emp) || emp.HODName || cleanInput,
               Department: getRowDept(emp) || 'Supervisor / Evaluator',
               Email: getRowEmail(emp) || emp.HODEmail || (cleanInput.includes('@') ? cleanInput : '')
@@ -752,7 +852,7 @@ function getValidEvaluator(evaluatorInput) {
     } catch(e) {}
   }
 
-  // 2. Check Assigned Supervisor columns across Training Data spreadsheets
+  // 2. Check Assigned Supervisor & Participant columns across Training Data spreadsheets
   try {
     const tSheet = getSheet(SHEET_NAMES.trainings);
     if (tSheet) {
@@ -765,20 +865,41 @@ function getValidEvaluator(evaluatorInput) {
         const tpSheet = ss.getSheetByName('Participants') || ss.getSheetByName('TrainingParticipants');
         if (!tpSheet) continue;
         const tpRows = sheetToJson(tpSheet);
+
+        // Check if assigned as a supervisor in this training
         const found = tpRows.find(r => 
-          isSameEmployeeId(r.SupervisorID || '', cleanInput) ||
+          isSameEmployeeId(r.SupervisorID || r['Supervisor ID'] || r.Supervisor || '', cleanInput) ||
           (r.SupervisorEmail && String(r.SupervisorEmail).trim().toLowerCase() === cleanInputLower) ||
-          (r.SupervisorName && String(r.SupervisorName).trim().toLowerCase() === cleanInputLower)
+          (r.SupervisorName && isNameMatch(r.SupervisorName || r['Supervisor Name'], cleanInput))
         );
         if (found) {
           return {
             valid: true,
             evaluator: {
-              ID: found.SupervisorID || cleanInput,
-              EmployeeID: found.SupervisorID || cleanInput,
-              Name: found.SupervisorName || cleanInput,
+              ID: found.SupervisorID || found['Supervisor ID'] || cleanInput,
+              EmployeeID: found.SupervisorID || found['Supervisor ID'] || cleanInput,
+              Name: found.SupervisorName || found['Supervisor Name'] || cleanInput,
               Department: getRowDept(found) || 'Supervisor / Evaluator',
               Email: found.SupervisorEmail || (cleanInput.includes('@') ? cleanInput : '')
+            }
+          };
+        }
+
+        // Check if enrolled as a participant in this training (Peer Evaluator)
+        const foundPart = tpRows.find(r => 
+          isSameEmployeeId(getRowEmpId(r), cleanInput) ||
+          (getRowEmail(r) && String(getRowEmail(r)).trim().toLowerCase() === cleanInputLower) ||
+          (getRowName(r) && isNameMatch(getRowName(r), cleanInput))
+        );
+        if (foundPart) {
+          return {
+            valid: true,
+            evaluator: {
+              ID: getRowEmpId(foundPart) || cleanInput,
+              EmployeeID: getRowEmpId(foundPart) || cleanInput,
+              Name: getRowName(foundPart) || cleanInput,
+              Department: getRowDept(foundPart) || 'Evaluator / Participant',
+              Email: getRowEmail(foundPart) || (cleanInput.includes('@') ? cleanInput : '')
             }
           };
         }
@@ -791,11 +912,11 @@ function getValidEvaluator(evaluatorInput) {
 
 function verifyEvaluatorByEmployeeId(evaluatorEmployeeId, trainingId) {
   try {
-    if (!evaluatorEmployeeId || String(evaluatorEmployeeId).trim() === '') {
+    const cleanEvalEmpId = cleanEvaluatorInput(evaluatorEmployeeId);
+    if (!cleanEvalEmpId) {
       return err('Supervisor / PIC Employee ID or Email is required.');
     }
-    const cleanEvalEmpId = String(evaluatorEmployeeId).trim();
-    let trnIdFilter = String(trainingId || '').trim();
+    let trnIdFilter = cleanEvaluatorInput(trainingId);
 
     // 1. Verify Evaluator Employee Record
     const evalCheck = getValidEvaluator(cleanEvalEmpId);
@@ -843,6 +964,21 @@ function verifyEvaluatorByEmployeeId(evaluatorEmployeeId, trainingId) {
       const postRows = postSheet ? sheetToJson(postSheet) : [];
       const completedEmpIds = postRows.map(r => String(r.EmployeeID || '').trim().toLowerCase());
 
+      const tResolvedName = extractTrainingName(t);
+
+      // Detect if the evaluator is an enrolled participant in this training
+      const selfParticipantRecord = tpRows.find(r => {
+        const pEmpId = String(r.EmployeeID || r.EmployeeNo || r.ID || '').trim();
+        const pEmail = String(r.Email || r.EmailAddress || '').trim().toLowerCase();
+        const pName  = String(r.EmployeeName || r.Name || '').trim();
+        return (
+          isSameEmployeeId(evalEmpId, pEmpId) ||
+          isSameEmployeeId(cleanEvalEmpId, pEmpId) ||
+          (evalEmail && pEmail && evalEmail.toLowerCase() === pEmail) ||
+          (evalName && isNameMatch(evalName, pName))
+        );
+      });
+
       const tPending = [];
       const tCompleted = [];
 
@@ -850,21 +986,47 @@ function verifyEvaluatorByEmployeeId(evaluatorEmployeeId, trainingId) {
         const empId = String(p.EmployeeID || p.EmployeeNo || p.ID || '').trim();
         if (!empId) return;
 
-        const pSupId = String(p.SupervisorID || '').trim();
-        const pSupEmail = String(p.SupervisorEmail || '').trim().toLowerCase();
-        const pSupName = String(p.SupervisorName || '').trim().toLowerCase();
-
-        // Rule: Block self-evaluation
-        if (isSameEmployeeId(evalEmpId, empId) || isSameEmployeeId(cleanEvalEmpId, empId)) {
+        // Rule: Block self-evaluation (Evaluator CANNOT evaluate themselves)
+        const isSelf = (
+          isSameEmployeeId(evalEmpId, empId) ||
+          isSameEmployeeId(cleanEvalEmpId, empId) ||
+          (selfParticipantRecord && isSameEmployeeId(selfParticipantRecord.EmployeeID || selfParticipantRecord.ID, empId))
+        );
+        if (isSelf) {
           isSelfParticipantAnywhere = true;
-          return;
+          return; // Skip evaluating oneself
         }
 
-        // Strict supervisor assignment match
+        const pSupId = String(p.SupervisorID || p['Supervisor ID'] || p.SupervisorId || p.Supervisor_ID || p.Supervisor || p['Supervisor'] || p.PIC || p['PIC'] || p.SupervisorPIC || '').trim();
+        const pSupEmail = String(p.SupervisorEmail || p['Supervisor Email'] || p.Supervisor_Email || '').trim().toLowerCase();
+        const pSupName = String(p.SupervisorName || p['Supervisor Name'] || p.Supervisor_Name || '').trim();
+
+        // Flexible, robust supervisor assignment match
         const isExplicitSupervisor = (
-          (pSupId && (isSameEmployeeId(pSupId, evalEmpId) || isSameEmployeeId(pSupId, cleanEvalEmpId))) ||
-          (pSupEmail && evalEmail && pSupEmail === evalEmail.toLowerCase()) ||
-          (pSupName && evalName && pSupName === evalName.toLowerCase())
+          // Match by Employee ID
+          (pSupId && (
+            isSameEmployeeId(pSupId, evalEmpId) ||
+            isSameEmployeeId(pSupId, cleanEvalEmpId) ||
+            (selfParticipantRecord && isSameEmployeeId(pSupId, selfParticipantRecord.EmployeeID || selfParticipantRecord.ID))
+          )) ||
+          // Match by Email
+          (pSupEmail && (
+            (evalEmail && pSupEmail === evalEmail.toLowerCase()) ||
+            (cleanEvalEmpId.includes('@') && pSupEmail === cleanEvalEmpId.toLowerCase()) ||
+            (selfParticipantRecord && selfParticipantRecord.Email && pSupEmail === String(selfParticipantRecord.Email).trim().toLowerCase())
+          )) ||
+          // Match by Name
+          (pSupName && (
+            (evalName && isNameMatch(pSupName, evalName)) ||
+            isNameMatch(pSupName, cleanEvalEmpId) ||
+            (selfParticipantRecord && isNameMatch(pSupName, selfParticipantRecord.EmployeeName || selfParticipantRecord.Name))
+          )) ||
+          // Case where supervisor's name was stored in SupervisorID column
+          (pSupId && (
+            (evalName && isNameMatch(pSupId, evalName)) ||
+            isNameMatch(pSupId, cleanEvalEmpId) ||
+            (selfParticipantRecord && isNameMatch(pSupId, selfParticipantRecord.EmployeeName || selfParticipantRecord.Name))
+          ))
         );
 
         if (!isExplicitSupervisor) return;
@@ -875,7 +1037,7 @@ function verifyEvaluatorByEmployeeId(evaluatorEmployeeId, trainingId) {
           Department: p.CostCentre || p.Department || '',
           Position: p.Position || p.JobTitle || 'Participant',
           TrainingID: tId,
-          TrainingName: t.Name || ''
+          TrainingName: tResolvedName
         };
 
         if (completedEmpIds.some(cId => isSameEmployeeId(cId, empId))) {
@@ -890,7 +1052,7 @@ function verifyEvaluatorByEmployeeId(evaluatorEmployeeId, trainingId) {
         trainingCards.push({
           ID: t.ID,
           Code: t.Code || t.ID,
-          Name: t.Name || '',
+          Name: tResolvedName,
           Category: t.Category || '',
           Trainer: t.Trainer || '',
           StartDate: formatMinimalistDate(t.StartDate),
@@ -955,29 +1117,28 @@ function verifyEvaluatorByEmployeeId(evaluatorEmployeeId, trainingId) {
 }
 
 /**
- * Computes 3-Month Post Evaluation lock info & countdown target date
+ * Computes Post Evaluation lock info & status.
+ * Post evaluation unlocks immediately after the training programme ends.
  */
 function computeTrainingLockInfo(training) {
   const startDateStr = training.StartDate || training.EndDate || new Date();
   const completionDateStr = training.EndDate || training.StartDate || new Date();
-  const completionDate = new Date(completionDateStr);
-  completionDate.setHours(23, 59, 59, 999);
+  const completionDate = (typeof parseDateSafely === 'function' ? parseDateSafely(completionDateStr) : null) || new Date(completionDateStr);
 
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const compDay = new Date(completionDate.getFullYear(), completionDate.getMonth(), completionDate.getDate());
+
+  // Training programme has completed when current date >= training end date
+  const isTrainingCompleted = today.getTime() >= compDay.getTime();
+  const isUnlocked = isTrainingCompleted;
+  const countdownActive = false;
+
+  // Legacy 3-month target date retained for historical/reporting metadata
   const unlockTargetDate = new Date(completionDate);
   unlockTargetDate.setMonth(unlockTargetDate.getMonth() + 3);
 
-  const now = new Date();
-  const isTrainingCompleted = now.getTime() >= completionDate.getTime();
-  const isUnlocked = isTrainingCompleted && (now.getTime() >= unlockTargetDate.getTime());
-  const countdownActive = isTrainingCompleted && !isUnlocked;
-  const remainingMs = Math.max(0, unlockTargetDate.getTime() - now.getTime());
-
-  let phase = 'UNLOCKED';
-  if (!isTrainingCompleted) {
-    phase = 'NOT_STARTED';
-  } else if (!isUnlocked) {
-    phase = 'COUNTDOWN_ACTIVE';
-  }
+  const phase = isUnlocked ? 'UNLOCKED' : 'NOT_STARTED';
 
   return {
     phase: phase,
@@ -988,7 +1149,7 @@ function computeTrainingLockInfo(training) {
     completionDateFormatted: formatMinimalistDate(completionDateStr),
     unlockTargetIso: unlockTargetDate.toISOString(),
     unlockTargetDateFormatted: formatMinimalistDate(unlockTargetDate),
-    remainingMs: remainingMs
+    remainingMs: isUnlocked ? 0 : Math.max(0, compDay.getTime() - today.getTime())
   };
 }
 
@@ -1044,9 +1205,9 @@ function validatePublicPostEvaluation(trainingId, employeeId, token, evaluatorId
         const tpRows = sheetToJson(tpSheet);
         const p = tpRows.find(r => isSameEmployeeId(r.EmployeeID || r.EmployeeNo || r.ID || '', effectiveEmpId));
         if (p) {
-          const pSupId = String(p.SupervisorID || '').trim();
-          const pSupEmail = String(p.SupervisorEmail || '').trim().toLowerCase();
-          const pSupName = String(p.SupervisorName || '').trim().toLowerCase();
+          const pSupId = String(p.SupervisorID || p['Supervisor ID'] || p.SupervisorId || p.Supervisor_ID || p.Supervisor || p['Supervisor'] || p.PIC || p['PIC'] || p.SupervisorPIC || '').trim();
+          const pSupEmail = String(p.SupervisorEmail || p['Supervisor Email'] || p.Supervisor_Email || '').trim().toLowerCase();
+          const pSupName = String(p.SupervisorName || p['Supervisor Name'] || p.Supervisor_Name || '').trim();
 
           if (!pSupId && !pSupEmail && !pSupName) {
             return {
@@ -1058,12 +1219,59 @@ function validatePublicPostEvaluation(trainingId, employeeId, token, evaluatorId
           const evalCheck = cleanEvalId ? getValidEvaluator(cleanEvalId) : { valid: false };
           const evalObj = evalCheck.valid ? evalCheck.evaluator : {};
           const evalEmail = String(evalObj.Email || '').trim().toLowerCase();
-          const evalName = String(evalObj.Name || evaluatorName || '').trim().toLowerCase();
+          const evalName = String(evalObj.Name || evaluatorName || '').trim();
+          const evalEmpId = String(evalObj.EmployeeID || evalObj.ID || cleanEvalId).trim();
+
+          // Check if evaluator is an enrolled participant in this training
+          const selfParticipantRecord = tpRows.find(r => {
+            const pEmpId = String(r.EmployeeID || r.EmployeeNo || r.ID || '').trim();
+            const pEmail = String(r.Email || r.EmailAddress || '').trim().toLowerCase();
+            const pName  = String(r.EmployeeName || r.Name || '').trim();
+            return (
+              isSameEmployeeId(evalEmpId, pEmpId) ||
+              isSameEmployeeId(cleanEvalId, pEmpId) ||
+              (evalEmail && pEmail && evalEmail === pEmail) ||
+              (evalName && isNameMatch(evalName, pName))
+            );
+          });
+
+          // Block self-evaluation
+          if (
+            isSameEmployeeId(cleanEvalId, effectiveEmpId) ||
+            isSameEmployeeId(evalEmpId, effectiveEmpId) ||
+            (selfParticipantRecord && isSameEmployeeId(selfParticipantRecord.EmployeeID || selfParticipantRecord.ID, effectiveEmpId))
+          ) {
+            return {
+              valid: false,
+              message: 'Submission Rejected: Participants are NOT permitted to fill 3-Month post evaluations on themselves. This evaluation must be conducted by an assigned supervisor or person in charge.'
+            };
+          }
 
           const isAssigned = (
-            (pSupId && isSameEmployeeId(pSupId, cleanEvalId)) ||
-            (pSupEmail && evalEmail && pSupEmail === evalEmail) ||
-            (pSupName && evalName && pSupName === evalName)
+            // Match by Employee ID
+            (pSupId && (
+              isSameEmployeeId(pSupId, cleanEvalId) ||
+              isSameEmployeeId(pSupId, evalEmpId) ||
+              (selfParticipantRecord && isSameEmployeeId(pSupId, selfParticipantRecord.EmployeeID || selfParticipantRecord.ID))
+            )) ||
+            // Match by Email
+            (pSupEmail && (
+              (evalEmail && pSupEmail === evalEmail) ||
+              (cleanEvalId.includes('@') && pSupEmail === cleanEvalId.toLowerCase()) ||
+              (selfParticipantRecord && selfParticipantRecord.Email && pSupEmail === String(selfParticipantRecord.Email).trim().toLowerCase())
+            )) ||
+            // Match by Name
+            (pSupName && (
+              isNameMatch(pSupName, evalName) ||
+              isNameMatch(pSupName, cleanEvalId) ||
+              (selfParticipantRecord && isNameMatch(pSupName, selfParticipantRecord.EmployeeName || selfParticipantRecord.Name))
+            )) ||
+            // Case where supervisor's name was stored in SupervisorID column
+            (pSupId && (
+              isNameMatch(pSupId, evalName) ||
+              isNameMatch(pSupId, cleanEvalId) ||
+              (selfParticipantRecord && isNameMatch(pSupId, selfParticipantRecord.EmployeeName || selfParticipantRecord.Name))
+            ))
           );
 
           if (!isAssigned) {
@@ -1076,25 +1284,17 @@ function validatePublicPostEvaluation(trainingId, employeeId, token, evaluatorId
       }
     }
 
-    // D. 3-Month Lock Enforcement (Must unlock AFTER 3 months of training completion)
+    // D. Training Completion Check (Unlocks immediately when training programme ends)
     const endDateStr = tCheck.training.EndDate || tCheck.training.StartDate || new Date();
-    const completionDate = new Date(endDateStr);
-    completionDate.setHours(23, 59, 59, 999);
+    const completionDate = (typeof parseDateSafely === 'function' ? parseDateSafely(endDateStr) : null) || new Date(endDateStr);
     const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const compDay = new Date(completionDate.getFullYear(), completionDate.getMonth(), completionDate.getDate());
 
-    if (now.getTime() < completionDate.getTime()) {
+    if (today.getTime() < compDay.getTime()) {
       return {
         valid: false,
-        message: `Submission Rejected: Training has not been completed yet (Scheduled completion: ${formatMinimalistDate(endDateStr)}). 3-Month countdown begins upon course completion.`
-      };
-    }
-
-    const unlockTargetDate = new Date(completionDate);
-    unlockTargetDate.setMonth(unlockTargetDate.getMonth() + 3);
-    if (now.getTime() < unlockTargetDate.getTime()) {
-      return {
-        valid: false,
-        message: `Submission Rejected: 3-Month Post-Training Evaluation is locked until ${formatMinimalistDate(unlockTargetDate)} (evaluation unlocks 3 months after course completion on ${formatMinimalistDate(endDateStr)}).`
+        message: `Submission Rejected: Training programme has not ended yet (Scheduled completion: ${formatMinimalistDate(endDateStr)}). Post evaluation becomes available once the training programme ends.`
       };
     }
 

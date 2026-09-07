@@ -848,4 +848,26 @@
     line-height: 1.6;
     margin-bottom: 20px;
   }
+
+  /* Print Styles */
+  @media print {
+    .theme-toggle-btn, .btn, .filter-controls, .modal-footer, button {
+      display: none !important;
+    }
+    body {
+      background: #fff !important;
+      color: #000 !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      padding: 0 !important;
+    }
+    .portal-container, .eval-form-card, .neo-card, .modal-box {
+      box-shadow: none !important;
+      border: 1px solid #ccc !important;
+      max-width: 100% !important;
+      width: 100% !important;
+      margin: 0 !important;
+      padding: 16px !important;
+    }
+  }
 </style>

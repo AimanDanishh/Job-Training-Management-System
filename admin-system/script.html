@@ -672,19 +672,21 @@ const ApolloCountdown = {
         shortText: 'Completed',
         detail: `${typeLabel} is complete`,
         isCompleted: true,
-        daysDiff: 0
+        daysDiff: 0,
+        is3Mo: is3Mo
       };
     }
 
     if (isWaiting || !completionDateInput) {
       return {
         status: 'waiting',
-        label: 'Waiting for Training Completion',
-        badgeText: 'Waiting for Completion',
-        shortText: 'Waiting',
-        detail: 'Countdowns start once training is completed',
+        label: is3Mo ? 'Not Available' : 'Waiting for Training Completion',
+        badgeText: is3Mo ? 'Not Available' : 'Waiting for Completion',
+        shortText: is3Mo ? 'Not Available' : 'Waiting',
+        detail: is3Mo ? 'Evaluation becomes available once training programme ends' : 'Countdowns start once training is completed',
         isWaiting: true,
-        daysDiff: 0
+        daysDiff: 0,
+        is3Mo: is3Mo
       };
     }
 
@@ -692,16 +694,56 @@ const ApolloCountdown = {
     if (!completionDate) {
       return {
         status: 'waiting',
-        label: 'Waiting for Training Completion',
-        badgeText: 'Waiting for Completion',
-        shortText: 'Waiting',
+        label: is3Mo ? 'Not Available' : 'Waiting for Training Completion',
+        badgeText: is3Mo ? 'Not Available' : 'Waiting for Completion',
+        shortText: is3Mo ? 'Not Available' : 'Waiting',
         detail: 'No valid completion date found',
         isWaiting: true,
-        daysDiff: 0
+        daysDiff: 0,
+        is3Mo: is3Mo
       };
     }
 
-    const deadline = is3Mo ? this.calculate3MonthDeadline(completionDate) : this.calculate2WeekDeadline(completionDate);
+    const now = new Date();
+    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const compMidnight = new Date(completionDate.getFullYear(), completionDate.getMonth(), completionDate.getDate());
+    const compStr = formatMinimalistDate(completionDate);
+
+    // Supervisor Post Evaluation unlocks immediately once training ends
+    if (is3Mo) {
+      if (todayMidnight.getTime() < compMidnight.getTime()) {
+        return {
+          status: 'waiting',
+          label: 'Not Available',
+          badgeText: 'Not Available',
+          shortText: 'Not Available',
+          detail: `Evaluation unlocks after training ends on ${compStr}`,
+          completionDateStr: compStr,
+          completionDate: completionDate,
+          isWaiting: true,
+          daysDiff: 0,
+          is3Mo: true
+        };
+      }
+
+      // Training has ended: Evaluation is Unlocked & Pending
+      const daysSinceEnd = Math.round((todayMidnight.getTime() - compMidnight.getTime()) / (1000 * 60 * 60 * 24));
+      return {
+        status: 'pending',
+        label: 'Pending',
+        badgeText: 'Pending',
+        shortText: 'Pending',
+        detail: `Available for supervisor review since ${compStr}`,
+        completionDateStr: compStr,
+        completionDate: completionDate,
+        daysDiff: daysSinceEnd,
+        isPending: true,
+        isOpen: true,
+        is3Mo: true
+      };
+    }
+
+    const deadline = this.calculate2WeekDeadline(completionDate);
     if (!deadline) {
       return {
         status: 'waiting',
@@ -714,31 +756,11 @@ const ApolloCountdown = {
       };
     }
 
-    const now = new Date();
-    const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const deadlineMidnight = new Date(deadline.getFullYear(), deadline.getMonth(), deadline.getDate());
-
-    const diffDays = Math.round((deadlineMidnight.getTime() - nowMidnight.getTime()) / (1000 * 60 * 60 * 24));
-    const compStr = formatMinimalistDate(completionDate);
+    const diffDays = Math.round((deadlineMidnight.getTime() - todayMidnight.getTime()) / (1000 * 60 * 60 * 24));
     const deadStr = formatMinimalistDate(deadline);
 
     if (diffDays < 0) {
-      if (is3Mo) {
-        return {
-          status: 'completed',
-          label: 'Open for Review',
-          badgeText: 'Open Now',
-          shortText: 'Open Now',
-          detail: `Review opened on ${deadStr}`,
-          completionDateStr: compStr,
-          deadlineDateStr: deadStr,
-          daysDiff: diffDays,
-          deadlineDate: deadline,
-          completionDate: completionDate,
-          is3Mo: true,
-          isOpen: true
-        };
-      }
       const overdueDays = Math.abs(diffDays);
       const dayText = overdueDays === 1 ? '1 day' : `${overdueDays} days`;
       return {
@@ -837,6 +859,7 @@ const ApolloCountdown = {
       overdue: 'cancel',
       today: 'warning',
       approaching: 'schedule',
+      pending: 'schedule',
       normal: 'schedule',
       waiting: 'hourglass_empty'
     };
@@ -850,12 +873,14 @@ const ApolloCountdown = {
     const isOverdue = statusObj.status === 'overdue';
     const isToday = statusObj.status === 'today';
     const isWaiting = statusObj.status === 'waiting';
+    const isPending = statusObj.status === 'pending';
 
     let headerBg = '#F8FAFC';
     let borderColor = '#E2E8F0';
     if (isCompleted) { headerBg = '#F0FDF4'; borderColor = '#BBF7D0'; }
     else if (isOverdue) { headerBg = '#FEF2F2'; borderColor = '#FECACA'; }
     else if (isToday) { headerBg = '#FFF8CF'; borderColor = '#FEC30D'; }
+    else if (isPending) { headerBg = '#FFFBEB'; borderColor = '#FDE68A'; }
     else if (statusObj.status === 'approaching') { headerBg = '#FFFBEB'; borderColor = '#FDE68A'; }
 
     return `
@@ -879,17 +904,17 @@ const ApolloCountdown = {
               <strong style="color:var(--apollo-dark);display:block">${statusObj.completionDateStr || '-'}</strong>
             </div>
             <div class="col-6 col-md-4">
-              <span style="color:var(--apollo-gray-500)">${statusObj.is3Mo ? 'Review Opens:' : 'Target Deadline:'}</span>
-              <strong style="color:var(--apollo-dark);display:block">${statusObj.deadlineDateStr || '-'}</strong>
+              <span style="color:var(--apollo-gray-500)">${statusObj.is3Mo ? 'Availability:' : 'Target Deadline:'}</span>
+              <strong style="color:var(--apollo-dark);display:block">${statusObj.is3Mo ? 'Available Now' : (statusObj.deadlineDateStr || '-')}</strong>
             </div>
             <div class="col-12 col-md-4">
               <span style="color:var(--apollo-gray-500)">Current Status:</span>
-              <strong style="color:${isCompleted ? '#16A34A' : isOverdue ? '#E91C2D' : '#111111'};display:block">${statusObj.label}</strong>
+              <strong style="color:${isCompleted ? '#16A34A' : isOverdue ? '#E91C2D' : isPending ? '#B45309' : '#111111'};display:block">${statusObj.label}</strong>
             </div>
           </div>
         ` : `
           <div style="font-size:12px;color:var(--apollo-gray-500);padding-top:8px;border-top:1px dashed #CBD5E1">
-            Training is currently in progress or not yet marked as completed. The post-training countdown will automatically begin on the training completion date.
+            Training is currently in progress or not yet marked as completed. Evaluation will automatically become available once the training programme ends.
           </div>
         `}
       </div>

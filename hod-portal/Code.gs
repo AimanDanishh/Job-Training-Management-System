@@ -52,6 +52,7 @@ function doGet(e) {
     template.systemLogoUrl = String(systemLogoUrl);
     template.employeePortalUrl = String(getEmployeePortalUrl() || '');
     template.participantPortalUrl = String(getParticipantPortalUrl() || '');
+    template.appUrl = String(getAppUrl() || '');
 
     return template.evaluate()
       .setTitle(appTitle)
@@ -900,50 +901,65 @@ function submitHODDecision(data) {
 
           sendOrDraftEmail(requesterEmail, reqSubject, reqBody, 'requester', emailLog, reqHtml);
 
-          // Notification to Arina (HR Admin)
+          // Notification to HR Admin (Arina / HR team from "HR email" tab in EMPLOYEE_SPREADSHEET_ID)
           const adminPortalBase = getAdminPortalUrl();
           const adminDeepLink = adminPortalBase
             ? (adminPortalBase.includes('?') ? `${adminPortalBase}&page=training&id=${encodeURIComponent(cleanId)}` : `${adminPortalBase}?page=training&id=${encodeURIComponent(cleanId)}`)
             : '';
 
-          const arinaSubject = `Training Requisition — ${trainingName} | ${cleanId}`;
-          const arinaBody = `Dear Arina,\n\n` +
-            `The following Training Requisition has received all required approvals (HOD, C-Suite, HOHR):\n\n` +
-            `Training Name: ${trainingName} (${cleanId})\n` +
-            `Requester: ${requesterName} (${requesterId})\n` +
-            `HOHR Approved By: ${hodName} (${hodId})\n` +
-            `Cost Centre: ${hodCostCentre}\n` +
-            (providerStr ? `Provider: ${providerStr}\n` : '') +
-            trainersText +
-            `Date Approved: ${timestamp}\n\n` +
-            attachmentsText +
-            `The Admin System can now proceed with session creation, QR code generation, and participant attendance tracking.\n\n` +
-            (adminDeepLink ? `View Training Request in Admin Portal:\n${adminDeepLink}\n\n` : '') +
-            `Thank you,\nTrainHub Training Management System`;
+          const hrRecords = getHrEmailRecords();
+          const hrRecipients = (hrRecords && hrRecords.length > 0)
+            ? hrRecords
+            : [{ name: 'Arina', email: getConfigProperty('HR_EMAIL', 'arina.ismail@apollofood.com.my') }];
 
-          const arinaHtml = buildTrainingRequisitionEmailHtml({
-            requestId: cleanId,
-            trainingTitle: trainingName,
-            requesterName: requesterName,
-            employeeId: requesterId,
-            department: requesterCostCentre,
-            category: categoryStr,
-            provider: providerStr,
-            trainers: trainersList,
-            attachments: attachmentsList,
-            proposedDate: proposedDateStr,
-            duration: durationStr,
-            estimatedFee: feeStr,
-            status: 'Approved',
-            reviewUrl: adminDeepLink,
-            isAdminAction: true,
-            buttonText: 'VIEW TRAINING REQUEST',
-            badgeText: 'ACTION REQUIRED',
-            headlineText: 'Training Requisition Fully Approved & Ready for Session Setup',
-            greetingText: 'Dear Arina,',
-            introText: `The Training Requisition for "${trainingName}" (${cleanId}) submitted by ${requesterName} (${requesterId}) has received all required approvals (HOD, C-Suite, HOHR) and is ready for session setup.`
+          const seenHrEmails = new Set();
+          hrRecipients.forEach(hrTarget => {
+            const hrTargetEmail = hrTarget.email ? hrTarget.email.toLowerCase().trim() : '';
+            if (!hrTargetEmail || seenHrEmails.has(hrTargetEmail)) return;
+            seenHrEmails.add(hrTargetEmail);
+
+            const hrTargetName = formatDisplayName(hrTarget.name || 'HR Administrator');
+
+            const arinaSubject = `Training Requisition — ${trainingName} | ${cleanId}`;
+            const arinaBody = `Dear ${hrTargetName},\n\n` +
+              `The following Training Requisition has received all required approvals (HOD, C-Suite, HOHR):\n\n` +
+              `Training Name: ${trainingName} (${cleanId})\n` +
+              `Requester: ${requesterName} (${requesterId})\n` +
+              `HOHR Approved By: ${hodName} (${hodId})\n` +
+              `Cost Centre: ${hodCostCentre}\n` +
+              (providerStr ? `Provider: ${providerStr}\n` : '') +
+              trainersText +
+              `Date Approved: ${timestamp}\n\n` +
+              attachmentsText +
+              `The Admin System can now proceed with session creation, QR code generation, and participant attendance tracking.\n\n` +
+              (adminDeepLink ? `View Training Request in Admin Portal:\n${adminDeepLink}\n\n` : '') +
+              `Thank you,\nTrainHub Training Management System`;
+
+            const arinaHtml = buildTrainingRequisitionEmailHtml({
+              requestId: cleanId,
+              trainingTitle: trainingName,
+              requesterName: requesterName,
+              employeeId: requesterId,
+              department: requesterCostCentre,
+              category: categoryStr,
+              provider: providerStr,
+              trainers: trainersList,
+              attachments: attachmentsList,
+              proposedDate: proposedDateStr,
+              duration: durationStr,
+              estimatedFee: feeStr,
+              status: 'Approved',
+              reviewUrl: adminDeepLink,
+              isAdminAction: true,
+              buttonText: 'VIEW TRAINING REQUEST',
+              badgeText: 'ACTION REQUIRED',
+              headlineText: 'Training Requisition Fully Approved & Ready for Session Setup',
+              greetingText: `Dear ${hrTargetName},`,
+              introText: `The Training Requisition for "${trainingName}" (${cleanId}) submitted by ${requesterName} (${requesterId}) has received all required approvals (HOD, C-Suite, HOHR) and is ready for session setup.`
+            });
+
+            sendOrDraftEmail(hrTargetEmail, arinaSubject, arinaBody, `HR Admin [${hrTargetName}]`, emailLog, arinaHtml);
           });
-
         }
       }
     } catch (mailErr) {

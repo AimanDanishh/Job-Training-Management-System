@@ -3,17 +3,229 @@
 <head>
   <base target="_top">
   <meta charset="utf-8">
-  <title>Success — TrainHub HOD Portal</title>
+  <title>Action Confirmation — TrainHub Approval Portal</title>
   <?!= include('style'); ?>
 </head>
 <body>
-  <div class="container" style="max-width:500px;margin-top:60px;text-align:center;">
-    <div class="card" style="border-top:4px solid var(--success);">
-      <div style="font-size:56px;margin-bottom:16px;">✅</div>
-      <h2 style="color:var(--success);margin-bottom:12px;">Action Successfully Processed!</h2>
-      <p style="color:var(--text-secondary);margin-bottom:24px;" id="successMessage">Your managerial action and digital stamp have been recorded.</p>
-      <a href="<?= getAppUrl() ?>" style="display:inline-block;padding:10px 20px;background:var(--primary);color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">Return to Portal Home</a>
-    </div>
+  <!-- Fixed Top-Right Theme Toggle Button -->
+  <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle Light / Dark Theme">
+    <span id="themeToggleIcon">🌙</span>
+    <span id="themeToggleLabel">Dark</span>
+  </button>
+
+  <div class="app-container">
+    <!-- Top Header -->
+    <header class="portal-header">
+      <div class="brand-logo">
+        <div class="brand-logo-img-wrap" style="width:44px;height:44px;border-radius:50%;background:transparent;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;filter:drop-shadow(0 4px 10px rgba(233,28,45,0.25));">
+          <? if (typeof systemLogoUrl !== 'undefined' && systemLogoUrl) { ?>
+            <img src="<?= systemLogoUrl ?>" alt="System Logo" style="width:100%;height:100%;object-fit:contain;border-radius:50%;" referrerpolicy="no-referrer" onerror="this.style.display='none';document.getElementById('hod-header-logo-fallback').style.display='flex';">
+            <div id="hod-header-logo-fallback" style="display:none;align-items:center;justify-content:center;width:100%;height:100%;">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+                <circle cx="50" cy="50" r="48" fill="#E91C2D" />
+                <circle cx="50" cy="40" fill="none" stroke="#FFFFFF" stroke-width="2.5" opacity="0.4" />
+                <text x="50" y="63" font-family="'Segoe UI', -apple-system, sans-serif" font-weight="900" font-size="36" fill="#FFFFFF" text-anchor="middle">A</text>
+              </svg>
+            </div>
+          <? } else { ?>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+              <circle cx="50" cy="50" r="48" fill="#E91C2D" />
+              <circle cx="50" cy="40" fill="none" stroke="#FFFFFF" stroke-width="2.5" opacity="0.4" />
+              <text x="50" y="63" font-family="'Segoe UI', -apple-system, sans-serif" font-weight="900" font-size="36" fill="#FFFFFF" text-anchor="middle">A</text>
+            </svg>
+          <? } ?>
+        </div>
+        <div>
+          <div class="brand-title">JOB TRAINING MANAGEMENT SYSTEM</div>
+          <div class="brand-subtitle">Approval Portal</div>
+        </div>
+      </div>
+    </header>
+
+    <?
+      var rawAction = (typeof params !== 'undefined' && params && params.action) ? String(params.action).toLowerCase().trim() : '';
+      var rawReqId = (typeof params !== 'undefined' && params && (params.id || params.trainingId || params.req)) ? String(params.id || params.trainingId || params.req).trim() : '';
+      var appUrlStr = (typeof appUrl !== 'undefined' && appUrl) ? String(appUrl).trim() : '';
+      var returnUrl = appUrlStr ? (appUrlStr.split('?')[0] + '?page=review') : '?page=review';
+
+      var contentMap = {
+        'approve': {
+          title: 'Request Approved Successfully',
+          message: 'The training request has been successfully approved.'
+        },
+        'approved': {
+          title: 'Request Approved Successfully',
+          message: 'The training request has been successfully approved.'
+        },
+        'reject': {
+          title: 'Request Rejected Successfully',
+          message: 'The training request has been successfully rejected.'
+        },
+        'rejected': {
+          title: 'Request Rejected Successfully',
+          message: 'The training request has been successfully rejected.'
+        },
+        'return': {
+          title: 'Request Returned Successfully',
+          message: 'The training request has been successfully returned to the requester for further action.'
+        },
+        'returned': {
+          title: 'Request Returned Successfully',
+          message: 'The training request has been successfully returned to the requester for further action.'
+        }
+      };
+
+      var fallbackContent = {
+        title: 'Request Processed Successfully',
+        message: 'The training request action has been successfully processed.'
+      };
+
+      var resolved = contentMap[rawAction] || fallbackContent;
+    ?>
+
+    <!-- Main Success Card View Container -->
+    <main class="success-page-content" style="display:flex;justify-content:center;align-items:center;min-height:55vh;padding:24px 12px;">
+      <div class="card success-card" style="max-width:540px;width:100%;text-align:center;padding:48px 32px;box-shadow:var(--shadow-raised);border-radius:var(--radius-lg);border:1px solid var(--border-color);background:var(--bg-card);">
+        
+        <!-- Success Checkmark Icon Container -->
+        <div class="success-icon-wrap" style="width:72px;height:72px;border-radius:50%;background:var(--success-bg);box-shadow:var(--shadow-raised-sm);display:inline-flex;align-items:center;justify-content:center;font-size:36px;font-weight:800;color:var(--success);margin-bottom:24px;border:2px solid var(--success);">
+          ✓
+        </div>
+
+        <!-- Action-Specific Title -->
+        <h2 id="successTitle" style="font-size:24px;font-weight:800;color:var(--text-primary);margin-bottom:12px;letter-spacing:-0.3px;">
+          <?= resolved.title ?>
+        </h2>
+
+        <!-- Action-Specific Message -->
+        <p id="successMessage" style="font-size:15px;color:var(--text-secondary);line-height:1.6;margin-bottom:24px;max-width:440px;margin-left:auto;margin-right:auto;">
+          <?= resolved.message ?>
+        </p>
+
+        <!-- Optional Requisition ID Chip -->
+        <div id="successRequestIdContainer" style="display:<?= rawReqId ? 'inline-flex' : 'none' ?>;align-items:center;gap:6px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:8px 16px;margin-bottom:28px;">
+          <span style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Requisition ID:</span>
+          <span id="successRequestIdText" style="font-size:14px;font-weight:700;color:var(--accent);"><?= rawReqId ?></span>
+        </div>
+
+        <!-- Back to Requests Action Button -->
+        <div>
+          <a href="<?= returnUrl ?>" id="btnBackToRequests" class="btn btn-primary-action" onclick="navigateToRequests(event)" style="padding:12px 32px;font-size:14.5px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:8px;">
+            <span>📋</span> Back to Requests
+          </a>
+        </div>
+      </div>
+    </main>
   </div>
+
+  <script>
+    const ACTION_CONTENT_MAP = {
+      'approve': {
+        title: 'Request Approved Successfully',
+        message: 'The training request has been successfully approved.'
+      },
+      'approved': {
+        title: 'Request Approved Successfully',
+        message: 'The training request has been successfully approved.'
+      },
+      'reject': {
+        title: 'Request Rejected Successfully',
+        message: 'The training request has been successfully rejected.'
+      },
+      'rejected': {
+        title: 'Request Rejected Successfully',
+        message: 'The training request has been successfully rejected.'
+      },
+      'return': {
+        title: 'Request Returned Successfully',
+        message: 'The training request has been successfully returned to the requester for further action.'
+      },
+      'returned': {
+        title: 'Request Returned Successfully',
+        message: 'The training request has been successfully returned to the requester for further action.'
+      }
+    };
+
+    const FALLBACK_ACTION_CONTENT = {
+      title: 'Request Processed Successfully',
+      message: 'The training request action has been successfully processed.'
+    };
+
+    window.addEventListener('DOMContentLoaded', () => {
+      initTheme();
+      syncContentFromClientUrl();
+    });
+
+    function initTheme() {
+      const savedTheme = localStorage.getItem('portal_theme') || 'dark';
+      applyTheme(savedTheme);
+    }
+
+    function toggleTheme() {
+      const currentTheme = document.body.classList.contains('theme-light') ? 'light' : 'dark';
+      const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      applyTheme(newTheme);
+      localStorage.setItem('portal_theme', newTheme);
+    }
+
+    function applyTheme(theme) {
+      if (theme === 'light') {
+        document.body.classList.remove('theme-dark');
+        document.body.classList.add('theme-light');
+        const icon = document.getElementById('themeToggleIcon');
+        const label = document.getElementById('themeToggleLabel');
+        if (icon) icon.innerText = '☀️';
+        if (label) label.innerText = 'Light';
+      } else {
+        document.body.classList.remove('theme-light');
+        document.body.classList.add('theme-dark');
+        const icon = document.getElementById('themeToggleIcon');
+        const label = document.getElementById('themeToggleLabel');
+        if (icon) icon.innerText = '🌙';
+        if (label) label.innerText = 'Dark';
+      }
+    }
+
+    function syncContentFromClientUrl() {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const actionParam = (urlParams.get('action') || '').toLowerCase().trim();
+        const idParam = (urlParams.get('id') || urlParams.get('trainingId') || urlParams.get('req') || '').trim();
+
+        if (actionParam) {
+          const cfg = ACTION_CONTENT_MAP[actionParam] || FALLBACK_ACTION_CONTENT;
+          const titleEl = document.getElementById('successTitle');
+          const msgEl = document.getElementById('successMessage');
+          if (titleEl) titleEl.innerText = cfg.title;
+          if (msgEl) msgEl.innerText = cfg.message;
+        }
+
+        const idContainer = document.getElementById('successRequestIdContainer');
+        const idText = document.getElementById('successRequestIdText');
+        if (idParam) {
+          if (idText) idText.innerText = idParam;
+          if (idContainer) idContainer.style.display = 'inline-flex';
+        } else if (!idText || !idText.innerText.trim()) {
+          if (idContainer) idContainer.style.display = 'none';
+        }
+      } catch (e) {
+        console.warn('URL parameter sync notice:', e);
+      }
+    }
+
+    function navigateToRequests(e) {
+      if (e) e.preventDefault();
+      const appUrlStr = '<?= (typeof appUrl !== "undefined" && appUrl) ? appUrl : "" ?>';
+      const cleanBase = appUrlStr ? appUrlStr.split('?')[0] : window.location.href.split('?')[0];
+      const targetUrl = cleanBase + '?page=review';
+      try {
+        if (window.top && window.top.location) {
+          window.top.location.href = targetUrl;
+          return;
+        }
+      } catch (err) {}
+      window.location.href = targetUrl;
+    }
+  </script>
 </body>
 </html>

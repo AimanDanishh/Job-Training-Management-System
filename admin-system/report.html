@@ -502,7 +502,7 @@
                 <option value="hours" selected>1. Training Hours (Cost Centre vs Month)</option>
                 <option value="cost">2. Training Cost Breakdown</option>
                 <option value="title">3. Training Title & Enrolled Participants</option>
-                <option value="employee">4. Employee Training Attendance Report</option>
+                <option value="employee">4. Employee Training Record (S-HRS-FM-003)</option>
                 <option value="atp">5. Annual Training Plan (ATP)</option>
                 <option value="single">6. Single Programme Detailed Summary</option>
               </select>
@@ -631,6 +631,7 @@
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px" id="report-output-header">
             <div>
               <h3 style="font-size:16px; font-weight:800; color:#1E293B; margin:0 0 2px" id="report-output-title">Report Title</h3>
+              <div id="report-output-doc-no" style="display:none; font-size:12px; color:#64748B; font-weight:600; margin-bottom:2px">Document No.: S-HRS-FM-003</div>
               <p style="font-size:12px; color:#64748B; margin:0" id="report-output-sub">Generated report preview</p>
             </div>
           </div>
@@ -1746,8 +1747,11 @@
 
   function renderCustomReportTable(type, data, filters) {
     const titleEl = document.getElementById('report-output-title');
+    const docNoEl = document.getElementById('report-output-doc-no');
     const subEl   = document.getElementById('report-output-sub');
     const tableContainer = document.getElementById('report-table-container');
+
+    if (docNoEl) docNoEl.style.display = 'none';
 
     const year = filters.year || '2026';
 
@@ -1764,7 +1768,11 @@
       subEl.textContent   = `Participant list & training session details by Training Title`;
       tableContainer.innerHTML = buildTitleReportHtml(data);
     } else if (type === 'employee') {
-      titleEl.textContent = `4. Employee Training Report`;
+      titleEl.textContent = `Employee Training Record`;
+      if (docNoEl) {
+        docNoEl.textContent = `Document No.: S-HRS-FM-003`;
+        docNoEl.style.display = 'block';
+      }
       subEl.textContent   = `Employee training attendance & total hours summary`;
       tableContainer.innerHTML = buildEmployeeReportHtml(data);
     } else if (type === 'atp') {
@@ -1962,6 +1970,13 @@
     });
 
     return `
+      <div class="report-table-print-header" style="padding:10px 0 14px; margin-bottom:12px; border-bottom:1px solid #E2E8F0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px">
+        <div>
+          <div style="font-size:16px; font-weight:800; color:#1E293B">Employee Training Record</div>
+          <div style="font-size:12px; font-weight:600; color:#64748B">Document No.: S-HRS-FM-003</div>
+        </div>
+        <div style="font-size:12px; color:#64748B">Apollo Job Training System</div>
+      </div>
       <table class="table-report">
         <thead>
           <tr>

@@ -11,10 +11,11 @@ function getTrainingInfo(trainingId) {
     if (!tCheck.valid) return err(tCheck.message);
 
     const t = tCheck.training;
+    const resolvedName = (typeof extractTrainingName === 'function') ? extractTrainingName(t) : (t.Name || t.TrainingName || t.CourseTitle || t.Code || '');
     return ok({
       ID: t.ID,
       Code: t.Code || '',
-      Name: t.Name || '',
+      Name: resolvedName,
       Category: t.Category || '',
       Trainer: t.Trainer || '',
       StartDate: formatMinimalistDate(t.StartDate),
@@ -52,52 +53,33 @@ function getPostEvalTrainingStatus(trainingId) {
 
     if (!t) return err('Training programme not found.');
 
-    // 3-Month Lock Status Calculation: Must unlock AFTER 3 months of training completion
-    const startDateStr = t.StartDate || t.EndDate || new Date();
-    const completionDateStr = t.EndDate || t.StartDate || new Date();
-    const startDate = new Date(startDateStr);
-    const completionDate = new Date(completionDateStr);
-    completionDate.setHours(23, 59, 59, 999);
-    
-    // Target unlock date is exactly 3 months after course completion
-    const unlockTargetDate = new Date(completionDate);
-    unlockTargetDate.setMonth(unlockTargetDate.getMonth() + 3);
-    
-    const now = new Date();
-    const isTrainingCompleted = now.getTime() >= completionDate.getTime();
-    const isUnlocked = isTrainingCompleted && (now.getTime() >= unlockTargetDate.getTime());
-    const countdownActive = isTrainingCompleted && !isUnlocked;
-    const remainingMs = Math.max(0, unlockTargetDate.getTime() - now.getTime());
+    const resolvedName = (typeof extractTrainingName === 'function') ? extractTrainingName(t) : (t.Name || t.TrainingName || t.CourseTitle || t.Code || '');
 
-    let phase = 'UNLOCKED';
-    if (!isTrainingCompleted) {
-      phase = 'NOT_STARTED'; // Training date not reached yet
-    } else if (!isUnlocked) {
-      phase = 'COUNTDOWN_ACTIVE'; // Training completed, counting down 3 months
-    }
+    // Post Evaluation Lock Status Calculation: Unlocks immediately when training programme ends
+    const lockInfo = (typeof computeTrainingLockInfo === 'function') ? computeTrainingLockInfo(t) : {
+      phase: 'UNLOCKED',
+      isTrainingCompleted: true,
+      isUnlocked: true,
+      countdownActive: false,
+      startDateFormatted: formatMinimalistDate(t.StartDate),
+      completionDateFormatted: formatMinimalistDate(t.EndDate || t.StartDate),
+      unlockTargetIso: new Date().toISOString(),
+      unlockTargetDateFormatted: formatMinimalistDate(t.EndDate || t.StartDate),
+      remainingMs: 0
+    };
 
     return ok({
       training: {
         ID: t.ID,
         Code: t.Code || t.ID,
-        Name: t.Name || '',
+        Name: resolvedName,
         Category: t.Category || '',
         Trainer: t.Trainer || '',
         StartDate: formatMinimalistDate(t.StartDate),
         EndDate: formatMinimalistDate(t.EndDate),
-        CompletionDate: formatMinimalistDate(completionDateStr)
+        CompletionDate: formatMinimalistDate(t.EndDate || t.StartDate)
       },
-      lockInfo: {
-        phase: phase, // 'NOT_STARTED' | 'COUNTDOWN_ACTIVE' | 'UNLOCKED'
-        isTrainingCompleted: isTrainingCompleted,
-        isUnlocked: isUnlocked,
-        countdownActive: countdownActive,
-        startDateFormatted: formatMinimalistDate(startDateStr),
-        completionDateFormatted: formatMinimalistDate(completionDateStr),
-        unlockTargetIso: unlockTargetDate.toISOString(),
-        unlockTargetDateFormatted: formatMinimalistDate(unlockTargetDate),
-        remainingMs: remainingMs
-      }
+      lockInfo: lockInfo
     });
   } catch(e) {
     Logger.log('getPostEvalTrainingStatus error: ' + e.message);

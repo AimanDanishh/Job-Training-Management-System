@@ -83,7 +83,8 @@
 <div id="participant-checkin-view" style="display:none; min-height: 100vh; background: #F8FAFC; padding: 20px; box-sizing: border-box; width: 100%; max-width: 100%;">
   <div class="qr-checkin-card">
     <div class="checkin-header">
-      <span class="session-badge" id="p-session-badge">Session Attendance</span>
+      <span class="session-badge" id="p-session-badge">Training Attendance List</span>
+      <div style="font-size:12px;font-weight:600;color:#64748B;margin:2px 0 6px">Document No.: S-HRS-FM-009</div>
       <h2 id="p-training-title" style="font-size:20px; font-weight:800; color:#1E293B; margin:4px 0 6px">Loading Training...</h2>
       <h4 id="p-session-name" style="font-size:15px; font-weight:600; color:#2563EB; margin:0 0 10px">-</h4>
       <div style="display:flex; justify-content:center; gap:16px; font-size:12.5px; color:#64748B; background:#F1F5F9; padding:8px 14px; border-radius:8px">
@@ -152,7 +153,11 @@
   <div class="main-area">
     <header class="topbar">
       <button id="sidebar-toggle" class="btn-th btn-secondary btn-sm sidebar-toggle-btn" style="display:none" aria-label="Toggle navigation menu"><span class="icon sm">menu</span></button>
-      <div style="flex:1"><h1 class="topbar-title">Attendance Management</h1><p class="topbar-sub" id="topbar-sub">Select a training to view attendance</p></div>
+      <div style="flex:1">
+        <h1 class="topbar-title">Training Attendance List</h1>
+        <div style="font-size:12px;color:var(--apollo-gray-500);font-weight:600;margin-top:2px">Document No.: S-HRS-FM-009</div>
+        <p class="topbar-sub" id="topbar-sub">Select a training to view attendance</p>
+      </div>
     </header>
 
     <main class="page-content">
@@ -189,7 +194,7 @@
       <div id="add-day-section" style="display:none" class="mt-4">
         <div class="card-th" style="position:relative">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
-            <h4 style="font-size:14px;font-weight:700;color:#1E293B;margin:0">Add Manual Attendance Records</h4>
+            <h4 style="font-size:14px;font-weight:700;color:#1E293B;margin:0">Add Manual Attendance Records <span style="font-size:11.5px;font-weight:600;color:#64748B;margin-left:6px">(Doc No.: S-HRS-FM-009)</span></h4>
             <div id="manual-att-loader" style="display:none;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#2563EB;background:#EFF6FF;border:1px solid #BFDBFE;padding:4px 12px;border-radius:20px">
               <span class="spinner" style="width:12px;height:12px;border-width:2px;border-color:rgba(37,99,235,0.2);border-top-color:#2563EB" role="status"></span>
               <span>Recording attendance & refreshing...</span>

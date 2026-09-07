@@ -476,6 +476,75 @@ function isSameEmployeeId(id1, id2) {
   return false;
 }
 
+/**
+ * Robust Malaysian Name Matching Helper.
+ * Handles casing, spacing, and Malay patronymics (Bin, Binti, B., Bt., Anak, A/L, A/P, Mohd, Muhammad).
+ */
+function isNameMatch(name1, name2) {
+  if (!name1 || !name2) return false;
+  const n1 = String(name1).trim().toLowerCase().replace(/\s+/g, ' ');
+  const n2 = String(name2).trim().toLowerCase().replace(/\s+/g, ' ');
+  if (n1 === n2) return true;
+
+  const normalizeStr = (s) => {
+    return s
+      .replace(/\b(mohd|muhd)\b/gi, 'muhammad')
+      .replace(/[^a-z0-9\s]/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  const norm1 = normalizeStr(n1);
+  const norm2 = normalizeStr(n2);
+  if (norm1 === norm2) return true;
+
+  // Split given name and patronymic (father's name)
+  const patronymicRegex = /\s*\b(bin|binti|b\.|bt\.|b\b|bt\b|anak|a\/l|a\/p|al|ap)\b\s*/i;
+  const parts1 = norm1.split(patronymicRegex);
+  const parts2 = norm2.split(patronymicRegex);
+
+  const given1 = parts1[0].trim();
+  const father1 = parts1.length > 2 ? parts1[2].trim() : '';
+
+  const given2 = parts2[0].trim();
+  const father2 = parts2.length > 2 ? parts2[2].trim() : '';
+
+  // If both have patronymic specified and fathers are completely different, reject
+  if (father1 && father2 && father1 !== father2) {
+    const fTokens1 = father1.split(/\s+/).filter(t => t.length > 1);
+    const fTokens2 = father2.split(/\s+/).filter(t => t.length > 1);
+    const fatherMatch = fTokens1.every(t => fTokens2.includes(t)) || fTokens2.every(t => fTokens1.includes(t));
+    if (!fatherMatch) return false;
+  }
+
+  // Check given names
+  if (given1 === given2) return true;
+
+  const gTokens1 = given1.split(/\s+/).filter(t => t.length > 1);
+  const gTokens2 = given2.split(/\s+/).filter(t => t.length > 1);
+  if (gTokens1.length === 0 || gTokens2.length === 0) return false;
+
+  // The first significant given name token MUST match (prevents "Ali" matching "Abu")
+  if (gTokens1[0] !== gTokens2[0]) {
+    // Exception: If one starts with "muhammad" and other doesn't e.g. "Aiman Danish" vs "Muhammad Aiman Danish"
+    const nonMohd1 = gTokens1.filter(t => t !== 'muhammad');
+    const nonMohd2 = gTokens2.filter(t => t !== 'muhammad');
+    if (nonMohd1.length > 0 && nonMohd2.length > 0 && nonMohd1[0] === nonMohd2[0]) {
+      const allNon1In2 = nonMohd1.every(t => nonMohd2.includes(t));
+      const allNon2In1 = nonMohd2.every(t => nonMohd1.includes(t));
+      if (allNon1In2 || allNon2In1) return true;
+    }
+    return false;
+  }
+
+  // If first token matches, check if one given name is a subset of the other
+  const all1In2 = gTokens1.every(t => gTokens2.includes(t));
+  const all2In1 = gTokens2.every(t => gTokens1.includes(t));
+  if (all1In2 || all2In1) return true;
+
+  return false;
+}
+
 function getPublicPortalUrl() {
   const portalUrl = getConfigProperty('PUBLIC_PORTAL_URL', '');
   if (portalUrl && portalUrl.trim() !== '') return portalUrl.trim();

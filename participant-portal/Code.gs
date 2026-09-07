@@ -28,6 +28,26 @@ function doGet(e) {
     template.params = (e && e.parameter) ? e.parameter : {};
     template.mode = modeParam;
     template.page = modeParam;
+    template.sessionId = (e && e.parameter && (e.parameter.session || e.parameter.sessionId || e.parameter.id || e.parameter.s)) ? String(e.parameter.session || e.parameter.sessionId || e.parameter.id || e.parameter.s).trim() : '';
+    template.trainingId = (e && e.parameter && (e.parameter.id || e.parameter.training || e.parameter.trainingId || e.parameter.trn)) ? String(e.parameter.id || e.parameter.training || e.parameter.trainingId || e.parameter.trn).trim() : '';
+    const rawEvalId = (e && e.parameter && (e.parameter.evaluator || e.parameter.emp || e.parameter.eval)) ? String(e.parameter.evaluator || e.parameter.emp || e.parameter.eval).trim() : '';
+    template.evaluatorId = (typeof cleanEvaluatorInput === 'function') ? cleanEvaluatorInput(rawEvalId) : rawEvalId.replace(/^["']+|["']+$/g, '').trim();
+    if (template.evaluatorId === 'undefined' || template.evaluatorId === 'null') template.evaluatorId = '';
+
+    template.trainingName = '';
+    template.trainingCode = template.trainingId || '';
+    if (template.trainingId) {
+      try {
+        const tCheck = getValidTraining(template.trainingId);
+        if (tCheck && tCheck.valid && tCheck.training) {
+          template.trainingName = (typeof extractTrainingName === 'function') ? extractTrainingName(tCheck.training) : (tCheck.training.Name || '');
+          template.trainingCode = tCheck.training.Code || template.trainingId;
+          template.training = tCheck.training;
+        }
+      } catch (tErr) {
+        Logger.log('doGet training lookup warning: ' + tErr.message);
+      }
+    }
     try {
       const rawLogo = getCompanyLogoUrl();
       const directLogo = convertDriveLinkToDirectImageUrl(rawLogo);

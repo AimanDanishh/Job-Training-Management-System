@@ -186,26 +186,22 @@ function autoUpdateTrainingLifecycleStages() {
             }
           }
 
-          // 3. Check 3-month milestone (90 days after endDate) & countdown calculation
+          // 3. Post Evaluation Availability (Unlocks immediately upon training completion)
           const targetPostEvalDate = new Date(endDate.getTime() + 90 * 24 * 60 * 60 * 1000);
-          const remainingMs = targetPostEvalDate.getTime() - new Date().getTime();
           const diffMs = today.getTime() - endDate.getTime();
           const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
           t.daysSinceEnd = diffDays;
-          t.isThreeMonthsReached = diffDays >= 90;
+          t.isPostEvalUnlocked = diffDays >= 0; // Unlocked immediately when training ends
+          t.isThreeMonthsReached = diffDays >= 90; // 3-month milestone for automated email reminder
           t.isSixMonthsReached = diffDays >= 90;
 
-          if (remainingMs > 0) {
-            const remDays = Math.floor(remainingMs / (1000 * 60 * 60 * 24));
-            const remHours = Math.floor(remainingMs / (1000 * 60 * 60));
-            if (remDays >= 1) {
-              t.countdownText = `${remDays} day${remDays > 1 ? 's' : ''} remaining`;
-            } else {
-              t.countdownText = `${remHours} hour${remHours > 1 ? 's' : ''} remaining`;
-            }
+          if (diffDays < 0) {
+            t.countdownText = 'Available after training ends';
+          } else if (!t.isThreeMonthsReached) {
+            t.countdownText = 'Evaluation Available';
           } else {
-            t.countdownText = '3-Month Evaluation Due Now';
+            t.countdownText = '3-Month Milestone Reached';
           }
 
           if (t.isThreeMonthsReached) {
@@ -1648,10 +1644,10 @@ function getTrainingActionNotifications(trainingsList) {
             stage: stage,
             title: 'Supervisor Required Before Post Evaluation Email',
             message: `Post Evaluation email cannot be sent for ${unassignedCount} participant${unassignedCount > 1 ? 's' : ''} because supervisors have not been assigned.`,
-            countdownText: '3-Month Milestone Reached',
+            countdownText: 'Training Completed',
             daysRemaining: 0,
-            deadlineDate: threeMonthDate.toISOString(),
-            deadlineFormatted: milestoneFormatted,
+            deadlineDate: compDate.toISOString(),
+            deadlineFormatted: compFormatted,
             unassignedCount: unassignedCount,
             action: 'ASSIGN_SUPERVISOR',
             actionLabel: 'Assign Supervisor'
@@ -1674,8 +1670,8 @@ function getTrainingActionNotifications(trainingsList) {
             message: `The supervisor Post Evaluation email could not be sent${t.PostEvalEmailError ? ': ' + t.PostEvalEmailError : '.'}`,
             countdownText: 'Email Failed',
             daysRemaining: 0,
-            deadlineDate: threeMonthDate.toISOString(),
-            deadlineFormatted: milestoneFormatted,
+            deadlineDate: compDate.toISOString(),
+            deadlineFormatted: compFormatted,
             action: 'RETRY_POST_EVAL_EMAIL',
             actionLabel: 'Retry Email',
             errorDetails: t.PostEvalEmailError || ''
@@ -1695,11 +1691,11 @@ function getTrainingActionNotifications(trainingsList) {
             status: status,
             stage: stage,
             title: 'Post Evaluation Email Sent',
-            message: `The 3-month Post Evaluation email was successfully sent to assigned supervisor(s)${t.PostEvalEmailSentAt ? ' on ' + t.PostEvalEmailSentAt : ''}.`,
+            message: `The Post Evaluation email was successfully sent to assigned supervisor(s)${t.PostEvalEmailSentAt ? ' on ' + t.PostEvalEmailSentAt : ''}.`,
             countdownText: 'Email Sent',
             daysRemaining: 0,
-            deadlineDate: threeMonthDate.toISOString(),
-            deadlineFormatted: milestoneFormatted,
+            deadlineDate: compDate.toISOString(),
+            deadlineFormatted: compFormatted,
             emailSentAt: t.PostEvalEmailSentAt || '',
             action: 'VIEW_POST_EVALUATION',
             actionLabel: 'View Post Evaluation',
@@ -1720,11 +1716,11 @@ function getTrainingActionNotifications(trainingsList) {
             status: status,
             stage: stage,
             title: 'Post Evaluation Email Pending',
-            message: 'The 3-month milestone has been reached. System is ready to send the supervisor evaluation email.',
-            countdownText: '3-Month Milestone Reached',
+            message: 'Training has ended. System is ready to send the supervisor evaluation email.',
+            countdownText: 'Training Completed',
             daysRemaining: 0,
-            deadlineDate: threeMonthDate.toISOString(),
-            deadlineFormatted: milestoneFormatted,
+            deadlineDate: compDate.toISOString(),
+            deadlineFormatted: compFormatted,
             action: 'SEND_POST_EVAL_EMAIL',
             actionLabel: 'Send Email Now',
             postUrl: postPublicUrl

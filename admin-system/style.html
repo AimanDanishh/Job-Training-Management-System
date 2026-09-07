@@ -501,6 +501,14 @@
     font-weight: 700;
   }
 
+  /* Pending Evaluation (Available after Training Completion) */
+  .cd-pending {
+    background: #FFFBEB;
+    color: #B45309;
+    border: 1.5px solid #FCD34D;
+    font-weight: 700;
+  }
+
   /* Waiting for Training Completion */
   .cd-waiting {
     background: var(--apollo-gray-50);
@@ -1104,5 +1112,30 @@
     border-top-color: var(--apollo-red);
     border-radius: 50%;
     animation: spin 0.6s linear infinite;
+  }
+
+  /* -- Print Styles -------------------------------------------------- */
+  @media print {
+    .sidebar, .topbar button, .filter-card, .kpi-grid, #toast-container, .btn-th {
+      display: none !important;
+    }
+    .main-area {
+      margin-left: 0 !important;
+      padding: 0 !important;
+      width: 100% !important;
+    }
+    .topbar {
+      border: none !important;
+      padding: 0 0 12px 0 !important;
+    }
+    .report-table-print-header, #report-output-doc-no {
+      display: block !important;
+    }
+    body {
+      background: #fff !important;
+      color: #000 !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
   }
 </style>

@@ -572,16 +572,11 @@ Add edit button for QR session, to edit session name, time and QR active or inac
 3. Change name in UI: "generate reports" -> "reports"
 
 
-
 **Training:**
 1. View Attendance button should open training attendance directly (future)
-
 2. Remove Google Workspace & Training Data Sheets
-
 3. Report synchronization status: date did not display correctly: missing 'T', "Last Sync: ue Sep 01 2026 09: | Duration: 34.49s | Trigger: System Lifecycle Auto-Advance"
-
 4. Remove "View Logs" in deactivate sessions
-
 5. Add participant > "Master Registry Picker" did not display participants, it keeps loading with error in console "Uncaught (in promise) ReferenceError: escapeHtml is not defined
 &#x20;   at userCodeAppPanel?createOAuthDialog=true:1663:20
 &#x20;   at Array.map (<anonymous>)
@@ -595,7 +590,6 @@ showAddParticipantPicker @ userCodeAppPanel?createOAuthDialog=true:1624
 await in showAddParticipantPicker
 switchPmTab @ userCodeAppPanel?createOAuthDialog=true:1522
 onclick @ userCodeAppPanel?createOAuthDialog=true:1"
-
 6. Submitted Evaluation Records - did not display "DEPT" (the cost centre) and date submitted
 
 Evaluation
@@ -613,3 +607,13 @@ Report
 
 Objective & Summary (User Manual)
 
+QR session page
+Start time and End time must required and no predefined value
+Start time and End time must remain same value when edit (preserve previous value)
+In the QR session page, under deactivate QR, remove the "view log" button from UI completely, keep "edit/reactivate" button only
+
+Attendance page
+UI overflow, container wider than screen
+
+Approver
+1. Add success page when they return, reject or approve

@@ -13,7 +13,9 @@ function getSessionInfo(sessionId) {
     const cleanSessionId = String(sessionId).trim();
 
     const found = findTrainingBySessionId(cleanSessionId);
-    if (!found || !found.session) return err('Session not found.');
+    if (!found || !found.session) {
+      return err(`Session (${cleanSessionId}) not found in the database. Please verify the session QR code.`);
+    }
 
     const session  = found.session;
     const training = found.training;
@@ -33,15 +35,15 @@ function getSessionInfo(sessionId) {
     };
 
     return ok({
-      SessionID:     session.SessionID,
-      TrainingID:    session.TrainingID,
-      SessionName:   session.SessionName || 'Session Check-In',
-      SessionDate:   session.SessionDate || '—',
-      StartTime:     formatTimeClean(session.StartTime, '09:00'),
-      EndTime:       formatTimeClean(session.EndTime, '17:00'),
-      QRStatus:      session.QRStatus || 'Active',
-      TrainingTitle: training ? (training.Name || training.TrainingTitle || 'Training Programme') : 'Training Programme',
-      TrainingCode:  training ? (training.Code || '') : ''
+      SessionID:     session.SessionID || session['Session ID'] || session.SessionId || cleanSessionId,
+      TrainingID:    session.TrainingID || session['Training ID'] || session.trainingId || (training ? (training.ID || training.TrainingID) : ''),
+      SessionName:   session.SessionName || session['Session Name'] || 'Session Check-In',
+      SessionDate:   session.SessionDate || session['Session Date'] || '—',
+      StartTime:     formatTimeClean(session.StartTime || session['Start Time'], '09:00'),
+      EndTime:       formatTimeClean(session.EndTime || session['End Time'], '17:00'),
+      QRStatus:      session.QRStatus || session['QR Status'] || 'Active',
+      TrainingTitle: training ? (training.Name || training.TrainingTitle || training['Training Title'] || 'Training Programme') : 'Training Programme',
+      TrainingCode:  training ? (training.Code || training.TrainingCode || training['Training Code'] || '') : ''
     });
   } catch (e) {
     Logger.log('getSessionInfo error: ' + e.message);
@@ -96,7 +98,7 @@ function submitAttendance(arg1, arg2, arg3, arg4) {
     const finalDept    = (empInfo && (empInfo.Department || empInfo.CostCentre)) ? (empInfo.Department || empInfo.CostCentre) : (department || '');
     const trainingCode = training ? (training.Code || '') : '';
 
-    const ss = getTrainingDataSpreadsheet(session.TrainingID);
+    const ss = (validation && validation.spreadsheet) ? validation.spreadsheet : (getTrainingDataSpreadsheet(session.TrainingID) || getSpreadsheet());
     if (!ss) return err('Could not open training data spreadsheet.');
 
     let attSheet = ss.getSheetByName('Attendance');

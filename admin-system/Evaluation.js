@@ -229,20 +229,73 @@ function assignPostEvalSupervisor(trainingId, employeeId, supervisorInput) {
 
     const cleanTId = String(trainingId).trim();
     const cleanEmpId = String(employeeId).trim();
-    const cleanSupInput = String(supervisorInput).trim().toLowerCase();
+    let cleanSupInput = String(supervisorInput).trim();
 
-    // 1. System check supervisor email or employee ID
+    // Support "Name (ID)" format if provided
+    let parsedSupId = '';
+    const idInParen = cleanSupInput.match(/\(([^)]+)\)$/);
+    if (idInParen) {
+      parsedSupId = idInParen[1].trim();
+    }
+
+    // 1. System check supervisor email, employee ID, or name
     let supervisor = null;
     const empSheet = getSheet(SHEET_NAMES.employees);
     if (empSheet) {
       const employees = sheetToJson(empSheet);
       supervisor = employees.find(e => 
+        (parsedSupId && isSameEmployeeId(e.ID || e.EmployeeID || e.EmployeeNo || '', parsedSupId)) ||
         isSameEmployeeId(e.ID || e.EmployeeID || e.EmployeeNo || '', cleanSupInput) ||
-        String(e.Email || '').trim().toLowerCase() === cleanSupInput
+        String(e.Email || '').trim().toLowerCase() === cleanSupInput.toLowerCase() ||
+        (e.Name && isNameMatch(String(e.Name), cleanSupInput))
       );
     }
 
-    // Fallback lookup if not found in Employees sheet
+    // Directory lookup fallback
+    if (!supervisor) {
+      try {
+        const directory = (typeof getOfficialEmployeeDirectory === 'function') ? getOfficialEmployeeDirectory() : null;
+        if (directory && directory.byId) {
+          const dRec = (parsedSupId && directory.byId[parsedSupId.toLowerCase()]) || directory.byId[cleanSupInput.toLowerCase()];
+          if (dRec) {
+            supervisor = {
+              ID: dRec.EmployeeID || dRec.ID || cleanSupInput,
+              Name: dRec.Name || dRec.EmployeeName || cleanSupInput,
+              Email: dRec.Email || (cleanSupInput.includes('@') ? cleanSupInput : '')
+            };
+          }
+        }
+      } catch(dErr) {}
+    }
+
+    // Fallback: check if the supervisor being assigned is another participant in this training
+    if (!supervisor) {
+      try {
+        const ssCheck = getTrainingDataSpreadsheet(cleanTId);
+        if (ssCheck) {
+          const pCheckSheet = ssCheck.getSheetByName('Participants') || ssCheck.getSheetByName('TrainingParticipants');
+          if (pCheckSheet) {
+            const tpCheckRows = sheetToJson(pCheckSheet);
+            const foundPart = tpCheckRows.find(p => 
+              (parsedSupId && isSameEmployeeId(p.EmployeeID || p.EmployeeNo || p.ID || '', parsedSupId)) ||
+              isSameEmployeeId(p.EmployeeID || p.EmployeeNo || p.ID || '', cleanSupInput) ||
+              String(p.Email || p.ParticipantEmail || '').trim().toLowerCase() === cleanSupInput.toLowerCase() ||
+              (p.EmployeeName && isNameMatch(String(p.EmployeeName), cleanSupInput)) ||
+              (p.Name && isNameMatch(String(p.Name), cleanSupInput))
+            );
+            if (foundPart) {
+              supervisor = {
+                ID: foundPart.EmployeeID || foundPart.EmployeeNo || foundPart.ID || cleanSupInput,
+                Name: foundPart.EmployeeName || foundPart.Name || cleanSupInput,
+                Email: foundPart.Email || foundPart.ParticipantEmail || ''
+              };
+            }
+          }
+        }
+      } catch(pErr) {}
+    }
+
+    // Fallback lookup if not found in Employees sheet or Participants sheet
     if (!supervisor) {
       if (cleanSupInput.includes('@')) {
         supervisor = {
@@ -251,7 +304,11 @@ function assignPostEvalSupervisor(trainingId, employeeId, supervisorInput) {
           Email: cleanSupInput
         };
       } else {
-        return err(`Supervisor with Email or Employee ID '${supervisorInput}' was not found in employee records.`);
+        supervisor = {
+          ID: parsedSupId || cleanSupInput,
+          Name: cleanSupInput,
+          Email: ''
+        };
       }
     }
 
@@ -266,7 +323,10 @@ function assignPostEvalSupervisor(trainingId, employeeId, supervisorInput) {
     const tpRows = sheetToJson(tpSheet);
     const headerRow = tpSheet.getRange(1, 1, 1, tpSheet.getLastColumn()).getValues()[0];
     
-    const findColIdx = (colName) => headerRow.findIndex(h => String(h || '').trim().toLowerCase() === colName.toLowerCase());
+    const findColIdx = (colName) => {
+      const normTarget = colName.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+      return headerRow.findIndex(h => String(h || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === normTarget);
+    };
     const supIdIdx = findColIdx('SupervisorID');
     const supEmailIdx = findColIdx('SupervisorEmail');
     const supNameIdx = findColIdx('SupervisorName');
@@ -280,6 +340,7 @@ function assignPostEvalSupervisor(trainingId, employeeId, supervisorInput) {
     if (supIdIdx !== -1) tpSheet.getRange(rowNum, supIdIdx + 1).setValue(supervisor.ID || supervisor.EmployeeID || '');
     if (supEmailIdx !== -1) tpSheet.getRange(rowNum, supEmailIdx + 1).setValue(supervisor.Email || '');
     if (supNameIdx !== -1) tpSheet.getRange(rowNum, supNameIdx + 1).setValue(supervisor.Name || supervisor.EmployeeName || '');
+    SpreadsheetApp.flush();
 
     return ok({
       message: `Supervisor ${supervisor.Name || supervisor.Email} successfully assigned to ${cleanEmpId} for post evaluation.`,
@@ -294,15 +355,26 @@ function assignPostEvalSupervisor(trainingId, employeeId, supervisorInput) {
 
 function ensureTrainingParticipantsColumns(sheet) {
   if (!sheet) return;
-  const headers = sheet.getRange(1, 1, 1, Math.max(1, sheet.getLastColumn())).getValues()[0];
-  const required = ['SupervisorID', 'SupervisorEmail', 'SupervisorName'];
+  const lastCol = Math.max(1, sheet.getLastColumn());
+  const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  const required = [
+    { key: 'supervisorid', label: 'SupervisorID' },
+    { key: 'supervisoremail', label: 'SupervisorEmail' },
+    { key: 'supervisorname', label: 'SupervisorName' }
+  ];
+  let added = false;
   required.forEach(req => {
-    const exists = headers.some(h => String(h || '').trim().toLowerCase() === req.toLowerCase());
+    const exists = headers.some(h => String(h || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === req.key);
     if (!exists) {
       const nextCol = sheet.getLastColumn() + 1;
-      sheet.getRange(1, nextCol).setValue(req).setFontWeight('bold');
+      sheet.getRange(1, nextCol).setValue(req.label).setFontWeight('bold');
+      headers.push(req.label);
+      added = true;
     }
   });
+  if (added) {
+    SpreadsheetApp.flush();
+  }
 }
 
 function isSubmittedEvaluationRecord(evalRow) {
@@ -603,7 +675,9 @@ function getAttendedParticipantsForPostEval(trainingId) {
     const endDate = training ? parseDateObj(training.EndDate || training.StartDate) || new Date() : new Date();
     const target3MonthDate = new Date(endDate.getTime() + 90 * 24 * 60 * 60 * 1000);
     const now = new Date();
-    const is3MonthReached = now >= target3MonthDate;
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const endDay = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+    const isCompleted = today.getTime() >= endDay.getTime();
 
     return ok({
       training: {
@@ -612,7 +686,8 @@ function getAttendedParticipantsForPostEval(trainingId) {
         Code: training ? (training.Code || training.ID) : cleanTId,
         EndDate: formatMinimalistDate(endDate),
         Target3MonthDate: formatMinimalistDate(target3MonthDate),
-        Is3MonthReached: is3MonthReached
+        Is3MonthReached: isCompleted,
+        IsEvaluationUnlocked: isCompleted
       },
       participants: participants
     });
@@ -633,28 +708,80 @@ function assignPostEvalSupervisorsBulk(trainingId, participantIds, supervisorInp
     }
 
     const cleanTId = String(trainingId).trim();
-    const cleanSupInput = String(supervisorInput).trim().toLowerCase();
+    let cleanSupInput = String(supervisorInput).trim();
+
+    // Support parsing "Name (ID)" format if selected from a dropdown or input
+    let parsedSupId = '';
+    const idInParen = cleanSupInput.match(/\(([^)]+)\)$/);
+    if (idInParen) {
+      parsedSupId = idInParen[1].trim();
+    }
 
     let supervisor = null;
     const empSheet = getSheet(SHEET_NAMES.employees);
     if (empSheet) {
       const employees = sheetToJson(empSheet);
       supervisor = employees.find(e => 
+        (parsedSupId && isSameEmployeeId(e.ID || e.EmployeeID || e.EmployeeNo || '', parsedSupId)) ||
         isSameEmployeeId(e.ID || e.EmployeeID || e.EmployeeNo || '', cleanSupInput) ||
-        String(e.Email || '').trim().toLowerCase() === cleanSupInput ||
-        String(e.Name || '').trim().toLowerCase() === cleanSupInput
+        String(e.Email || '').trim().toLowerCase() === cleanSupInput.toLowerCase() ||
+        (e.Name && isNameMatch(String(e.Name), cleanSupInput))
       );
+    }
+
+    // Directory lookup fallback
+    if (!supervisor) {
+      try {
+        const directory = (typeof getOfficialEmployeeDirectory === 'function') ? getOfficialEmployeeDirectory() : null;
+        if (directory && directory.byId) {
+          const dRec = (parsedSupId && directory.byId[parsedSupId.toLowerCase()]) || directory.byId[cleanSupInput.toLowerCase()];
+          if (dRec) {
+            supervisor = {
+              ID: dRec.EmployeeID || dRec.ID || cleanSupInput,
+              Name: dRec.Name || dRec.EmployeeName || cleanSupInput,
+              Email: dRec.Email || (cleanSupInput.includes('@') ? cleanSupInput : '')
+            };
+          }
+        }
+      } catch(dErr) {}
+    }
+
+    // Fallback: check if the supervisor being assigned is another participant in this training
+    if (!supervisor) {
+      try {
+        const ssCheck = getTrainingDataSpreadsheet(cleanTId);
+        if (ssCheck) {
+          const pCheckSheet = ssCheck.getSheetByName('Participants') || ssCheck.getSheetByName('TrainingParticipants');
+          if (pCheckSheet) {
+            const tpCheckRows = sheetToJson(pCheckSheet);
+            const foundPart = tpCheckRows.find(p => 
+              (parsedSupId && isSameEmployeeId(p.EmployeeID || p.EmployeeNo || p.ID || '', parsedSupId)) ||
+              isSameEmployeeId(p.EmployeeID || p.EmployeeNo || p.ID || '', cleanSupInput) ||
+              String(p.Email || p.ParticipantEmail || '').trim().toLowerCase() === cleanSupInput.toLowerCase() ||
+              (p.EmployeeName && isNameMatch(String(p.EmployeeName), cleanSupInput)) ||
+              (p.Name && isNameMatch(String(p.Name), cleanSupInput))
+            );
+            if (foundPart) {
+              supervisor = {
+                ID: foundPart.EmployeeID || foundPart.EmployeeNo || foundPart.ID || cleanSupInput,
+                Name: foundPart.EmployeeName || foundPart.Name || cleanSupInput,
+                Email: foundPart.Email || foundPart.ParticipantEmail || ''
+              };
+            }
+          }
+        }
+      } catch(pErr) {}
     }
 
     if (!supervisor) {
       supervisor = {
-        ID: cleanSupInput.split('@')[0],
+        ID: parsedSupId || (cleanSupInput.includes('@') ? cleanSupInput.split('@')[0] : cleanSupInput),
         Name: overrideName || cleanSupInput.split('@')[0],
         Email: overrideEmail || (cleanSupInput.includes('@') ? cleanSupInput : '')
       };
     } else {
       supervisor = {
-        ID: supervisor.ID || supervisor.EmployeeID || cleanSupInput,
+        ID: supervisor.ID || supervisor.EmployeeID || parsedSupId || cleanSupInput,
         Name: overrideName || supervisor.Name || supervisor.EmployeeName || cleanSupInput,
         Email: overrideEmail || supervisor.Email || (cleanSupInput.includes('@') ? cleanSupInput : '')
       };
@@ -673,7 +800,10 @@ function assignPostEvalSupervisorsBulk(trainingId, participantIds, supervisorInp
     const tpRows = sheetToJson(tpSheet);
     const headerRow = tpSheet.getRange(1, 1, 1, tpSheet.getLastColumn()).getValues()[0];
     
-    const findColIdx = (colName) => headerRow.findIndex(h => String(h || '').trim().toLowerCase() === colName.toLowerCase());
+    const findColIdx = (colName) => {
+      const normTarget = colName.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+      return headerRow.findIndex(h => String(h || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === normTarget);
+    };
     const supIdIdx = findColIdx('SupervisorID');
     const supEmailIdx = findColIdx('SupervisorEmail');
     const supNameIdx = findColIdx('SupervisorName');
@@ -684,12 +814,13 @@ function assignPostEvalSupervisorsBulk(trainingId, participantIds, supervisorInp
       const targetRowIndex = tpRows.findIndex(r => isSameEmployeeId(r.EmployeeID || r.EmployeeNo || r.ID || '', cleanEmpId));
       if (targetRowIndex !== -1) {
         const rowNum = targetRowIndex + 2;
-        if (supIdIdx !== -1) tpSheet.getRange(rowNum, supIdIdx + 1).setValue(supervisor.ID || supervisor.Email || '');
+        if (supIdIdx !== -1) tpSheet.getRange(rowNum, supIdIdx + 1).setValue(supervisor.ID || supervisor.EmployeeID || supervisor.Email || '');
         if (supEmailIdx !== -1) tpSheet.getRange(rowNum, supEmailIdx + 1).setValue(supervisor.Email || '');
-        if (supNameIdx !== -1) tpSheet.getRange(rowNum, supNameIdx + 1).setValue(supervisor.Name || supervisor.Email || '');
+        if (supNameIdx !== -1) tpSheet.getRange(rowNum, supNameIdx + 1).setValue(supervisor.Name || supervisor.EmployeeName || supervisor.Email || '');
         updatedCount++;
       }
     });
+    SpreadsheetApp.flush();
 
     // Check if 3-month milestone is reached for this training
     const tSheet = getSheet(SHEET_NAMES.trainings);
@@ -1267,7 +1398,7 @@ function processAutomated3MonthPostEvaluationEmails(simulatedDate, testEmailReci
 
       const isCompleted = ['Training Completed', 'Evaluation Completed', 'Waiting for 3-Month Review', 'Programme Closed', 'Completed'].includes(stage) ||
                           status === 'Completed' ||
-                          (todayMidnight.getTime() > compDate.getTime());
+                          (todayMidnight.getTime() >= compDate.getTime());
       if (!isCompleted) return;
 
       // 3-Month Milestone calculation

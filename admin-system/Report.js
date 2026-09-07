@@ -917,7 +917,7 @@ function exportFilteredReportExcel(reportType, filters) {
     if (reportType === 'hours') titleName = `Training_Hours_CostCentre_${year}_${timestamp}`;
     else if (reportType === 'cost') titleName = `Training_Cost_${year}_${timestamp}`;
     else if (reportType === 'title') titleName = `Training_Title_Report_${timestamp}`;
-    else if (reportType === 'employee') titleName = `Employee_Training_Report_${timestamp}`;
+    else if (reportType === 'employee') titleName = `Employee_Training_Record_S-HRS-FM-003_${timestamp}`;
     else if (reportType === 'atp') titleName = `Annual_Training_Plan_${year}_${timestamp}`;
 
     const repFolder = getOrCreateReportsFolder();
@@ -2328,13 +2328,16 @@ function exportAttendanceSheet(trainingId) {
     const attData = safeParseObj(getAttendance(trainingId)).data || [];
 
     const ss    = getSpreadsheet();
-    const name  = 'Attendance_' + training.Code + '_' + new Date().getTime();
+    const name  = 'Attendance_List_' + training.Code + '_' + new Date().getTime();
     const sheet = ss.insertSheet(name);
+
+    sheet.appendRow(['Training Attendance List', 'Document No.: S-HRS-FM-009', '', '', '', '', '', '', '', '']);
+    sheet.getRange(1, 1, 1, 10).setFontWeight('bold').setBackground('#EFF6FF').setFontColor('#1E3A8A');
 
     const headers = ['Employee ID', 'Employee Name', 'Department',
                      'Day', 'Date', 'Check In', 'Check Out', 'Hours', 'Status', 'Remarks'];
     sheet.appendRow(headers);
-    sheet.getRange(1, 1, 1, headers.length)
+    sheet.getRange(2, 1, 1, headers.length)
       .setFontWeight('bold').setBackground('#2563EB').setFontColor('#FFFFFF');
 
     attData.forEach(day => {

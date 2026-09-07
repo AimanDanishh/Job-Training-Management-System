@@ -44,6 +44,7 @@
       <div>
         <span class="badge-pillar">POST-TRAINING EVALUATION</span>
       </div>
+      <div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin:4px 0 6px;letter-spacing:0.3px;">Document No.: S-HRS-FM-006</div>
       <h1 class="portal-title" id="pageMainHeading">3-Month Competency Assessment</h1>
       <p class="portal-subtitle" id="pageMainSubheading">Supervisor / Manager / HOD Post-Training Review Portal</p>
     </div>
@@ -58,10 +59,10 @@
          STEP 1: EVALUATOR LOGIN / VERIFICATION VIEW
          ═══════════════════════════════════════════════════════════════ -->
     <div id="view-login" style="display:none;">
-      
+
       <div style="text-align:center; margin-bottom: 20px;">
         <h2 style="font-size: 16px; font-weight: 800; color: var(--text-primary);">Evaluator Authentication</h2>
-        <p style="font-size: 12.5px; color: var(--text-secondary); margin-top: 4px;">
+        <p style="font-size: 12.5px; color: var(--text-secondary); margin-top: 4px;" id="txt-login-subtext">
           Enter your Supervisor Employee ID or Work Email to access your assigned training evaluations.
         </p>
       </div>
@@ -207,13 +208,16 @@
       <!-- Evaluation Form Container -->
       <div id="form-container" style="display:none; margin-top:20px; border-top:1px solid var(--border-color); padding-top:20px;">
         
-        <div style="background:var(--bg-input); border:1px solid var(--border-color); box-shadow:var(--shadow-inset); border-radius:var(--radius-md); padding:12px 16px; margin-bottom:20px;">
-          <h3 style="font-size:14px; font-weight:800; color:var(--primary);">
-            📝 Performance Review for: <span id="selected-subordinate-name" style="color:var(--text-primary);">--</span>
-          </h3>
-          <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;" id="selected-subordinate-meta">
-            Employee ID: -- • Department: --
+        <div style="background:var(--bg-input); border:1px solid var(--border-color); box-shadow:var(--shadow-inset); border-radius:var(--radius-md); padding:12px 16px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+          <div>
+            <h3 style="font-size:14px; font-weight:800; color:var(--primary); margin:0;">
+              📝 Performance Review for: <span id="selected-subordinate-name" style="color:var(--text-primary);">--</span>
+            </h3>
+            <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;" id="selected-subordinate-meta">
+              Employee ID: -- • Department: --
+            </div>
           </div>
+          <span style="font-size:12px; font-weight:600; color:var(--text-secondary);">Document No.: S-HRS-FM-006</span>
         </div>
 
         <form onsubmit="handlePostEvalSubmit(event)">
@@ -336,9 +340,35 @@
 </div>
 
 <div id="toast-container"></div>
+<script id="server-params" type="application/json">
+<?!= JSON.stringify((typeof params !== 'undefined' && params) ? params : {}) ?>
+</script>
+<script>
+  window.SERVER_PARAMS = <?!= JSON.stringify((typeof params !== 'undefined' && params) ? params : {}) ?>;
+  window.SERVER_TRAINING_ID = <?!= JSON.stringify((typeof trainingId !== 'undefined' && trainingId) ? String(trainingId) : "") ?>;
+  window.SERVER_EVALUATOR_ID = <?!= JSON.stringify((typeof evaluatorId !== 'undefined' && evaluatorId) ? String(evaluatorId) : "") ?>;
+  window.SERVER_TRAINING_NAME = <?!= JSON.stringify((typeof trainingName !== 'undefined' && trainingName) ? String(trainingName) : "") ?>;
+  window.SERVER_TRAINING_CODE = <?!= JSON.stringify((typeof trainingCode !== 'undefined' && trainingCode) ? String(trainingCode) : "") ?>;
+</script>
 <?!= include('script') ?>
 
 <script>
+  function cleanDisplayText(val) {
+    if (!val) return '';
+    let s = String(val).trim();
+    s = s.replace(/^\[+["']*/g, '').replace(/["']*\]+$/g, '');
+    s = s.replace(/^["']+|["']+$/g, '');
+    s = s.replace(/&quot;/gi, '').replace(/\\"/g, '');
+    s = s.replace(/^["']+|["']+$/g, '');
+    s = s.trim();
+    if (s.toLowerCase() === 'undefined' || s.toLowerCase() === 'null') return '';
+    return s;
+  }
+
+  function cleanEvaluatorParam(val) {
+    return cleanDisplayText(val);
+  }
+
   const COMPETENCY_LEVELS = [
     { v:1, label:'1 - Novice',             desc:'Basic awareness; requires constant supervision' },
     { v:2, label:'2 - Advanced Beginner',   desc:'Developing skill; requires occasional guidance' },
@@ -360,18 +390,74 @@
     initTheme();
     renderCompetencySelectors();
 
-    targetTrainingIdParam = getQueryParam('id') || getQueryParam('training') || getQueryParam('trainingId') || getQueryParam('trn');
-    const preEvalEmp = getQueryParam('evaluator') || getQueryParam('emp') || getQueryParam('eval');
+    targetTrainingIdParam = cleanEvaluatorParam(
+      (typeof window.SERVER_TRAINING_ID !== 'undefined' && window.SERVER_TRAINING_ID)
+        ? window.SERVER_TRAINING_ID
+        : (getQueryParam('id') || getQueryParam('training') || getQueryParam('trainingId') || getQueryParam('trn'))
+    );
+    let preEvalEmp = cleanEvaluatorParam(
+      (typeof window.SERVER_EVALUATOR_ID !== 'undefined' && window.SERVER_EVALUATOR_ID)
+        ? window.SERVER_EVALUATOR_ID
+        : (getQueryParam('evaluator') || getQueryParam('emp') || getQueryParam('eval'))
+    );
 
-    if (preEvalEmp) {
+    // Asynchronous fallback for Google Apps Script iframe environments
+    if (!targetTrainingIdParam && typeof google !== 'undefined' && google.script && google.script.url && google.script.url.getLocation) {
+      await new Promise(resolve => {
+        try {
+          google.script.url.getLocation(loc => {
+            if (loc && loc.parameter) {
+              const p = loc.parameter;
+              targetTrainingIdParam = cleanEvaluatorParam(p.id || p.training || p.trainingId || p.trn || '');
+              if (!preEvalEmp) preEvalEmp = cleanEvaluatorParam(p.evaluator || p.emp || p.eval || '');
+            }
+            resolve();
+          });
+        } catch(locErr) {
+          resolve();
+        }
+        setTimeout(resolve, 800);
+      });
+    }
+
+    // Display target training name on login banner if targeted
+    updateLoginTrainingBanner(targetTrainingIdParam);
+
+    if (preEvalEmp && preEvalEmp.length > 0) {
       document.getElementById('inp-evaluator-empid').value = preEvalEmp;
-      // Auto-trigger verification if employee parameter is provided
+      // Auto-trigger verification only if valid employee parameter is provided
       handleVerifyEvaluator({ preventDefault: () => {} });
     } else {
       document.getElementById('view-loading').style.display = 'none';
       document.getElementById('view-login').style.display = 'block';
     }
   });
+
+  function updateLoginTrainingBanner(trainingId) {
+    const subHeading = document.getElementById('pageMainSubheading');
+    if (!subHeading) return;
+
+    const preCode = cleanDisplayText(window.SERVER_TRAINING_CODE || trainingId || '');
+    const preName = cleanDisplayText(window.SERVER_TRAINING_NAME || '');
+
+    if (preName) {
+      subHeading.textContent = preCode ? `Post-Training Review for [${preCode}] ${preName}` : `Post-Training Review for ${preName}`;
+    } else if (preCode) {
+      subHeading.textContent = `Post-Training Review for [${preCode}]`;
+    } else {
+      subHeading.textContent = 'Supervisor / Manager / HOD / PIC Review Portal';
+    }
+
+    if (trainingId && !preName) {
+      callServer('getTrainingInfo', trainingId).then(res => {
+        if (res && res.Name && subHeading) {
+          const resCode = cleanDisplayText(res.Code || trainingId);
+          const resName = cleanDisplayText(res.Name);
+          subHeading.textContent = resCode ? `Post-Training Review for [${resCode}] ${resName}` : `Post-Training Review for ${resName}`;
+        }
+      }).catch(() => {});
+    }
+  }
 
   function renderCompetencySelectors() {
     const beforeEl = document.getElementById('group-comp-before');
@@ -466,7 +552,7 @@
       // Expand to wide dashboard container
       document.getElementById('mainContainer').classList.add('dashboard-mode');
       document.getElementById('pageMainHeading').textContent = 'Post-Training Evaluation Dashboard';
-      document.getElementById('pageMainSubheading').textContent = 'Centralized 3-Month Competency Reviews for Supervised Staff';
+      document.getElementById('pageMainSubheading').textContent = 'Centralized Competency Reviews for Supervised Staff';
 
       renderTrainingsList(allTrainingsData);
 
@@ -514,18 +600,16 @@
       let badgeHtml = '';
       let actionBtnHtml = '';
 
-      if (lock.phase === 'NOT_STARTED') {
+      if (!lock.isUnlocked || lock.phase === 'NOT_STARTED') {
         badgeHtml = `<span class="badge-status badge-not-started">📅 Course In Progress</span>`;
-        actionBtnHtml = `<button class="btn-neo" disabled title="Training completed on ${lock.completionDateFormatted}">🔒 Locked (Course Not Completed Yet)</button>`;
-      } else if (lock.phase === 'COUNTDOWN_ACTIVE' || !lock.isUnlocked) {
-        badgeHtml = `<span class="badge-status badge-countdown">🔒 Locked Until ${lock.unlockTargetDateFormatted || '3 Months'}</span>`;
-        actionBtnHtml = `<button class="btn-neo" disabled title="Evaluation window unlocks exactly 3 months after course completion">🔒 Locked (Unlocks ${lock.unlockTargetDateFormatted})</button>`;
+        actionBtnHtml = `<button class="btn-neo" disabled title="Training ends on ${lock.completionDateFormatted || t.EndDate}">🔒 Locked (Course In Progress)</button>`;
       } else {
-        // UNLOCKED
-        badgeHtml = `<span class="badge-status badge-unlocked">🔓 3-Month Window Unlocked</span>`;
+        // UNLOCKED - Training Completed
         if (t.pendingCount > 0) {
+          badgeHtml = `<span class="badge-status badge-pending">⏳ Pending Evaluation</span>`;
           actionBtnHtml = `<button class="btn-neo btn-neo-primary" onclick="openTrainingEvaluation('${t.ID}')">📝 Evaluate Subordinates (${t.pendingCount} Pending) →</button>`;
         } else {
+          badgeHtml = `<span class="badge-status badge-completed">✅ Completed</span>`;
           actionBtnHtml = `<button class="btn-neo" onclick="openTrainingEvaluation('${t.ID}')">✅ All Evaluated (${t.completedCount} Completed)</button>`;
         }
       }
@@ -534,8 +618,8 @@
         <div class="training-neo-card">
           <div class="training-neo-header">
             <div>
-              <span class="training-code-pill">${escapeHtml(t.Code || t.ID)}</span>
-              <h3 class="training-title">${escapeHtml(t.Name)}</h3>
+              <span class="training-code-pill">${escapeHtml(cleanDisplayText(t.Code || t.ID))}</span>
+              <h3 class="training-title">${escapeHtml(cleanDisplayText(t.Name || t.TrainingName || t.Title || t.CourseTitle || t.Code || t.ID || 'Training Programme'))}</h3>
             </div>
             <div>
               ${badgeHtml}
@@ -578,10 +662,12 @@
     document.getElementById('view-evaluation').style.display = 'block';
 
     // Populate Training Details
-    document.getElementById('txt-eval-training-name').textContent = `[${training.Code || training.ID}] ${training.Name}`;
+    const resolvedTName = cleanDisplayText(training.Name || training.TrainingName || training.Title || training.CourseTitle || '');
+    const resolvedTCode = cleanDisplayText(training.Code || training.ID || '');
+    document.getElementById('txt-eval-training-name').textContent = resolvedTName ? `[${resolvedTCode}] ${resolvedTName}` : `[${resolvedTCode}]`;
     const lock = training.lockInfo || {};
     document.getElementById('txt-eval-completion-date').textContent = lock.completionDateFormatted || training.EndDate || '—';
-    document.getElementById('txt-eval-window-status').textContent = lock.isUnlocked ? '🔓 3-Month Window Open' : `🔒 Locked Until ${lock.unlockTargetDateFormatted}`;
+    document.getElementById('txt-eval-window-status').textContent = lock.isUnlocked ? '🔓 Available' : '🔒 Locked (Course In Progress)';
 
     renderSubordinatesDropdown(training);
   }
@@ -658,7 +744,7 @@
     }
 
     const btn = document.getElementById('btn-submit-post');
-    setBtnLoading(btn, true, 'Submitting 3-Month Evaluation...');
+    setBtnLoading(btn, true, 'Submitting Evaluation...');
 
     try {
       const payload = {
@@ -693,7 +779,7 @@
 
       document.getElementById('view-evaluation').style.display = 'none';
       document.getElementById('view-success').style.display = 'block';
-      document.getElementById('txt-success-post-msg').textContent = `3-Month Post-Training Review for ${partEmpId} submitted successfully.`;
+      document.getElementById('txt-success-post-msg').textContent = `Post-Training Review for ${partEmpId} submitted successfully.`;
 
     } catch(err) {
       showToast(err.message, 'error');
@@ -722,7 +808,7 @@
   function switchEvaluator() {
     document.getElementById('mainContainer').classList.remove('dashboard-mode');
     document.getElementById('pageMainHeading').textContent = '3-Month Competency Assessment';
-    document.getElementById('pageMainSubheading').textContent = 'Supervisor / Manager / HOD / PIC Review Portal';
+    updateLoginTrainingBanner(targetTrainingIdParam);
     document.getElementById('view-dashboard').style.display = 'none';
     document.getElementById('view-evaluation').style.display = 'none';
     document.getElementById('view-success').style.display = 'none';

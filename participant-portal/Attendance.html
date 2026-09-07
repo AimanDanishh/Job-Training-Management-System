@@ -47,8 +47,9 @@
         <? } ?>
       </div>
       <div>
-        <span class="badge-pillar" id="badge-session" data-i18n="badgeSession">TRAINING ATTENDANCE</span>
+        <span class="badge-pillar" id="badge-session" data-i18n="badgeSession">TRAINING ATTENDANCE LIST</span>
       </div>
+      <div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin:4px 0 6px;letter-spacing:0.3px;">Document No.: S-HRS-FM-009</div>
       <h1 class="portal-title" id="txt-training-title">Loading Training...</h1>
       <p class="portal-subtitle" id="txt-session-name" style="color:var(--primary);">Verifying session details...</p>
       
@@ -193,6 +194,13 @@
 </div>
 
 <div id="toast-container"></div>
+<script id="server-params" type="application/json">
+<?!= JSON.stringify((typeof params !== 'undefined' && params) ? params : {}) ?>
+</script>
+<script>
+  window.SERVER_PARAMS = <?!= JSON.stringify((typeof params !== 'undefined' && params) ? params : {}) ?>;
+  window.SERVER_SESSION_ID = <?= (typeof sessionId !== 'undefined' && sessionId) ? JSON.stringify(sessionId) : '""' ?>;
+</script>
 <?!= include('script') ?>
 
 <script>
@@ -200,7 +208,7 @@
   const TRANSLATIONS = {
     en: {
       docTitle: 'Training Attendance — TrainHub',
-      badgeSession: 'TRAINING ATTENDANCE',
+      badgeSession: 'TRAINING ATTENDANCE LIST',
       loadingTraining: 'Loading Training...',
       loadingSession: 'Verifying session details...',
       loadingContext: 'Validating session context...',
@@ -241,7 +249,7 @@
     },
     bm: {
       docTitle: 'Kehadiran Latihan — TrainHub',
-      badgeSession: 'KEHADIRAN LATIHAN',
+      badgeSession: 'SENARAI KEHADIRAN LATIHAN',
       loadingTraining: 'Memuatkan Latihan...',
       loadingSession: 'Mengesahkan butiran sesi...',
       loadingContext: 'Mengesahkan maklumat sesi...',
@@ -342,8 +350,28 @@
   document.addEventListener('DOMContentLoaded', async () => {
     applyLanguage(currentLang);
 
-    activeSessionId = getQueryParam('session') || getQueryParam('sessionId') || getQueryParam('id') || getQueryParam('s');
-    
+    activeSessionId = (typeof window.SERVER_SESSION_ID !== 'undefined' && window.SERVER_SESSION_ID)
+      ? window.SERVER_SESSION_ID
+      : (getQueryParam('session') || getQueryParam('sessionId') || getQueryParam('id') || getQueryParam('s'));
+
+    // Asynchronous fallback for Google Apps Script iframe environments
+    if (!activeSessionId && typeof google !== 'undefined' && google.script && google.script.url && google.script.url.getLocation) {
+      await new Promise(resolve => {
+        try {
+          google.script.url.getLocation(loc => {
+            if (loc && loc.parameter) {
+              const p = loc.parameter;
+              activeSessionId = p.session || p.sessionId || p.id || p.s || '';
+            }
+            resolve();
+          });
+        } catch(locErr) {
+          resolve();
+        }
+        setTimeout(resolve, 800);
+      });
+    }
+
     if (!activeSessionId) {
       showErrorState(t('toastMissingSession'));
       return;

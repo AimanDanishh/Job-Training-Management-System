@@ -91,6 +91,7 @@
             </div>
             <div class="col">
               <div style="font-size:14px;font-weight:800;color:var(--apollo-dark);margin-bottom:2px">Participant Training Evaluation Link (2-Week Deadline)</div>
+              <div style="font-size:11.5px;color:#92400E;font-weight:600;margin-bottom:4px">Training Evaluation Form &bull; Document No.: S-HRS-FM-006</div>
               <div style="font-size:12px;color:var(--apollo-gray-600);margin-bottom:10px">Direct QR code & link for participants to evaluate course effectiveness and trainer delivery. Must be answered within 2 weeks after training completion.</div>
               <div style="display:flex;gap:8px;flex-wrap:wrap">
                 <button class="btn-th btn-secondary btn-sm" onclick="copyEvalUrl('l1')"><span class="icon sm">content_copy</span> Copy Link</button>
@@ -128,6 +129,7 @@
           <div style="padding:16px 20px;border-bottom:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
             <div>
               <h4 style="font-size:14px;font-weight:800;color:var(--apollo-dark);margin:0">Participant Training Evaluation Status (2-Week Deadline)</h4>
+              <div style="font-size:11.5px;color:var(--apollo-gray-500);font-weight:600;margin:2px 0 0">Training Evaluation Form &bull; Document No.: S-HRS-FM-006</div>
               <p style="font-size:11.5px;color:var(--apollo-gray-500);margin:2px 0 0">Tracking submission status per enrolled participant. All attendees must complete within 2 weeks of training end date.</p>
             </div>
           </div>
@@ -151,7 +153,10 @@
         <!-- Submitted Participant Evaluations Table -->
         <div class="card-th card-th-p0">
           <div style="padding:16px 20px;border-bottom:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center">
-            <h4 style="font-size:14px;font-weight:800;color:var(--apollo-dark);margin:0">Submitted Participant Evaluation Records</h4>
+            <div>
+              <h4 style="font-size:14px;font-weight:800;color:var(--apollo-dark);margin:0">Submitted Participant Evaluation Records</h4>
+              <div style="font-size:11.5px;color:var(--apollo-gray-500);font-weight:600;margin:2px 0 0">Document No.: S-HRS-FM-006</div>
+            </div>
           </div>
           <div style="overflow-x:auto">
             <table class="table-th">
@@ -177,6 +182,7 @@
             </div>
             <div class="col">
               <div style="font-size:14px;font-weight:800;color:var(--apollo-dark);margin-bottom:2px">Supervisor Evaluation Link (3 Months)</div>
+              <div style="font-size:11.5px;color:#92400E;font-weight:600;margin-bottom:4px">Post Training Evaluation Form &bull; Document No.: S-HRS-FM-006</div>
               <div style="font-size:12px;color:var(--apollo-gray-600);margin-bottom:10px">Supervisors evaluate employees on behavioral competency improvement 3 months after training completion.</div>
               <div style="display:flex;gap:8px;flex-wrap:wrap">
                 <button class="btn-th btn-secondary btn-sm" onclick="copyEvalUrl('l3')"><span class="icon sm">content_copy</span> Copy Link</button>
@@ -276,7 +282,11 @@
 <div id="modal-eval" class="modal-overlay" style="display:none">
   <div class="modal-box" style="max-width:620px">
     <div class="modal-header">
-      <div><h3 class="modal-title">Training Evaluation Form</h3><p class="modal-sub">Borang Penilaian Latihan</p></div>
+      <div>
+        <h3 class="modal-title">Training Evaluation Form</h3>
+        <div style="font-size:12px;color:var(--apollo-gray-500);font-weight:600;margin-top:2px;">Document No.: S-HRS-FM-006</div>
+        <p class="modal-sub">Borang Penilaian Latihan</p>
+      </div>
       <button class="modal-close" onclick="closeModal('modal-eval')"><span class="icon sm">close</span></button>
     </div>
     <input type="hidden" id="eval-tid">
@@ -331,7 +341,11 @@
 <div id="modal-post-eval" class="modal-overlay" style="display:none">
   <div class="modal-box" style="max-width:600px">
     <div class="modal-header">
-      <div><h3 class="modal-title">Post Training Evaluation (3 Months)</h3><p class="modal-sub">Supervisor assessment form</p></div>
+      <div>
+        <h3 class="modal-title">Post Training Evaluation (3 Months)</h3>
+        <div style="font-size:12px;color:var(--apollo-gray-500);font-weight:600;margin-top:2px;">Document No.: S-HRS-FM-006</div>
+        <p class="modal-sub">Supervisor assessment form</p>
+      </div>
       <button class="modal-close" onclick="closeModal('modal-post-eval')"><span class="icon sm">close</span></button>
     </div>
     <input type="hidden" id="post-tid">
@@ -524,7 +538,7 @@
 
       const widgetBox = document.getElementById('supervisor-eval-3month-widget');
       if (widgetBox) {
-        widgetBox.innerHTML = ApolloCountdown.renderWidget(st, 'Supervisor Evaluation (3-Month Review)');
+        widgetBox.innerHTML = ApolloCountdown.renderWidget(st, 'Supervisor Evaluation');
       }
     }
   }
