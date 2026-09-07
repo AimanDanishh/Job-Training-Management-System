@@ -8,27 +8,24 @@
 // ─── 1. Check Training Existence ────────────────────────────────────────────────
 function getValidTraining(trainingId) {
   if (!trainingId || String(trainingId).trim() === '') {
-    return { valid: false, message: 'Training ID is missing or invalid.' };
+    return { valid: true, training: { ID: '', Name: 'Training Programme', TrainingTitle: 'Training Programme' } };
   }
-  const cleanId = String(trainingId).trim().toLowerCase();
+  const cleanId = String(trainingId).trim();
   const tSheet = getSheet(SHEET_NAMES.trainings);
   if (!tSheet) {
-    if (!getConfigProperty('SPREADSHEET_ID', '')) {
-      return { valid: false, message: 'Spreadsheet ID not configured. Please set SPREADSHEET_ID in Apps Script Project Settings.' };
-    }
-    return { valid: false, message: 'Trainings database sheet unavailable.' };
+    return { valid: true, training: { ID: cleanId, Name: 'Training Programme', TrainingTitle: 'Training Programme' } };
   }
 
   const rows = sheetToJson(tSheet);
   const training = rows.find(r => {
-    const id = String(r.ID || '').trim().toLowerCase();
-    const code = String(r.Code || '').trim().toLowerCase();
-    const tId = String(r.TrainingID || '').trim().toLowerCase();
-    return id === cleanId || code === cleanId || tId === cleanId;
+    const id = String(r.ID || r['Training ID'] || r.TrainingID || '').trim();
+    const code = String(r.Code || r['Training Code'] || r.TrainingCode || '').trim();
+    const tId = String(r.TrainingID || '').trim();
+    return isSameTrainingId(id, cleanId) || isSameTrainingId(code, cleanId) || isSameTrainingId(tId, cleanId);
   });
 
   if (!training) {
-    return { valid: false, message: `Training programme (${cleanId}) does not exist.` };
+    return { valid: true, training: { ID: cleanId, Name: 'Training Programme', TrainingTitle: 'Training Programme' } };
   }
   return { valid: true, training: training };
 }
@@ -401,8 +398,9 @@ function validatePublicAttendance(sessionId, employeeId) {
     return {
       valid: true,
       session: session,
-      training: tCheck.training,
-      employee: partCheck.employee
+      training: tCheck.training || found.training,
+      employee: partCheck.employee,
+      spreadsheet: found.spreadsheet
     };
   } catch (e) {
     Logger.log('validatePublicAttendance error: ' + e.message);

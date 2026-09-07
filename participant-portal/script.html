@@ -1,7 +1,3 @@
-<script id="server-params" type="application/json">
-<?!= JSON.stringify((typeof params !== 'undefined' && params) ? params : {}) ?>
-</script>
-
 <script>
   /**
    * Universal async wrapper for calling backend Google Apps Script functions.
@@ -34,23 +30,93 @@
   }
 
   /**
-   * Helper to retrieve URL Query Parameters (checks window.location and server-params)
+   * Helper to retrieve URL Query Parameters across multiple environments
+   * Checks: window.SERVER_PARAMS -> DOM #server-params -> location.search -> location.hash -> window.top
    */
   function getQueryParam(param) {
+    if (!param) return '';
+    const cleanParam = String(param).toLowerCase().trim();
+
+    // 1. Check window.SERVER_PARAMS (injected by server-side template)
     try {
-      const urlParams = new URLSearchParams(window.location.search);
-      const val = urlParams.get(param);
-      if (val !== null && val !== '') return val;
-    } catch(e) {}
-    try {
-      const el = document.getElementById('server-params');
-      if (el && el.textContent) {
-        const data = JSON.parse(el.textContent.trim());
-        if (data && data[param] !== undefined && data[param] !== null && String(data[param]).trim() !== '') {
-          return String(data[param]).trim();
+      if (window.SERVER_PARAMS && typeof window.SERVER_PARAMS === 'object') {
+        if (window.SERVER_PARAMS[param] !== undefined && window.SERVER_PARAMS[param] !== null && String(window.SERVER_PARAMS[param]).trim() !== '') {
+          return String(window.SERVER_PARAMS[param]).trim();
+        }
+        for (const k of Object.keys(window.SERVER_PARAMS)) {
+          if (k.toLowerCase().trim() === cleanParam) {
+            const val = window.SERVER_PARAMS[k];
+            if (val !== undefined && val !== null && String(val).trim() !== '') {
+              return String(val).trim();
+            }
+          }
         }
       }
     } catch(e) {}
+
+    // 2. Check DOM #server-params element
+    try {
+      const el = document.getElementById('server-params');
+      if (el && el.textContent) {
+        const text = el.textContent.trim();
+        if (text.startsWith('{') && text.endsWith('}')) {
+          const data = JSON.parse(text);
+          if (data && typeof data === 'object') {
+            if (data[param] !== undefined && data[param] !== null && String(data[param]).trim() !== '') {
+              return String(data[param]).trim();
+            }
+            for (const k of Object.keys(data)) {
+              if (k.toLowerCase().trim() === cleanParam) {
+                const val = data[k];
+                if (val !== undefined && val !== null && String(val).trim() !== '') {
+                  return String(val).trim();
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch(e) {}
+
+    // 3. Check window.location.search
+    try {
+      if (window.location && window.location.search) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const val = urlParams.get(param);
+        if (val !== null && val !== '') return val;
+        for (const [k, v] of urlParams.entries()) {
+          if (k.toLowerCase().trim() === cleanParam && v) return v;
+        }
+      }
+    } catch(e) {}
+
+    // 4. Check window.location.hash
+    try {
+      if (window.location && window.location.hash) {
+        const hashStr = window.location.hash.replace(/^#/, '');
+        if (hashStr.includes('=')) {
+          const hashParams = new URLSearchParams(hashStr.includes('?') ? hashStr.split('?')[1] : hashStr);
+          const val = hashParams.get(param);
+          if (val !== null && val !== '') return val;
+          for (const [k, v] of hashParams.entries()) {
+            if (k.toLowerCase().trim() === cleanParam && v) return v;
+          }
+        }
+      }
+    } catch(e) {}
+
+    // 5. Check window.top.location.search (if accessible / same origin)
+    try {
+      if (window.top && window.top !== window && window.top.location && window.top.location.search) {
+        const topParams = new URLSearchParams(window.top.location.search);
+        const val = topParams.get(param);
+        if (val !== null && val !== '') return val;
+        for (const [k, v] of topParams.entries()) {
+          if (k.toLowerCase().trim() === cleanParam && v) return v;
+        }
+      }
+    } catch(e) {}
+
     return '';
   }
 

@@ -28,6 +28,9 @@ function doGet(e) {
     template.params = (e && e.parameter) ? e.parameter : {};
     template.mode = modeParam;
     template.page = modeParam;
+    template.sessionId = (e && e.parameter && (e.parameter.session || e.parameter.sessionId || e.parameter.id || e.parameter.s)) ? String(e.parameter.session || e.parameter.sessionId || e.parameter.id || e.parameter.s).trim() : '';
+    template.trainingId = (e && e.parameter && (e.parameter.id || e.parameter.training || e.parameter.trainingId || e.parameter.trn)) ? String(e.parameter.id || e.parameter.training || e.parameter.trainingId || e.parameter.trn).trim() : '';
+    template.evaluatorId = (e && e.parameter && (e.parameter.evaluator || e.parameter.emp || e.parameter.eval)) ? String(e.parameter.evaluator || e.parameter.emp || e.parameter.eval).trim() : '';
     try {
       const rawLogo = getCompanyLogoUrl();
       const directLogo = convertDriveLinkToDirectImageUrl(rawLogo);

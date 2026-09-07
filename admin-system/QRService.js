@@ -76,11 +76,21 @@ function generateMissingQRCodes(forceRegenerate = false) {
       const sessionIdx = findIndex(['SessionID', 'Session ID', 'Session_ID', 'ID']);
       const attUrlIdx = findIndex(['AttendanceURL', 'Attendance URL', 'Attendance_URL', 'AttURL']);
       const qrUrlIdx = findIndex(['QRCodeURL', 'QR Code URL', 'QR_Code_URL', 'QRCode', 'QRURL']);
+      const qrStatusIdx = findIndex(['QRStatus', 'QR Status', 'Status', 'State']);
       if (sessionIdx === -1 || attUrlIdx === -1 || qrUrlIdx === -1) return;
       let sheetUpdated = false;
       for (let i = 1; i < data.length; i++) {
         const sessionId = String(data[i][sessionIdx]).trim();
         if (!sessionId) continue;
+
+        // Skip deactivated / inactive sessions so deactivated QR codes are never made active
+        if (qrStatusIdx !== -1) {
+          const st = String(data[i][qrStatusIdx] || '').trim().toLowerCase();
+          if (['deactivate', 'deactivated', 'inactive', 'expired', 'deleted'].includes(st)) {
+            continue;
+          }
+        }
+
         let attUrl = data[i][attUrlIdx];
         let qrUrl = data[i][qrUrlIdx];
         let rowUpdated = false;

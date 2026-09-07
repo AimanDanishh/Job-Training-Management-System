@@ -117,7 +117,7 @@ function getEmployeeSpreadsheet() {
 }
 
 function getSheet(name) {
-  const isEmpSheet = ['employees', 'cost centre', 'costcentre', 'hod email', 'hodemail', 'csuite email', 'csuiteemail', 'c-suite email', 'hohr email', 'hohremail', 'for it', 'forit', 'for_it'].includes(String(name).toLowerCase().trim());
+  const isEmpSheet = ['employees', 'cost centre', 'costcentre', 'hod email', 'hodemail', 'csuite email', 'csuiteemail', 'c-suite email', 'hohr email', 'hohremail', 'hr email', 'hremail', 'for it', 'forit', 'for_it'].includes(String(name).toLowerCase().trim());
   const primarySs = isEmpSheet ? getEmployeeSpreadsheet() : getSpreadsheet();
 
   const secondarySs = isEmpSheet ? getSpreadsheet() : getEmployeeSpreadsheet();
@@ -196,6 +196,53 @@ function findRowById(sheet, id) {
     }
   }
   return -1;
+}
+
+/**
+ * Reads all records from the "HR email" tab in EMPLOYEE_SPREADSHEET_ID.
+ * Header format: Employee No | HR | Cost Centre | Position Title | Email
+ */
+function getHrEmailRecords() {
+  const getVal = (rowObj, nameList) => {
+    if (!rowObj) return '';
+    const keys = Object.keys(rowObj);
+    for (let n of nameList) {
+      const matchKey = keys.find(k => k.toLowerCase().replace(/[^a-z0-9]/g, '') === n.toLowerCase().replace(/[^a-z0-9]/g, ''));
+      if (matchKey && rowObj[matchKey] !== undefined && rowObj[matchKey] !== null) {
+        return String(rowObj[matchKey]).trim();
+      }
+    }
+    return '';
+  };
+
+  const idAliases = ['Employee No', 'EmployeeNo', 'EmployeeID', 'ID', 'EmpNo', 'Staff ID'];
+  const nameAliases = ['HR', 'HRName', 'HR Name', 'Name', 'Employee Name'];
+  const deptAliases = ['Cost Centre', 'CostCentre', 'Department', 'Dept'];
+  const posAliases = ['Position Title', 'PositionTitle', 'Position', 'JobTitle'];
+  const emailAliases = ['Email', 'EmailAddress', 'Email Address', 'HREmail'];
+
+  const records = [];
+  try {
+    const hrSheet = getSheet('HR email') || getSheet('HR Email') || getSheet('HR');
+    if (hrSheet) {
+      const rows = sheetToJson(hrSheet);
+      rows.forEach(r => {
+        const email = getVal(r, emailAliases);
+        if (email) {
+          records.push({
+            employeeNo: getVal(r, idAliases),
+            name: getVal(r, nameAliases) || 'HR Department',
+            costCentre: getVal(r, deptAliases),
+            position: getVal(r, posAliases) || 'HR Department',
+            email: email.toLowerCase().trim()
+          });
+        }
+      });
+    }
+  } catch (e) {
+    Logger.log('getHrEmailRecords error: ' + e.message);
+  }
+  return records;
 }
 
 function formatDate(date) {

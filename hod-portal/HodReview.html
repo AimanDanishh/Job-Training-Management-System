@@ -162,6 +162,40 @@
 
     </main>
 
+    <!-- Dedicated Success Confirmation View Container -->
+    <section id="successConfirmationScreen" class="success-page-content" style="display:none;justify-content:center;align-items:center;min-height:55vh;padding:24px 12px;">
+      <div class="card success-card" style="max-width:540px;width:100%;text-align:center;padding:48px 32px;box-shadow:var(--shadow-raised);border-radius:var(--radius-lg);border:1px solid var(--border-color);background:var(--bg-card);margin:20px auto 0 auto;">
+        
+        <!-- Success Checkmark Icon Container -->
+        <div class="success-icon-wrap" style="width:72px;height:72px;border-radius:50%;background:var(--success-bg);box-shadow:var(--shadow-raised-sm);display:inline-flex;align-items:center;justify-content:center;font-size:36px;font-weight:800;color:var(--success);margin-bottom:24px;border:2px solid var(--success);">
+          ✓
+        </div>
+
+        <!-- Action-Specific Title -->
+        <h2 id="modalSuccessTitle" style="font-size:24px;font-weight:800;color:var(--text-primary);margin-bottom:12px;letter-spacing:-0.3px;">
+          Request Approved Successfully
+        </h2>
+
+        <!-- Action-Specific Message -->
+        <p id="modalSuccessMessage" style="font-size:15px;color:var(--text-secondary);line-height:1.6;margin-bottom:24px;max-width:440px;margin-left:auto;margin-right:auto;">
+          The training request has been successfully approved.
+        </p>
+
+        <!-- Optional Requisition ID Chip -->
+        <div id="modalSuccessRequestIdContainer" style="display:none;align-items:center;gap:6px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:8px 16px;margin-bottom:28px;">
+          <span style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Requisition ID:</span>
+          <span id="modalSuccessRequestIdText" style="font-size:14px;font-weight:700;color:var(--accent);">--</span>
+        </div>
+
+        <!-- Back to Requests Action Button -->
+        <div>
+          <button type="button" id="btnModalBackToRequests" class="btn btn-primary-action" onclick="returnToRequestsFromSuccess()" style="padding:12px 32px;font-size:14.5px;font-weight:700;display:inline-flex;align-items:center;gap:8px;cursor:pointer;">
+            <span>📋</span> Back to Requests
+          </button>
+        </div>
+      </div>
+    </section>
+
     <!-- Access Denied Screen (Unauthorized or Unidentified Account) -->
     <div id="accessDeniedScreen" class="access-card" style="display:none;">
       <div style="font-size:56px;margin-bottom:12px;">🔒</div>
@@ -487,8 +521,18 @@
       renderApproverIdentity(currentApprover);
       renderDashboardMetrics(dashboardMetrics);
 
-      if (employeePortalUrl) {
-        document.getElementById('employeePortalHeaderBtn').style.display = 'inline-flex';
+      const empBtn = document.getElementById('employeePortalHeaderBtn');
+      if (empBtn && employeePortalUrl) {
+        empBtn.style.display = 'inline-flex';
+      }
+
+      // Check if page=success is in URL
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('page') === 'success') {
+        const actionParam = urlParams.get('action') || 'approve';
+        const idParam = urlParams.get('id') || urlParams.get('trainingId') || urlParams.get('req') || '';
+        showSuccessConfirmation(actionParam, idParam);
+        return;
       }
 
       document.getElementById('mainDashboardContent').style.display = 'block';
@@ -497,7 +541,6 @@
       showPendingRequests();
 
       // Auto-open specific request if 'id' parameter is in URL
-      const urlParams = new URLSearchParams(window.location.search);
       const reqIdParam = urlParams.get('id') || urlParams.get('req');
       if (reqIdParam) {
         const found = allSupervisedList.find(r => {
@@ -860,6 +903,132 @@
     function closeDetailsModal() {
       document.getElementById('requestDetailsModal').style.display = 'none';
       selectedRequestForModal = null;
+      resetModalActionButtons();
+    }
+
+    function resetModalActionButtons() {
+      const btnApprove = document.getElementById('btnModalApprove');
+      const btnReject = document.getElementById('btnModalReject');
+      const btnReturn = document.getElementById('btnModalReturn');
+      if (btnApprove) {
+        btnApprove.innerHTML = '<span>✅</span> Approve Request';
+        btnApprove.disabled = false;
+      }
+      if (btnReject) {
+        btnReject.innerHTML = '<span>❌</span> Reject Request';
+        btnReject.disabled = false;
+      }
+      if (btnReturn) {
+        btnReturn.innerHTML = '<span>↩️</span> Return with Remarks';
+        btnReturn.disabled = false;
+      }
+    }
+
+    const ACTION_CONTENT_MAP = {
+      'approve': {
+        title: 'Request Approved Successfully',
+        message: 'The training request has been successfully approved.'
+      },
+      'approved': {
+        title: 'Request Approved Successfully',
+        message: 'The training request has been successfully approved.'
+      },
+      'reject': {
+        title: 'Request Rejected Successfully',
+        message: 'The training request has been successfully rejected.'
+      },
+      'rejected': {
+        title: 'Request Rejected Successfully',
+        message: 'The training request has been successfully rejected.'
+      },
+      'return': {
+        title: 'Request Returned Successfully',
+        message: 'The training request has been successfully returned to the requester for further action.'
+      },
+      'returned': {
+        title: 'Request Returned Successfully',
+        message: 'The training request has been successfully returned to the requester for further action.'
+      }
+    };
+
+    const FALLBACK_ACTION_CONTENT = {
+      title: 'Request Processed Successfully',
+      message: 'The training request action has been successfully processed.'
+    };
+
+    function showSuccessConfirmation(action, reqId) {
+      // 1. Hide main dashboard & other screen elements
+      const mainContent = document.getElementById('mainDashboardContent');
+      const identityBanner = document.getElementById('approverIdentityBanner');
+      const accessScreen = document.getElementById('accessDeniedScreen');
+      const successScreen = document.getElementById('successConfirmationScreen');
+
+      if (mainContent) mainContent.style.display = 'none';
+      if (identityBanner) identityBanner.style.display = 'none';
+      if (accessScreen) accessScreen.style.display = 'none';
+
+      // 2. Set dynamic action-specific content
+      const actionKey = String(action || 'approve').toLowerCase().trim();
+      const cfg = ACTION_CONTENT_MAP[actionKey] || FALLBACK_ACTION_CONTENT;
+
+      const titleEl = document.getElementById('modalSuccessTitle');
+      const msgEl = document.getElementById('modalSuccessMessage');
+      if (titleEl) titleEl.innerText = cfg.title;
+      if (msgEl) msgEl.innerText = cfg.message;
+
+      // 3. Set optional Requisition ID
+      const idContainer = document.getElementById('modalSuccessRequestIdContainer');
+      const idText = document.getElementById('modalSuccessRequestIdText');
+      if (reqId && String(reqId).trim()) {
+        if (idText) idText.innerText = String(reqId).trim();
+        if (idContainer) idContainer.style.display = 'inline-flex';
+      } else {
+        if (idContainer) idContainer.style.display = 'none';
+      }
+
+      // 4. Show success screen
+      if (successScreen) {
+        successScreen.style.display = 'flex';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+
+      // 5. Safely update browser URL without top-navigation violation
+      const actionSlug = actionKey.includes('reject') ? 'reject' : (actionKey.includes('return') ? 'return' : 'approve');
+      const queryString = `?page=success&action=${encodeURIComponent(actionSlug)}${reqId ? '&id=' + encodeURIComponent(reqId) : ''}`;
+      
+      try {
+        if (typeof google !== 'undefined' && google.script && google.script.history) {
+          google.script.history.push(null, { page: 'success', action: actionSlug, id: reqId || '' }, queryString);
+        } else if (window.history && window.history.pushState) {
+          window.history.pushState(null, '', queryString);
+        }
+      } catch (e) {
+        console.warn('URL history update notice:', e);
+      }
+    }
+
+    function returnToRequestsFromSuccess() {
+      // 1. Hide success screen
+      const successScreen = document.getElementById('successConfirmationScreen');
+      if (successScreen) successScreen.style.display = 'none';
+
+      // 2. Show approver identity banner & main dashboard content
+      const identityBanner = document.getElementById('approverIdentityBanner');
+      const mainContent = document.getElementById('mainDashboardContent');
+      if (identityBanner && currentApprover) identityBanner.style.display = 'flex';
+      if (mainContent) mainContent.style.display = 'block';
+
+      // 3. Reset URL to ?page=review
+      try {
+        if (typeof google !== 'undefined' && google.script && google.script.history) {
+          google.script.history.push(null, { page: 'review' }, '?page=review');
+        } else if (window.history && window.history.pushState) {
+          window.history.pushState(null, '', '?page=review');
+        }
+      } catch (e) {}
+
+      // 4. Switch to Pending Requests tab and force fresh reload from server
+      showPendingRequests(true);
     }
 
     function submitDecisionFromModal(decision) {
@@ -878,10 +1047,23 @@
         return;
       }
 
-      showLoading(`Processing ${decision.toUpperCase()} approval decision...`);
-
-      // Disable buttons during submit
+      // 1. Disable all action buttons inside #modalActionButtons to prevent duplicate clicks
       document.querySelectorAll('#modalActionButtons button').forEach(b => b.disabled = true);
+
+      // 2. Update the clicked button label according to the action
+      const btnApprove = document.getElementById('btnModalApprove');
+      const btnReject = document.getElementById('btnModalReject');
+      const btnReturn = document.getElementById('btnModalReturn');
+
+      if (decision === 'Approved' && btnApprove) {
+        btnApprove.innerHTML = '<span>⏳</span> Approving...';
+      } else if (decision === 'Rejected' && btnReject) {
+        btnReject.innerHTML = '<span>⏳</span> Rejecting...';
+      } else if (decision === 'Returned' && btnReturn) {
+        btnReturn.innerHTML = '<span>⏳</span> Returning...';
+      }
+
+      showLoading(`Processing ${decision.toUpperCase()} approval decision...`);
 
       const payload = {
         trainingId: reqId,
@@ -896,23 +1078,29 @@
       google.script.run
         .withSuccessHandler(resStr => {
           hideLoading();
-          document.querySelectorAll('#modalActionButtons button').forEach(b => b.disabled = false);
-          const res = JSON.parse(resStr);
+          let res;
+          try {
+            res = (typeof resStr === 'string') ? JSON.parse(resStr) : resStr;
+          } catch (e) {
+            res = { success: false, message: 'Invalid response from server: ' + e.message };
+          }
 
-          if (!res.success) {
-            alert(res.message);
+          if (!res || !res.success) {
+            resetModalActionButtons();
+            alert(res ? res.message : 'Action processing failed.');
             return;
           }
 
-          alert(res.data.message || `Training request successfully marked as ${decision.toUpperCase()}.`);
+          // Step 1: Success alert removed
+          // Step 2: Close current request modal
           closeDetailsModal();
 
-          // Refresh Dashboard data
-          initApprovalPortal();
+          // Step 3: Show dedicated success confirmation screen
+          showSuccessConfirmation(decision, reqId);
         })
         .withFailureHandler(err => {
           hideLoading();
-          document.querySelectorAll('#modalActionButtons button').forEach(b => b.disabled = false);
+          resetModalActionButtons();
           alert('Submission failed: ' + err.message);
         })
         .submitHODDecision(payload);

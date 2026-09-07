@@ -430,6 +430,35 @@
   </div>
 </div>
 
+<!-- Renew QR Session Confirmation Modal (Embedded in Training tab) -->
+<div id="modal-renew-session" class="modal-overlay" style="display:none">
+  <div class="modal-box" style="max-width:480px">
+    <div class="modal-header">
+      <div>
+        <h3 class="modal-title" style="color:#059669">Generate New QR Code</h3>
+        <p class="modal-sub">Issue a fresh QR code with a unique Session ID</p>
+      </div>
+      <button class="modal-close" onclick="closeModal('modal-renew-session')"><span class="icon sm">close</span></button>
+    </div>
+    <div style="padding:16px 0 8px">
+      <p style="font-size:13.5px;color:#334155;line-height:1.5;margin:0 0 12px">
+        Generate a brand-new QR code for this session? The old QR code (<strong id="renew-session-id-display" style="font-family:monospace"></strong>) will be <strong>permanently deactivated</strong> and cannot be scanned for attendance.
+      </p>
+      <div style="font-size:12px;color:#64748B;background:#F8FAFC;padding:10px 12px;border-radius:8px;border:1px solid #E2E8F0;line-height:1.5">
+        <span class="icon sm" style="color:#059669">security</span> <strong>Zero Collision Guarantee:</strong> The new QR code will use a completely new Session ID that is distinct from any active, deleted, or deactivated sessions.
+      </div>
+    </div>
+    <input type="hidden" id="renew-session-id-val" value="">
+    <input type="hidden" id="renew-session-training-id" value="">
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:16px;border-top:1px solid #F1F5F9">
+      <button class="btn-th btn-secondary" onclick="closeModal('modal-renew-session')">Cancel</button>
+      <button class="btn-th btn-success" id="btn-confirm-renew-session" onclick="executeRenewSessionFromTrainingTab()" style="background:#059669;color:#fff;border:none;display:inline-flex;align-items:center;gap:4px">
+        <span class="icon sm">qr_code_2</span>Generate New QR
+      </button>
+    </div>
+  </div>
+</div>
+
 <div id="toast-container"></div>
 <script>
   console.log("=== APOLLO TRAINING SCRIPT START ===");
@@ -1857,6 +1886,9 @@
                       </div>
                     </div>
                     <div style="display:flex;align-items:center;gap:8px">
+                      <button class="btn-th btn-success btn-xs" style="background:#059669;color:#fff;border:none;display:inline-flex;align-items:center;gap:4px" onclick="confirmRenewSessionForTraining('${s.SessionID}', '${t.ID}')" title="Generate fresh QR code with new Session ID">
+                        <span class="icon sm">qr_code_2</span> Generate New QR
+                      </button>
                       <button class="btn-th btn-primary btn-xs" onclick="openEditSessionForTraining('${s.SessionID}', '${t.ID}')" title="Reactivate or Edit">
                         <span class="icon sm">edit</span> Edit / Reactivate
                       </button>
@@ -2634,6 +2666,36 @@
       showToast('Failed to delete session: ' + e.message, 'error');
     } finally {
       setBtnLoading(btn, false, '<span class="icon sm">delete</span>Delete Session');
+    }
+  }
+
+  function confirmRenewSessionForTraining(sessionId, trainingId) {
+    document.getElementById('renew-session-id-val').value = sessionId;
+    document.getElementById('renew-session-id-display').textContent = sessionId;
+    document.getElementById('renew-session-training-id').value = trainingId || currentPmTrainingId || '';
+    openModal('modal-renew-session');
+  }
+
+  async function executeRenewSessionFromTrainingTab() {
+    const sessionId = document.getElementById('renew-session-id-val').value.trim();
+    const trainingId = document.getElementById('renew-session-training-id').value.trim() || currentPmTrainingId;
+    if (!sessionId) return;
+
+    const btn = document.getElementById('btn-confirm-renew-session');
+    setBtnLoading(btn, true, 'Generating...');
+    try {
+      const res = await callServer('renewSessionQRCode', sessionId);
+      showToast(res.message || 'New QR code generated successfully!', 'success');
+      closeModal('modal-renew-session');
+      if (trainingId) {
+        ApolloCache.remove('training_detail_' + trainingId);
+        await openDetail(trainingId, true);
+      }
+      loadTrainings();
+    } catch(e) {
+      showToast('Failed to generate new QR: ' + e.message, 'error');
+    } finally {
+      setBtnLoading(btn, false, '<span class="icon sm">qr_code_2</span>Generate New QR');
     }
   }
   console.log("=== APOLLO TRAINING SCRIPT COMPLETE ===");

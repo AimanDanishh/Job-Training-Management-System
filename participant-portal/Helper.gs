@@ -55,6 +55,38 @@ function convertDriveLinkToDirectImageUrl(input) {
   return str;
 }
 
+/**
+ * Safely extracts a 25+ character Google Drive / Spreadsheet ID from raw IDs or full URLs.
+ */
+function extractSpreadsheetId(input) {
+  if (!input) return '';
+  const str = String(input).trim();
+  const urlMatch = str.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+  if (urlMatch && urlMatch[1]) return urlMatch[1];
+  const dMatch = str.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (dMatch && dMatch[1]) return dMatch[1];
+  const idMatch = str.match(/id=([a-zA-Z0-9_-]+)/);
+  if (idMatch && idMatch[1]) return idMatch[1];
+  if (/^[a-zA-Z0-9_-]{25,}$/.test(str)) return str;
+  return str;
+}
+
+/**
+ * Safely extracts a Google Drive folder ID from raw IDs or full URLs.
+ */
+function extractFolderId(input) {
+  if (!input) return '';
+  const str = String(input).trim();
+  const folderMatch = str.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+  if (folderMatch && folderMatch[1]) return folderMatch[1];
+  const dMatch = str.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (dMatch && dMatch[1]) return dMatch[1];
+  const idMatch = str.match(/id=([a-zA-Z0-9_-]+)/);
+  if (idMatch && idMatch[1]) return idMatch[1];
+  if (/^[a-zA-Z0-9_-]{25,}$/.test(str)) return str;
+  return str;
+}
+
 function formatMinimalistDate(dateVal) {
   if (!dateVal) return '';
   const str = String(dateVal).replace(/GMT.*$/, '').replace(/\(.*\)$/, '').trim();
@@ -128,6 +160,58 @@ function isSameEmployeeId(id1, id2) {
   const p1 = cleanPrefix(s1);
   const p2 = cleanPrefix(s2);
   if (p1 !== '' && p1 === p2) return true;
+
+  return false;
+}
+
+function isSameSessionId(id1, id2) {
+  if (id1 === null || id1 === undefined || id2 === null || id2 === undefined) return false;
+  let s1 = String(id1).trim().toLowerCase();
+  let s2 = String(id2).trim().toLowerCase();
+
+  // If passed a URL or query string, extract session value
+  if (s1.includes('session=') || s1.includes('sessionid=')) {
+    const m = s1.match(/[?&](?:session|sessionid|id|s)=([^&#\s]+)/i);
+    if (m && m[1]) s1 = decodeURIComponent(m[1]).trim().toLowerCase();
+  }
+  if (s2.includes('session=') || s2.includes('sessionid=')) {
+    const m = s2.match(/[?&](?:session|sessionid|id|s)=([^&#\s]+)/i);
+    if (m && m[1]) s2 = decodeURIComponent(m[1]).trim().toLowerCase();
+  }
+
+  if (s1 === s2) return true;
+  if (!s1 || !s2) return false;
+
+  // 1. Compare alphanumeric only (removes dashes, spaces, underscores: e.g. "SES-0001" vs "SES0001" vs "SES 0001")
+  const c1 = s1.replace(/[^a-z0-9]/g, '');
+  const c2 = s2.replace(/[^a-z0-9]/g, '');
+  if (c1 !== '' && c1 === c2) return true;
+
+  // 2. Strip "SES" prefix and leading zeros (e.g. "SES0001" vs "1" or "SES-1")
+  const n1 = c1.replace(/^ses/i, '').replace(/^0+/, '');
+  const n2 = c2.replace(/^ses/i, '').replace(/^0+/, '');
+  if (n1 !== '' && n1 === n2) return true;
+
+  // 3. Both are zero (e.g. "SES0000" vs "0")
+  if (c1.replace(/^ses/i, '').replace(/^0+/, '') === '' && c2.replace(/^ses/i, '').replace(/^0+/, '') === '') return true;
+
+  return false;
+}
+
+function isSameTrainingId(id1, id2) {
+  if (id1 === null || id1 === undefined || id2 === null || id2 === undefined) return false;
+  const s1 = String(id1).trim().toLowerCase();
+  const s2 = String(id2).trim().toLowerCase();
+  if (s1 === s2) return true;
+  if (!s1 || !s2) return false;
+
+  const c1 = s1.replace(/[^a-z0-9]/g, '');
+  const c2 = s2.replace(/[^a-z0-9]/g, '');
+  if (c1 !== '' && c1 === c2) return true;
+
+  const n1 = c1.replace(/^(trn|tr|training)[\-_:\s]*/i, '').replace(/^0+/, '');
+  const n2 = c2.replace(/^(trn|tr|training)[\-_:\s]*/i, '').replace(/^0+/, '');
+  if (n1 !== '' && n1 === n2) return true;
 
   return false;
 }
@@ -215,8 +299,20 @@ function getSheet(name) {
  */
 function getTrainingDataSpreadsheet(trainingOrId) {
   if (!trainingOrId) return null;
+
+  // Direct Resolution: If passed an existing 25+ character Drive Spreadsheet ID directly or full URL
+  if (typeof trainingOrId === 'string') {
+    const extractedDirectId = extractSpreadsheetId(trainingOrId);
+    if (extractedDirectId && /^[a-zA-Z0-9_-]{25,}$/.test(extractedDirectId)) {
+      try {
+        const directSs = SpreadsheetApp.openById(extractedDirectId);
+        if (directSs) return directSs;
+      } catch(e) {}
+    }
+  }
+
   let t = (typeof trainingOrId === 'object' && trainingOrId !== null) ? trainingOrId : null;
-  const cleanId = String(t ? (t.ID || t.TrainingID || t.Code || '') : trainingOrId).trim().toLowerCase();
+  const cleanId = String(t ? (t.ID || t.TrainingID || t.Code || '') : trainingOrId).trim();
 
   const tSheet = getSheet(SHEET_NAMES.trainings);
   if (!tSheet) return null;
@@ -224,16 +320,26 @@ function getTrainingDataSpreadsheet(trainingOrId) {
   if (!t) {
     const trainings = sheetToJson(tSheet);
     t = trainings.find(r => {
-      const id = String(r.ID || '').trim().toLowerCase();
-      const code = String(r.Code || '').trim().toLowerCase();
-      const tId = String(r.TrainingID || '').trim().toLowerCase();
-      return id === cleanId || code === cleanId || tId === cleanId;
+      const id = String(r.ID || r['Training ID'] || r.TrainingID || '').trim();
+      const code = String(r.Code || r['Training Code'] || r.TrainingCode || '').trim();
+      const tId = String(r.TrainingID || '').trim();
+      return isSameTrainingId(id, cleanId) || isSameTrainingId(code, cleanId) || isSameTrainingId(tId, cleanId);
     });
   }
   if (!t) return null;
 
-  // 1. Direct Resolution: Open by stored ParticipantsSheetID / SessionsSheetID / singleSheetId
-  const storedSheetId = String(t.ParticipantsSheetID || t.SessionsSheetID || t.singleSheetId || t.TrainingDataSheetID || t.TrainingDataID || '').trim();
+  // 1. Direct Resolution: Open by stored ParticipantsSheetID / SessionsSheetID / singleSheetId / AttendanceSheetID
+  const rawSheetId = String(
+    t.ParticipantsSheetID || t['ParticipantsSheetID'] || t['Participants Sheet ID'] || t['Participants Sheet'] ||
+    t.SessionsSheetID || t['SessionsSheetID'] || t['Sessions Sheet ID'] || t['Sessions Sheet'] ||
+    t.AttendanceSheetID || t['AttendanceSheetID'] || t['Attendance Sheet ID'] ||
+    t.singleSheetId || t['singleSheetId'] ||
+    t.TrainingDataSheetID || t['TrainingDataSheetID'] || t['Training Data Sheet ID'] ||
+    t.TrainingDataID || t['TrainingDataID'] ||
+    t.SheetID || t['SheetID'] || t['Spreadsheet ID'] || t['SpreadsheetID'] ||
+    ''
+  ).trim();
+  const storedSheetId = extractSpreadsheetId(rawSheetId);
   if (storedSheetId) {
     try {
       const ss = SpreadsheetApp.openById(storedSheetId);
@@ -246,13 +352,22 @@ function getTrainingDataSpreadsheet(trainingOrId) {
   // 2. Direct Folder Resolution: Open from t.FolderID if present
   if (t.FolderID) {
     try {
-      const folder = DriveApp.getFolderById(String(t.FolderID).trim());
+      const folderId = extractFolderId(t.FolderID) || String(t.FolderID).trim();
+      const folder = DriveApp.getFolderById(folderId);
       if (folder) {
         const code = t.Code || t.ID || cleanId;
         let fileIter = folder.getFilesByName('Training Data');
         if (!fileIter.hasNext()) fileIter = folder.getFilesByName(`${code} Training Data`);
         if (fileIter.hasNext()) {
           return SpreadsheetApp.openById(fileIter.next().getId());
+        }
+        // Fallback: Check any Google Sheet file in the folder
+        const allFiles = folder.getFiles();
+        while (allFiles.hasNext()) {
+          const f = allFiles.next();
+          if (f.getMimeType() === MimeType.GOOGLE_SHEETS || f.getName().includes('Training') || f.getName().includes('Data')) {
+            return SpreadsheetApp.openById(f.getId());
+          }
         }
       }
     } catch(fErr) {}
@@ -408,69 +523,211 @@ function getOrCreateSingleTrainingSheet(folder, code) {
  */
 function findTrainingBySessionId(sessionId) {
   if (!sessionId) return null;
-  const cleanSessionId = String(sessionId).trim().toLowerCase();
+  let cleanSessionId = String(sessionId).trim();
 
-  // Tier 1: Check central Main Database spreadsheet first
+  // If a full URL or query string was passed as sessionId
+  if (cleanSessionId.includes('http://') || cleanSessionId.includes('https://') || cleanSessionId.includes('?')) {
+    const urlMatch = cleanSessionId.match(/[?&](?:session|sessionId|id|s)=([^&#\s]+)/i);
+    if (urlMatch && urlMatch[1]) {
+      cleanSessionId = decodeURIComponent(urlMatch[1]).trim();
+    }
+  }
+
+  const extractSessionIdFromRow = (r) => {
+    if (!r || typeof r !== 'object') return '';
+    return String(
+      r.SessionID || r['Session ID'] || r['SessionId'] || r['Session_ID'] ||
+      r.ID || r['ID'] || r.SessionCode || r['Session Code'] || r.Code || r.Session || ''
+    ).trim();
+  };
+
+  const findSessionSheetInSpreadsheet = (ss) => {
+    if (!ss) return null;
+    const targetNames = ['trainingsessions', 'sessions', 'trainingsession', 'session'];
+    const allSheets = ss.getSheets();
+    for (const name of targetNames) {
+      const found = allSheets.find(s => s.getName().toLowerCase().replace(/[^a-z0-9]/g, '') === name);
+      if (found) return found;
+    }
+    // Check if sheet name contains "session"
+    const fuzzyFound = allSheets.find(s => s.getName().toLowerCase().includes('session'));
+    if (fuzzyFound) return fuzzyFound;
+
+    // Fallback: check if row 1 headers contain 'SessionID' or 'Session ID'
+    for (const s of allSheets) {
+      try {
+        if (s.getLastRow() >= 1 && s.getLastColumn() >= 1) {
+          const firstRow = s.getRange(1, 1, 1, Math.min(s.getLastColumn(), 15)).getValues()[0];
+          const hasSessionCol = firstRow.some(h => {
+            const clean = String(h).toLowerCase().replace(/[^a-z0-9]/g, '');
+            return clean === 'sessionid' || clean === 'sessioncode';
+          });
+          if (hasSessionCol) return s;
+        }
+      } catch(e) {}
+    }
+    return null;
+  };
+
+  const searchSessionInSheet = (sheet) => {
+    if (!sheet) return null;
+    try {
+      // 1. Structured JSON row lookup
+      const rows = sheetToJson(sheet);
+      for (const r of rows) {
+        const sId = extractSessionIdFromRow(r);
+        if (isSameSessionId(sId, cleanSessionId)) {
+          return r;
+        }
+      }
+
+      // 2. Raw 2D grid fallback: scans every cell in data range if header parsing missed it
+      const data = sheet.getDataRange().getValues();
+      if (data.length >= 2) {
+        let headerRowIdx = 0;
+        for (let r = 0; r < Math.min(data.length, 5); r++) {
+          const stringCells = data[r].filter(c => typeof c === 'string' && c.trim().length > 0);
+          if (stringCells.length >= 2) {
+            headerRowIdx = r;
+            break;
+          }
+        }
+        const headers = data[headerRowIdx].map(h => String(h || '').trim());
+        for (let r = headerRowIdx + 1; r < data.length; r++) {
+          const rowValues = data[r];
+          if (rowValues.every(c => c === '' || c === null || c === undefined)) continue;
+          
+          let matched = false;
+          for (let c = 0; c < rowValues.length; c++) {
+            const cellVal = String(rowValues[c] || '').trim();
+            if (isSameSessionId(cellVal, cleanSessionId)) {
+              matched = true;
+              break;
+            }
+          }
+          if (matched) {
+            const rowObj = {};
+            headers.forEach((h, idx) => {
+              if (h) rowObj[h] = rowValues[idx] !== undefined ? String(rowValues[idx]) : '';
+            });
+            if (!rowObj.SessionID) rowObj.SessionID = cleanSessionId;
+            if (!rowObj.SessionName) rowObj.SessionName = rowObj['Session Name'] || 'Session Check-In';
+            return rowObj;
+          }
+        }
+      }
+    } catch(err) {
+      Logger.log('searchSessionInSheet warning: ' + err.message);
+    }
+    return null;
+  };
+
+  // Tier 1: Check Central Database Spreadsheet & Employee Spreadsheet
   try {
     const mainSs = getSpreadsheet();
-    if (mainSs) {
-      const centralSessSheet = mainSs.getSheetByName('TrainingSessions') || 
-                               mainSs.getSheetByName('Sessions') || 
-                               mainSs.getSheetByName('Training Sessions') || 
-                               mainSs.getSheetByName('Session');
-      if (centralSessSheet) {
-        const sessions = sheetToJson(centralSessSheet);
-        const session = sessions.find(s => {
-          const sId = String(s.SessionID || s.ID || s.SessionCode || '').trim().toLowerCase();
-          return sId === cleanSessionId;
-        });
-        if (session) {
-          const tSheet = getSheet(SHEET_NAMES.trainings);
-          const trainings = tSheet ? sheetToJson(tSheet) : [];
-          const t = trainings.find(r => {
-            const id = String(r.ID || '').trim().toLowerCase();
-            const code = String(r.Code || '').trim().toLowerCase();
-            const tId = String(r.TrainingID || '').trim().toLowerCase();
-            return id === String(session.TrainingID || '').trim().toLowerCase() ||
-                   code === String(session.TrainingID || '').trim().toLowerCase() ||
-                   tId === String(session.TrainingID || '').trim().toLowerCase();
-          });
+    const candidateSpreadsheets = [mainSs];
+    const empSs = getEmployeeSpreadsheet();
+    if (empSs && (!mainSs || empSs.getId() !== mainSs.getId())) {
+      candidateSpreadsheets.push(empSs);
+    }
 
-          if (!t) {
-            // Training was deleted or no longer exists
-            return null;
+    for (const ss of candidateSpreadsheets) {
+      if (!ss) continue;
+      const centralSessSheet = findSessionSheetInSpreadsheet(ss);
+      if (centralSessSheet) {
+        const session = searchSessionInSheet(centralSessSheet);
+        if (session) {
+          // Resolve parent training (if available)
+          let t = null;
+          try {
+            const tSheet = getSheet(SHEET_NAMES.trainings);
+            const trainings = tSheet ? sheetToJson(tSheet) : [];
+            const sessionTId = String(session.TrainingID || session['Training ID'] || session.trainingId || '').trim();
+            t = trainings.find(r => {
+              const id = String(r.ID || r['Training ID'] || r.TrainingID || '').trim();
+              const code = String(r.Code || r['Training Code'] || r.TrainingCode || '').trim();
+              const tId = String(r.TrainingID || '').trim();
+              return isSameTrainingId(id, sessionTId) ||
+                     isSameTrainingId(code, sessionTId) ||
+                     isSameTrainingId(tId, sessionTId);
+            });
+          } catch(tErr) {
+            Logger.log('Parent training lookup warning in findTrainingBySessionId: ' + tErr.message);
           }
 
-          const perTrainingSs = getTrainingDataSpreadsheet(t) || mainSs;
-          return { session: session, training: t, spreadsheet: perTrainingSs, sessionSheet: centralSessSheet };
+          // CRITICAL: Even if parent training record was not found in Trainings sheet,
+          // NEVER return null! We already found the verified session!
+          const trainingObj = t || {
+            ID: session.TrainingID || session['Training ID'] || 'TRN-0000',
+            Name: session.SessionName || session['Session Name'] || session.TrainingTitle || 'Training Programme',
+            TrainingTitle: session.SessionName || session['Session Name'] || session.TrainingTitle || 'Training Programme',
+            Code: session.TrainingCode || session['Training Code'] || session.TrainingID || session['Training ID'] || ''
+          };
+
+          const perTrainingSs = (t && (t.ID || t.Code)) ? (getTrainingDataSpreadsheet(t) || ss) : ss;
+          return { session: session, training: trainingObj, spreadsheet: perTrainingSs, sessionSheet: centralSessSheet };
         }
       }
     }
-  } catch(eCentral) {}
+  } catch(eCentral) {
+    Logger.log('findTrainingBySessionId Tier 1 error: ' + eCentral.message);
+  }
 
   // Tier 2: Check per-training spreadsheets
-  const tSheet = getSheet(SHEET_NAMES.trainings);
-  if (!tSheet) return null;
-
-  const trainings = sheetToJson(tSheet);
-  for (const t of trainings) {
-    if (!t.ID && !t.Code) continue;
-    const ss = getTrainingDataSpreadsheet(t);
-    if (!ss) continue;
-    const sessSheet = ss.getSheetByName('TrainingSessions') || 
-                      ss.getSheetByName('Sessions') || 
-                      ss.getSheetByName('Training Sessions') || 
-                      ss.getSheetByName('Session');
-    if (!sessSheet) continue;
-    const sessions = sheetToJson(sessSheet);
-    const session = sessions.find(s => {
-      const sId = String(s.SessionID || s.ID || s.SessionCode || '').trim().toLowerCase();
-      return sId === cleanSessionId;
-    });
-    if (session) {
-      return { session: session, training: t, spreadsheet: ss, sessionSheet: sessSheet };
+  try {
+    const tSheet = getSheet(SHEET_NAMES.trainings);
+    if (tSheet) {
+      const trainings = sheetToJson(tSheet);
+      for (const t of trainings) {
+        if (!t.ID && !t.Code && !t.TrainingID && !t['Training ID']) continue;
+        const ss = getTrainingDataSpreadsheet(t);
+        if (!ss) continue;
+        const sessSheet = findSessionSheetInSpreadsheet(ss);
+        if (!sessSheet) continue;
+        const session = searchSessionInSheet(sessSheet);
+        if (session) {
+          return { session: session, training: t, spreadsheet: ss, sessionSheet: sessSheet };
+        }
+      }
     }
+  } catch(eTier2) {
+    Logger.log('findTrainingBySessionId Tier 2 error: ' + eTier2.message);
   }
+
+  // Tier 3: Drive Search for recent Training Data spreadsheets
+  try {
+    const fileIter = DriveApp.searchFiles('mimeType = "application/vnd.google-apps.spreadsheet" and title contains "Training Data"');
+    let count = 0;
+    while (fileIter.hasNext() && count < 8) {
+      count++;
+      const file = fileIter.next();
+      try {
+        const ss = SpreadsheetApp.openById(file.getId());
+        const sessSheet = findSessionSheetInSpreadsheet(ss);
+        if (sessSheet) {
+          const session = searchSessionInSheet(sessSheet);
+          if (session) {
+            const inferredName = file.getName().replace(/ Training Data.*/i, '').trim();
+            return {
+              session: session,
+              training: {
+                ID: session.TrainingID || inferredName,
+                Name: session.SessionName || inferredName,
+                TrainingTitle: session.SessionName || inferredName,
+                Code: session.TrainingCode || inferredName
+              },
+              spreadsheet: ss,
+              sessionSheet: sessSheet
+            };
+          }
+        }
+      } catch(fErr) {}
+    }
+  } catch(eTier3) {
+    Logger.log('findTrainingBySessionId Tier 3 error: ' + eTier3.message);
+  }
+
+  Logger.log('findTrainingBySessionId: Session not found for ID: ' + cleanSessionId);
   return null;
 }
 
@@ -556,6 +813,19 @@ function sheetToJson(sheet) {
     if (obj.PositionTitle && !obj.Position) obj.Position = obj.PositionTitle;
     if (obj['Position Title'] && !obj.Position) obj.Position = obj['Position Title'];
     if (obj['Job Title'] && !obj.Position) obj.Position = obj['Job Title'];
+
+    // Session ID & Training ID alias cross-population
+    const detectedSessionId = obj.SessionID || obj['Session ID'] || obj['Session Id'] || obj['Session_ID'] || obj.SessionCode || obj['Session Code'] || (String(obj.ID || '').toUpperCase().startsWith('SES') ? obj.ID : '');
+    if (detectedSessionId) {
+      if (!obj.SessionID) obj.SessionID = detectedSessionId;
+      if (!obj['Session ID']) obj['Session ID'] = detectedSessionId;
+    }
+
+    const detectedTrainingId = obj.TrainingID || obj['Training ID'] || obj['Training Id'] || obj['Training_ID'] || (String(obj.ID || '').toUpperCase().startsWith('TRN') ? obj.ID : '');
+    if (detectedTrainingId) {
+      if (!obj.TrainingID) obj.TrainingID = detectedTrainingId;
+      if (!obj['Training ID']) obj['Training ID'] = detectedTrainingId;
+    }
 
     // Smart fallback for shifted columns
     if (obj.TrainingID && String(obj.TrainingID).trim().toUpperCase().startsWith('SES')) {

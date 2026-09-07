@@ -217,6 +217,34 @@
   </div>
 </div>
 
+<!-- Renew QR Session Confirmation Modal -->
+<div id="modal-renew-session" class="modal-overlay" style="display:none">
+  <div class="modal-box" style="max-width:480px">
+    <div class="modal-header">
+      <div>
+        <h3 class="modal-title" style="color:#059669">Generate New QR Code</h3>
+        <p class="modal-sub">Issue a fresh QR code with a unique Session ID</p>
+      </div>
+      <button class="modal-close" onclick="closeModal('modal-renew-session')"><span class="icon sm">close</span></button>
+    </div>
+    <div style="padding:16px 0 8px">
+      <p style="font-size:13.5px;color:#334155;line-height:1.5;margin:0 0 12px">
+        Generate a brand-new QR code for this session? The old QR code (<strong id="renew-session-id-display" style="font-family:monospace"></strong>) will be <strong>permanently deactivated</strong> and cannot be scanned for attendance.
+      </p>
+      <div style="font-size:12px;color:#64748B;background:#F8FAFC;padding:10px 12px;border-radius:8px;border:1px solid #E2E8F0;line-height:1.5">
+        <span class="icon sm" style="color:#059669">security</span> <strong>Zero Collision Guarantee:</strong> The new QR code will use a completely new Session ID that is distinct from any active, deleted, or deactivated sessions.
+      </div>
+    </div>
+    <input type="hidden" id="renew-session-id-val" value="">
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:16px;border-top:1px solid #F1F5F9">
+      <button class="btn-th btn-secondary" onclick="closeModal('modal-renew-session')">Cancel</button>
+      <button class="btn-th btn-success" id="btn-confirm-renew-session" onclick="executeRenewSession()" style="background:#059669;color:#fff;border:none;display:inline-flex;align-items:center;gap:4px">
+        <span class="icon sm">qr_code_2</span>Generate New QR
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- Company Logo QR Modal -->
 <div id="modal-logo" class="modal-overlay" style="display:none">
   <div class="modal-box" style="max-width:540px">
@@ -471,8 +499,11 @@
               <div style="font-size:11px;color:#7F1D1D;margin-top:2px">Scans for this session are rejected.</div>
             </div>
 
-            <div style="margin-top:auto">
-              <button class="btn-th btn-primary btn-sm" style="width:100%" onclick="openEditSessionModal('${s.SessionID}')" title="Reactivate or Edit">
+            <div style="margin-top:auto;display:flex;flex-direction:column;gap:6px">
+              <button class="btn-th btn-success btn-sm" style="width:100%;background:#059669;color:#fff;border:none;display:inline-flex;align-items:center;justify-content:center;gap:4px" onclick="confirmRenewSession('${s.SessionID}')" title="Generate fresh QR code with new Session ID">
+                <span class="icon sm">qr_code_2</span>Generate New QR Code
+              </button>
+              <button class="btn-th btn-secondary btn-sm" style="width:100%" onclick="openEditSessionModal('${s.SessionID}')" title="Reactivate or Edit">
                 <span class="icon sm">edit</span>Edit / Reactivate
               </button>
             </div>
@@ -732,6 +763,30 @@
       showToast('Failed to delete session: ' + e.message, 'error');
     } finally {
       setBtnLoading(btn, false, '<span class="icon sm">delete</span>Delete Session');
+    }
+  }
+
+  function confirmRenewSession(sessionId) {
+    document.getElementById('renew-session-id-val').value = sessionId;
+    document.getElementById('renew-session-id-display').textContent = sessionId;
+    openModal('modal-renew-session');
+  }
+
+  async function executeRenewSession() {
+    const sessionId = document.getElementById('renew-session-id-val').value.trim();
+    if (!sessionId) return;
+
+    const btn = document.getElementById('btn-confirm-renew-session');
+    setBtnLoading(btn, true, 'Generating...');
+    try {
+      const res = await callServer('renewSessionQRCode', sessionId);
+      showToast(res.message || 'New QR code generated successfully!', 'success');
+      closeModal('modal-renew-session');
+      await loadSessions();
+    } catch(e) {
+      showToast('Failed to generate new QR: ' + e.message, 'error');
+    } finally {
+      setBtnLoading(btn, false, '<span class="icon sm">qr_code_2</span>Generate New QR');
     }
   }
 

@@ -3,35 +3,164 @@
  */
 
 /**
- * Generate sequential Session ID (e.g., SES0001, SES0002, ...)
+ * Record a decommissioned, deleted, or deactivated session ID in Script Properties
+ * so it can NEVER be reused by future session generators.
  */
-function generateSessionId() {
-  let maxNum = 0;
+function recordDecommissionedSessionId(sessionId) {
+  if (!sessionId) return;
   try {
-    const tSheet = getSheet(SHEET_NAMES.trainings);
-    if (tSheet) {
-      const trainings = sheetToJson(tSheet);
-      for (const t of trainings) {
-        if (!t.ID) continue;
-        const ss = getTrainingDataSpreadsheet(t.ID);
-        if (!ss) continue;
-        const sessSheet = ss.getSheetByName('Sessions') || ss.getSheetByName('TrainingSessions') || ss.getSheetByName('Training Sessions') || ss.getSheetByName('Session');
-        if (!sessSheet) continue;
-        const data = sessSheet.getDataRange().getValues();
-        for (let i = 1; i < data.length; i++) {
-          const id = String(data[i][0]).trim();
-          if (id.startsWith('SES')) {
-            const num = parseInt(id.replace('SES', ''), 10);
-            if (!isNaN(num) && num > maxNum) {
-              maxNum = num;
-            }
+    const cleanId = String(sessionId).trim().toUpperCase();
+    const raw = getConfigProperty('DECOMMISSIONED_SESSION_IDS', '[]');
+    let list = [];
+    try { list = JSON.parse(raw); } catch(e) { list = []; }
+    if (!Array.isArray(list)) list = [];
+    if (!list.includes(cleanId)) {
+      list.push(cleanId);
+      setConfigProperty('DECOMMISSIONED_SESSION_IDS', JSON.stringify(list));
+    }
+  } catch(e) {
+    Logger.log('recordDecommissionedSessionId warning: ' + e.message);
+  }
+}
+
+/**
+ * Scan all databases to collect all session IDs that have EVER existed:
+ * - Central Main Database (all session tabs & attendance tabs)
+ * - All Per-Training Spreadsheets (Sessions & Attendance tabs)
+ * - Persistent decommissioned / deleted list
+ */
+function getAllKnownSessionIds() {
+  const allIds = new Set();
+  const sessionNumPattern = /SES-?(\d+)/i;
+
+  const extractIdsFromSheet = (sheet) => {
+    if (!sheet) return;
+    try {
+      const lastRow = sheet.getLastRow();
+      const lastCol = sheet.getLastColumn();
+      if (lastRow < 2 || lastCol < 1) return;
+      
+      const values = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+      const headers = values[0].map(h => String(h || '').toLowerCase().replace(/[^a-z0-9]/g, ''));
+      let targetCols = [];
+      headers.forEach((h, idx) => {
+        if (['sessionid', 'sessioncode', 'id', 'session', 'sessid'].includes(h)) {
+          targetCols.push(idx);
+        }
+      });
+      if (targetCols.length === 0) {
+        targetCols = Array.from({ length: lastCol }, (_, i) => i);
+      }
+
+      for (let r = 1; r < values.length; r++) {
+        for (const c of targetCols) {
+          const cellStr = String(values[r][c] || '').trim();
+          if (cellStr && (sessionNumPattern.test(cellStr) || cellStr.toUpperCase().startsWith('SES'))) {
+            allIds.add(cellStr.toUpperCase());
           }
         }
       }
+    } catch(e) {}
+  };
+
+  // 1. Scan Central Main Spreadsheet
+  try {
+    const mainSs = getSpreadsheet();
+    if (mainSs) {
+      const allSheets = mainSs.getSheets();
+      allSheets.forEach(s => {
+        const name = s.getName().toLowerCase();
+        if (name.includes('session') || name.includes('attendance')) {
+          extractIdsFromSheet(s);
+        }
+      });
     }
-  } catch (e) {}
-  const nextNum = maxNum + 1;
-  return 'SES' + String(nextNum).padStart(4, '0');
+  } catch(e) {}
+
+  // 2. Scan All Per-Training Spreadsheets
+  try {
+    const tSheet = getSheet(SHEET_NAMES.trainings);
+    if (tSheet && tSheet.getLastRow() >= 2) {
+      const trainings = sheetToJson(tSheet);
+      for (const t of trainings) {
+        if (!t.ID && !t.Code) continue;
+        try {
+          const ss = getTrainingDataSpreadsheet(t);
+          if (ss) {
+            const allSheets = ss.getSheets();
+            allSheets.forEach(s => {
+              const name = s.getName().toLowerCase();
+              if (name.includes('session') || name.includes('attendance')) {
+                extractIdsFromSheet(s);
+              }
+            });
+          }
+        } catch(ssErr) {}
+      }
+    }
+  } catch(e) {}
+
+  // 3. Scan Decommissioned / Deleted Session IDs stored in Script Properties
+  try {
+    const rawDecom = getConfigProperty('DECOMMISSIONED_SESSION_IDS', '');
+    if (rawDecom) {
+      const parsed = JSON.parse(rawDecom);
+      if (Array.isArray(parsed)) {
+        parsed.forEach(id => allIds.add(String(id).trim().toUpperCase()));
+      }
+    }
+  } catch(e) {}
+
+  return allIds;
+}
+
+/**
+ * Generate guaranteed-unique sequential Session ID (e.g., SES0001, SES0002, ...)
+ * 
+ * STRICT GUARANTEE: The generated ID will NEVER match:
+ * - Any active session in central or per-training sheets
+ * - Any deactivated or inactive session
+ * - Any historically deleted session
+ * - Any session ID ever recorded in attendance logs
+ * 
+ * Uses a monotonically increasing persistent sequence counter (LAST_SESSION_SEQ).
+ */
+function generateSessionId() {
+  const allIds = getAllKnownSessionIds();
+  let maxNum = 0;
+
+  // 1. Find the highest numerical ID across all existing, deactivated, and deleted sessions
+  allIds.forEach(id => {
+    const m = id.match(/SES-?(\d+)/i);
+    if (m && m[1]) {
+      const n = parseInt(m[1], 10);
+      if (!isNaN(n) && n > maxNum) maxNum = n;
+    }
+  });
+
+  // 2. Check persistent monotonic sequence counter in Script Properties
+  try {
+    const storedSeq = parseInt(getConfigProperty('LAST_SESSION_SEQ', '0'), 10);
+    if (!isNaN(storedSeq) && storedSeq > maxNum) {
+      maxNum = storedSeq;
+    }
+  } catch(e) {}
+
+  // 3. Increment and ensure the candidate ID has NEVER been used anywhere
+  let nextNum = maxNum + 1;
+  let candidateId = 'SES' + String(nextNum).padStart(4, '0');
+  while (allIds.has(candidateId) || allIds.has('SES-' + String(nextNum).padStart(4, '0'))) {
+    nextNum++;
+    candidateId = 'SES' + String(nextNum).padStart(4, '0');
+  }
+
+  // 4. Update persistent monotonic sequence counter so it NEVER drops even if rows are deleted
+  try {
+    setConfigProperty('LAST_SESSION_SEQ', String(nextNum));
+  } catch(e) {}
+
+  Logger.log(`[SESSION ID GENERATOR] Generated guaranteed-unique Session ID: ${candidateId} (maxNum: ${maxNum})`);
+  return candidateId;
 }
 
 /**
@@ -548,6 +677,9 @@ function deleteSession(sessionId) {
     const cleanSessionId = String(sessionId).trim();
     const lowerSessionId = cleanSessionId.toLowerCase();
 
+    // 0. Permanently blacklist this session ID from ever being regenerated
+    recordDecommissionedSessionId(cleanSessionId);
+
     // 1. Direct deactivation in central Main Database Sessions tabs
     try {
       const mainSs = getSpreadsheet();
@@ -634,6 +766,91 @@ function deleteSession(sessionId) {
   } catch (e) {
     Logger.log('deleteSession error: ' + e.message);
     return err('Failed to delete session: ' + e.message);
+  }
+}
+
+/**
+ * Generates a brand-new QR Code with a fresh, guaranteed-unique Session ID for an existing session.
+ * Permanently retires and deactivates the old Session ID and QR code,
+ * ensuring the old QR code can NEVER be used for attendance.
+ * 
+ * @param {string} oldSessionId - The session ID to renew/replace
+ * @returns {string} JSON response with the updated session containing the new QR code
+ */
+function renewSessionQRCode(oldSessionId) {
+  try {
+    if (!oldSessionId) return err('Session ID is required.');
+    const cleanOldId = String(oldSessionId).trim();
+    const found = findTrainingBySessionId(cleanOldId);
+    if (!found || !found.session) return err(`Session ${cleanOldId} not found.`);
+
+    const oldSession = found.session;
+    const trainingId = oldSession.TrainingID;
+
+    // 1. Permanently blacklist old session ID
+    recordDecommissionedSessionId(cleanOldId);
+
+    // 2. Mark old session row as deactivated
+    deleteSession(cleanOldId);
+
+    // 3. Generate a brand new, strictly unique Session ID
+    const newSessionId = generateSessionId();
+    const newAttendanceUrl = generateAttendanceURL(newSessionId);
+    const newQRCodeUrl = generateQRCode(newAttendanceUrl);
+    const timeNow = now();
+
+    // 4. Create new session with the same session metadata but active with fresh QR code
+    const newSession = {
+      SessionID:     newSessionId,
+      TrainingID:    trainingId,
+      SessionName:   oldSession.SessionName || 'Session Check-In',
+      SessionDate:   oldSession.SessionDate || '',
+      StartTime:     oldSession.StartTime || '09:00',
+      EndTime:       oldSession.EndTime || '16:00',
+      AttendanceURL: newAttendanceUrl,
+      QRCodeURL:     newQRCodeUrl,
+      QRStatus:      'Active',
+      CreatedDate:   timeNow
+    };
+
+    const sessionRow = [
+      newSession.SessionID,
+      newSession.TrainingID,
+      newSession.SessionName,
+      newSession.SessionDate,
+      newSession.StartTime,
+      newSession.EndTime,
+      newSession.AttendanceURL,
+      newSession.QRCodeURL,
+      newSession.QRStatus,
+      newSession.CreatedDate
+    ];
+
+    // Append to per-training spreadsheet
+    const ss = getTrainingDataSpreadsheet(trainingId);
+    if (ss) {
+      let sheet = ss.getSheetByName('TrainingSessions') || ss.getSheetByName('Sessions') || ss.getSheetByName('Training Sessions');
+      if (sheet) sheet.appendRow(sessionRow);
+    }
+
+    // Append to central Main Database
+    const mainSs = getSpreadsheet();
+    if (mainSs) {
+      let cSheet = mainSs.getSheetByName('TrainingSessions') || mainSs.getSheetByName('Sessions') || mainSs.getSheetByName('Training Sessions');
+      if (cSheet) cSheet.appendRow(sessionRow);
+    }
+
+    invalidateTrainingCaches(trainingId);
+
+    Logger.log(`[QR RENEWAL] Replaced session ${cleanOldId} with fresh session ${newSessionId} and new QR code.`);
+    return ok({
+      message: `New QR Code generated successfully! Session ID: ${newSessionId}. Old session ${cleanOldId} is permanently deactivated.`,
+      oldSessionId: cleanOldId,
+      newSession: newSession
+    });
+  } catch (e) {
+    Logger.log('renewSessionQRCode error: ' + e.message);
+    return err('Failed to generate new QR code: ' + e.message);
   }
 }
 

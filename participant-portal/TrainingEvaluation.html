@@ -209,6 +209,13 @@
 </div>
 
 <div id="toast-container"></div>
+<script id="server-params" type="application/json">
+<?!= JSON.stringify((typeof params !== 'undefined' && params) ? params : {}) ?>
+</script>
+<script>
+  window.SERVER_PARAMS = <?!= JSON.stringify((typeof params !== 'undefined' && params) ? params : {}) ?>;
+  window.SERVER_TRAINING_ID = <?= (typeof trainingId !== 'undefined' && trainingId) ? JSON.stringify(trainingId) : '""' ?>;
+</script>
 <?!= include('script') ?>
 
 <script>
@@ -228,8 +235,28 @@
   let activeTrainingObj = null;
 
   document.addEventListener('DOMContentLoaded', async () => {
-    activeTrainingId = getQueryParam('id') || getQueryParam('training') || getQueryParam('trainingId') || getQueryParam('trn');
-    
+    activeTrainingId = (typeof window.SERVER_TRAINING_ID !== 'undefined' && window.SERVER_TRAINING_ID)
+      ? window.SERVER_TRAINING_ID
+      : (getQueryParam('id') || getQueryParam('training') || getQueryParam('trainingId') || getQueryParam('trn'));
+
+    // Asynchronous fallback for Google Apps Script iframe environments
+    if (!activeTrainingId && typeof google !== 'undefined' && google.script && google.script.url && google.script.url.getLocation) {
+      await new Promise(resolve => {
+        try {
+          google.script.url.getLocation(loc => {
+            if (loc && loc.parameter) {
+              const p = loc.parameter;
+              activeTrainingId = p.id || p.training || p.trainingId || p.trn || '';
+            }
+            resolve();
+          });
+        } catch(locErr) {
+          resolve();
+        }
+        setTimeout(resolve, 800);
+      });
+    }
+
     if (!activeTrainingId) {
       showErrorState('Training ID parameter missing from URL link.');
       return;

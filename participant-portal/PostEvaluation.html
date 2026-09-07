@@ -336,6 +336,14 @@
 </div>
 
 <div id="toast-container"></div>
+<script id="server-params" type="application/json">
+<?!= JSON.stringify((typeof params !== 'undefined' && params) ? params : {}) ?>
+</script>
+<script>
+  window.SERVER_PARAMS = <?!= JSON.stringify((typeof params !== 'undefined' && params) ? params : {}) ?>;
+  window.SERVER_TRAINING_ID = <?= (typeof trainingId !== 'undefined' && trainingId) ? JSON.stringify(trainingId) : '""' ?>;
+  window.SERVER_EVALUATOR_ID = <?= (typeof evaluatorId !== 'undefined' && evaluatorId) ? JSON.stringify(evaluatorId) : '""' ?>;
+</script>
 <?!= include('script') ?>
 
 <script>
@@ -360,8 +368,31 @@
     initTheme();
     renderCompetencySelectors();
 
-    targetTrainingIdParam = getQueryParam('id') || getQueryParam('training') || getQueryParam('trainingId') || getQueryParam('trn');
-    const preEvalEmp = getQueryParam('evaluator') || getQueryParam('emp') || getQueryParam('eval');
+    targetTrainingIdParam = (typeof window.SERVER_TRAINING_ID !== 'undefined' && window.SERVER_TRAINING_ID)
+      ? window.SERVER_TRAINING_ID
+      : (getQueryParam('id') || getQueryParam('training') || getQueryParam('trainingId') || getQueryParam('trn'));
+    let preEvalEmp = (typeof window.SERVER_EVALUATOR_ID !== 'undefined' && window.SERVER_EVALUATOR_ID)
+      ? window.SERVER_EVALUATOR_ID
+      : (getQueryParam('evaluator') || getQueryParam('emp') || getQueryParam('eval'));
+
+    // Asynchronous fallback for Google Apps Script iframe environments
+    if (!targetTrainingIdParam && typeof google !== 'undefined' && google.script && google.script.url && google.script.url.getLocation) {
+      await new Promise(resolve => {
+        try {
+          google.script.url.getLocation(loc => {
+            if (loc && loc.parameter) {
+              const p = loc.parameter;
+              targetTrainingIdParam = p.id || p.training || p.trainingId || p.trn || '';
+              if (!preEvalEmp) preEvalEmp = p.evaluator || p.emp || p.eval || '';
+            }
+            resolve();
+          });
+        } catch(locErr) {
+          resolve();
+        }
+        setTimeout(resolve, 800);
+      });
+    }
 
     if (preEvalEmp) {
       document.getElementById('inp-evaluator-empid').value = preEvalEmp;

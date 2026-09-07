@@ -193,6 +193,13 @@
 </div>
 
 <div id="toast-container"></div>
+<script id="server-params" type="application/json">
+<?!= JSON.stringify((typeof params !== 'undefined' && params) ? params : {}) ?>
+</script>
+<script>
+  window.SERVER_PARAMS = <?!= JSON.stringify((typeof params !== 'undefined' && params) ? params : {}) ?>;
+  window.SERVER_SESSION_ID = <?= (typeof sessionId !== 'undefined' && sessionId) ? JSON.stringify(sessionId) : '""' ?>;
+</script>
 <?!= include('script') ?>
 
 <script>
@@ -342,8 +349,28 @@
   document.addEventListener('DOMContentLoaded', async () => {
     applyLanguage(currentLang);
 
-    activeSessionId = getQueryParam('session') || getQueryParam('sessionId') || getQueryParam('id') || getQueryParam('s');
-    
+    activeSessionId = (typeof window.SERVER_SESSION_ID !== 'undefined' && window.SERVER_SESSION_ID)
+      ? window.SERVER_SESSION_ID
+      : (getQueryParam('session') || getQueryParam('sessionId') || getQueryParam('id') || getQueryParam('s'));
+
+    // Asynchronous fallback for Google Apps Script iframe environments
+    if (!activeSessionId && typeof google !== 'undefined' && google.script && google.script.url && google.script.url.getLocation) {
+      await new Promise(resolve => {
+        try {
+          google.script.url.getLocation(loc => {
+            if (loc && loc.parameter) {
+              const p = loc.parameter;
+              activeSessionId = p.session || p.sessionId || p.id || p.s || '';
+            }
+            resolve();
+          });
+        } catch(locErr) {
+          resolve();
+        }
+        setTimeout(resolve, 800);
+      });
+    }
+
     if (!activeSessionId) {
       showErrorState(t('toastMissingSession'));
       return;
