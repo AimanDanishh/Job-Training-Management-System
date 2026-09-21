@@ -106,7 +106,6 @@ function parseDateSafely(val) {
   if (!isNaN(d.getTime())) return d;
   return null;
 }
-
 function formatMinimalistDate(dateVal) {
   if (!dateVal) return '';
   const str = String(dateVal).replace(/GMT.*$/, '').replace(/\(.*\)$/, '').trim();
