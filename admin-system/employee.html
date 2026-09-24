@@ -18,7 +18,7 @@
       <button id="sidebar-toggle" class="btn-th btn-secondary btn-sm sidebar-toggle-btn" style="display:none" aria-label="Toggle navigation menu"><span class="icon sm">menu</span></button>
       <div style="flex:1">
         <h1 class="topbar-title">Employees</h1>
-        <div style="font-size:12px;color:var(--apollo-gray-500);font-weight:600;margin-top:2px">Employee Training Record &bull; Document No.: S-HRS-FM-003</div>
+        <div id="emp-doc-badge" style="font-size:12px;color:var(--apollo-gray-500);font-weight:600;margin-top:2px">Employee Training Record &bull; Document No.: Loading...</div>
         <p class="topbar-sub">Employee directory and records (Read-Only)</p>
       </div>
     </header>
@@ -124,7 +124,24 @@
 <script>
   let allEmployees = [];
 
+  async function initEmployeeDocControlLabels() {
+    try {
+      const info = await fetchDocumentControl('employee-training-record');
+      if (info) {
+        const docNos = Array.isArray(info.documentNos) ? info.documentNos : (info.documentNo ? [info.documentNo] : []);
+        const formatted = typeof formatDocumentNumbers === 'function' ? formatDocumentNumbers(docNos) : (info.documentNo || docNos.join(' / '));
+        if (formatted) {
+          const badge = document.getElementById('emp-doc-badge');
+          if (badge) badge.innerHTML = `${info.documentName || 'Employee Training Record'} &bull; Document No.: ${formatted}`;
+        }
+      }
+    } catch(e) {
+      console.warn('initEmployeeDocControlLabels error:', e);
+    }
+  }
+
   onReady(() => {
+    initEmployeeDocControlLabels();
     loadEmployees();
     const sInput = document.getElementById('search-input');
     const dFilter = document.getElementById('dept-filter');

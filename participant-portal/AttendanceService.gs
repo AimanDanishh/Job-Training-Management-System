@@ -114,28 +114,8 @@ function submitAttendance(arg1, arg2, arg3, arg4) {
     const attId = generateId('ATT');
     const scanTime = now();
     
-    // Evaluate if check-in is Late based on session start time
-    let status = 'Present';
-    try {
-      if (session && session.StartTime) {
-        const startStr = String(session.StartTime).trim();
-        const match = startStr.match(/(\d{1,2}):(\d{2})(?:\s*([AaPp][Mm]))?/);
-        if (match) {
-          let startH = parseInt(match[1], 10);
-          const startM = parseInt(match[2], 10);
-          const ampm = match[3];
-          if (ampm) {
-            if (ampm.toLowerCase() === 'pm' && startH < 12) startH += 12;
-            if (ampm.toLowerCase() === 'am' && startH === 12) startH = 0;
-          }
-          const startTotalMinutes = startH * 60 + startM;
-          const scanMinutes = new Date().getHours() * 60 + new Date().getMinutes();
-          if (scanMinutes > (startTotalMinutes + 15)) {
-            status = 'Late';
-          }
-        }
-      }
-    } catch(tErr) {}
+    // All check-ins are recorded as 'Present'. Only 'Present' and 'Absent' are supported.
+    const status = 'Present';
 
     // Check if an existing row for this participant was marked 'Absent'
     let updatedExisting = false;

@@ -34,6 +34,88 @@
     </header>
 
     <main class="page-content">
+      <!-- Navigation Tabs: Document Control vs General Settings -->
+      <div class="tabs-nav mb-4" style="display:flex; gap:10px; border-bottom:2px solid #E2E8F0; padding-bottom:10px">
+        <button id="tab-btn-doc-control" class="btn-th btn-primary" onclick="switchSettingsTab('doc-control')" style="display:flex; align-items:center; gap:8px; font-weight:600">
+          <span class="icon sm">fact_check</span> Document Control
+        </button>
+        <button id="tab-btn-general" class="btn-th btn-secondary" onclick="switchSettingsTab('general')" style="display:flex; align-items:center; gap:8px; font-weight:600">
+          <span class="icon sm">settings</span> General & System Settings
+        </button>
+      </div>
+
+      <!-- SECTION 1: Document Control Tab -->
+      <div id="section-doc-control">
+        <div class="card-th mb-4">
+          <div class="card-th-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px">
+            <div>
+              <h3 class="card-th-title" style="display:flex; align-items:center; gap:8px">
+                <span class="icon filled" style="color:#2563EB">verified</span> ISO Document Control Settings
+              </h3>
+              <p class="card-th-sub">Central single source of truth for controlled document numbers, revisions, originators, and effective dates.</p>
+            </div>
+            <div style="display:flex; gap:8px">
+              <button class="btn-th btn-primary btn-sm" onclick="saveAllDocControlSettings()">
+                <span class="icon sm">save</span> Save Document Settings
+              </button>
+            </div>
+          </div>
+          <div class="card-th-body">
+            <div class="alert-th alert-info mb-4" style="font-size:12.5px; line-height:1.5">
+              <span class="icon sm filled" style="margin-top:2px">info</span>
+              <div>
+                <strong>Single Source of Truth:</strong> Modifying document numbers here will automatically update all page headers, form badges, and PDF exports system-wide. The <strong>ISO Document Control Box</strong> will be automatically generated at the <strong>bottom of the final page</strong> on exported PDFs.
+              </div>
+            </div>
+
+            <!-- Controlled Documents Table -->
+            <div class="table-responsive">
+              <table class="table-th" style="font-size:13px">
+                <thead>
+                  <tr style="background:#F8FAFC">
+                    <th style="width:28%">Document Name</th>
+                    <th style="width:16%">Document No.</th>
+                    <th style="width:12%">Revision No.</th>
+                    <th style="width:20%">Originator</th>
+                    <th style="width:14%">Effective Date</th>
+                    <th style="width:10%; text-align:center">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="tbl-doc-control-body">
+                  <tr><td colspan="6" style="text-align:center; color:#94A3B8; padding:20px">Loading controlled documents...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Document Control Box Preview Card -->
+        <div class="card-th mb-4" style="background:#F8FAFC; border-color:#CBD5E1">
+          <div class="card-th-header" style="padding-bottom:8px">
+            <h4 style="font-size:13.5px; font-weight:700; color:#1E293B; display:flex; align-items:center; gap:6px; margin:0">
+              <span class="icon sm" style="color:#2563EB">visibility</span> Live Preview: ISO Document Control Box
+            </h4>
+            <p class="card-th-sub" style="margin:2px 0 0">This exact box is generated at the bottom of the final page of exported PDFs.</p>
+          </div>
+          <div class="card-th-body" style="padding-top:8px">
+            <div style="margin-bottom:8px; display:flex; align-items:center; gap:10px">
+              <label for="sel-preview-doc" class="label-th" style="margin:0; font-size:12px">Select Document to Preview:</label>
+              <select id="sel-preview-doc" class="input-th" style="max-width:280px; font-size:12px; padding:4px 8px" onchange="renderLivePreviewBox()">
+                <option value="attendance">Training Attendance List</option>
+                <option value="evaluation">Training Evaluation Form</option>
+                <option value="training-request">Training Request Form</option>
+                <option value="employee-training-record">Employee Training Record</option>
+              </select>
+            </div>
+            <div id="iso-preview-container" style="background:#FFF; padding:16px; border:1px dashed #94A3B8; border-radius:6px">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 2: General & System Settings Tab -->
+      <div id="section-general-settings" style="display:none">
       <!-- Status Banner -->
       <div id="settings-status-banner" class="alert-th alert-success mb-4" style="display:flex; align-items:center; justify-content:space-between">
         <div style="display:flex; align-items:center; gap:10px">
@@ -252,7 +334,7 @@
                 <div class="col-12 col-md-4">
                   <div style="display:flex; align-items:center; gap:14px; padding:12px 14px; background:#FFF8CF; border:1.5px solid #FEC30D; border-radius:10px">
                     <div style="width:48px; height:48px; border-radius:8px; background:#fff; border:1px solid #E2E8F0; display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0">
-                      <img id="company-logo-preview" src="" alt="Logo Preview" referrerpolicy="no-referrer" style="max-width:100%; max-height:100%; object-fit:contain" onerror="handleLogoPreviewError(this)">
+                      <img id="company-logo-preview" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0MCA0MCI+PHJlY3Qgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiByeD0iOCIgZmlsbD0iI0U5MUMyRCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTYlIiBmb250LWZhbWlseT0iQXJpYWwsc2Fucy1zZXJpZiIgZm9udC13ZWlnaHQ9IjkwMCIgZm9udC1zaXplPSIyMCIgZmlsbD0iI0ZGRjhDRiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSI+QTwvdGV4dD48L3N2Zz4=" alt="Logo Preview" referrerpolicy="no-referrer" style="max-width:100%; max-height:100%; object-fit:contain" onerror="handleLogoPreviewError(this)">
                     </div>
                     <div>
                       <div style="font-size:12.5px; font-weight:700; color:var(--apollo-dark)">Company Logo</div>
@@ -278,7 +360,7 @@
                 <div class="col-12 col-md-4">
                   <div style="display:flex; align-items:center; gap:14px; padding:12px 14px; background:#FEF2F2; border:1.5px solid #FECACA; border-radius:10px">
                     <div style="width:48px; height:48px; border-radius:50%; background:#fff; border:1px solid #E2E8F0; display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0; box-shadow:0 2px 6px rgba(233,28,45,0.15)">
-                      <img id="system-logo-preview" src="" alt="System Logo Preview" referrerpolicy="no-referrer" style="max-width:100%; max-height:100%; object-fit:contain; border-radius:50%" onerror="handleSystemLogoPreviewError(this)">
+                      <img id="system-logo-preview" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0MCA0MCI+PGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iMTgiIGZpbGw9IiNFOTFDMkQiLz48dGV4dCB4PSI1MCUiIHk9IjU2JSIgZm9udC1mYW1pbHk9IkFyaWFsLHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI5MDAiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiNGRkZGRkYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiPkE8L3RleHQ+PC9zdmc+" alt="System Logo Preview" referrerpolicy="no-referrer" style="max-width:100%; max-height:100%; object-fit:contain; border-radius:50%" onerror="handleSystemLogoPreviewError(this)">
                     </div>
                     <div>
                       <div style="font-size:12.5px; font-weight:700; color:#991B1B">Login System Logo</div>
@@ -291,6 +373,71 @@
           </div>
         </div>
       </div>
+      </div> <!-- /#section-general-settings -->
+
+      <!-- Modal: Edit Document Control Entry -->
+      <div id="modal-edit-doc-control" class="modal-th-backdrop" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.6); z-index:9999; align-items:center; justify-content:center">
+        <div class="card-th" style="width:100%; max-width:620px; max-height:90vh; overflow-y:auto; margin:20px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.3)">
+          <div class="card-th-header" style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #E2E8F0; padding-bottom:12px">
+            <div>
+              <h3 class="card-th-title" id="modal-doc-title">Edit Document Control</h3>
+              <p class="card-th-sub" id="modal-doc-internal-id" style="font-family:monospace; font-size:11.5px; color:#2563EB; margin:2px 0 0">Internal ID: attendance</p>
+            </div>
+            <button class="btn-th btn-secondary btn-sm" onclick="closeDocEditModal()" style="border:none; padding:4px 8px" aria-label="Close modal"><span class="icon sm">close</span></button>
+          </div>
+          <div class="card-th-body" style="padding-top:16px">
+            <input type="hidden" id="edit-doc-id">
+            
+            <div class="mb-3">
+              <label for="edit-doc-name" class="label-th">Document Name <span style="color:#EF4444">*</span></label>
+              <input type="text" id="edit-doc-name" class="input-th" oninput="onModalFieldChange()" required>
+            </div>
+
+            <!-- Dynamic Document Numbers Section -->
+            <div class="mb-3">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px">
+                <label class="label-th" style="margin:0">Document Number(s) <span style="color:#EF4444">*</span></label>
+                <button type="button" class="btn-th btn-secondary btn-sm" onclick="addDocNoInputRow('')" style="display:inline-flex; align-items:center; gap:4px; font-size:11.5px; padding:3px 8px">
+                  <span class="icon sm" style="font-size:14px">add</span> Add Document Number
+                </button>
+              </div>
+              <div id="doc-nos-container" style="display:flex; flex-direction:column; gap:8px"></div>
+              <div style="font-size:11px; color:#64748B; margin-top:4px">
+                One form can have multiple Document Numbers (e.g. S-HRS-FM-009 and S-HRS-FM-015). At least one document number is required.
+              </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+              <div class="col-md-4">
+                <label for="edit-doc-rev" class="label-th">Revision No. <span style="color:#EF4444">*</span></label>
+                <input type="text" id="edit-doc-rev" class="input-th" style="font-family:monospace" placeholder="e.g. 0" oninput="onModalFieldChange()" required>
+              </div>
+              <div class="col-md-8">
+                <label for="edit-doc-originator" class="label-th">Originator <span style="color:#EF4444">*</span></label>
+                <input type="text" id="edit-doc-originator" class="input-th" placeholder="e.g. Arina Binti Ismail" oninput="onModalFieldChange()" required>
+              </div>
+            </div>
+
+            <div class="mb-4">
+              <label for="edit-doc-date" class="label-th">Effective Date <span style="color:#EF4444">*</span></label>
+              <input type="text" id="edit-doc-date" class="input-th" placeholder="DD.MM.YYYY e.g. 01.09.2026" oninput="onModalFieldChange()" required>
+            </div>
+
+            <!-- Live Modal Preview -->
+            <div style="margin-bottom:20px; background:#F8FAFC; border:1px solid #CBD5E1; border-radius:8px; padding:12px">
+              <div style="font-size:11px; font-weight:700; color:#64748B; margin-bottom:8px; letter-spacing:0.5px">LIVE PREVIEW (ISO Document Control Box)</div>
+              <div id="modal-live-preview-box"></div>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:10px">
+              <button class="btn-th btn-secondary" onclick="closeDocEditModal()">Cancel</button>
+              <button class="btn-th btn-primary" onclick="saveDocEditModal()">
+                <span class="icon sm">check</span> Save Document Control
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </main>
   </div>
 </div>
@@ -298,6 +445,9 @@
 <div id="toast-container"></div>
 <script>
   onReady(() => {
+    if (typeof loadDocumentControlSettings === 'function') {
+      loadDocumentControlSettings();
+    }
     loadSettingsData();
   });
 
@@ -312,6 +462,9 @@
 
   function renderSettings(data) {
     if (!data) return;
+    if (data.documentControl && !currentDocControlData) {
+      renderDocControl(data.documentControl);
+    }
     const v = data.validation || {};
     const db = v.database || {};
 

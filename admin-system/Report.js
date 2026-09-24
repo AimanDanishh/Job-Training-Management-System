@@ -917,7 +917,12 @@ function exportFilteredReportExcel(reportType, filters) {
     if (reportType === 'hours') titleName = `Training_Hours_CostCentre_${year}_${timestamp}`;
     else if (reportType === 'cost') titleName = `Training_Cost_${year}_${timestamp}`;
     else if (reportType === 'title') titleName = `Training_Title_Report_${timestamp}`;
-    else if (reportType === 'employee') titleName = `Employee_Training_Record_S-HRS-FM-003_${timestamp}`;
+    else if (reportType === 'employee') {
+      const empDoc = getDocumentControlInfo('employee-training-record');
+      const rawCode = (empDoc && empDoc.documentNo) ? empDoc.documentNo : 'S-HRS-FM-003';
+      const docCode = rawCode.replace(/[^a-zA-Z0-9_-]+/g, '_');
+      titleName = `Employee_Training_Record_${docCode}_${timestamp}`;
+    }
     else if (reportType === 'atp') titleName = `Annual_Training_Plan_${year}_${timestamp}`;
 
     const repFolder = getOrCreateReportsFolder();
@@ -2331,7 +2336,10 @@ function exportAttendanceSheet(trainingId) {
     const name  = 'Attendance_List_' + training.Code + '_' + new Date().getTime();
     const sheet = ss.insertSheet(name);
 
-    sheet.appendRow(['Training Attendance List', 'Document No.: S-HRS-FM-009', '', '', '', '', '', '', '', '']);
+    const attDocInfo = getDocumentControlInfo('attendance');
+    const attDocNo = (attDocInfo && attDocInfo.documentNo) ? attDocInfo.documentNo : 'S-HRS-FM-009';
+    const attDocName = (attDocInfo && attDocInfo.documentName) ? attDocInfo.documentName : 'Training Attendance List';
+    sheet.appendRow([attDocName, 'Document No.: ' + attDocNo, '', '', '', '', '', '', '', '']);
     sheet.getRange(1, 1, 1, 10).setFontWeight('bold').setBackground('#EFF6FF').setFontColor('#1E3A8A');
 
     const headers = ['Employee ID', 'Employee Name', 'Department',
@@ -2481,4 +2489,749 @@ function buildDeptData(rows) {
     .map(([dept, count]) => ({ dept, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 8);
+}
+
+// ===============================================================================
+// Centralized ISO Document Control PDF Export Engine
+// ===============================================================================
+
+/**
+ * Generates an official Training Attendance List PDF.
+ * Retrieves centralized Document Control information for "attendance".
+ * Positions the ISO Document Control Box at the BOTTOM of the FINAL PDF PAGE.
+ */
+function generateAttendancePdf(trainingId) {
+  try {
+    if (!trainingId) return err('Training ID is required.');
+
+    // 1. Fetch Training metadata
+    const tResult = safeParseObj(getTrainingById(trainingId));
+    if (!tResult.success || !tResult.data) return err('Training programme not found.');
+    const training = tResult.data;
+
+    // 2. Fetch centralized ISO Document Control information (Single Source of Truth)
+    const docInfo = getDocumentControlInfo('attendance');
+
+    // 3. Fetch Registered / Enrolled Participants for this training programme
+    let registeredParticipants = [];
+    try {
+      if (typeof getEnrolledParticipantsForTraining === 'function') {
+        registeredParticipants = getEnrolledParticipantsForTraining(trainingId) || [];
+      } else if (typeof getTrainingParticipantsList === 'function') {
+        registeredParticipants = getTrainingParticipantsList(trainingId) || [];
+      }
+    } catch (eParts) {
+      Logger.log('Error fetching registered participants: ' + eParts.message);
+      registeredParticipants = [];
+    }
+
+    // 4. Fetch Sessions and Attendance Records
+    const attGroupedRes = safeParseObj(getAttendanceByTraining(trainingId));
+    let groupedSessions = (attGroupedRes && attGroupedRes.success && Array.isArray(attGroupedRes.data)) ? attGroupedRes.data : [];
+
+    // Fallback: If no sessions returned from getAttendanceByTraining, attempt to fetch from getSessions
+    if (groupedSessions.length === 0) {
+      try {
+        const sessRes = safeParseObj(getSessions(trainingId));
+        const sessList = (sessRes && sessRes.success && Array.isArray(sessRes.data)) ? sessRes.data : [];
+        if (sessList.length > 0) {
+          groupedSessions = sessList.map(s => ({
+            session: s,
+            records: []
+          }));
+        } else {
+          groupedSessions = [{
+            session: {
+              SessionName: training.Name || training.Title || 'Session 1',
+              SessionDate: training.StartDate || training.Date || '',
+              StartTime: training.StartTime || '',
+              EndTime: training.EndTime || ''
+            },
+            records: []
+          }];
+        }
+      } catch (eSess) {
+        Logger.log('Fallback getSessions error: ' + eSess.message);
+      }
+    }
+
+    // Format strings & helpers
+    const trainingTitle = escapeHtmlForPdf(training.Name || training.Title || 'Training Programme');
+    const trainingCode  = escapeHtmlForPdf(training.Code || '');
+    const dateRange     = escapeHtmlForPdf(formatDisplayDateRange(training.StartDate, training.EndDate) || '-');
+    const venue         = escapeHtmlForPdf(training.Venue || training.Location || '-');
+    const trainer       = escapeHtmlForPdf(training.Trainer || training.TrainerName || training.Provider || '-');
+    const docName       = escapeHtmlForPdf(docInfo.documentName || 'Training Attendance List');
+    const docNo         = escapeHtmlForPdf(docInfo.documentNo || 'S-HRS-FM-009');
+
+    // Company / System Logo: 100% Base64 data URL for PDF engine compatibility
+    const logoHtml = getPdfLogoHtml();
+
+    // Track total metrics across all sessions rendered
+    let totalPresent = 0;
+    let totalAbsent = 0;
+
+    // Build Session Tables HTML
+    let sessionsHtml = '';
+    if (!groupedSessions || groupedSessions.length === 0) {
+      sessionsHtml = `
+        <div style="padding: 16px; background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; text-align: center; color: #64748B; margin-bottom: 20px;">
+          No attendance records registered for this programme yet.
+        </div>`;
+    } else {
+      groupedSessions.forEach((g, sIdx) => {
+        const s = g.session || {};
+        const records = Array.isArray(g.records) ? g.records : [];
+        const sName = escapeHtmlForPdf(s.SessionName || `Session ${sIdx + 1}`);
+        const sDate = escapeHtmlForPdf(formatMinimalistDate(s.SessionDate) || '-');
+        const sTime = escapeHtmlForPdf(formatSessionTimeRange(s.StartTime, s.EndTime) || '-');
+
+        // Build complete session attendee list:
+        // 1. Registered participants (matched with session record, or marked Absent)
+        // 2. Any additional walk-in attendees from records not in registered list
+        const usedRecordIndices = new Set();
+        const sessionAttendees = [];
+
+        // Map registered participants
+        if (registeredParticipants && registeredParticipants.length > 0) {
+          registeredParticipants.forEach(p => {
+            const pEmpId = String(p.EmployeeID || p.EmployeeNo || p.EmpID || p.ID || p.StaffId || '').trim();
+            const pName = String(p.EmployeeName || p.Name || p['Full Name'] || p.FullName || '').trim();
+            const pDept = String(p.Department || p.Dept || '-').trim();
+
+            // Find matching record in this session's records
+            const matchIdx = records.findIndex((r, rIdx) => {
+              if (usedRecordIndices.has(rIdx)) return false;
+              const rEmpId = String(r.EmployeeNo || r.EmployeeID || r.EmpID || r.ID || r.StaffId || '').trim();
+              const rName = String(r.EmployeeName || r.Name || '').trim();
+
+              if (pEmpId && rEmpId && isSameEmployeeId(pEmpId, rEmpId)) return true;
+              if (pName && rName && isNameMatch(pName, rName)) return true;
+              return false;
+            });
+
+            if (matchIdx !== -1) {
+              usedRecordIndices.add(matchIdx);
+              const rec = records[matchIdx];
+              const rawSt = String(rec.Status || 'Present').trim().toLowerCase();
+              const isAbsent = (rawSt === 'absent');
+              sessionAttendees.push({
+                empId: rec.EmployeeNo || rec.EmployeeID || pEmpId || '-',
+                name: rec.EmployeeName || rec.Name || pName || '-',
+                department: rec.Department || pDept || '-',
+                status: isAbsent ? 'Absent' : 'Present',
+                scanTime: isAbsent ? '-' : (rec.ScanTime || rec.CheckIn || '-'),
+                remarks: rec.Remarks || '-'
+              });
+            } else {
+              // Registered participant who did not scan / has no record: marked Absent
+              sessionAttendees.push({
+                empId: pEmpId || '-',
+                name: pName || '-',
+                department: pDept || '-',
+                status: 'Absent',
+                scanTime: '-',
+                remarks: p.Remarks || '-'
+              });
+            }
+          });
+        }
+
+        // Include any walk-ins (records in this session that weren't in registeredParticipants)
+        records.forEach((r, rIdx) => {
+          if (!usedRecordIndices.has(rIdx)) {
+            const rawSt = String(r.Status || 'Present').trim().toLowerCase();
+            const isAbsent = (rawSt === 'absent');
+            sessionAttendees.push({
+              empId: r.EmployeeNo || r.EmployeeID || r.EmpID || r.ID || '-',
+              name: r.EmployeeName || r.Name || '-',
+              department: r.Department || '-',
+              status: isAbsent ? 'Absent' : 'Present',
+              scanTime: isAbsent ? '-' : (r.ScanTime || r.CheckIn || '-'),
+              remarks: r.Remarks || '-'
+            });
+          }
+        });
+
+        // Generate rows HTML (NO Signature column!)
+        let rowsHtml = '';
+        if (sessionAttendees.length === 0) {
+          rowsHtml = `<tr><td colspan="7" style="text-align: center; color: #94A3B8; padding: 12px;">No attendees recorded for this session.</td></tr>`;
+        } else {
+          sessionAttendees.forEach((attendee, rIdx) => {
+            const isAbsent = (attendee.status === 'Absent');
+            if (isAbsent) {
+              totalAbsent++;
+            } else {
+              totalPresent++;
+            }
+
+            const statusColor = isAbsent ? '#991B1B' : '#166534';
+            const statusBg = isAbsent ? '#FEE2E2' : '#DCFCE7';
+
+            rowsHtml += `
+              <tr style="border-bottom: 1px solid #E2E8F0; page-break-inside: avoid;">
+                <td style="padding: 5px 8px; text-align: center; color: #64748B;">${rIdx + 1}</td>
+                <td style="padding: 5px 8px; font-family: monospace; font-weight: bold; color: #0F172A;">${escapeHtmlForPdf(attendee.empId)}</td>
+                <td style="padding: 5px 8px; font-weight: 600; color: #1E293B;">${escapeHtmlForPdf(attendee.name)}</td>
+                <td style="padding: 5px 8px; color: #475569;">${escapeHtmlForPdf(attendee.department)}</td>
+                <td style="padding: 5px 8px; text-align: center;">
+                  <span style="display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 8pt; font-weight: bold; color: ${statusColor}; background-color: ${statusBg};">
+                    ${escapeHtmlForPdf(attendee.status)}
+                  </span>
+                </td>
+                <td style="padding: 5px 8px; text-align: center; color: #475569; font-size: 8.5pt;">${escapeHtmlForPdf(attendee.scanTime)}</td>
+                <td style="padding: 5px 8px; color: #64748B; font-size: 8.5pt;">${escapeHtmlForPdf(attendee.remarks)}</td>
+              </tr>`;
+          });
+        }
+
+        sessionsHtml += `
+          <div class="session-block" style="margin-bottom: 20px;">
+            <div style="background-color: #F1F5F9; border-left: 4px solid #2563EB; padding: 6px 12px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-weight: 700; font-size: 9.5pt; color: #1E293B;">${sName}</span>
+              <span style="font-size: 8.5pt; color: #475569;">Date: <strong>${sDate}</strong> &nbsp;|&nbsp; Time: <strong>${sTime}</strong></span>
+            </div>
+            <table style="width: 100%; border-collapse: collapse; border: 1px solid #CBD5E1; font-size: 8.5pt;">
+              <thead>
+                <tr style="background-color: #F8FAFC; border-bottom: 1.5px solid #94A3B8; color: #475569;">
+                  <th style="padding: 6px; width: 5%; text-align: center;">#</th>
+                  <th style="padding: 6px; width: 14%;">Emp ID</th>
+                  <th style="padding: 6px; width: 28%;">Employee Name</th>
+                  <th style="padding: 6px; width: 18%;">Department</th>
+                  <th style="padding: 6px; width: 12%; text-align: center;">Status</th>
+                  <th style="padding: 6px; width: 13%; text-align: center;">Scan Time</th>
+                  <th style="padding: 6px; width: 10%;">Remarks</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rowsHtml}
+              </tbody>
+            </table>
+          </div>`;
+      });
+    }
+
+    // Compute final summary statistics matching exactly what is rendered
+    const totalAttendees = totalPresent + totalAbsent;
+    const attendanceRate = totalAttendees > 0 ? Math.round((totalPresent / totalAttendees) * 100) : 0;
+    const summary = {
+      total: totalAttendees,
+      present: totalPresent,
+      absent: totalAbsent,
+      pct: attendanceRate
+    };
+
+    // Build the standardized reusable ISO Document Control Box HTML (to be placed at BOTTOM of final page)
+    const isoBoxHtml = buildIsoDocumentControlBoxHtml(docInfo);
+
+    // Full HTML Document for PDF rendering
+    const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>${trainingCode} - Attendance List</title>
+      <style>
+        @page {
+          size: A4 portrait;
+          margin: 14mm 12mm 14mm 12mm;
+        }
+        body {
+          font-family: Arial, Helvetica, sans-serif;
+          font-size: 9pt;
+          line-height: 1.35;
+          color: #0F172A;
+          margin: 0;
+          padding: 0;
+        }
+        .header-table {
+          width: 100%;
+          border-bottom: 2px solid #2563EB;
+          padding-bottom: 8px;
+          margin-bottom: 12px;
+        }
+        .info-card {
+          width: 100%;
+          border: 1px solid #CBD5E1;
+          border-collapse: collapse;
+          margin-bottom: 14px;
+          background-color: #F8FAFC;
+          font-size: 8.5pt;
+        }
+        .info-card td {
+          padding: 5px 10px;
+          border: 1px solid #E2E8F0;
+        }
+        .info-label {
+          color: #64748B;
+          width: 16%;
+          font-weight: normal;
+        }
+        .info-val {
+          color: #0F172A;
+          font-weight: 600;
+          width: 34%;
+        }
+        .summary-boxes {
+          display: table;
+          width: 100%;
+          margin-bottom: 16px;
+        }
+        .summary-cell {
+          display: table-cell;
+          width: 25%;
+          padding: 6px 10px;
+          text-align: center;
+          border: 1px solid #CBD5E1;
+          background-color: #FFFFFF;
+        }
+        .summary-num {
+          font-size: 13pt;
+          font-weight: bold;
+          margin-bottom: 2px;
+        }
+        .summary-lbl {
+          font-size: 7.5pt;
+          color: #64748B;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        .signoff-section {
+          width: 100%;
+          margin-top: 18px;
+          page-break-inside: avoid;
+        }
+        .signoff-table {
+          width: 100%;
+          border-collapse: collapse;
+        }
+        .signoff-box {
+          border: 1px solid #CBD5E1;
+          padding: 8px 12px;
+          width: 48%;
+          vertical-align: top;
+          background-color: #FFFFFF;
+        }
+        .doc-footer {
+          margin-top: 8px;
+          text-align: right;
+          font-size: 7.5pt;
+          color: #94A3B8;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="pdf-document">
+        <!-- Main Document Header -->
+        <table class="header-table" style="border-collapse: collapse;">
+          <tr>
+            <td style="vertical-align: top; width: 65%;">
+              ${logoHtml}
+              <div style="font-size: 14pt; font-weight: 800; color: #1E293B; letter-spacing: -0.3px;">${docName.toUpperCase()}</div>
+              <div style="font-size: 9.5pt; color: #2563EB; font-weight: 700; margin-top: 2px;">${trainingTitle}</div>
+            </td>
+            <td style="vertical-align: top; text-align: right; width: 35%;">
+              <div style="font-size: 8pt; color: #64748B;">Official Training Record</div>
+              <div style="font-size: 11pt; font-weight: bold; color: #0F172A; font-family: monospace; margin: 3px 0;">${trainingCode}</div>
+              <div style="font-size: 8pt; color: #475569;">Doc Ref: <strong>${docNo}</strong></div>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Training Information Card -->
+        <table class="info-card">
+          <tr>
+            <td class="info-label">Programme Title:</td>
+            <td class="info-val" colspan="3">${trainingTitle}</td>
+          </tr>
+          <tr>
+            <td class="info-label">Training Code:</td>
+            <td class="info-val">${trainingCode}</td>
+            <td class="info-label">Duration / Dates:</td>
+            <td class="info-val">${dateRange}</td>
+          </tr>
+          <tr>
+            <td class="info-label">Trainer / Provider:</td>
+            <td class="info-val">${trainer}</td>
+            <td class="info-label">Training Venue:</td>
+            <td class="info-val">${venue}</td>
+          </tr>
+        </table>
+
+        <!-- Summary Metrics -->
+        <div class="summary-boxes">
+          <div class="summary-cell" style="border-right: none;">
+            <div class="summary-num" style="color: #2563EB;">${summary.total || 0}</div>
+            <div class="summary-lbl">Total Enrolled</div>
+          </div>
+          <div class="summary-cell" style="border-right: none;">
+            <div class="summary-num" style="color: #16A34A;">${summary.present || 0}</div>
+            <div class="summary-lbl">Present</div>
+          </div>
+          <div class="summary-cell" style="border-right: none;">
+            <div class="summary-num" style="color: #DC2626;">${summary.absent || 0}</div>
+            <div class="summary-lbl">Absent</div>
+          </div>
+          <div class="summary-cell">
+            <div class="summary-num" style="color: #2563EB;">${summary.pct || 0}%</div>
+            <div class="summary-lbl">Attendance Rate</div>
+          </div>
+        </div>
+
+        <!-- Session-by-Session Attendance Details -->
+        <div class="sessions-content">
+          ${sessionsHtml}
+        </div>
+
+        <!-- Verification & Sign-Off Section (Appears after all content) -->
+        <div class="signoff-section">
+          <table class="signoff-table">
+            <tr>
+              <td style="width: 52%; border: none;"></td>
+              <td class="signoff-box" style="width: 48%;">
+                <div style="font-weight: bold; font-size: 8.5pt; color: #334155; margin-bottom: 28px;">Verified by (Human Resource / HOD):</div>
+                <div style="border-top: 1px dotted #94A3B8; padding-top: 4px; font-size: 8pt; color: #475569;">
+                  Signature & Date &nbsp;&nbsp;|&nbsp;&nbsp; Name: _______________________
+                </div>
+              </td>
+            </tr>
+          </table>
+        </div>
+
+        <!-- ISO DOCUMENT CONTROL BOX: Placed at the BOTTOM of the FINAL PDF PAGE ONLY -->
+        ${isoBoxHtml}
+
+        <!-- Document Footer -->
+        <div class="doc-footer">
+          <span>APOLLO Job Training Management System &bull; Controlled Document &bull; ${escapeHtmlForPdf(docNo)}</span>
+        </div>
+      </div>
+    </body>
+    </html>
+    `;
+
+    // 4. Convert HTML Blob to PDF
+    const cleanDocNo = docNo.replace(/[^a-zA-Z0-9_-]+/g, '_');
+    const fileName = `${trainingCode}_Attendance_List_${cleanDocNo}`;
+    const blob = Utilities.newBlob(htmlContent, 'text/html', fileName + '.html');
+    const pdfBlob = blob.getAs('application/pdf').setName(fileName + '.pdf');
+    const base64Data = Utilities.base64Encode(pdfBlob.getBytes());
+
+    return ok({
+      base64: base64Data,
+      fileName: fileName + '.pdf',
+      documentNo: docNo
+    });
+  } catch (e) {
+    Logger.log('generateAttendancePdf error: ' + e.message);
+    return err('Failed to generate Attendance PDF: ' + e.message);
+  }
+}
+
+/**
+ * Generates official Training Evaluation PDF (Participant Feedback or Supervisor Post-Evaluation).
+ * Retrieves centralized Document Control information for "evaluation".
+ * Positions the ISO Document Control Box at the BOTTOM of the FINAL PDF PAGE.
+ */
+function generateEvaluationPdf(trainingId, evalType) {
+  try {
+    if (!trainingId) return err('Training ID is required.');
+    const isParticipant = (String(evalType || '').trim().toLowerCase() !== 'supervisor');
+
+    // 1. Fetch Training metadata
+    const tResult = safeParseObj(getTrainingById(trainingId));
+    if (!tResult.success || !tResult.data) return err('Training programme not found.');
+    const training = tResult.data;
+
+    // 2. Fetch centralized ISO Document Control info for "evaluation" (Single Source of Truth)
+    const docInfo = getDocumentControlInfo('evaluation');
+
+    const trainingTitle = escapeHtmlForPdf(training.Name || training.Title || 'Training Programme');
+    const trainingCode  = escapeHtmlForPdf(training.Code || '');
+    const dateRange     = escapeHtmlForPdf(formatDisplayDateRange(training.StartDate, training.EndDate) || '-');
+    const venue         = escapeHtmlForPdf(training.Venue || training.Location || '-');
+    const trainer       = escapeHtmlForPdf(training.Trainer || training.TrainerName || training.Provider || '-');
+    const docNo         = escapeHtmlForPdf(docInfo.documentNo || 'S-HRS-FM-006');
+    const reportTitle   = isParticipant ? 'TRAINING EVALUATION REPORT (PARTICIPANT FEEDBACK)' : 'POST TRAINING EVALUATION REPORT (SUPERVISOR 3-MONTH REVIEW)';
+
+    // Company / System Logo: 100% Base64 data URL for PDF engine compatibility
+    const logoHtml = getPdfLogoHtml();
+
+    let contentHtml = '';
+
+    if (isParticipant) {
+      // Participant Evaluation
+      const evalsRes = safeParseObj(getTrainingEvaluations(trainingId));
+      const evals = (evalsRes && evalsRes.success && Array.isArray(evalsRes.data)) ? evalsRes.data : [];
+
+      let totalScore = 0;
+      let scoreCount = 0;
+      let rowsHtml = '';
+
+      if (evals.length === 0) {
+        rowsHtml = `<tr><td colspan="6" style="text-align: center; color: #94A3B8; padding: 16px;">No participant evaluations submitted yet.</td></tr>`;
+      } else {
+        evals.forEach((e, idx) => {
+          const empNo = escapeHtmlForPdf(e.EmployeeID || e.ID || '-');
+          const empName = escapeHtmlForPdf(e.EmployeeName || e.Name || '-');
+          const dept = escapeHtmlForPdf(e.Department || '-');
+          const avgScore = Number(e.AvgScore || 0);
+          if (avgScore > 0) {
+            totalScore += avgScore;
+            scoreCount++;
+          }
+          const submittedAt = escapeHtmlForPdf(e.SubmittedAt || '-');
+          const feedback = escapeHtmlForPdf(e.SectionB1 || e.Comments || e.Remarks || '-');
+
+          rowsHtml += `
+            <tr style="border-bottom: 1px solid #E2E8F0; page-break-inside: avoid;">
+              <td style="padding: 6px 8px; text-align: center; color: #64748B;">${idx + 1}</td>
+              <td style="padding: 6px 8px; font-family: monospace; font-weight: bold; color: #0F172A;">${empNo}</td>
+              <td style="padding: 6px 8px; font-weight: 600; color: #1E293B;">${empName}</td>
+              <td style="padding: 6px 8px; color: #475569;">${dept}</td>
+              <td style="padding: 6px 8px; text-align: center; font-weight: bold; color: #2563EB;">
+                ${avgScore > 0 ? avgScore.toFixed(1) : '-'} / 5.0
+              </td>
+              <td style="padding: 6px 8px; color: #475569; font-size: 8pt;">${feedback}</td>
+            </tr>`;
+        });
+      }
+
+      const overallAvg = scoreCount > 0 ? (totalScore / scoreCount).toFixed(2) : '-';
+
+      contentHtml = `
+        <div style="display: table; width: 100%; margin-bottom: 16px;">
+          <div style="display: table-cell; width: 50%; padding: 8px 12px; border: 1px solid #CBD5E1; background: #FFFFFF; text-align: center;">
+            <div style="font-size: 14pt; font-weight: bold; color: #2563EB;">${evals.length}</div>
+            <div style="font-size: 7.5pt; color: #64748B; text-transform: uppercase;">Evaluations Completed</div>
+          </div>
+          <div style="display: table-cell; width: 50%; padding: 8px 12px; border: 1px solid #CBD5E1; border-left: none; background: #FFFFFF; text-align: center;">
+            <div style="font-size: 14pt; font-weight: bold; color: #16A34A;">${overallAvg} / 5.0</div>
+            <div style="font-size: 7.5pt; color: #64748B; text-transform: uppercase;">Overall Average Rating</div>
+          </div>
+        </div>
+
+        <table style="width: 100%; border-collapse: collapse; border: 1px solid #CBD5E1; font-size: 8.5pt; margin-bottom: 20px;">
+          <thead>
+            <tr style="background-color: #F8FAFC; border-bottom: 1.5px solid #94A3B8; color: #475569;">
+              <th style="padding: 6px; width: 4%; text-align: center;">#</th>
+              <th style="padding: 6px; width: 14%;">Emp ID</th>
+              <th style="padding: 6px; width: 24%;">Participant Name</th>
+              <th style="padding: 6px; width: 16%;">Department</th>
+              <th style="padding: 6px; width: 12%; text-align: center;">Avg Score</th>
+              <th style="padding: 6px; width: 30%;">Key Comments / Feedback</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>`;
+    } else {
+      // Supervisor Post-Evaluation (3-Month Review)
+      const postRes = safeParseObj(getPostEvaluations(trainingId));
+      const postEvals = (postRes && postRes.success && Array.isArray(postRes.data)) ? postRes.data : [];
+
+      let rowsHtml = '';
+      if (postEvals.length === 0) {
+        rowsHtml = `<tr><td colspan="7" style="text-align: center; color: #94A3B8; padding: 16px;">No supervisor post-evaluations recorded yet.</td></tr>`;
+      } else {
+        postEvals.forEach((pe, idx) => {
+          const empNo = escapeHtmlForPdf(pe.EmployeeID || pe.ID || '-');
+          const evaluator = escapeHtmlForPdf(pe.EvaluatorName || pe.Evaluator || '-');
+          const cb = escapeHtmlForPdf(pe.CompetencyBefore || '-');
+          const ca = escapeHtmlForPdf(pe.CompetencyAfter || '-');
+          const improvement = escapeHtmlForPdf(pe.Improvement || '-');
+          const canApply = escapeHtmlForPdf(pe.CanApply || '-');
+          const comments = escapeHtmlForPdf(pe.Comments || '-');
+
+          rowsHtml += `
+            <tr style="border-bottom: 1px solid #E2E8F0; page-break-inside: avoid;">
+              <td style="padding: 6px 8px; text-align: center; color: #64748B;">${idx + 1}</td>
+              <td style="padding: 6px 8px; font-family: monospace; font-weight: bold; color: #0F172A;">${empNo}</td>
+              <td style="padding: 6px 8px; font-weight: 600; color: #1E293B;">${evaluator}</td>
+              <td style="padding: 6px 8px; text-align: center;">${cb} &rarr; <strong>${ca}</strong></td>
+              <td style="padding: 6px 8px; text-align: center; font-weight: 600; color: #16A34A;">${improvement}</td>
+              <td style="padding: 6px 8px; text-align: center;">${canApply}</td>
+              <td style="padding: 6px 8px; color: #475569; font-size: 8pt;">${comments}</td>
+            </tr>`;
+        });
+      }
+
+      contentHtml = `
+        <table style="width: 100%; border-collapse: collapse; border: 1px solid #CBD5E1; font-size: 8.5pt; margin-bottom: 20px;">
+          <thead>
+            <tr style="background-color: #F8FAFC; border-bottom: 1.5px solid #94A3B8; color: #475569;">
+              <th style="padding: 6px; width: 4%; text-align: center;">#</th>
+              <th style="padding: 6px; width: 14%;">Emp ID</th>
+              <th style="padding: 6px; width: 22%;">Evaluator / Supervisor</th>
+              <th style="padding: 6px; width: 15%; text-align: center;">Competency (Pre &rarr; Post)</th>
+              <th style="padding: 6px; width: 13%; text-align: center;">Improvement</th>
+              <th style="padding: 6px; width: 12%; text-align: center;">Can Apply</th>
+              <th style="padding: 6px; width: 20%;">Supervisor Remarks</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>`;
+    }
+
+    // Build the standardized reusable ISO Document Control Box HTML (BOTTOM of final page)
+    const isoBoxHtml = buildIsoDocumentControlBoxHtml(docInfo);
+
+    const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>${trainingCode} - Evaluation Report</title>
+      <style>
+        @page {
+          size: A4 portrait;
+          margin: 14mm 12mm 14mm 12mm;
+        }
+        body {
+          font-family: Arial, Helvetica, sans-serif;
+          font-size: 9pt;
+          line-height: 1.35;
+          color: #0F172A;
+          margin: 0;
+          padding: 0;
+        }
+        .header-table {
+          width: 100%;
+          border-bottom: 2px solid #2563EB;
+          padding-bottom: 8px;
+          margin-bottom: 12px;
+        }
+        .info-card {
+          width: 100%;
+          border: 1px solid #CBD5E1;
+          border-collapse: collapse;
+          margin-bottom: 14px;
+          background-color: #F8FAFC;
+          font-size: 8.5pt;
+        }
+        .info-card td {
+          padding: 5px 10px;
+          border: 1px solid #E2E8F0;
+        }
+        .info-label {
+          color: #64748B;
+          width: 16%;
+          font-weight: normal;
+        }
+        .info-val {
+          color: #0F172A;
+          font-weight: 600;
+          width: 34%;
+        }
+        .signoff-section {
+          width: 100%;
+          margin-top: 18px;
+          page-break-inside: avoid;
+        }
+        .signoff-table {
+          width: 100%;
+          border-collapse: collapse;
+        }
+        .signoff-box {
+          border: 1px solid #CBD5E1;
+          padding: 8px 12px;
+          width: 48%;
+          vertical-align: top;
+          background-color: #FFFFFF;
+        }
+        .doc-footer {
+          margin-top: 8px;
+          text-align: right;
+          font-size: 7.5pt;
+          color: #94A3B8;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="pdf-document">
+        <table class="header-table" style="border-collapse: collapse;">
+          <tr>
+            <td style="vertical-align: top; width: 65%;">
+              ${logoHtml}
+              <div style="font-size: 13pt; font-weight: 800; color: #1E293B; letter-spacing: -0.3px;">${reportTitle}</div>
+              <div style="font-size: 9.5pt; color: #2563EB; font-weight: 700; margin-top: 2px;">${trainingTitle}</div>
+            </td>
+            <td style="vertical-align: top; text-align: right; width: 35%;">
+              <div style="font-size: 8pt; color: #64748B;">Official ISO Evaluation Record</div>
+              <div style="font-size: 11pt; font-weight: bold; color: #0F172A; font-family: monospace; margin: 3px 0;">${trainingCode}</div>
+              <div style="font-size: 8pt; color: #475569;">Doc Ref: <strong>${docNo}</strong></div>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Training Information Card -->
+        <table class="info-card">
+          <tr>
+            <td class="info-label">Programme Title:</td>
+            <td class="info-val" colspan="3">${trainingTitle}</td>
+          </tr>
+          <tr>
+            <td class="info-label">Training Code:</td>
+            <td class="info-val">${trainingCode}</td>
+            <td class="info-label">Duration / Dates:</td>
+            <td class="info-val">${dateRange}</td>
+          </tr>
+          <tr>
+            <td class="info-label">Trainer / Provider:</td>
+            <td class="info-val">${trainer}</td>
+            <td class="info-label">Training Venue:</td>
+            <td class="info-val">${venue}</td>
+          </tr>
+        </table>
+
+        <!-- Evaluation Results Content -->
+        ${contentHtml}
+
+        <!-- Verification & Sign-Off Section -->
+        <div class="signoff-section">
+          <table class="signoff-table">
+            <tr>
+              <td style="width: 52%; border: none;"></td>
+              <td class="signoff-box" style="width: 48%;">
+                <div style="font-weight: bold; font-size: 8.5pt; color: #334155; margin-bottom: 28px;">Verified by (Human Resource / HOD):</div>
+                <div style="border-top: 1px dotted #94A3B8; padding-top: 4px; font-size: 8pt; color: #475569;">
+                  Signature & Date &nbsp;&nbsp;|&nbsp;&nbsp; Name: _______________________
+                </div>
+              </td>
+            </tr>
+          </table>
+        </div>
+
+        <!-- ISO DOCUMENT CONTROL BOX: Placed at the BOTTOM of the FINAL PDF PAGE ONLY -->
+        ${isoBoxHtml}
+
+        <!-- Document Footer -->
+        <div class="doc-footer">
+          <span>APOLLO Job Training Management System &bull; Controlled Document &bull; ${escapeHtmlForPdf(docNo)}</span>
+        </div>
+      </div>
+    </body>
+    </html>
+    `;
+
+    const suffix = isParticipant ? 'Participant_Evaluation' : 'Supervisor_Evaluation';
+    const cleanDocNo = docNo.replace(/[^a-zA-Z0-9_-]+/g, '_');
+    const fileName = `${trainingCode}_${suffix}_${cleanDocNo}`;
+    const blob = Utilities.newBlob(htmlContent, 'text/html', fileName + '.html');
+    const pdfBlob = blob.getAs('application/pdf').setName(fileName + '.pdf');
+    const base64Data = Utilities.base64Encode(pdfBlob.getBytes());
+
+    return ok({
+      base64: base64Data,
+      fileName: fileName + '.pdf',
+      documentNo: docNo
+    });
+  } catch (e) {
+    Logger.log('generateEvaluationPdf error: ' + e.message);
+    return err('Failed to generate Evaluation PDF: ' + e.message);
+  }
 }

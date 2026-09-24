@@ -91,12 +91,13 @@
             </div>
             <div class="col">
               <div style="font-size:14px;font-weight:800;color:var(--apollo-dark);margin-bottom:2px">Participant Training Evaluation Link (2-Week Deadline)</div>
-              <div style="font-size:11.5px;color:#92400E;font-weight:600;margin-bottom:4px">Training Evaluation Form &bull; Document No.: S-HRS-FM-006</div>
+              <div id="eval-qr-l1-doc" style="font-size:11.5px;color:#92400E;font-weight:600;margin-bottom:4px">Training Evaluation Form &bull; Document No.: Loading...</div>
               <div style="font-size:12px;color:var(--apollo-gray-600);margin-bottom:10px">Direct QR code & link for participants to evaluate course effectiveness and trainer delivery. Must be answered within 2 weeks after training completion.</div>
               <div style="display:flex;gap:8px;flex-wrap:wrap">
                 <button class="btn-th btn-secondary btn-sm" onclick="copyEvalUrl('l1')"><span class="icon sm">content_copy</span> Copy Link</button>
                 <button class="btn-th btn-primary btn-sm" onclick="downloadQRWithLogo(activeEvalUrls.l1, 'Apollo_Training_Eval_QR.png')"><span class="icon sm">download</span> Download QR Code</button>
                 <button class="btn-th btn-secondary btn-sm" onclick="openCreateEvalModal()"><span class="icon sm">add_circle</span> Manual Input</button>
+                <button class="btn-th btn-secondary btn-sm" onclick="exportParticipantEvalPdf()"><span class="icon sm" style="color:#EF4444">picture_as_pdf</span> Export PDF</button>
               </div>
             </div>
           </div>
@@ -129,9 +130,10 @@
           <div style="padding:16px 20px;border-bottom:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
             <div>
               <h4 style="font-size:14px;font-weight:800;color:var(--apollo-dark);margin:0">Participant Training Evaluation Status (2-Week Deadline)</h4>
-              <div style="font-size:11.5px;color:var(--apollo-gray-500);font-weight:600;margin:2px 0 0">Training Evaluation Form &bull; Document No.: S-HRS-FM-006</div>
+              <div id="eval-table-l1-doc" style="font-size:11.5px;color:var(--apollo-gray-500);font-weight:600;margin:2px 0 0">Training Evaluation Form &bull; Document No.: Loading...</div>
               <p style="font-size:11.5px;color:var(--apollo-gray-500);margin:2px 0 0">Tracking submission status per enrolled participant. All attendees must complete within 2 weeks of training end date.</p>
             </div>
+            <button class="btn-th btn-secondary btn-sm" onclick="exportParticipantEvalPdf()"><span class="icon sm" style="color:#EF4444">picture_as_pdf</span> Export PDF</button>
           </div>
           <div style="overflow-x:auto">
             <table class="table-th">
@@ -155,7 +157,7 @@
           <div style="padding:16px 20px;border-bottom:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center">
             <div>
               <h4 style="font-size:14px;font-weight:800;color:var(--apollo-dark);margin:0">Submitted Participant Evaluation Records</h4>
-              <div style="font-size:11.5px;color:var(--apollo-gray-500);font-weight:600;margin:2px 0 0">Document No.: S-HRS-FM-006</div>
+              <div id="eval-table-submitted-doc" style="font-size:11.5px;color:var(--apollo-gray-500);font-weight:600;margin:2px 0 0">Document No.: Loading...</div>
             </div>
           </div>
           <div style="overflow-x:auto">
@@ -182,12 +184,13 @@
             </div>
             <div class="col">
               <div style="font-size:14px;font-weight:800;color:var(--apollo-dark);margin-bottom:2px">Supervisor Evaluation Link (3 Months)</div>
-              <div style="font-size:11.5px;color:#92400E;font-weight:600;margin-bottom:4px">Post Training Evaluation Form &bull; Document No.: S-HRS-FM-006</div>
+              <div id="eval-qr-l3-doc" style="font-size:11.5px;color:#92400E;font-weight:600;margin-bottom:4px">Post Training Evaluation Form &bull; Document No.: Loading...</div>
               <div style="font-size:12px;color:var(--apollo-gray-600);margin-bottom:10px">Supervisors evaluate employees on behavioral competency improvement 3 months after training completion.</div>
               <div style="display:flex;gap:8px;flex-wrap:wrap">
                 <button class="btn-th btn-secondary btn-sm" onclick="copyEvalUrl('l3')"><span class="icon sm">content_copy</span> Copy Link</button>
                 <button class="btn-th btn-primary btn-sm" onclick="downloadQRWithLogo(activeEvalUrls.l3, 'Apollo_Supervisor_Eval_QR.png')"><span class="icon sm">download</span> Download QR Code</button>
                 <button class="btn-th btn-secondary btn-sm" onclick="openCreatePostEvalModal()"><span class="icon sm">add_circle</span> Manual Input</button>
+                <button class="btn-th btn-secondary btn-sm" onclick="exportSupervisorEvalPdf()"><span class="icon sm" style="color:#EF4444">picture_as_pdf</span> Export PDF</button>
               </div>
             </div>
           </div>
@@ -284,7 +287,7 @@
     <div class="modal-header">
       <div>
         <h3 class="modal-title">Training Evaluation Form</h3>
-        <div style="font-size:12px;color:var(--apollo-gray-500);font-weight:600;margin-top:2px;">Document No.: S-HRS-FM-006</div>
+        <div id="modal-eval-doc" style="font-size:12px;color:var(--apollo-gray-500);font-weight:600;margin-top:2px;">Document No.: Loading...</div>
         <p class="modal-sub">Borang Penilaian Latihan</p>
       </div>
       <button class="modal-close" onclick="closeModal('modal-eval')"><span class="icon sm">close</span></button>
@@ -343,7 +346,7 @@
     <div class="modal-header">
       <div>
         <h3 class="modal-title">Post Training Evaluation (3 Months)</h3>
-        <div style="font-size:12px;color:var(--apollo-gray-500);font-weight:600;margin-top:2px;">Document No.: S-HRS-FM-006</div>
+        <div id="modal-post-doc" style="font-size:12px;color:var(--apollo-gray-500);font-weight:600;margin-top:2px;">Document No.: Loading...</div>
         <p class="modal-sub">Supervisor assessment form</p>
       </div>
       <button class="modal-close" onclick="closeModal('modal-post-eval')"><span class="icon sm">close</span></button>
@@ -623,6 +626,7 @@
 
   // --- Page Init --------------------------------------------------------------
   onReady(async () => {
+    initEvaluationDocControlLabels();
     buildLikert();
     buildCompetency('comp-before', 'cb');
     buildCompetency('comp-after',  'ca');
@@ -860,8 +864,6 @@
                 const rawStatus = String(attRec.Status || 'Present').trim().toLowerCase();
                 if (rawStatus === 'absent' || rawStatus === 'did not attend') {
                   attStatusText = 'Did Not Attend'; attColor = 'red'; hasAttended = false;
-                } else if (rawStatus === 'late' || rawStatus === 'partial') {
-                  attStatusText = 'Late / Partial'; attColor = 'yellow'; hasAttended = true;
                 } else {
                   attStatusText = 'Attended'; attColor = 'green'; hasAttended = true;
                 }
@@ -893,8 +895,6 @@
                 let hasAttended = true;
                 if (rawStatus === 'absent' || rawStatus === 'did not attend') {
                   attStatusText = 'Did Not Attend'; attColor = 'red'; hasAttended = false;
-                } else if (rawStatus === 'late' || rawStatus === 'partial') {
-                  attStatusText = 'Late / Partial'; attColor = 'yellow'; hasAttended = true;
                 }
                 uniqueFromAtt.set(eId.toLowerCase(), {
                   ID: eId,
@@ -1318,6 +1318,74 @@
       loadEvaluations();
     } catch(e) { showToast(e.message, 'error'); }
     finally { setBtnLoading(btn, false, '<span class="icon sm">send</span> Submit'); }
+  }
+
+  async function initEvaluationDocControlLabels() {
+    try {
+      const info = await fetchDocumentControl('evaluation');
+      if (info) {
+        const docNos = Array.isArray(info.documentNos) ? info.documentNos : (info.documentNo ? [info.documentNo] : []);
+        const formatted = typeof formatDocumentNumbers === 'function' ? formatDocumentNumbers(docNos) : (info.documentNo || docNos.join(' / '));
+        if (formatted) {
+          const qrL1 = document.getElementById('eval-qr-l1-doc');
+          if (qrL1) qrL1.innerHTML = `${info.documentName || 'Training Evaluation Form'} &bull; Document No.: ${formatted}`;
+          const tblL1 = document.getElementById('eval-table-l1-doc');
+          if (tblL1) tblL1.innerHTML = `${info.documentName || 'Training Evaluation Form'} &bull; Document No.: ${formatted}`;
+          const subTbl = document.getElementById('eval-table-submitted-doc');
+          if (subTbl) subTbl.textContent = `Document No.: ${formatted}`;
+          const qrL3 = document.getElementById('eval-qr-l3-doc');
+          if (qrL3) qrL3.innerHTML = `${info.documentName || 'Post Training Evaluation Form'} &bull; Document No.: ${formatted}`;
+          const modEval = document.getElementById('modal-eval-doc');
+          if (modEval) modEval.textContent = `Document No.: ${formatted}`;
+          const modPost = document.getElementById('modal-post-doc');
+          if (modPost) modPost.textContent = `Document No.: ${formatted}`;
+        }
+      }
+    } catch(e) {
+      console.warn('initEvaluationDocControlLabels error:', e);
+    }
+  }
+
+  async function exportParticipantEvalPdf() {
+    const tid = document.getElementById('sel-eval-t').value;
+    if (!tid) {
+      showToast('Please select a training programme first.', 'error');
+      return;
+    }
+    showToast('Generating Participant Evaluation PDF...', 'info');
+    try {
+      const res = await callServer('generateEvaluationPdf', tid, 'participant');
+      const data = (res && res.data) ? res.data : res;
+      if (data && data.base64) {
+        downloadPdfFromBase64(data.base64, data.fileName || 'Participant_Evaluation_Report.pdf');
+        showToast('Evaluation PDF downloaded successfully!', 'success');
+      } else {
+        showToast('PDF generation failed: ' + ((res && res.message) || 'No data returned'), 'error');
+      }
+    } catch(e) {
+      showToast('Export failed: ' + e.message, 'error');
+    }
+  }
+
+  async function exportSupervisorEvalPdf() {
+    const tid = document.getElementById('sel-eval-t').value;
+    if (!tid) {
+      showToast('Please select a training programme first.', 'error');
+      return;
+    }
+    showToast('Generating Supervisor Evaluation PDF...', 'info');
+    try {
+      const res = await callServer('generateEvaluationPdf', tid, 'supervisor');
+      const data = (res && res.data) ? res.data : res;
+      if (data && data.base64) {
+        downloadPdfFromBase64(data.base64, data.fileName || 'Supervisor_Evaluation_Report.pdf');
+        showToast('Supervisor Evaluation PDF downloaded successfully!', 'success');
+      } else {
+        showToast('PDF generation failed: ' + ((res && res.message) || 'No data returned'), 'error');
+      }
+    } catch(e) {
+      showToast('Export failed: ' + e.message, 'error');
+    }
   }
 </script>
 

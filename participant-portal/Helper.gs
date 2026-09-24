@@ -17,6 +17,121 @@ function getConfigProperty(key, defaultValue) {
   return defaultValue;
 }
 
+const DEFAULT_DOCUMENT_CONTROL_SETTINGS = {
+  'attendance': {
+    formId: 'attendance',
+    documentName: 'Training Attendance List',
+    documentNos: ['S-HRS-FM-009'],
+    revisionNo: '0',
+    originator: 'Arina Binti Ismail',
+    effectiveDate: '01.09.2026'
+  },
+  'evaluation': {
+    formId: 'evaluation',
+    documentName: 'Training Evaluation Form',
+    documentNos: ['S-HRS-FM-006'],
+    revisionNo: '0',
+    originator: 'Arina Binti Ismail',
+    effectiveDate: '01.09.2026'
+  },
+  'training-request': {
+    formId: 'training-request',
+    documentName: 'Training Request Form',
+    documentNos: ['S-HRS-FM-004'],
+    revisionNo: '0',
+    originator: 'Arina Binti Ismail',
+    effectiveDate: '01.09.2026'
+  },
+  'employee-training-record': {
+    formId: 'employee-training-record',
+    documentName: 'Employee Training Record',
+    documentNos: ['S-HRS-FM-003'],
+    revisionNo: '0',
+    originator: 'Arina Binti Ismail',
+    effectiveDate: '01.09.2026'
+  }
+};
+
+function formatDocumentNumbers(documentNos, separator) {
+  var sep = separator || ' / ';
+  if (Array.isArray(documentNos)) {
+    var cleaned = documentNos
+      .map(function(n) { return (n !== null && n !== undefined) ? String(n).trim() : ''; })
+      .filter(function(n) { return n.length > 0; });
+    return cleaned.join(sep);
+  }
+  if (documentNos !== null && documentNos !== undefined && String(documentNos).trim() !== '') {
+    return String(documentNos).trim();
+  }
+  return '';
+}
+
+function normalizeDocumentControlItem(item, defaultItem) {
+  var def = defaultItem || {
+    documentName: 'Controlled Document',
+    documentNos: [],
+    revisionNo: '0',
+    originator: 'Admin',
+    effectiveDate: ''
+  };
+
+  var rawNos = [];
+  if (item && Array.isArray(item.documentNos)) {
+    rawNos = item.documentNos;
+  } else if (item && item.documentNo !== undefined && item.documentNo !== null) {
+    if (typeof item.documentNo === 'string' && item.documentNo.includes('/')) {
+      rawNos = item.documentNo.split('/').map(function(s) { return s.trim(); });
+    } else {
+      rawNos = [item.documentNo];
+    }
+  } else if (def && Array.isArray(def.documentNos)) {
+    rawNos = def.documentNos;
+  } else if (def && def.documentNo) {
+    rawNos = [def.documentNo];
+  }
+
+  var seen = {};
+  var cleanedNos = [];
+  rawNos.forEach(function(n) {
+    var trimmed = (n !== null && n !== undefined) ? String(n).trim() : '';
+    if (trimmed && !seen[trimmed.toLowerCase()]) {
+      seen[trimmed.toLowerCase()] = true;
+      cleanedNos.push(trimmed);
+    }
+  });
+
+  var finalNos = cleanedNos.length > 0 ? cleanedNos : (Array.isArray(def.documentNos) ? def.documentNos.slice() : ['N/A']);
+  var docName = String((item && item.documentName) || def.documentName || '').trim();
+  var revNo = String((item && item.revisionNo !== undefined) ? item.revisionNo : (def.revisionNo !== undefined ? def.revisionNo : '0')).trim();
+  var originator = String((item && item.originator) || def.originator || '').trim();
+  var effDate = String((item && item.effectiveDate) || def.effectiveDate || '').trim();
+
+  return {
+    documentName: docName,
+    documentNos: finalNos,
+    documentNo: formatDocumentNumbers(finalNos),
+    revisionNo: revNo,
+    originator: originator,
+    effectiveDate: effDate
+  };
+}
+
+function getDocumentControlInfo(formId) {
+  var defaultItem = DEFAULT_DOCUMENT_CONTROL_SETTINGS[formId] || null;
+  try {
+    var raw = PropertiesService.getScriptProperties().getProperty('DOCUMENT_CONTROL_SETTINGS');
+    if (raw) {
+      var parsed = JSON.parse(raw);
+      if (parsed && parsed[formId]) {
+        return normalizeDocumentControlItem(parsed[formId], defaultItem);
+      }
+    }
+  } catch (e) {
+    Logger.log('getDocumentControlInfo error: ' + e.message);
+  }
+  return defaultItem ? normalizeDocumentControlItem(defaultItem, defaultItem) : null;
+}
+
 const DEFAULT_APOLLO_LOGO_URL = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="22" fill="%232563EB"/><circle cx="50" cy="50" r="28" fill="%23FFFFFF"/><text x="50" y="61" font-family="Arial, sans-serif" font-weight="900" font-size="32" fill="%232563EB" text-anchor="middle">A</text></svg>';
 
 function getCompanyLogoUrl() {
@@ -854,7 +969,10 @@ function sheetToJson(sheet) {
       }
     }
     if (!obj.Status && (obj.Date === 'Present' || obj.Date === 'Absent' || obj.Date === 'Late')) {
-      obj.Status = obj.Date;
+      obj.Status = obj.Date === 'Absent' ? 'Absent' : 'Present';
+    }
+    if (obj.Status === 'Late') {
+      obj.Status = 'Present';
     }
     if (!obj.ScanTime && obj.Day && String(obj.Day).includes(':')) {
       obj.ScanTime = obj.Day;
@@ -902,7 +1020,7 @@ function ensureAttendanceSheetColumns(sheet) {
           row[4] || '',                                    // EmployeeName
           row[5] || '',                                    // Department
           row[6] || row[14] || now(),                      // ScanTime
-          row[7] === 'Present' || row[7] === 'Late' || row[7] === 'Absent' ? row[7] : 'Present', // Status
+          row[7] === 'Absent' ? 'Absent' : 'Present', // Status
           row[8] || '',                                    // TrainingCode
           row[9] || '',                                    // Day
           row[10] || '',                                   // Date

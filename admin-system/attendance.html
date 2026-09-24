@@ -84,7 +84,7 @@
   <div class="qr-checkin-card">
     <div class="checkin-header">
       <span class="session-badge" id="p-session-badge">Training Attendance List</span>
-      <div style="font-size:12px;font-weight:600;color:#64748B;margin:2px 0 6px">Document No.: S-HRS-FM-009</div>
+      <div id="p-doc-no" style="font-size:12px;font-weight:600;color:#64748B;margin:2px 0 6px">Document No.: Loading...</div>
       <h2 id="p-training-title" style="font-size:20px; font-weight:800; color:#1E293B; margin:4px 0 6px">Loading Training...</h2>
       <h4 id="p-session-name" style="font-size:15px; font-weight:600; color:#2563EB; margin:0 0 10px">-</h4>
       <div style="display:flex; justify-content:center; gap:16px; font-size:12.5px; color:#64748B; background:#F1F5F9; padding:8px 14px; border-radius:8px">
@@ -154,8 +154,8 @@
     <header class="topbar">
       <button id="sidebar-toggle" class="btn-th btn-secondary btn-sm sidebar-toggle-btn" style="display:none" aria-label="Toggle navigation menu"><span class="icon sm">menu</span></button>
       <div style="flex:1">
-        <h1 class="topbar-title">Training Attendance List</h1>
-        <div style="font-size:12px;color:var(--apollo-gray-500);font-weight:600;margin-top:2px">Document No.: S-HRS-FM-009</div>
+        <h1 class="topbar-title" id="att-topbar-title">Training Attendance List</h1>
+        <div id="att-doc-no-badge" style="font-size:12px;color:var(--apollo-gray-500);font-weight:600;margin-top:2px">Document No.: Loading...</div>
         <p class="topbar-sub" id="topbar-sub">Select a training to view attendance</p>
       </div>
     </header>
@@ -164,14 +164,19 @@
       <!-- Training selector -->
       <div class="card-th mb-4">
         <div class="row g-3 align-items-end">
-          <div class="col-md-6">
+          <div class="col-md-5">
             <label for="sel-training" class="label-th">Select Training Programme</label>
             <select id="sel-training" class="input-th" onchange="onTrainingSelect()" aria-label="Select Training Programme">
               <option value="">- Select a training -</option>
             </select>
           </div>
-          <div class="col-md-3">
+          <div class="col-md-2">
             <button class="btn-th btn-primary" style="width:100%" onclick="loadAttendance()"><span class="icon sm">search</span>Load Attendance</button>
+          </div>
+          <div class="col-md-2">
+            <button id="btn-export-pdf" class="btn-th btn-secondary" style="width:100%; display:inline-flex; justify-content:center; align-items:center; gap:6px; padding:9px" onclick="exportAttendancePdf()">
+              <span class="icon sm" style="color:#EF4444">picture_as_pdf</span> Export PDF
+            </button>
           </div>
           <div class="col-md-3">
             <a id="btn-open-att-sheet" class="btn-th" style="display:none;width:100%;background:#059669;color:#fff;border:none;text-decoration:none;justify-content:center;align-items:center;gap:6px;padding:9px" target="_blank"><span class="icon sm">table_chart</span>Open Data Sheet</a>
@@ -181,10 +186,9 @@
 
       <!-- Summary row -->
       <div class="row g-3 mb-4" id="att-summary" style="display:none">
-        <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-value" style="color:#22C55E" id="s-present">-</div><div class="stat-label">Present Records</div></div></div>
-        <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-value" style="color:#EF4444" id="s-absent">-</div><div class="stat-label">Absent</div></div></div>
-        <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-value" style="color:#F59E0B" id="s-late">-</div><div class="stat-label">Late</div></div></div>
-        <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-value" style="color:#2563EB" id="s-pct">-</div><div class="stat-label">Attendance Rate</div></div></div>
+        <div class="col-12 col-md-4"><div class="stat-card"><div class="stat-value" style="color:#22C55E" id="s-present">-</div><div class="stat-label">Present Records</div></div></div>
+        <div class="col-12 col-md-4"><div class="stat-card"><div class="stat-value" style="color:#EF4444" id="s-absent">-</div><div class="stat-label">Absent</div></div></div>
+        <div class="col-12 col-md-4"><div class="stat-card"><div class="stat-value" style="color:#2563EB" id="s-pct">-</div><div class="stat-label">Attendance Rate</div></div></div>
       </div>
 
       <!-- Days / Session Accordion -->
@@ -194,7 +198,7 @@
       <div id="add-day-section" style="display:none" class="mt-4">
         <div class="card-th" style="position:relative">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
-            <h4 style="font-size:14px;font-weight:700;color:#1E293B;margin:0">Add Manual Attendance Records <span style="font-size:11.5px;font-weight:600;color:#64748B;margin-left:6px">(Doc No.: S-HRS-FM-009)</span></h4>
+            <h4 style="font-size:14px;font-weight:700;color:#1E293B;margin:0">Add Manual Attendance Records <span id="att-manual-doc-badge" style="font-size:11.5px;font-weight:600;color:#64748B;margin-left:6px">(Doc No.: Loading...)</span></h4>
             <div id="manual-att-loader" style="display:none;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#2563EB;background:#EFF6FF;border:1px solid #BFDBFE;padding:4px 12px;border-radius:20px">
               <span class="spinner" style="width:12px;height:12px;border-width:2px;border-color:rgba(37,99,235,0.2);border-top-color:#2563EB" role="status"></span>
               <span>Recording attendance & refreshing...</span>
@@ -211,7 +215,6 @@
               <label for="add-status-select" class="label-th">Status</label>
               <select id="add-status-select" class="input-th" aria-label="Attendance Status">
                 <option value="Present" selected>Present</option>
-                <option value="Late">Late</option>
                 <option value="Absent">Absent</option>
               </select>
             </div>
@@ -247,12 +250,11 @@
   let allEmployeesList = [];
   let selectedParticipantIds = new Set();
   let currentFilteredEmployees = [];
-  let selectedManualParticipant = null;
-  const STATUS_OPTIONS = ['Present','Late','Partial Attendance','Left Early','Absent'];
-  const REMARK_OPTIONS = ['No remarks','Left after lunch','Medical leave','Emergency','Personal reason','Attended morning session only'];
+  const STATUS_OPTIONS = ['Present', 'Absent'];
 
   onReady(async () => {
     try {
+      initDocControlLabels();
       // Check if opened via QR Code scan with session parameter
       const sessionIdParam = getQueryParam('session') || (window.__TRAINHUB_CONFIG__ && window.__TRAINHUB_CONFIG__.sessionParam) || '';
       if (sessionIdParam) {
@@ -631,7 +633,6 @@
       if (sum) {
         document.getElementById('s-present').textContent = sum.present || 0;
         document.getElementById('s-absent').textContent  = sum.absent  || 0;
-        document.getElementById('s-late').textContent    = sum.late    || 0;
         document.getElementById('s-pct').textContent     = (sum.pct || 0) + '%';
       }
       if (Array.isArray(grouped)) {
@@ -651,7 +652,6 @@
     document.getElementById('att-summary').style.display = 'flex';
     document.getElementById('s-present').innerHTML = '<div class="skeleton-shimmer skeleton-text" style="width:40px;height:24px;margin:0 auto"></div>';
     document.getElementById('s-absent').innerHTML = '<div class="skeleton-shimmer skeleton-text" style="width:40px;height:24px;margin:0 auto"></div>';
-    document.getElementById('s-late').innerHTML = '<div class="skeleton-shimmer skeleton-text" style="width:40px;height:24px;margin:0 auto"></div>';
     document.getElementById('s-pct').innerHTML = '<div class="skeleton-shimmer skeleton-text" style="width:50px;height:24px;margin:0 auto"></div>';
     document.getElementById('days-container').innerHTML = `
       <div class="skeleton-card" style="margin-bottom:16px"><div class="skeleton-shimmer skeleton-title" style="width:40%;height:22px;margin-bottom:14px"></div><div class="skeleton-shimmer skeleton-text" style="width:100%;height:40px;margin-bottom:8px"></div><div class="skeleton-shimmer skeleton-text" style="width:100%;height:40px"></div></div>
@@ -691,7 +691,6 @@
     document.getElementById('att-summary').style.display = '';
     document.getElementById('s-present').textContent = sum.present || 0;
     document.getElementById('s-absent').textContent  = sum.absent  || 0;
-    document.getElementById('s-late').textContent    = sum.late    || 0;
     document.getElementById('s-pct').textContent     = (sum.pct || 0) + '%';
 
     // Populate Session Selector Dropdown with Session Name, Date & Time without timezone
@@ -751,16 +750,18 @@
               ${records.length ? records.map((r, i) => {
                 const recId = r.AttendanceID || r.ID || r.id;
                 const safeRemarks = (r.Remarks || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                const rawSt = String(r.Status || 'Present').trim().toLowerCase();
+                const safeStatus = (rawSt === 'absent') ? 'Absent' : 'Present';
                 return `
                 <tr id="att-row-${recId}">
                   <td style="font-family:monospace;font-size:11px;color:#2563EB;font-weight:700">${r.EmployeeNo || r.EmployeeID}</td>
                   <td><div style="display:flex;align-items:center;gap:7px">${avatar(r.EmployeeName,25,i)}<span style="font-size:13px;font-weight:500">${r.EmployeeName}</span></div></td>
                   <td style="font-size:12px;color:#64748B">${r.Department}</td>
                   <td style="font-family:monospace;font-size:12px">${formatMinimalistDateTime(r.ScanTime || r.CheckIn || r.Timestamp) || r.ScanTime || r.CheckIn || '-'}</td>
-                  <td id="att-stat-cell-${recId}">${statusBadge(r.Status)}</td>
+                  <td id="att-stat-cell-${recId}">${statusBadge(safeStatus)}</td>
                   <td id="att-rem-cell-${recId}" style="font-size:12px;color:#64748B">${r.Remarks||'-'}</td>
                   <td id="att-act-cell-${recId}">
-                    <button class="btn-th btn-secondary btn-xs" onclick="editParticipantRow('${recId}', '${r.Status||'Present'}', '${safeRemarks}')">
+                    <button class="btn-th btn-secondary btn-xs" onclick="editParticipantRow('${recId}', '${safeStatus}', '${safeRemarks}')">
                       <span class="icon sm">edit</span> Edit
                     </button>
                   </td>
@@ -830,6 +831,55 @@
       const res = await callServer('exportAttendanceSheet', id);
       showToast('Exported to sheet: ' + (res.sheetName || 'Attendance'), 'success');
     } catch(e) { showToast(e.message, 'error'); }
+  }
+
+  async function initDocControlLabels() {
+    try {
+      const info = await fetchDocumentControl('attendance');
+      if (info) {
+        const docNos = Array.isArray(info.documentNos) ? info.documentNos : (info.documentNo ? [info.documentNo] : []);
+        const formatted = typeof formatDocumentNumbers === 'function' ? formatDocumentNumbers(docNos) : (info.documentNo || docNos.join(' / '));
+        if (formatted) {
+          const pDoc = document.getElementById('p-doc-no');
+          if (pDoc) pDoc.textContent = `Document No.: ${formatted}`;
+          const topDoc = document.getElementById('att-doc-no-badge');
+          if (topDoc) topDoc.textContent = `Document No.: ${formatted}`;
+          const manualDoc = document.getElementById('att-manual-doc-badge');
+          if (manualDoc) manualDoc.textContent = `(Doc No.: ${formatted})`;
+        }
+        if (info.documentName) {
+          const topTitle = document.getElementById('att-topbar-title');
+          if (topTitle) topTitle.textContent = info.documentName;
+        }
+      }
+    } catch(e) {
+      console.warn('initDocControlLabels error:', e);
+    }
+  }
+
+  async function exportAttendancePdf() {
+    const id = document.getElementById('sel-training').value;
+    if (!id) {
+      showToast('Please select a training programme first.', 'error');
+      return;
+    }
+    const btn = document.getElementById('btn-export-pdf');
+    try {
+      if (btn) setBtnLoading(btn, true, 'Generating PDF...');
+      const res = await callServer('generateAttendancePdf', id);
+      if (btn) setBtnLoading(btn, false, '<span class="icon sm" style="color:#EF4444">picture_as_pdf</span> Export PDF');
+
+      const data = (res && res.data) ? res.data : res;
+      if (data && data.base64) {
+        downloadPdfFromBase64(data.base64, data.fileName || 'Attendance_List.pdf');
+        showToast('Attendance PDF downloaded successfully!', 'success');
+      } else {
+        showToast('PDF generation failed: ' + ((res && res.message) || 'No data returned'), 'error');
+      }
+    } catch(e) {
+      if (btn) setBtnLoading(btn, false, '<span class="icon sm" style="color:#EF4444">picture_as_pdf</span> Export PDF');
+      showToast('PDF Export error: ' + e.message, 'error');
+    }
   }
 </script>
 </body>

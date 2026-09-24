@@ -60,7 +60,7 @@ function submitAttendance(arg1, arg2, arg3, arg4) {
     const attId = generateId('ATT');
     const scanTime = now();
     
-    // Determine status (Present, Late, or explicitly requested status e.g. Absent)
+    // Determine status (Present, or explicitly requested status e.g. Absent)
     let determinedStatus = reqStatus || 'Present';
     if (!reqStatus && session) {
       determinedStatus = determineAttendanceStatus(session, new Date());
@@ -203,7 +203,7 @@ function getAttendanceByTraining(trainingId) {
       const records = allAtt.filter(a => String(a.SessionID || '').trim().toLowerCase() === String(s.SessionID || '').trim().toLowerCase());
       const presentCount = records.filter(r => {
         const st = String(r.Status || '').trim().toLowerCase();
-        return st === 'present' || st === 'late';
+        return st !== 'absent';
       }).length;
       const totalExpected = Math.max(totalEnrolled, records.length);
       return {
@@ -299,20 +299,23 @@ function getAttendance(trainingId) {
  */
 function getAttendanceSummary(trainingId) {
   try {
-    if (!trainingId) return ok({ total: 0, present: 0, absent: 0, late: 0, pct: 0 });
+    if (!trainingId) return ok({ total: 0, present: 0, absent: 0, pct: 0 });
     const ss = getTrainingDataSpreadsheet(trainingId);
-    if (!ss) return ok({ total: 0, present: 0, absent: 0, late: 0, pct: 0 });
+    if (!ss) return ok({ total: 0, present: 0, absent: 0, pct: 0 });
 
     const sheet = ss.getSheetByName('Attendance');
-    if (!sheet) return ok({ total: 0, present: 0, absent: 0, late: 0, pct: 0 });
+    if (!sheet) return ok({ total: 0, present: 0, absent: 0, pct: 0 });
 
     const rows = sheetToJson(sheet);
     const enrolledParts = getEnrolledParticipantsForTraining(trainingId);
     const enrolledCount = enrolledParts.length;
 
-    const present = rows.filter(r => String(r.Status || '').trim().toLowerCase() === 'present').length;
-    const late    = rows.filter(r => String(r.Status || '').trim().toLowerCase() === 'late').length;
-    let absent    = rows.filter(r => String(r.Status || '').trim().toLowerCase() === 'absent').length;
+    // Only 'Present' and 'Absent' are supported. Any historical 'late' is counted as present.
+    const present = rows.filter(r => {
+      const st = String(r.Status || '').trim().toLowerCase();
+      return st === 'present' || st === 'late' || (st !== 'absent' && st !== '');
+    }).length;
+    let absent = rows.filter(r => String(r.Status || '').trim().toLowerCase() === 'absent').length;
 
     const sessionsRes = getSessions(trainingId);
     const sessionsObj = typeof sessionsRes === 'string' ? JSON.parse(sessionsRes) : sessionsRes;
@@ -322,12 +325,10 @@ function getAttendanceSummary(trainingId) {
     const totalExpected = enrolledCount > 0 ? (enrolledCount * sessionCount) : rows.length;
     const total = Math.max(totalExpected, rows.length);
 
-    if (absent === 0 && total > (present + late)) {
-      absent = total - (present + late);
-    }
+    absent = Math.max(0, total - present);
 
-    const pct = total > 0 ? Math.round(((present + late) / total) * 100) : 0;
-    return ok({ total, present, absent, late, pct });
+    const pct = total > 0 ? Math.round((present / total) * 100) : 0;
+    return ok({ total, present, absent, pct });
   } catch (e) {
     return err(e.message);
   }
@@ -345,46 +346,10 @@ function isDeactivatedStatus(status) {
 }
 
 /**
- * Evaluates whether an attendance check-in is Late based on session start time and grace period.
+ * Evaluates attendance check-in status.
+ * All attendee check-ins are recorded as 'Present'. Only 'Present' and 'Absent' are supported.
  */
 function determineAttendanceStatus(session, scanDate) {
-  if (!session) return 'Present';
-  const nowObj = scanDate || new Date();
-  try {
-    const startStr = String(session.StartTime || '').trim();
-    if (!startStr) return 'Present';
-    const match = startStr.match(/(\d{1,2}):(\d{2})(?:\s*([AaPp][Mm]))?/);
-    if (!match) return 'Present';
-
-    let startH = parseInt(match[1], 10);
-    const startM = parseInt(match[2], 10);
-    const ampm = match[3];
-    if (ampm) {
-      if (ampm.toLowerCase() === 'pm' && startH < 12) startH += 12;
-      if (ampm.toLowerCase() === 'am' && startH === 12) startH = 0;
-    }
-
-    const startTotalMinutes = startH * 60 + startM;
-    const scanTotalMinutes = nowObj.getHours() * 60 + nowObj.getMinutes();
-
-    // If session date is in the past, mark as Late
-    if (session.SessionDate) {
-      const sDateStr = String(session.SessionDate).replace(/GMT.*$/, '').replace(/\(.*\)$/, '').trim();
-      const sDate = new Date(sDateStr);
-      if (!isNaN(sDate.getTime())) {
-        const todayMid = new Date(nowObj.getFullYear(), nowObj.getMonth(), nowObj.getDate()).getTime();
-        const sMid = new Date(sDate.getFullYear(), sDate.getMonth(), sDate.getDate()).getTime();
-        if (todayMid > sMid) return 'Late';
-      }
-    }
-
-    // Grace period of 15 minutes after session start time
-    if (scanTotalMinutes > (startTotalMinutes + 15)) {
-      return 'Late';
-    }
-  } catch (e) {
-    Logger.log('determineAttendanceStatus error: ' + e.message);
-  }
   return 'Present';
 }
 

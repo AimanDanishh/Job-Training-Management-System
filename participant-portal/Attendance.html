@@ -49,7 +49,7 @@
       <div>
         <span class="badge-pillar" id="badge-session" data-i18n="badgeSession">TRAINING ATTENDANCE LIST</span>
       </div>
-      <div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin:4px 0 6px;letter-spacing:0.3px;">Document No.: S-HRS-FM-009</div>
+      <div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin:4px 0 6px;letter-spacing:0.3px;">Document No.: <?= (typeof docNo !== 'undefined' && docNo) ? docNo : 'S-HRS-FM-009' ?></div>
       <h1 class="portal-title" id="txt-training-title">Loading Training...</h1>
       <p class="portal-subtitle" id="txt-session-name" style="color:var(--primary);">Verifying session details...</p>
       

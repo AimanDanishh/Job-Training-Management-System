@@ -26,6 +26,316 @@ function setConfigProperty(key, value) {
   PropertiesService.getScriptProperties().setProperty(key, value);
 }
 
+// --- Centralized ISO Document Control System -----------------------------------
+const DEFAULT_DOCUMENT_CONTROL_SETTINGS = {
+  'attendance': {
+    documentName: 'Training Attendance List',
+    documentNos: ['S-HRS-FM-009'],
+    revisionNo: '0',
+    originator: 'Arina Binti Ismail',
+    effectiveDate: '01.09.2026'
+  },
+  'evaluation': {
+    documentName: 'Training Evaluation Form',
+    documentNos: ['S-HRS-FM-006'],
+    revisionNo: '0',
+    originator: 'Arina Binti Ismail',
+    effectiveDate: '01.09.2026'
+  },
+  'training-request': {
+    documentName: 'Training Request Form',
+    documentNos: ['S-HRS-FM-004'],
+    revisionNo: '0',
+    originator: 'Arina Binti Ismail',
+    effectiveDate: '01.09.2026'
+  },
+  'employee-training-record': {
+    documentName: 'Employee Training Record',
+    documentNos: ['S-HRS-FM-003'],
+    revisionNo: '0',
+    originator: 'Arina Binti Ismail',
+    effectiveDate: '01.09.2026'
+  }
+};
+
+/**
+ * Formats an array of document numbers into a standardized display string.
+ * e.g. ['S-HRS-FM-009', 'S-HRS-FM-015'] -> 'S-HRS-FM-009 / S-HRS-FM-015'
+ * Handles single strings or empty values gracefully.
+ */
+function formatDocumentNumbers(documentNos, separator) {
+  const sep = separator || ' / ';
+  if (Array.isArray(documentNos)) {
+    const cleaned = documentNos
+      .map(n => (n !== null && n !== undefined) ? String(n).trim() : '')
+      .filter(n => n.length > 0);
+    return cleaned.join(sep);
+  }
+  if (documentNos !== null && documentNos !== undefined && String(documentNos).trim() !== '') {
+    return String(documentNos).trim();
+  }
+  return '';
+}
+
+/**
+ * Normalizes a document control item from storage or inputs.
+ * Ensures backward compatibility with legacy `documentNo` string while establishing `documentNos` array.
+ */
+function normalizeDocumentControlItem(item, defaultItem) {
+  const def = defaultItem || {
+    documentName: 'Controlled Document',
+    documentNos: [],
+    revisionNo: '0',
+    originator: 'Admin',
+    effectiveDate: ''
+  };
+
+  let rawNos = [];
+  if (item && Array.isArray(item.documentNos)) {
+    rawNos = item.documentNos;
+  } else if (item && item.documentNo !== undefined && item.documentNo !== null) {
+    if (typeof item.documentNo === 'string' && item.documentNo.includes('/')) {
+      rawNos = item.documentNo.split('/').map(s => s.trim());
+    } else {
+      rawNos = [item.documentNo];
+    }
+  } else if (def && Array.isArray(def.documentNos)) {
+    rawNos = def.documentNos;
+  } else if (def && def.documentNo) {
+    rawNos = [def.documentNo];
+  }
+
+  // Deduplicate and filter non-empty
+  const seen = new Set();
+  const cleanedNos = [];
+  rawNos.forEach(n => {
+    const trimmed = (n !== null && n !== undefined) ? String(n).trim() : '';
+    if (trimmed && !seen.has(trimmed.toLowerCase())) {
+      seen.add(trimmed.toLowerCase());
+      cleanedNos.push(trimmed);
+    }
+  });
+
+  const finalNos = cleanedNos.length > 0 ? cleanedNos : (Array.isArray(def.documentNos) ? def.documentNos.slice() : ['N/A']);
+  const docName = String((item && item.documentName) || def.documentName || '').trim();
+  const revNo = String((item && item.revisionNo !== undefined) ? item.revisionNo : (def.revisionNo !== undefined ? def.revisionNo : '0')).trim();
+  const originator = String((item && item.originator) || def.originator || '').trim();
+  const effDate = String((item && item.effectiveDate) || def.effectiveDate || '').trim();
+
+  return {
+    documentName: docName,
+    documentNos: finalNos,
+    documentNo: formatDocumentNumbers(finalNos), // Backwards compatibility for any legacy callers
+    revisionNo: revNo,
+    originator: originator,
+    effectiveDate: effDate
+  };
+}
+
+/**
+ * Retrieves all centralized Document Control settings.
+ * Merges missing keys with default values without overwriting existing settings.
+ * Automatically normalizes legacy `documentNo` into `documentNos` array.
+ */
+function getDocumentControlSettings() {
+  try {
+    const raw = PropertiesService.getScriptProperties().getProperty('DOCUMENT_CONTROL_SETTINGS');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const merged = {};
+      Object.keys(DEFAULT_DOCUMENT_CONTROL_SETTINGS).forEach(id => {
+        merged[id] = normalizeDocumentControlItem(parsed[id], DEFAULT_DOCUMENT_CONTROL_SETTINGS[id]);
+      });
+      return merged;
+    }
+  } catch (e) {
+    Logger.log('getDocumentControlSettings error: ' + e.message);
+  }
+  const defaults = {};
+  Object.keys(DEFAULT_DOCUMENT_CONTROL_SETTINGS).forEach(id => {
+    defaults[id] = normalizeDocumentControlItem(DEFAULT_DOCUMENT_CONTROL_SETTINGS[id], DEFAULT_DOCUMENT_CONTROL_SETTINGS[id]);
+  });
+  return defaults;
+}
+
+/**
+ * Saves all centralized Document Control settings.
+ * Validates that all required fields for each document are present and supports 1..N document numbers.
+ */
+function saveDocumentControlSettings(docSettings) {
+  try {
+    if (!docSettings || typeof docSettings !== 'object') {
+      return err('Invalid document control data.');
+    }
+
+    const current = getDocumentControlSettings();
+    const updated = {};
+
+    const requiredKeys = ['attendance', 'evaluation', 'training-request', 'employee-training-record'];
+    for (const key of requiredKeys) {
+      const item = docSettings[key] || current[key];
+      if (!item) {
+        return err(`Missing document control configuration for ${key}.`);
+      }
+      const docName = String(item.documentName || '').trim();
+      const revNo = String(item.revisionNo !== undefined ? item.revisionNo : '').trim();
+      const originator = String(item.originator || '').trim();
+      const effDate = String(item.effectiveDate || '').trim();
+
+      // Extract document numbers
+      let docNos = [];
+      if (Array.isArray(item.documentNos)) {
+        docNos = item.documentNos.map(n => String(n || '').trim()).filter(n => n.length > 0);
+      } else if (item.documentNo) {
+        docNos = String(item.documentNo).split('/').map(n => n.trim()).filter(n => n.length > 0);
+      }
+
+      if (!docName) {
+        return err(`Document Name is required for "${key}".`);
+      }
+      if (docNos.length === 0) {
+        return err(`Please provide at least one Document Number for "${docName || key}".`);
+      }
+
+      // Check for duplicate document numbers within the same form
+      const seen = new Set();
+      for (const n of docNos) {
+        const lower = n.toLowerCase();
+        if (seen.has(lower)) {
+          return err(`Duplicate document numbers are not allowed for "${docName || key}".`);
+        }
+        seen.add(lower);
+      }
+
+      if (revNo === '' || !originator || !effDate) {
+        return err(`Please complete Revision No., Originator, and Effective Date for "${docName || key}".`);
+      }
+
+      updated[key] = {
+        documentName: docName,
+        documentNos: docNos,
+        documentNo: formatDocumentNumbers(docNos), // Keep backward compatibility
+        revisionNo: revNo,
+        originator: originator,
+        effectiveDate: effDate
+      };
+    }
+
+    PropertiesService.getScriptProperties().setProperty('DOCUMENT_CONTROL_SETTINGS', JSON.stringify(updated));
+    return ok(updated);
+  } catch (e) {
+    Logger.log('saveDocumentControlSettings error: ' + e.message);
+    return err('Failed to save document control settings: ' + e.message);
+  }
+}
+
+/**
+ * Retrieves document control info for a single form ID.
+ * Returns normalized object: { documentName, documentNos, documentNo, revisionNo, originator, effectiveDate }
+ */
+function getDocumentControlInfo(formId) {
+  const all = getDocumentControlSettings();
+  const cleanId = String(formId || '').trim().toLowerCase();
+  if (all[cleanId]) {
+    return all[cleanId];
+  }
+  // Fallback mappings if slightly different format requested
+  if (cleanId === 'attendancelist' || cleanId === 'att') return all['attendance'];
+  if (cleanId === 'eval' || cleanId === 'trainingeval' || cleanId === 'posteval') return all['evaluation'];
+  if (cleanId === 'requisition' || cleanId === 'trainingrequest' || cleanId === 'trnreq') return all['training-request'];
+  if (cleanId === 'employeerecord' || cleanId === 'emp') return all['employee-training-record'];
+
+  return {
+    documentName: formId,
+    documentNos: ['N/A'],
+    documentNo: 'N/A',
+    revisionNo: '0',
+    originator: 'Admin',
+    effectiveDate: ''
+  };
+}
+
+/**
+ * Safe HTML escaping helper for document generation.
+ */
+function escapeHtmlForPdf(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
+ * Builds the standardized, table-based ISO Document Control Box HTML.
+ * Engineered for clean PDF rendering at the bottom of the final page with page-break-inside: avoid.
+ * Automatically accommodates 1 or multiple document numbers without clipping or overflow.
+ */
+function buildIsoDocumentControlBoxHtml(docInfo) {
+  const info = docInfo || {};
+  const rev = escapeHtmlForPdf(info.revisionNo !== undefined ? info.revisionNo : '0');
+  const orig = escapeHtmlForPdf(info.originator || '');
+  const date = escapeHtmlForPdf(info.effectiveDate || '');
+  
+  // Format document numbers (supports array or legacy single string)
+  const rawNos = Array.isArray(info.documentNos) ? info.documentNos : (info.documentNo ? [info.documentNo] : []);
+  const formattedNos = formatDocumentNumbers(rawNos);
+  const no = escapeHtmlForPdf(formattedNos || 'N/A');
+
+  // Choose layout dynamically based on text length to prevent clipping or overflow
+  const isMultiLineLayout = formattedNos.length > 28;
+
+  let tableRowsHtml = '';
+  if (isMultiLineLayout) {
+    tableRowsHtml = `
+      <tr>
+        <td style="border: none; padding: 6px 10px; width: 22%; vertical-align: middle; white-space: nowrap;">
+          <span style="color: #475569;">Revision No:</span> <strong style="color: #0F172A;">${rev}</strong>
+        </td>
+        <td style="border: none; padding: 6px 10px; width: 48%; vertical-align: middle;">
+          <span style="color: #475569;">Originator:</span> <strong style="color: #0F172A;">${orig}</strong>
+        </td>
+        <td style="border: none; padding: 6px 10px; width: 30%; vertical-align: middle; white-space: nowrap;">
+          <span style="color: #475569;">Effective Date:</span> <strong style="color: #0F172A;">${date}</strong>
+        </td>
+      </tr>
+      <tr>
+        <td colspan="3" style="border: none; padding: 6px 10px; vertical-align: middle; word-break: break-word;">
+          <span style="color: #475569;">Doc.No:</span> <strong style="color: #0F172A;">${no}</strong>
+        </td>
+      </tr>
+    `;
+  } else {
+    tableRowsHtml = `
+      <tr>
+        <td style="border: none; padding: 6px 10px; width: 18%; vertical-align: middle; white-space: nowrap;">
+          <span style="color: #475569;">Revision No:</span> <strong style="color: #0F172A;">${rev}</strong>
+        </td>
+        <td style="border: none; padding: 6px 10px; width: 34%; vertical-align: middle;">
+          <span style="color: #475569;">Originator:</span> <strong style="color: #0F172A;">${orig}</strong>
+        </td>
+        <td style="border: none; padding: 6px 10px; width: 22%; vertical-align: middle; white-space: nowrap;">
+          <span style="color: #475569;">Effective Date:</span> <strong style="color: #0F172A;">${date}</strong>
+        </td>
+        <td style="border: none; padding: 6px 10px; width: 26%; vertical-align: middle; word-break: break-word;">
+          <span style="color: #475569;">Doc.No:</span> <strong style="color: #0F172A;">${no}</strong>
+        </td>
+      </tr>
+    `;
+  }
+
+  return `
+  <div class="iso-doc-control-wrap" style="page-break-inside: avoid; margin-top: 24px; margin-bottom: 6px; width: 100%;">
+    <table class="iso-doc-control-box" style="width: 100%; border-collapse: collapse; border: 1.5px solid #1E293B; font-family: Arial, sans-serif; font-size: 8.5pt; background-color: #FFFFFF;">
+      <tbody>
+        ${tableRowsHtml}
+      </tbody>
+    </table>
+  </div>`;
+}
+
 // ===============================================================================
 // Centralized High-Performance Cache Layer (CacheService)
 // ===============================================================================
@@ -435,6 +745,7 @@ function invalidateLogoCaches() {
   try {
     removeCachedData(LOGO_CACHE_KEYS.COMPANY_LOGO);
     removeCachedData(LOGO_CACHE_KEYS.SYSTEM_LOGO);
+    removeCachedData('apollo:pdf:logo_data_uri');
   } catch(e) {}
 }
 
@@ -462,6 +773,96 @@ function setSystemLogoUrl(url) {
   invalidateLogoCaches();
   Logger.log('SYSTEM_LOGO_URL updated in Project Settings: ' + url);
   return 'SYSTEM_LOGO_URL set to: ' + url;
+}
+
+/**
+ * Retrieves the configured company or system logo formatted as an inline Base64 data URL
+ * inside an <img> tag for reliable, flawless embedding in Google Apps Script PDF exports.
+ * 
+ * Precedence:
+ * 1. Checks COMPANY_LOGO_URL
+ * 2. Fallbacks to SYSTEM_LOGO_URL
+ * 3. If neither is configured, returns '' (clean layout, no broken image icon or empty box).
+ * 
+ * Supports Base64 data URIs, Google Drive URLs / File IDs, and external HTTP/HTTPS image URLs.
+ * Converts external/Drive assets to inline Base64 data URLs to avoid PDF rendering sandbox blocks.
+ *
+ * @returns {string} HTML <img> tag or empty string ''
+ */
+function getPdfLogoHtml() {
+  try {
+    // 1. Check COMPANY_LOGO_URL first, then fallback to SYSTEM_LOGO_URL
+    let rawUrl = getConfigProperty('COMPANY_LOGO_URL', '');
+    if (!rawUrl || String(rawUrl).trim() === '') {
+      rawUrl = getConfigProperty('SYSTEM_LOGO_URL', '');
+    }
+    if (!rawUrl || String(rawUrl).trim() === '') {
+      return '';
+    }
+
+    const str = String(rawUrl).trim();
+
+    // 2. If already a base64 data URI, return directly
+    if (str.startsWith('data:image/')) {
+      return `<img src="${str}" alt="Logo" style="max-height: 44px; max-width: 180px; object-fit: contain; margin-bottom: 6px;">`;
+    }
+
+    // 3. Try cache for previously converted Base64 data URI
+    const cacheKey = 'apollo:pdf:logo_data_uri';
+    try {
+      const cached = getCachedData(cacheKey);
+      if (cached && typeof cached === 'string' && cached.startsWith('data:image/')) {
+        return `<img src="${cached}" alt="Logo" style="max-height: 44px; max-width: 180px; object-fit: contain; margin-bottom: 6px;">`;
+      }
+    } catch (eC) {}
+
+    // 4. Check if it is a Google Drive link or File ID
+    const fileId = extractDriveFileIdFromUrl(str);
+    if (fileId) {
+      try {
+        const file = DriveApp.getFileById(fileId);
+        const blob = file.getBlob();
+        let mime = blob.getContentType() || 'image/png';
+        if (mime.indexOf('image/') !== 0) mime = 'image/png';
+        const bytes = blob.getBytes();
+        if (bytes && bytes.length > 0 && bytes.length < 3145728) {
+          const base64 = Utilities.base64Encode(bytes);
+          const dataUri = `data:${mime};base64,${base64}`;
+          try { setCachedData(cacheKey, dataUri, 21600); } catch (e) {}
+          return `<img src="${dataUri}" alt="Logo" style="max-height: 44px; max-width: 180px; object-fit: contain; margin-bottom: 6px;">`;
+        }
+      } catch (dErr) {
+        Logger.log('getPdfLogoHtml DriveApp conversion error: ' + dErr.message);
+      }
+    }
+
+    // 5. External HTTP/HTTPS URL: Fetch bytes and convert to Base64
+    if (str.startsWith('http://') || str.startsWith('https://')) {
+      try {
+        const response = UrlFetchApp.fetch(str, { muteHttpExceptions: true, validateHttpsCertificates: false });
+        if (response.getResponseCode() === 200) {
+          const blob = response.getBlob();
+          let mime = blob.getContentType() || 'image/png';
+          if (mime.indexOf('image/') !== 0) mime = 'image/png';
+          const bytes = blob.getBytes();
+          if (bytes && bytes.length > 0 && bytes.length < 3145728) {
+            const base64 = Utilities.base64Encode(bytes);
+            const dataUri = `data:${mime};base64,${base64}`;
+            try { setCachedData(cacheKey, dataUri, 21600); } catch (e) {}
+            return `<img src="${dataUri}" alt="Logo" style="max-height: 44px; max-width: 180px; object-fit: contain; margin-bottom: 6px;">`;
+          }
+        }
+      } catch (uErr) {
+        Logger.log('getPdfLogoHtml UrlFetchApp conversion error: ' + uErr.message);
+      }
+    }
+
+    // If conversion could not produce a valid image, do not output broken <img> tag
+    return '';
+  } catch (err) {
+    Logger.log('getPdfLogoHtml error: ' + err.message);
+    return '';
+  }
 }
 
 function isSameEmployeeId(id1, id2) {
@@ -1520,6 +1921,95 @@ function formatMinimalistDate(date) {
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   
   return days[d.getDay()] + ', ' + d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
+}
+
+/**
+ * Safely converts and formats any date input into DD/MM/YYYY string format.
+ */
+function formatDisplayDate(val) {
+  if (!val) return '';
+  const str = String(val).replace(/GMT.*$/, '').replace(/\(.*\)$/, '').trim();
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) return str;
+
+  const ymdMatch = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+  if (ymdMatch) {
+    const year = ymdMatch[1];
+    const month = ymdMatch[2].padStart(2, '0');
+    const day = ymdMatch[3].padStart(2, '0');
+    return `${day}/${month}/${year}`;
+  }
+
+  const dmyMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  if (dmyMatch) {
+    const day = dmyMatch[1].padStart(2, '0');
+    const month = dmyMatch[2].padStart(2, '0');
+    const year = dmyMatch[3];
+    return `${day}/${month}/${year}`;
+  }
+
+  const d = (val instanceof Date) ? val : (typeof parseDateObj === 'function' ? parseDateObj(str) : new Date(str));
+  if (d && !isNaN(d.getTime())) {
+    try {
+      if (typeof Utilities !== 'undefined' && typeof Session !== 'undefined') {
+        return Utilities.formatDate(d, Session.getScriptTimeZone(), 'dd/MM/yyyy');
+      }
+    } catch (e) {}
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
+  }
+  return str.split('T')[0] || '';
+}
+
+/**
+ * Formats a date range into a standardized display string (e.g. 01/09/2026 - 03/09/2026).
+ */
+function formatDisplayDateRange(startDateVal, endDateVal) {
+  if (!startDateVal) return '-';
+  const startStr = formatDisplayDate(startDateVal);
+  if (!endDateVal) return startStr || '-';
+  const endStr = formatDisplayDate(endDateVal);
+  if (!endStr || startStr === endStr) return startStr || '-';
+  return `${startStr} - ${endStr}`;
+}
+
+/**
+ * Formats a time value into 12-hour AM/PM format (e.g. 09:00 AM).
+ */
+function formatDisplayTime(val, defaultTime) {
+  const def = (defaultTime !== undefined && defaultTime !== null) ? defaultTime : '09:00 AM';
+  if (!val) return def;
+  const str = String(val).replace(/GMT.*$/, '').replace(/\(.*\)$/, '').trim();
+  const ampmMatch = str.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+  if (ampmMatch && !str.includes('1899') && !str.includes('Singapore') && !str.includes('Standard') && !str.includes('GMT')) {
+    let hh = parseInt(ampmMatch[1], 10);
+    const mm = ampmMatch[2];
+    const ampm = ampmMatch[3] ? ampmMatch[3].toUpperCase() : (hh >= 12 ? 'PM' : 'AM');
+    if (hh > 12) hh -= 12;
+    if (hh === 0) hh = 12;
+    return `${String(hh).padStart(2, '0')}:${mm} ${ampm}`;
+  }
+  const d = (val instanceof Date) ? val : new Date(str);
+  if (!isNaN(d.getTime())) {
+    let hh = d.getHours();
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    const ampm = hh >= 12 ? 'PM' : 'AM';
+    hh = hh % 12 || 12;
+    return `${String(hh).padStart(2, '0')}:${mm} ${ampm}`;
+  }
+  return str || def;
+}
+
+/**
+ * Formats start and end times into a session time range (e.g. 09:00 AM - 05:00 PM).
+ */
+function formatSessionTimeRange(startVal, endVal) {
+  if (!startVal && !endVal) return '-';
+  const start = formatDisplayTime(startVal, '');
+  const end = formatDisplayTime(endVal, '');
+  if (start && end) return `${start} - ${end}`;
+  return start || end || '-';
 }
 
 /**

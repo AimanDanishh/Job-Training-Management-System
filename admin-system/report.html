@@ -502,7 +502,7 @@
                 <option value="hours" selected>1. Training Hours (Cost Centre vs Month)</option>
                 <option value="cost">2. Training Cost Breakdown</option>
                 <option value="title">3. Training Title & Enrolled Participants</option>
-                <option value="employee">4. Employee Training Record (S-HRS-FM-003)</option>
+                <option value="employee" id="opt-report-employee">4. Employee Training Record (S-HRS-FM-003)</option>
                 <option value="atp">5. Annual Training Plan (ATP)</option>
                 <option value="single">6. Single Programme Detailed Summary</option>
               </select>
@@ -849,8 +849,28 @@
     }
   }
 
+  async function initReportDocControlLabels() {
+    try {
+      const info = await fetchDocumentControl('employee-training-record');
+      if (info) {
+        const docNos = Array.isArray(info.documentNos) ? info.documentNos : (info.documentNo ? [info.documentNo] : []);
+        const formatted = typeof formatDocumentNumbers === 'function' ? formatDocumentNumbers(docNos) : (info.documentNo || docNos.join(' / '));
+        if (formatted) {
+          window.__empRecDocNo = formatted;
+          const opt = document.getElementById('opt-report-employee');
+          if (opt) opt.textContent = `4. ${info.documentName || 'Employee Training Record'} (${formatted})`;
+          const outDoc = document.getElementById('report-output-doc-no');
+          if (outDoc) outDoc.textContent = `Document No.: ${formatted}`;
+        }
+      }
+    } catch(e) {
+      console.warn('initReportDocControlLabels error:', e);
+    }
+  }
+
   onReady(async () => {
     try {
+      initReportDocControlLabels();
       populateYearOptions();
 
       const [trainings, depts] = await Promise.all([
@@ -1770,7 +1790,7 @@
     } else if (type === 'employee') {
       titleEl.textContent = `Employee Training Record`;
       if (docNoEl) {
-        docNoEl.textContent = `Document No.: S-HRS-FM-003`;
+        docNoEl.textContent = `Document No.: ${window.__empRecDocNo || 'S-HRS-FM-003'}`;
         docNoEl.style.display = 'block';
       }
       subEl.textContent   = `Employee training attendance & total hours summary`;
@@ -1973,7 +1993,7 @@
       <div class="report-table-print-header" style="padding:10px 0 14px; margin-bottom:12px; border-bottom:1px solid #E2E8F0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px">
         <div>
           <div style="font-size:16px; font-weight:800; color:#1E293B">Employee Training Record</div>
-          <div style="font-size:12px; font-weight:600; color:#64748B">Document No.: S-HRS-FM-003</div>
+          <div style="font-size:12px; font-weight:600; color:#64748B">Document No.: ${window.__empRecDocNo || 'S-HRS-FM-003'}</div>
         </div>
         <div style="font-size:12px; color:#64748B">Apollo Job Training System</div>
       </div>
@@ -2139,17 +2159,18 @@
                 <th style="padding:6px 10px; font-size:11.5px">Total Records</th>
                 <th style="padding:6px 10px; font-size:11.5px">Present</th>
                 <th style="padding:6px 10px; font-size:11.5px">Absent</th>
-                <th style="padding:6px 10px; font-size:11.5px">Late</th>
                 <th style="padding:6px 10px; font-size:11.5px">Rate (%)</th>
               </tr>
             </thead>
             <tbody>
               ${days.length ? days.map(d => {
                 const recs = d.records || [];
-                const pres = recs.filter(r => String(r.Status || '').trim().toLowerCase() === 'present').length;
+                const pres = recs.filter(r => {
+                  const s = String(r.Status || '').trim().toLowerCase();
+                  return s === 'present' || s === 'late';
+                }).length;
                 const abs  = recs.filter(r => String(r.Status || '').trim().toLowerCase() === 'absent').length;
-                const late = recs.filter(r => String(r.Status || '').trim().toLowerCase() === 'late').length;
-                const pct  = recs.length ? Math.round((pres + late) / recs.length * 100) : 0;
+                const pct  = recs.length ? Math.round(pres / recs.length * 100) : 0;
                 const dayLabel = !d.day ? 'Day 1' : (String(d.day).toLowerCase().startsWith('day') ? d.day : ('Day ' + d.day));
                 const dateStr = formatFn(d.date) || d.date || '-';
                 return `<tr>
@@ -2158,10 +2179,9 @@
                   <td style="text-align:center; padding:6px 10px">${recs.length}</td>
                   <td style="color:#16A34A; font-weight:bold; text-align:center; padding:6px 10px">${pres}</td>
                   <td style="color:#DC2626; font-weight:bold; text-align:center; padding:6px 10px">${abs}</td>
-                  <td style="color:#D97706; text-align:center; padding:6px 10px">${late}</td>
                   <td style="text-align:center; padding:6px 10px"><strong>${pct}%</strong></td>
                 </tr>`;
-              }).join('') : '<tr><td colspan="7" style="text-align:center; padding:14px; color:#94A3B8; font-size:12px">No attendance records registered.</td></tr>'}
+              }).join('') : '<tr><td colspan="6" style="text-align:center; padding:14px; color:#94A3B8; font-size:12px">No attendance records registered.</td></tr>'}
             </tbody>
           </table>
         </div>

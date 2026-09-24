@@ -44,7 +44,7 @@
       <div>
         <span class="badge-pillar">POST-TRAINING EVALUATION</span>
       </div>
-      <div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin:4px 0 6px;letter-spacing:0.3px;">Document No.: S-HRS-FM-006</div>
+      <div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin:4px 0 6px;letter-spacing:0.3px;">Document No.: <?= (typeof docNo !== 'undefined' && docNo) ? docNo : 'S-HRS-FM-006' ?></div>
       <h1 class="portal-title" id="pageMainHeading">3-Month Competency Assessment</h1>
       <p class="portal-subtitle" id="pageMainSubheading">Supervisor / Manager / HOD Post-Training Review Portal</p>
     </div>
@@ -217,7 +217,7 @@
               Employee ID: -- • Department: --
             </div>
           </div>
-          <span style="font-size:12px; font-weight:600; color:var(--text-secondary);">Document No.: S-HRS-FM-006</span>
+          <span style="font-size:12px; font-weight:600; color:var(--text-secondary);">Document No.: <?= (typeof docNo !== 'undefined' && docNo) ? docNo : 'S-HRS-FM-006' ?></span>
         </div>
 
         <form onsubmit="handlePostEvalSubmit(event)">

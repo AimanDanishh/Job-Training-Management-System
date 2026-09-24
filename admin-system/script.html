@@ -9,35 +9,54 @@ function safeExternalUrl(domainAndPath) {
 function readTrainHubConfig() {
   var cfg = window.__TRAINHUB_CONFIG__ || {};
   var el = document.getElementById('__trainhub_config__');
+  var hasConfig = false;
+
   if (el && el.getAttribute && el.getAttribute('data-config')) {
     try {
       var raw = el.getAttribute('data-config');
       if (raw) {
-        cfg = JSON.parse(decodeURIComponent(raw));
-        window.__TRAINHUB_CONFIG__ = cfg;
-        if (cfg.page) window.__TRAINHUB_PAGE__ = cfg.page;
-        if (cfg.appUrl) {
-          window.__APP_URL__ = cfg.appUrl;
-          _cachedBaseUrl = cfg.appUrl;
-        }
-        if (cfg.publicPortalUrl) {
-          window.__PUBLIC_PORTAL_URL__ = cfg.publicPortalUrl;
-          if (!_cachedBaseUrl) _cachedBaseUrl = cfg.publicPortalUrl;
-        }
-        if (cfg.companyLogoUrl) window.__COMPANY_LOGO_URL__ = cfg.companyLogoUrl;
-        if (cfg.systemLogoUrl) window.__SYSTEM_LOGO_URL__ = cfg.systemLogoUrl;
-        if (cfg.currentUser) window.__CURRENT_USER__ = cfg.currentUser;
-        if (cfg.queryParams) window.__QUERY_PARAMS__ = cfg.queryParams;
+        var parsed = JSON.parse(decodeURIComponent(raw));
+        cfg = Object.assign({}, cfg, parsed);
+        hasConfig = true;
       }
     } catch(e) {}
+  } else if (window.__TRAINHUB_CONFIG__ && window.__TRAINHUB_CONFIG__.currentUser) {
+    hasConfig = true;
   }
-  enforceAuthGuard();
+
+  window.__TRAINHUB_CONFIG__ = cfg;
+  if (cfg.page) window.__TRAINHUB_PAGE__ = cfg.page;
+  if (cfg.appUrl) {
+    window.__APP_URL__ = cfg.appUrl;
+    _cachedBaseUrl = cfg.appUrl;
+  }
+  if (cfg.publicPortalUrl) {
+    window.__PUBLIC_PORTAL_URL__ = cfg.publicPortalUrl;
+    if (!_cachedBaseUrl) _cachedBaseUrl = cfg.publicPortalUrl;
+  }
+  if (cfg.companyLogoUrl) window.__COMPANY_LOGO_URL__ = cfg.companyLogoUrl;
+  if (cfg.systemLogoUrl) window.__SYSTEM_LOGO_URL__ = cfg.systemLogoUrl;
+  if (cfg.currentUser) window.__CURRENT_USER__ = cfg.currentUser;
+  if (cfg.queryParams) window.__QUERY_PARAMS__ = cfg.queryParams;
+
+  // Only enforce auth guard once config has actually been loaded
+  if (hasConfig) {
+    enforceAuthGuard();
+  }
   return cfg;
 }
 
 function enforceAuthGuard() {
   try {
     const cfg = window.__TRAINHUB_CONFIG__ || {};
+    const user = window.__CURRENT_USER__ || (cfg && cfg.currentUser);
+    const el = document.getElementById('__trainhub_config__');
+
+    // If config hasn't loaded at all yet, do not block prematurely
+    if (!user && !el && typeof document !== 'undefined' && document.readyState === 'loading') {
+      return;
+    }
+
     const page = cfg.page || window.__TRAINHUB_PAGE__ || 'dashboard';
     const hasSession = cfg.sessionParam || (typeof window !== 'undefined' && window.location && window.location.search && window.location.search.includes('session='));
     
@@ -46,23 +65,28 @@ function enforceAuthGuard() {
       return;
     }
 
-    const user = window.__CURRENT_USER__;
     if (!user || user.authenticated !== true) {
       console.warn('[ApolloAuthGuard] Unauthorized client route access blocked for page: ' + page);
       const base = window.__APP_URL__ || window.__PUBLIC_PORTAL_URL__ || '';
       const cleanBase = base ? base.split('?')[0] : '';
       const targetUrl = (cleanBase || window.location.href.split('?')[0]) + '?page=index';
       try {
-        window.open(targetUrl, '_top');
-      } catch(e) {
         window.location.href = targetUrl;
+      } catch(e) {
+        try { window.location.replace(targetUrl); } catch(rErr) {}
       }
     }
   } catch(guardErr) {}
 }
 
 (function() {
-  readTrainHubConfig();
+  if (typeof document !== 'undefined' && document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+      readTrainHubConfig();
+    });
+  } else {
+    readTrainHubConfig();
+  }
 })();
 
 // ===============================================================================
@@ -512,6 +536,22 @@ function handleLogoFallbackError(img) {
     img.onerror = null;
     img.src = DEFAULT_FALLBACK_LOGO;
   }
+}
+
+function handleLogoPreviewError(img) {
+  if (!img) return;
+  img.onerror = null;
+  img.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0MCA0MCI+PHJlY3Qgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiByeD0iOCIgZmlsbD0iI0U5MUMyRCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTYlIiBmb250LWZhbWlseT0iQXJpYWwsc2Fucy1zZXJpZiIgZm9udC13ZWlnaHQ9IjkwMCIgZm9udC1zaXplPSIyMCIgZmlsbD0iI0ZGRjhDRiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSI+QTwvdGV4dD48L3N2Zz4=';
+  const previewText = document.getElementById('company-logo-preview-text');
+  if (previewText) previewText.textContent = 'Default Apollo emblem active.';
+}
+
+function handleSystemLogoPreviewError(img) {
+  if (!img) return;
+  img.onerror = null;
+  img.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0MCA0MCI+PGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iMTgiIGZpbGw9IiNFOTFDMkQiLz48dGV4dCB4PSI1MCUiIHk9IjU2JSIgZm9udC1mYW1pbHk9IkFyaWFsLHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI5MDAiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiNGRkZGRkYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiPkE8L3RleHQ+PC9zdmc+';
+  const previewText = document.getElementById('system-logo-preview-text');
+  if (previewText) previewText.textContent = 'Default circular red emblem active.';
 }
 
 function initSidebarLogo() {
@@ -974,23 +1014,26 @@ const CountdownTimerManager = {
 // ===============================================================================
 
 function statusBadge(status) {
+  let displayStatus = status;
+  if (String(status || '').trim().toLowerCase() === 'late') {
+    displayStatus = 'Present';
+  }
   const map = {
     'Active':           'badge-green',   'In Progress':       'badge-gold',
     'Upcoming':         'badge-yellow',  'Completed':         'badge-green',
     'On going':         'badge-gold',    'On planning':       'badge-purple',
     'Draft':            'badge-gray',    'Archived':          'badge-gray',
     'Present':          'badge-green',   'Absent':            'badge-red',
-    'Late':             'badge-yellow',  'Partial Attendance':'badge-yellow',
-    'Left Early':       'badge-yellow',  'Pending':           'badge-yellow',
-    'Pending Approval': 'badge-yellow',  'Approved':          'badge-green',
-    'Rejected':         'badge-red',     'Postponed':         'badge-yellow',
-    'Rescheduled':      'badge-yellow',  'Cancelled':         'badge-red',
-    'Not Submitted':    'badge-gray',    'Inactive':          'badge-red',
-    'Expired':          'badge-red',     'Deactivate':        'badge-red',
-    'Deactivated':      'badge-red',
+    'Partial Attendance':'badge-yellow', 'Left Early':        'badge-yellow',
+    'Pending':          'badge-yellow',  'Pending Approval':  'badge-yellow',
+    'Approved':         'badge-green',   'Rejected':          'badge-red',
+    'Postponed':        'badge-yellow',  'Rescheduled':       'badge-yellow',
+    'Cancelled':        'badge-red',     'Not Submitted':     'badge-gray',
+    'Inactive':         'badge-red',     'Expired':           'badge-red',
+    'Deactivate':       'badge-red',     'Deactivated':       'badge-red',
   };
-  const cls = map[status] || 'badge-gray';
-  return `<span class="badge-th ${cls}">${status}</span>`;
+  const cls = map[displayStatus] || 'badge-gray';
+  return `<span class="badge-th ${cls}">${displayStatus}</span>`;
 }
 
 function approvalStatusBadge(status) {
@@ -1413,6 +1456,83 @@ window.addEventListener('beforeunload', () => {
   CountdownTimerManager.stop();
 });
 
+// --- PDF Download & ISO Document Control Utilities ---------------------------
+function downloadPdfFromBase64(base64Data, filename) {
+  if (!base64Data) {
+    showToast('Failed to download PDF: No data returned from server.', 'error');
+    return;
+  }
+  try {
+    const byteCharacters = atob(base64Data);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    const blob = new Blob([byteArray], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = filename || 'Document.pdf';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 200);
+  } catch(e) {
+    console.error('downloadPdfFromBase64 error:', e);
+    showToast('Failed to process PDF download: ' + e.message, 'error');
+  }
+}
+
+let _cachedDocControlSettings = null;
+async function fetchDocumentControl(formId) {
+  try {
+    if (!_cachedDocControlSettings) {
+      const res = await callServer('getDocumentControlSettings');
+      _cachedDocControlSettings = (res && res.data) ? res.data : res;
+    }
+    if (_cachedDocControlSettings && _cachedDocControlSettings[formId]) {
+      return _cachedDocControlSettings[formId];
+    }
+    const single = await callServer('getDocumentControlInfo', formId);
+    return (single && single.data) ? single.data : single;
+  } catch(e) {
+    console.warn('fetchDocumentControl error:', e);
+    return null;
+  }
+}
+
+function formatDocumentNumbers(documentNos, separator) {
+  const sep = separator || ' / ';
+  if (Array.isArray(documentNos)) {
+    const cleaned = documentNos
+      .map(n => (n !== null && n !== undefined) ? String(n).trim() : '')
+      .filter(n => n.length > 0);
+    return cleaned.join(sep);
+  }
+  if (documentNos !== null && documentNos !== undefined && String(documentNos).trim() !== '') {
+    return String(documentNos).trim();
+  }
+  return '';
+}
+
+async function applyDocumentControlBadge(formId, targetElementId, prefix) {
+  const el = document.getElementById(targetElementId);
+  if (!el) return;
+  const info = await fetchDocumentControl(formId);
+  if (info) {
+    const docNos = Array.isArray(info.documentNos) ? info.documentNos : (info.documentNo ? [info.documentNo] : []);
+    const formatted = formatDocumentNumbers(docNos);
+    if (formatted) {
+      const pfx = prefix !== undefined ? prefix : 'Document No.: ';
+      el.textContent = `${pfx}${formatted}`;
+    }
+  }
+}
+
 // Explicitly bind utility functions to global window object
 window.escapeHtml = escapeHtml;
 window.navTo = navTo;
@@ -1450,5 +1570,532 @@ window.initSidebarState = initSidebarState;
 window.loadRealUserProfile = loadRealUserProfile;
 window.ApolloCountdown = ApolloCountdown;
 window.CountdownTimerManager = CountdownTimerManager;
+window.downloadPdfFromBase64 = downloadPdfFromBase64;
+window.fetchDocumentControl = fetchDocumentControl;
+window.formatDocumentNumbers = formatDocumentNumbers;
+window.applyDocumentControlBadge = applyDocumentControlBadge;
+window.handleLogoPreviewError = handleLogoPreviewError;
+window.handleSystemLogoPreviewError = handleSystemLogoPreviewError;
+
+// ===============================================================================
+// Centralized Settings & ISO Document Control Logic (Global)
+// ===============================================================================
+let activeSettingsTab = 'doc-control';
+let currentDocControlData = null;
+let isDocControlLoading = false;
+
+function switchSettingsTab(tab) {
+  activeSettingsTab = tab || 'doc-control';
+  const isDoc = activeSettingsTab === 'doc-control';
+  const secDoc = document.getElementById('section-doc-control');
+  const secGen = document.getElementById('section-general-settings');
+  if (secDoc) secDoc.style.display = isDoc ? 'block' : 'none';
+  if (secGen) secGen.style.display = isDoc ? 'none' : 'block';
+
+  const btnDoc = document.getElementById('tab-btn-doc-control');
+  const btnGen = document.getElementById('tab-btn-general');
+  if (isDoc) {
+    if (btnDoc) btnDoc.className = 'btn-th btn-primary';
+    if (btnGen) btnGen.className = 'btn-th btn-secondary';
+    if (!currentDocControlData && !isDocControlLoading) {
+      loadDocumentControlSettings();
+    }
+  } else {
+    if (btnDoc) btnDoc.className = 'btn-th btn-secondary';
+    if (btnGen) btnGen.className = 'btn-th btn-primary';
+    if (typeof window.loadSettingsData === 'function') {
+      window.loadSettingsData();
+    }
+  }
+}
+
+function showDocControlLoading() {
+  const tbody = document.getElementById('tbl-doc-control-body');
+  if (!tbody) return;
+  tbody.innerHTML = `
+    <tr id="doc-control-loading-row">
+      <td colspan="6" style="text-align:center; color:#64748B; padding:28px 20px">
+        <div style="display:inline-flex; align-items:center; gap:10px">
+          <span class="icon sm spin" style="animation:spin 1s linear infinite; color:#2563EB">autorenew</span>
+          <span style="font-weight:600; font-size:13px">Loading Document Control settings...</span>
+        </div>
+      </td>
+    </tr>
+  `;
+}
+
+function showDocControlError(message) {
+  const tbody = document.getElementById('tbl-doc-control-body');
+  if (!tbody) return;
+  tbody.innerHTML = `
+    <tr>
+      <td colspan="6" style="text-align:center; padding:22px 20px; background:#FEF2F2; border:1px solid #FECACA; border-radius:6px">
+        <div style="display:flex; flex-direction:column; align-items:center; gap:8px">
+          <span class="icon md filled" style="color:#DC2626">error</span>
+          <div style="font-weight:600; color:#991B1B; font-size:13px">${escapeHtml(message || 'Unable to load Document Control settings. Please refresh the page or check the browser console.')}</div>
+          <button type="button" class="btn-th btn-secondary btn-sm" onclick="loadDocumentControlSettings()" style="margin-top:6px; display:inline-flex; align-items:center; gap:4px">
+            <span class="icon sm">refresh</span> Retry
+          </button>
+        </div>
+      </td>
+    </tr>
+  `;
+}
+
+function loadDocumentControlSettings() {
+  if (isDocControlLoading) return;
+  isDocControlLoading = true;
+  showDocControlLoading();
+
+  function handleSuccess(raw) {
+    try {
+      const parsed = (typeof raw === 'string') ? JSON.parse(raw) : raw;
+      const data = (parsed && parsed.data !== undefined) ? parsed.data : parsed;
+      renderDocumentControlSettings(data);
+    } catch (err) {
+      console.error('Error rendering Document Control settings:', err);
+      showDocControlError('Unable to load Document Control settings. Please refresh the page or check the browser console.');
+    } finally {
+      isDocControlLoading = false;
+    }
+  }
+
+  function handleFailure(err) {
+    console.error('Backend failure getting Document Control settings:', err);
+    try {
+      showDocControlError('Unable to load Document Control settings. Please refresh the page or check the browser console.');
+    } finally {
+      isDocControlLoading = false;
+    }
+  }
+
+  if (typeof google !== 'undefined' && google.script && google.script.run) {
+    try {
+      google.script.run
+        .withSuccessHandler(handleSuccess)
+        .withFailureHandler(handleFailure)
+        .getDocumentControlSettings();
+    } catch (callErr) {
+      handleFailure(callErr);
+    }
+  } else if (typeof callServer === 'function') {
+    callServer('getDocumentControlSettings')
+      .then(handleSuccess)
+      .catch(handleFailure);
+  } else {
+    handleFailure(new Error('Google Apps Script runtime environment not detected.'));
+  }
+}
+
+function renderDocumentControlSettings(docSettings) {
+  try {
+    if (!docSettings || typeof docSettings !== 'object') {
+      showDocControlError('Unable to load Document Control settings. Please refresh the page or check the browser console.');
+      return;
+    }
+
+    currentDocControlData = JSON.parse(JSON.stringify(docSettings));
+
+    const tbody = document.getElementById('tbl-doc-control-body');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    const docOrder = [
+      { id: 'attendance', name: 'Training Attendance List', icon: 'fact_check', badge: 'Attendance' },
+      { id: 'evaluation', name: 'Training Evaluation Form', icon: 'assignment', badge: 'Participant & Supervisor' },
+      { id: 'training-request', name: 'Training Request Form', icon: 'school', badge: 'Requisition' },
+      { id: 'employee-training-record', name: 'Employee Training Record', icon: 'badge', badge: 'Employee' }
+    ];
+
+    docOrder.forEach(item => {
+      const conf = currentDocControlData[item.id] || {
+        documentName: item.name,
+        documentNos: ['S-HRS-FM-000'],
+        revisionNo: '0',
+        originator: 'Admin',
+        effectiveDate: ''
+      };
+
+      const docNos = Array.isArray(conf.documentNos) ? conf.documentNos : (conf.documentNo ? [conf.documentNo] : []);
+      const formattedNos = formatDocumentNumbers(docNos);
+
+      const tr = document.createElement('tr');
+      tr.style.verticalAlign = 'middle';
+      tr.innerHTML = `
+        <td>
+          <div style="font-weight:700; color:#1E293B; display:flex; align-items:center; gap:6px">
+            <span class="icon sm" style="color:#2563EB">${item.icon}</span>
+            <span>${escapeHtml(conf.documentName || item.name)}</span>
+          </div>
+          <div style="font-size:11px; color:#64748B; margin-top:2px">
+            <span class="badge-th badge-neutral" style="font-size:10px; padding:1px 6px">${item.badge}</span>
+            <span style="font-family:monospace; margin-left:4px">[id: ${item.id}]</span>
+          </div>
+        </td>
+        <td>
+          <span style="font-family:monospace; font-weight:700; font-size:12.5px; color:#0F172A; background:#EFF6FF; border:1px solid #BFDBFE; padding:3px 8px; border-radius:4px; display:inline-block; word-break:break-word">
+            ${escapeHtml(formattedNos || 'N/A')}
+          </span>
+        </td>
+        <td>
+          <span style="font-family:monospace; font-weight:600; color:#334155">${escapeHtml(conf.revisionNo !== undefined ? String(conf.revisionNo) : '0')}</span>
+        </td>
+        <td>
+          <span style="font-weight:600; color:#334155">${escapeHtml(conf.originator || '-')}</span>
+        </td>
+        <td>
+          <span style="font-family:monospace; color:#475569">${escapeHtml(conf.effectiveDate || '-')}</span>
+        </td>
+        <td style="text-align:center">
+          <button class="btn-th btn-secondary btn-sm" onclick="openDocEditModal('${item.id}')" style="display:inline-flex; align-items:center; gap:4px">
+            <span class="icon sm">edit</span> Edit
+          </button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    renderLivePreviewBox();
+  } catch (err) {
+    console.error('renderDocumentControlSettings error:', err);
+    showDocControlError('Unable to load Document Control settings. Please refresh the page or check the browser console.');
+  }
+}
+
+const renderDocControl = renderDocumentControlSettings;
+
+function renderLivePreviewBox() {
+  try {
+    const selEl = document.getElementById('sel-preview-doc');
+    const selectedId = selEl ? selEl.value : 'attendance';
+    const conf = (currentDocControlData && currentDocControlData[selectedId]) ? currentDocControlData[selectedId] : {
+      documentName: 'Training Attendance List',
+      documentNos: ['S-HRS-FM-009'],
+      revisionNo: '0',
+      originator: 'Arina Binti Ismail',
+      effectiveDate: '01.09.2026'
+    };
+
+    const container = document.getElementById('iso-preview-container');
+    if (!container) return;
+
+    const docNos = Array.isArray(conf.documentNos) ? conf.documentNos : (conf.documentNo ? [conf.documentNo] : []);
+    const formattedNos = formatDocumentNumbers(docNos);
+    const isMultiLine = formattedNos.length > 28;
+
+    const rev = escapeHtml(conf.revisionNo !== undefined ? String(conf.revisionNo) : '0');
+    const orig = escapeHtml(conf.originator || '-');
+    const date = escapeHtml(conf.effectiveDate || '-');
+    const docNoStr = escapeHtml(formattedNos || 'N/A');
+    const docNameStr = escapeHtml(conf.documentName || 'Controlled Document');
+
+    let rowsHtml = '';
+    if (isMultiLine) {
+      rowsHtml = `
+        <tr>
+          <td style="border:none; padding:7px 12px; width:22%; white-space:nowrap">
+            <span style="color:#64748B">Revision No:</span> <strong style="color:#0F172A">${rev}</strong>
+          </td>
+          <td style="border:none; padding:7px 12px; width:48%">
+            <span style="color:#64748B">Originator:</span> <strong style="color:#0F172A">${orig}</strong>
+          </td>
+          <td style="border:none; padding:7px 12px; width:30%; white-space:nowrap">
+            <span style="color:#64748B">Effective Date:</span> <strong style="color:#0F172A">${date}</strong>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="3" style="border:none; padding:7px 12px; word-break:break-word">
+            <span style="color:#64748B">Doc. No.:</span> <strong style="color:#0F172A">${docNoStr}</strong>
+          </td>
+        </tr>
+      `;
+    } else {
+      rowsHtml = `
+        <tr>
+          <td style="border:none; padding:7px 12px; width:18%; white-space:nowrap">
+            <span style="color:#64748B">Revision No:</span> <strong style="color:#0F172A">${rev}</strong>
+          </td>
+          <td style="border:none; padding:7px 12px; width:34%">
+            <span style="color:#64748B">Originator:</span> <strong style="color:#0F172A">${orig}</strong>
+          </td>
+          <td style="border:none; padding:7px 12px; width:22%; white-space:nowrap">
+            <span style="color:#64748B">Effective Date:</span> <strong style="color:#0F172A">${date}</strong>
+          </td>
+          <td style="border:none; padding:7px 12px; width:26%; word-break:break-word">
+            <span style="color:#64748B">Doc. No.:</span> <strong style="color:#0F172A">${docNoStr}</strong>
+          </td>
+        </tr>
+      `;
+    }
+
+    container.innerHTML = `
+      <div style="font-size:11px; color:#64748B; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center">
+        <span><strong>${docNameStr}</strong> &mdash; ISO Document Control Box (Bottom of Final PDF Page)</span>
+        <span class="badge-th badge-success" style="font-size:10px">Standardized Layout</span>
+      </div>
+      <table style="width:100%; border-collapse:collapse; border:1.5px solid #1E293B; font-family:Arial, sans-serif; font-size:11px; background:#FFF">
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+      </table>
+    `;
+  } catch (e) {
+    console.error('renderLivePreviewBox error:', e);
+  }
+}
+
+function addDocNoInputRow(val) {
+  const container = document.getElementById('doc-nos-container');
+  if (!container) return;
+  const row = document.createElement('div');
+  row.className = 'doc-no-row';
+  row.style.cssText = 'display:flex; gap:8px; align-items:center;';
+  row.innerHTML = `
+    <div style="flex:1">
+      <input type="text" class="input-th doc-no-input" style="font-family:monospace; font-weight:700" placeholder="e.g. S-HRS-FM-009" value="${escapeHtml(val || '')}" oninput="onModalFieldChange()" required>
+    </div>
+    <button type="button" class="btn-th btn-secondary btn-sm" onclick="removeDocNoInputRow(this)" style="color:#EF4444; border-color:#FECACA; padding:8px 12px;" title="Remove this document number">
+      <span class="icon sm" style="font-size:14px">delete</span> Remove
+    </button>
+  `;
+  container.appendChild(row);
+  onModalFieldChange();
+}
+
+function removeDocNoInputRow(btn) {
+  const container = document.getElementById('doc-nos-container');
+  if (!container) return;
+  const rows = container.querySelectorAll('.doc-no-row');
+  if (rows.length <= 1) {
+    showToast('At least one Document Number is required.', 'error');
+    return;
+  }
+  const row = btn ? btn.closest('.doc-no-row') : null;
+  if (row) {
+    row.remove();
+    onModalFieldChange();
+  }
+}
+
+function getModalDocumentNos() {
+  const container = document.getElementById('doc-nos-container');
+  if (!container) return [];
+  const inputs = Array.from(container.querySelectorAll('.doc-no-input'));
+  return inputs.map(i => i.value.trim()).filter(v => v.length > 0);
+}
+
+function openDocEditModal(id) {
+  if (!currentDocControlData || !currentDocControlData[id]) return;
+  const item = currentDocControlData[id];
+
+  const editId = document.getElementById('edit-doc-id');
+  const editName = document.getElementById('edit-doc-name');
+  const editRev = document.getElementById('edit-doc-rev');
+  const editOrig = document.getElementById('edit-doc-originator');
+  const editDate = document.getElementById('edit-doc-date');
+  if (editId) editId.value = id;
+  if (editName) editName.value = item.documentName || '';
+  if (editRev) editRev.value = item.revisionNo !== undefined ? item.revisionNo : '0';
+  if (editOrig) editOrig.value = item.originator || '';
+  if (editDate) editDate.value = item.effectiveDate || '';
+
+  const container = document.getElementById('doc-nos-container');
+  if (container) {
+    container.innerHTML = '';
+    const nos = Array.isArray(item.documentNos) && item.documentNos.length > 0
+      ? item.documentNos
+      : (item.documentNo ? [item.documentNo] : ['']);
+    nos.forEach(no => addDocNoInputRow(no));
+  }
+
+  const titleEl = document.getElementById('modal-doc-title');
+  const intIdEl = document.getElementById('modal-doc-internal-id');
+  if (titleEl) titleEl.textContent = `Edit Document Control: ${item.documentName || id}`;
+  if (intIdEl) intIdEl.textContent = `Permanent Internal ID: ${id}`;
+
+  onModalFieldChange();
+  const modal = document.getElementById('modal-edit-doc-control');
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeDocEditModal() {
+  const modal = document.getElementById('modal-edit-doc-control');
+  if (modal) modal.style.display = 'none';
+}
+
+function onModalFieldChange() {
+  const revEl = document.getElementById('edit-doc-rev');
+  const origEl = document.getElementById('edit-doc-originator');
+  const dateEl = document.getElementById('edit-doc-date');
+  const rev = revEl ? revEl.value || '0' : '0';
+  const orig = origEl ? origEl.value || '-' : '-';
+  const date = dateEl ? dateEl.value || '-' : '-';
+  
+  const nos = getModalDocumentNos();
+  const formattedNos = formatDocumentNumbers(nos.length > 0 ? nos : ['-']);
+  const isMultiLine = formattedNos.length > 28;
+
+  const box = document.getElementById('modal-live-preview-box');
+  if (!box) return;
+
+  let rowsHtml = '';
+  if (isMultiLine) {
+    rowsHtml = `
+      <tr>
+        <td style="border:none; padding:5px 8px; width:22%; white-space:nowrap">
+          <span style="color:#64748B">Revision No:</span> <strong style="color:#0F172A">${escapeHtml(rev)}</strong>
+        </td>
+        <td style="border:none; padding:5px 8px; width:48%">
+          <span style="color:#64748B">Originator:</span> <strong style="color:#0F172A">${escapeHtml(orig)}</strong>
+        </td>
+        <td style="border:none; padding:5px 8px; width:30%; white-space:nowrap">
+          <span style="color:#64748B">Effective Date:</span> <strong style="color:#0F172A">${escapeHtml(date)}</strong>
+        </td>
+      </tr>
+      <tr>
+        <td colspan="3" style="border:none; padding:5px 8px; word-break:break-word">
+          <span style="color:#64748B">Doc. No.:</span> <strong style="color:#0F172A">${escapeHtml(formattedNos)}</strong>
+        </td>
+      </tr>
+    `;
+  } else {
+    rowsHtml = `
+      <tr>
+        <td style="border:none; padding:5px 8px; width:18%; white-space:nowrap">
+          <span style="color:#64748B">Revision No:</span> <strong style="color:#0F172A">${escapeHtml(rev)}</strong>
+        </td>
+        <td style="border:none; padding:5px 8px; width:34%">
+          <span style="color:#64748B">Originator:</span> <strong style="color:#0F172A">${escapeHtml(orig)}</strong>
+        </td>
+        <td style="border:none; padding:5px 8px; width:22%; white-space:nowrap">
+          <span style="color:#64748B">Effective Date:</span> <strong style="color:#0F172A">${escapeHtml(date)}</strong>
+        </td>
+        <td style="border:none; padding:5px 8px; width:26%; word-break:break-word">
+          <span style="color:#64748B">Doc. No.:</span> <strong style="color:#0F172A">${escapeHtml(formattedNos)}</strong>
+        </td>
+      </tr>
+    `;
+  }
+
+  box.innerHTML = `
+    <table style="width:100%; border-collapse:collapse; border:1.5px solid #1E293B; font-family:Arial, sans-serif; font-size:10px; background:#FFF">
+      <tbody>
+        ${rowsHtml}
+      </tbody>
+    </table>
+  `;
+}
+
+async function saveDocEditModal() {
+  const idEl = document.getElementById('edit-doc-id');
+  const nameEl = document.getElementById('edit-doc-name');
+  const revEl = document.getElementById('edit-doc-rev');
+  const origEl = document.getElementById('edit-doc-originator');
+  const dateEl = document.getElementById('edit-doc-date');
+  if (!idEl || !nameEl) return;
+
+  const id = idEl.value;
+  const name = nameEl.value.trim();
+  const rev = revEl ? revEl.value.trim() : '0';
+  const orig = origEl ? origEl.value.trim() : '';
+  const date = dateEl ? dateEl.value.trim() : '';
+
+  const container = document.getElementById('doc-nos-container');
+  const inputs = container ? Array.from(container.querySelectorAll('.doc-no-input')) : [];
+  const docNos = [];
+  const seen = new Set();
+
+  for (const inp of inputs) {
+    const val = inp.value.trim();
+    if (!val) continue;
+    const lower = val.toLowerCase();
+    if (seen.has(lower)) {
+      showToast('Duplicate document numbers are not allowed.', 'error');
+      inp.focus();
+      return;
+    }
+    seen.add(lower);
+    docNos.push(val);
+  }
+
+  if (docNos.length === 0) {
+    showToast('Please provide at least one Document Number.', 'error');
+    return;
+  }
+
+  if (!name || rev === '' || !orig || !date) {
+    showToast('Please complete all required document control fields.', 'error');
+    return;
+  }
+
+  if (!currentDocControlData) currentDocControlData = {};
+  currentDocControlData[id] = {
+    documentName: name,
+    documentNos: docNos,
+    documentNo: formatDocumentNumbers(docNos),
+    revisionNo: rev,
+    originator: orig,
+    effectiveDate: date
+  };
+
+  try {
+    showLoadingOverlay('Saving Document Control settings...');
+    const res = await callServer('saveDocumentControlSettings', currentDocControlData);
+    hideLoadingOverlay();
+    const savedData = (res && res.data) ? res.data : res;
+    currentDocControlData = savedData;
+    closeDocEditModal();
+    renderDocControl(currentDocControlData);
+    showToast('Document control settings saved successfully!', 'success');
+  } catch(e) {
+    hideLoadingOverlay();
+    showToast('Save error: ' + e.message, 'error');
+  }
+}
+
+async function saveAllDocControlSettings() {
+  if (!currentDocControlData) {
+    showToast('No document control settings loaded.', 'error');
+    return;
+  }
+  try {
+    showLoadingOverlay('Saving Document Control settings...');
+    const res = await callServer('saveDocumentControlSettings', currentDocControlData);
+    hideLoadingOverlay();
+    const savedData = (res && res.data) ? res.data : res;
+    currentDocControlData = savedData;
+    renderDocControl(currentDocControlData);
+    showToast('Document control settings saved successfully.', 'success');
+  } catch(e) {
+    hideLoadingOverlay();
+    showToast('Save error: ' + e.message, 'error');
+  }
+}
+
+// Auto-initialize document control settings if on settings page
+onReady(() => {
+  const isSettings = (window.__TRAINHUB_PAGE__ === 'settings') || 
+                     (window.location && window.location.search && window.location.search.includes('page=settings')) ||
+                     !!document.getElementById('section-doc-control');
+  if (isSettings) {
+    loadDocumentControlSettings();
+  }
+});
+
+// Explicit global window bindings
+window.switchSettingsTab = switchSettingsTab;
+window.loadDocumentControlSettings = loadDocumentControlSettings;
+window.renderDocumentControlSettings = renderDocumentControlSettings;
+window.renderDocControl = renderDocControl;
+window.renderLivePreviewBox = renderLivePreviewBox;
+window.addDocNoInputRow = addDocNoInputRow;
+window.removeDocNoInputRow = removeDocNoInputRow;
+window.getModalDocumentNos = getModalDocumentNos;
+window.openDocEditModal = openDocEditModal;
+window.closeDocEditModal = closeDocEditModal;
+window.onModalFieldChange = onModalFieldChange;
+window.saveDocEditModal = saveDocEditModal;
+window.saveAllDocControlSettings = saveAllDocControlSettings;
+
 console.log("=== APOLLO SCRIPT.HTML COMPLETE ===");
 </script>

@@ -16,6 +16,10 @@ function doGet(e) {
       template.systemLogoUrl = '';
     }
 
+    const docInfo = (typeof getDocumentControlInfo === 'function') ? getDocumentControlInfo('training-request') : null;
+    template.docNo = (docInfo && docInfo.documentNo) ? docInfo.documentNo : 'S-HRS-FM-004';
+    template.docName = (docInfo && docInfo.documentName) ? docInfo.documentName : 'Training Request Form';
+
     return template.evaluate()
       .setTitle(appTitle)
       .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no')

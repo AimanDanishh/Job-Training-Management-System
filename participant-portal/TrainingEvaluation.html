@@ -42,7 +42,7 @@
       <div>
         <span class="badge-pillar" id="badge-eval">TRAINING EVALUATION FORM</span>
       </div>
-      <div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin:4px 0 6px;letter-spacing:0.3px;">Document No.: S-HRS-FM-006</div>
+      <div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin:4px 0 6px;letter-spacing:0.3px;">Document No.: <?= (typeof docNo !== 'undefined' && docNo) ? docNo : 'S-HRS-FM-006' ?></div>
       <h1 class="portal-title" id="txt-eval-title">Loading Training...</h1>
       <p class="portal-subtitle" id="txt-eval-sub">Programme Evaluation Form</p>
     </div>

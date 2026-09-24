@@ -54,6 +54,12 @@ function doGet(e) {
     template.participantPortalUrl = String(getParticipantPortalUrl() || '');
     template.appUrl = String(getAppUrl() || '');
 
+    const reqDoc = (typeof getDocumentControlInfo === 'function') ? getDocumentControlInfo('training-request') : null;
+    const evalDoc = (typeof getDocumentControlInfo === 'function') ? getDocumentControlInfo('evaluation') : null;
+    template.reqDocNo = (reqDoc && reqDoc.documentNo) ? reqDoc.documentNo : 'S-HRS-FM-004';
+    template.evalDocNo = (evalDoc && evalDoc.documentNo) ? evalDoc.documentNo : 'S-HRS-FM-006';
+    template.docNo = (pageParam === 'posteval') ? template.evalDocNo : template.reqDocNo;
+
     return template.evaluate()
       .setTitle(appTitle)
       .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no')

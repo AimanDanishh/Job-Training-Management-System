@@ -527,11 +527,6 @@ function getAttendedParticipantsForPostEval(trainingId) {
           attColor = 'red';
           attCode = 'ABSENT';
           hasAttended = false;
-        } else if (lower === 'late' || lower === 'partial' || lower === 'partial attendance') {
-          attStatusText = 'Late / Partial';
-          attColor = 'yellow';
-          attCode = 'PARTIAL';
-          hasAttended = true;
         } else {
           attStatusText = 'Attended';
           attColor = 'green';
@@ -621,8 +616,6 @@ function getAttendedParticipantsForPostEval(trainingId) {
               const lower = rawStatus.toLowerCase();
               if (lower === 'absent' || lower === 'did not attend' || lower === 'not attend') {
                 attStatusText = 'Did Not Attend'; attColor = 'red'; attCode = 'ABSENT'; hasAttended = false;
-              } else if (lower === 'late' || lower === 'partial' || lower === 'partial attendance') {
-                attStatusText = 'Late / Partial'; attColor = 'yellow'; attCode = 'PARTIAL'; hasAttended = true;
               } else {
                 attStatusText = 'Attended'; attColor = 'green'; attCode = 'ATTENDED'; hasAttended = true;
               }

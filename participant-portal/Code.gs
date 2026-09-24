@@ -34,6 +34,16 @@ function doGet(e) {
     template.evaluatorId = (typeof cleanEvaluatorInput === 'function') ? cleanEvaluatorInput(rawEvalId) : rawEvalId.replace(/^["']+|["']+$/g, '').trim();
     if (template.evaluatorId === 'undefined' || template.evaluatorId === 'null') template.evaluatorId = '';
 
+    const docControlMap = {
+      'attendance': 'attendance',
+      'evaluation': 'evaluation',
+      'post': 'evaluation'
+    };
+    const docKey = docControlMap[modeParam] || 'attendance';
+    const docInfo = (typeof getDocumentControlInfo === 'function') ? getDocumentControlInfo(docKey) : null;
+    template.docNo = (docInfo && docInfo.documentNo) ? docInfo.documentNo : (docKey === 'attendance' ? 'S-HRS-FM-009' : 'S-HRS-FM-006');
+    template.docName = (docInfo && docInfo.documentName) ? docInfo.documentName : '';
+
     template.trainingName = '';
     template.trainingCode = template.trainingId || '';
     if (template.trainingId) {

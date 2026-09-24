@@ -195,7 +195,8 @@ function getSettingsData() {
     adminEmails: getConfigProperty('ADMIN_EMAILS', ''),
     companyLogoUrl: getConfigProperty('COMPANY_LOGO_URL', ''),
     systemLogoUrl: getConfigProperty('SYSTEM_LOGO_URL', ''),
-    appTitle: getConfigProperty('APP_TITLE', '')
+    appTitle: getConfigProperty('APP_TITLE', ''),
+    documentControl: getDocumentControlSettings()
   });
 }
 
